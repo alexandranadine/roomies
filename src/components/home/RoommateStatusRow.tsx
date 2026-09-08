@@ -20,7 +20,7 @@ export function RoommateStatusRow({ roommates }: RoommateStatusRowProps) {
         {roommates.map((roommate) => (
           <article
             key={roommate.id}
-            className="flex w-[4.6rem] shrink-0 flex-col items-center gap-1.5 text-center"
+            className="flex w-[4.75rem] shrink-0 flex-col items-center gap-1 text-center"
           >
             <div className="relative">
               <Avatar

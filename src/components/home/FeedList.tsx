@@ -439,7 +439,7 @@ export function FeedItemCard({ item }: { item: FeedItem }) {
 
 export function FeedList({ items }: FeedListProps) {
   return (
-    <section className="px-4 pb-28" aria-label="Household feed">
+    <section className="px-4 pb-24" aria-label="Household feed">
       <div className="space-y-3">
         {items.map((item) => (
           <FeedItemCard key={item.id} item={item} />

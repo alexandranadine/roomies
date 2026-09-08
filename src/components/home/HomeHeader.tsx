@@ -36,7 +36,7 @@ export function HomeHeader({ household }: HomeHeaderProps) {
           className="relative inline-flex h-10 w-10 items-center justify-center rounded-full text-[var(--color-espresso)] transition-colors hover:bg-[var(--color-cream-deep)]"
         >
           <BellIcon size={22} />
-          <span className="absolute top-1 right-1 inline-flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-[var(--color-danger)] px-1 text-[10px] font-bold text-white">
+          <span className="absolute top-1.5 right-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--color-danger)] px-1 text-[10px] leading-none font-bold text-white">
             {household.notificationCount}
           </span>
         </button>

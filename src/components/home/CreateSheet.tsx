@@ -47,7 +47,7 @@ export function CreateSheet({
         role="dialog"
         aria-modal="true"
         aria-label="Create something"
-        className="relative w-full rounded-t-[22px] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 pt-3 pb-6 shadow-[0_-8px_30px_rgb(44_36_27_/_0.12)]"
+        className="relative max-h-[min(82dvh,640px)] w-full overflow-y-auto rounded-t-[22px] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 pt-3 pb-6 shadow-[0_-8px_30px_rgb(44_36_27_/_0.12)]"
       >
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[var(--color-border)]" />
         <div className="mb-3 flex items-center justify-between">
