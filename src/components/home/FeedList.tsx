@@ -27,7 +27,7 @@ function ReactionRow({
   if (!reactions?.length) return null
 
   return (
-    <div className="mt-3 flex items-center gap-3 text-[var(--color-ink-muted)]">
+    <div className="mt-2.5 flex items-center gap-3 text-[var(--color-ink-muted)]">
       {reactions.map((reaction) => {
         const Icon = reaction.type === 'heart' ? HeartIcon : CommentIcon
         const show = reaction.type === 'comment' ? Boolean(allowComments) : true
@@ -61,7 +61,7 @@ function FeedCardShell({
   menuLabel?: string
 }) {
   return (
-    <article className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3.5 shadow-[var(--shadow-soft)]">
+    <article className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3 shadow-[var(--shadow-soft)]">
       <div className="relative">
         <button
           type="button"
@@ -172,7 +172,7 @@ function SupplyFeedItemView({
               {item.timestamp}
             </span>
           </div>
-          <div className="mt-2.5 flex items-center justify-between gap-3 rounded-[12px] border border-[var(--color-border-soft)] bg-[var(--color-cream)] px-3 py-2.5">
+          <div className="mt-2 flex items-center justify-between gap-3 rounded-[12px] border border-[var(--color-border-soft)] bg-[var(--color-cream)] px-3 py-2">
             <div>
               <p className="text-sm font-medium text-[var(--color-espresso)]">
                 {item.itemName}
@@ -269,7 +269,7 @@ function EventFeedItemView({
               {item.body}
             </p>
           ) : null}
-          <div className="mt-3 flex items-center justify-between gap-3">
+          <div className="mt-2.5 flex items-center justify-between gap-3">
             <div className="flex items-center">
               <span className="mr-2 text-xs font-medium text-[var(--color-ink-muted)]">
                 Who’s in?
@@ -327,12 +327,12 @@ function PollFeedItemView({
               {item.body}
             </p>
           ) : null}
-          <div className="mt-2.5 space-y-1.5">
+          <div className="mt-2 space-y-1.5">
             {item.options.map((option) => (
               <button
                 key={option}
                 type="button"
-                className="flex w-full items-center justify-between rounded-[12px] border border-[var(--color-border)] bg-[var(--color-cream)] px-3 py-2 text-left text-sm font-medium text-[var(--color-espresso)] transition-colors hover:bg-[var(--color-cream-deep)]"
+                className="flex w-full items-center justify-between rounded-[12px] border border-[var(--color-border)] bg-[var(--color-cream)] px-3 py-1.5 text-left text-sm font-medium text-[var(--color-espresso)] transition-colors hover:bg-[var(--color-cream-deep)]"
               >
                 <span>{option}</span>
               </button>

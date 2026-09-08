@@ -15,12 +15,12 @@ const statusClass: Record<Roommate['statusTone'], string> = {
 
 export function RoommateStatusRow({ roommates }: RoommateStatusRowProps) {
   return (
-    <section className="px-4 pt-1 pb-3" aria-label="Roommate status">
-      <div className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <section className="px-4 pt-1 pb-2.5" aria-label="Roommate status">
+      <div className="-mx-1 flex gap-1.5 overflow-x-auto overscroll-x-contain px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {roommates.map((roommate) => (
           <article
             key={roommate.id}
-            className="flex w-[4.75rem] shrink-0 flex-col items-center gap-1 text-center"
+            className="flex w-[4.85rem] shrink-0 flex-col items-center gap-1 text-center"
           >
             <div className="relative">
               <Avatar

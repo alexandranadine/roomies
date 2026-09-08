@@ -7,22 +7,22 @@ type HomeHeaderProps = {
 
 export function HomeHeader({ household }: HomeHeaderProps) {
   return (
-    <header className="flex items-start justify-between gap-3 px-4 pt-4 pb-2">
+    <header className="flex items-start justify-between gap-3 px-4 pt-5 pb-3">
       <div className="min-w-0">
         <h1 className="text-[1.75rem] leading-none font-extrabold tracking-tight text-[var(--color-espresso)]">
           {household.brand}
         </h1>
         <button
           type="button"
-          className="mt-2 inline-flex items-center gap-1.5 rounded-lg text-sm font-medium text-[var(--color-ink-muted)] transition-colors hover:text-[var(--color-espresso)]"
+          className="mt-2.5 inline-flex max-w-full items-center gap-1.5 rounded-lg text-sm font-medium text-[var(--color-ink-muted)] transition-colors hover:text-[var(--color-espresso)]"
         >
-          <HouseIcon size={15} className="text-[var(--color-sage)]" />
-          <span>{household.name}</span>
-          <ChevronDownIcon size={14} />
+          <HouseIcon size={15} className="shrink-0 text-[var(--color-sage)]" />
+          <span className="truncate">{household.name}</span>
+          <ChevronDownIcon size={14} className="shrink-0" />
         </button>
       </div>
 
-      <div className="flex items-center gap-1.5 pt-1">
+      <div className="flex shrink-0 items-center gap-1 pt-0.5">
         <button
           type="button"
           aria-label="Open chat"
