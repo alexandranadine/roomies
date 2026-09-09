@@ -1,0 +1,6 @@
+{
+  "name": "@roomies/backend",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Roomies Node/Express modular monolith backend"
+}
