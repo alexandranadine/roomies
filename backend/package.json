@@ -7,6 +7,6 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
-    "@types/node": "^22.18.0"
+    "@types/node": "^24.13.3"
   }
 }

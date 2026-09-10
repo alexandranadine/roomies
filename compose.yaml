@@ -1,0 +1,26 @@
+# Local development PostgreSQL only. Not for production, staging, or Neon.
+services:
+  roomies-postgres:
+    image: postgres:18
+    container_name: roomies-postgres
+    environment:
+      POSTGRES_DB: roomies
+      POSTGRES_USER: roomies
+      # Local development credentials only — never reuse in deployed environments.
+      POSTGRES_PASSWORD: roomies_dev_only
+    ports:
+      - '127.0.0.1:5432:5432'
+    volumes:
+      # PG 18+ expects the volume at /var/lib/postgresql (not .../data).
+      - roomies_pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U roomies -d roomies']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  roomies_pgdata:
+    name: roomies_pgdata
