@@ -1,0 +1,543 @@
+[
+  {
+    "id": "table.auth_accounts",
+    "label": "Create table \"auth_accounts\"",
+    "summary": "Creates table \"auth_accounts\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "auth_accounts"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"auth_accounts\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"auth_accounts\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"auth_accounts\"",
+        "sql": "CREATE TABLE \"public\".\"auth_accounts\" (\n  \"access_token\" text,\n  \"access_token_expires_at\" timestamptz,\n  \"account_id\" text NOT NULL,\n  \"created_at\" timestamptz DEFAULT (now()) NOT NULL,\n  \"id\" uuid DEFAULT (gen_random_uuid()) NOT NULL,\n  \"id_token\" text,\n  \"password\" text,\n  \"provider_id\" text NOT NULL,\n  \"refresh_token\" text,\n  \"refresh_token_expires_at\" timestamptz,\n  \"scope\" text,\n  \"updated_at\" timestamptz DEFAULT (now()) NOT NULL,\n  \"user_id\" uuid NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"auth_accounts\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"auth_accounts\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.auth_identities",
+    "label": "Create table \"auth_identities\"",
+    "summary": "Creates table \"auth_identities\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "auth_identities"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"auth_identities\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"auth_identities\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"auth_identities\"",
+        "sql": "CREATE TABLE \"public\".\"auth_identities\" (\n  \"created_at\" timestamptz DEFAULT (now()) NOT NULL,\n  \"email\" text NOT NULL,\n  \"email_verified\" bool DEFAULT false NOT NULL,\n  \"id\" uuid DEFAULT (gen_random_uuid()) NOT NULL,\n  \"image\" text,\n  \"name\" text NOT NULL,\n  \"updated_at\" timestamptz DEFAULT (now()) NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"auth_identities\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"auth_identities\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.auth_sessions",
+    "label": "Create table \"auth_sessions\"",
+    "summary": "Creates table \"auth_sessions\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "auth_sessions"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"auth_sessions\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"auth_sessions\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"auth_sessions\"",
+        "sql": "CREATE TABLE \"public\".\"auth_sessions\" (\n  \"created_at\" timestamptz DEFAULT (now()) NOT NULL,\n  \"expires_at\" timestamptz NOT NULL,\n  \"id\" uuid DEFAULT (gen_random_uuid()) NOT NULL,\n  \"ip_address\" text,\n  \"token\" text NOT NULL,\n  \"updated_at\" timestamptz DEFAULT (now()) NOT NULL,\n  \"user_agent\" text,\n  \"user_id\" uuid NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"auth_sessions\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"auth_sessions\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.auth_verifications",
+    "label": "Create table \"auth_verifications\"",
+    "summary": "Creates table \"auth_verifications\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "auth_verifications"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"auth_verifications\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"auth_verifications\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"auth_verifications\"",
+        "sql": "CREATE TABLE \"public\".\"auth_verifications\" (\n  \"created_at\" timestamptz DEFAULT (now()) NOT NULL,\n  \"expires_at\" timestamptz NOT NULL,\n  \"id\" uuid DEFAULT (gen_random_uuid()) NOT NULL,\n  \"identifier\" text NOT NULL,\n  \"updated_at\" timestamptz DEFAULT (now()) NOT NULL,\n  \"value\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"auth_verifications\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"auth_verifications\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "function.public.provision_user_for_auth_identity",
+    "label": "Create auth identity canonical User provisioning function",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [
+      {
+        "description": "ensure provisioning function does not exist",
+        "sql": "SELECT to_regprocedure($1) IS NULL AS \"result\"",
+        "params": [
+          "public.provision_user_for_auth_identity()"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create canonical User provisioning function",
+        "sql": "CREATE FUNCTION public.provision_user_for_auth_identity()\nRETURNS trigger\nLANGUAGE plpgsql\nSECURITY INVOKER\nSET search_path = pg_catalog\nAS $function$\nBEGIN\n  INSERT INTO public.users (id, updated_at)\n  VALUES (NEW.id, CURRENT_TIMESTAMP);\n\n  RETURN NEW;\nEND;\n$function$",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify canonical User provisioning function contract",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM pg_catalog.pg_proc AS p\n  INNER JOIN pg_catalog.pg_namespace AS n ON n.oid = p.pronamespace\n  INNER JOIN pg_catalog.pg_language AS l ON l.oid = p.prolang\n  WHERE n.nspname = 'public'\n    AND p.proname = 'provision_user_for_auth_identity'\n    AND p.pronargs = 0\n    AND p.prorettype = 'pg_catalog.trigger'::pg_catalog.regtype\n    AND p.prosecdef = false\n    AND l.lanname = 'plpgsql'\n    AND COALESCE(p.proconfig, ARRAY[]::text[]) @> ARRAY['search_path=pg_catalog']\n    AND POSITION(\n      'insert into public.users (id, updated_at) values (new.id, current_timestamp);'\n      IN pg_catalog.regexp_replace(pg_catalog.lower(p.prosrc), '[[:space:]]+', ' ', 'g')\n    ) > 0\n    AND POSITION(\n      'return new;'\n      IN pg_catalog.regexp_replace(pg_catalog.lower(p.prosrc), '[[:space:]]+', ' ', 'g')\n    ) > 0\n    AND POSITION('on conflict' IN pg_catalog.lower(p.prosrc)) = 0\n    AND POSITION('exception' IN pg_catalog.lower(p.prosrc)) = 0\n) AS \"result\"",
+        "params": []
+      }
+    ]
+  },
+  {
+    "id": "trigger.public.auth_identities.auth_identities_provision_user",
+    "label": "Create auth identity canonical User provisioning trigger",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [
+      {
+        "description": "ensure trigger is absent and provisioning function exists",
+        "sql": "SELECT (\n  to_regprocedure($1) IS NOT NULL\n  AND NOT EXISTS (\n    SELECT 1\n    FROM pg_catalog.pg_trigger AS t\n    WHERE t.tgrelid = to_regclass($2)\n      AND t.tgname = $3\n  )\n) AS \"result\"",
+        "params": [
+          "public.provision_user_for_auth_identity()",
+          "public.auth_identities",
+          "auth_identities_provision_user"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create canonical User provisioning trigger",
+        "sql": "CREATE TRIGGER auth_identities_provision_user\nBEFORE INSERT\nON public.auth_identities\nFOR EACH ROW\nEXECUTE FUNCTION public.provision_user_for_auth_identity()",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify provisioning trigger catalog contract",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM pg_catalog.pg_trigger AS t\n  WHERE t.tgrelid = to_regclass('public.auth_identities')\n    AND t.tgname = 'auth_identities_provision_user'\n    AND t.tgenabled = 'O'\n    AND t.tgisinternal = false\n    AND t.tgtype = 7\n    AND t.tgfoid = to_regprocedure('public.provision_user_for_auth_identity()')\n) AS \"result\"",
+        "params": []
+      }
+    ]
+  },
+  {
+    "id": "index.auth_accounts.auth_accounts_user_id_idx_6c952402",
+    "label": "Create index \"auth_accounts_user_id_idx_6c952402\" on \"auth_accounts\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "auth_accounts_user_id_idx_6c952402",
+        "table": "auth_accounts"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"auth_accounts_user_id_idx_6c952402\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"auth_accounts_user_id_idx_6c952402\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"auth_accounts_user_id_idx_6c952402\"",
+        "sql": "CREATE INDEX \"auth_accounts_user_id_idx_6c952402\" ON \"public\".\"auth_accounts\" (\"user_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"auth_accounts_user_id_idx_6c952402\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"auth_accounts_user_id_idx_6c952402\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.auth_identities.auth_identities_email_uidx_34912d96",
+    "label": "Create index \"auth_identities_email_uidx_34912d96\" on \"auth_identities\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "auth_identities_email_uidx_34912d96",
+        "table": "auth_identities"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"auth_identities_email_uidx_34912d96\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"auth_identities_email_uidx_34912d96\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"auth_identities_email_uidx_34912d96\"",
+        "sql": "CREATE UNIQUE INDEX \"auth_identities_email_uidx_34912d96\" ON \"public\".\"auth_identities\" (\"email\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"auth_identities_email_uidx_34912d96\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"auth_identities_email_uidx_34912d96\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.auth_sessions.auth_sessions_token_uidx_62c1af9d",
+    "label": "Create index \"auth_sessions_token_uidx_62c1af9d\" on \"auth_sessions\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "auth_sessions_token_uidx_62c1af9d",
+        "table": "auth_sessions"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"auth_sessions_token_uidx_62c1af9d\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"auth_sessions_token_uidx_62c1af9d\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"auth_sessions_token_uidx_62c1af9d\"",
+        "sql": "CREATE UNIQUE INDEX \"auth_sessions_token_uidx_62c1af9d\" ON \"public\".\"auth_sessions\" (\"token\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"auth_sessions_token_uidx_62c1af9d\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"auth_sessions_token_uidx_62c1af9d\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.auth_sessions.auth_sessions_user_id_idx_6c952402",
+    "label": "Create index \"auth_sessions_user_id_idx_6c952402\" on \"auth_sessions\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "auth_sessions_user_id_idx_6c952402",
+        "table": "auth_sessions"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"auth_sessions_user_id_idx_6c952402\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"auth_sessions_user_id_idx_6c952402\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"auth_sessions_user_id_idx_6c952402\"",
+        "sql": "CREATE INDEX \"auth_sessions_user_id_idx_6c952402\" ON \"public\".\"auth_sessions\" (\"user_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"auth_sessions_user_id_idx_6c952402\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"auth_sessions_user_id_idx_6c952402\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.auth_verifications.auth_verifications_identifier_idx_79a0dbb3",
+    "label": "Create index \"auth_verifications_identifier_idx_79a0dbb3\" on \"auth_verifications\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "auth_verifications_identifier_idx_79a0dbb3",
+        "table": "auth_verifications"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"auth_verifications_identifier_idx_79a0dbb3\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"auth_verifications_identifier_idx_79a0dbb3\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"auth_verifications_identifier_idx_79a0dbb3\"",
+        "sql": "CREATE INDEX \"auth_verifications_identifier_idx_79a0dbb3\" ON \"public\".\"auth_verifications\" (\"identifier\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"auth_verifications_identifier_idx_79a0dbb3\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"auth_verifications_identifier_idx_79a0dbb3\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.auth_accounts.auth_accounts_user_id_fkey",
+    "label": "Add foreign key \"auth_accounts_user_id_fkey\" on \"auth_accounts\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "auth_accounts_user_id_fkey",
+        "table": "auth_accounts"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"auth_accounts_user_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "auth_accounts_user_id_fkey",
+          "public",
+          "\"public\".\"auth_accounts\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"auth_accounts_user_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"auth_accounts\"\nADD CONSTRAINT \"auth_accounts_user_id_fkey\"\nFOREIGN KEY (\"user_id\")\nREFERENCES \"public\".\"auth_identities\" (\"id\")\nON DELETE CASCADE\nON UPDATE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"auth_accounts_user_id_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "auth_accounts_user_id_fkey",
+          "public",
+          "\"public\".\"auth_accounts\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.auth_identities.auth_identities_id_fkey",
+    "label": "Add foreign key \"auth_identities_id_fkey\" on \"auth_identities\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "auth_identities_id_fkey",
+        "table": "auth_identities"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"auth_identities_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "auth_identities_id_fkey",
+          "public",
+          "\"public\".\"auth_identities\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"auth_identities_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"auth_identities\"\nADD CONSTRAINT \"auth_identities_id_fkey\"\nFOREIGN KEY (\"id\")\nREFERENCES \"public\".\"users\" (\"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"auth_identities_id_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "auth_identities_id_fkey",
+          "public",
+          "\"public\".\"auth_identities\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.auth_sessions.auth_sessions_user_id_fkey",
+    "label": "Add foreign key \"auth_sessions_user_id_fkey\" on \"auth_sessions\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "auth_sessions_user_id_fkey",
+        "table": "auth_sessions"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"auth_sessions_user_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "auth_sessions_user_id_fkey",
+          "public",
+          "\"public\".\"auth_sessions\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"auth_sessions_user_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"auth_sessions\"\nADD CONSTRAINT \"auth_sessions_user_id_fkey\"\nFOREIGN KEY (\"user_id\")\nREFERENCES \"public\".\"auth_identities\" (\"id\")\nON DELETE CASCADE\nON UPDATE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"auth_sessions_user_id_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "auth_sessions_user_id_fkey",
+          "public",
+          "\"public\".\"auth_sessions\""
+        ]
+      }
+    ]
+  }
+]

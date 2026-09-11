@@ -24,6 +24,7 @@ import {
   assertSafeTestDatabase,
   resolveTestDatabaseUrl,
 } from '../src/platform/persistence/test-database.js';
+import { verifyAuthPersistence } from './verify-auth-persistence.js';
 
 const backendRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -70,5 +71,8 @@ console.log(
 runPrisma(['migration', 'check'], databaseUrl);
 runPrisma(['db', 'migrate', '--db', databaseUrl, '--yes'], databaseUrl);
 runPrisma(['db', 'verify', '--db', databaseUrl, '--strict'], databaseUrl);
+await verifyAuthPersistence(databaseUrl);
 
-console.log('Fresh-database migration verification passed.');
+console.log(
+  'Fresh-database migration and auth persistence verification passed.',
+);

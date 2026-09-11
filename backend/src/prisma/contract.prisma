@@ -17,6 +17,7 @@ model User {
   createdAt   temporal.createdAt() @map("created_at")
   updatedAt   temporal.updatedAt() @map("updated_at")
   memberships Membership[]
+  authIdentity AuthIdentity?
 
   @@map("users")
 }
@@ -50,4 +51,73 @@ model Membership {
   @@index([homeId], name: "memberships_home_id")
   @@index([userId], name: "memberships_user_id")
   @@map("memberships")
+}
+
+// Better Auth 1.7.4 persistence. Authentication identity/profile data stays
+// separate from the canonical Roomies User and from Home authorization.
+model AuthIdentity {
+  id            Uuid        @id @default(dbgenerated("gen_random_uuid()"))
+  name          String
+  email         String
+  emailVerified Boolean     @default(false) @map("email_verified")
+  image         String?
+  createdAt     Timestamptz @default(now()) @map("created_at")
+  updatedAt     Timestamptz @default(now()) @map("updated_at")
+
+  user     User          @relation(fields: [id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "auth_identities_id_fkey")
+  accounts AuthAccount[]
+  sessions AuthSession[]
+
+  @@index([email], unique: true, name: "auth_identities_email_uidx")
+  @@map("auth_identities")
+}
+
+model AuthAccount {
+  id                    Uuid         @id @default(dbgenerated("gen_random_uuid()"))
+  accountId             String       @map("account_id")
+  providerId            String       @map("provider_id")
+  userId                Uuid         @map("user_id")
+  accessToken           String?      @map("access_token")
+  refreshToken          String?      @map("refresh_token")
+  idToken               String?      @map("id_token")
+  accessTokenExpiresAt  Timestamptz? @map("access_token_expires_at")
+  refreshTokenExpiresAt Timestamptz? @map("refresh_token_expires_at")
+  scope                  String?
+  password               String?
+  createdAt              Timestamptz  @default(now()) @map("created_at")
+  updatedAt              Timestamptz  @default(now()) @map("updated_at")
+
+  user AuthIdentity @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "auth_accounts_user_id_fkey")
+
+  @@index([userId], name: "auth_accounts_user_id_idx")
+  @@map("auth_accounts")
+}
+
+model AuthSession {
+  id        Uuid        @id @default(dbgenerated("gen_random_uuid()"))
+  expiresAt Timestamptz @map("expires_at")
+  token     String
+  createdAt Timestamptz @default(now()) @map("created_at")
+  updatedAt Timestamptz @default(now()) @map("updated_at")
+  ipAddress String?     @map("ip_address")
+  userAgent String?     @map("user_agent")
+  userId    Uuid        @map("user_id")
+
+  user AuthIdentity @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "auth_sessions_user_id_fkey")
+
+  @@index([token], unique: true, name: "auth_sessions_token_uidx")
+  @@index([userId], name: "auth_sessions_user_id_idx")
+  @@map("auth_sessions")
+}
+
+model AuthVerification {
+  id         Uuid        @id @default(dbgenerated("gen_random_uuid()"))
+  identifier String
+  value      String
+  expiresAt  Timestamptz @map("expires_at")
+  createdAt  Timestamptz @default(now()) @map("created_at")
+  updatedAt  Timestamptz @default(now()) @map("updated_at")
+
+  @@index([identifier], name: "auth_verifications_identifier_idx")
+  @@map("auth_verifications")
 }
