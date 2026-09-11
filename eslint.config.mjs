@@ -12,6 +12,10 @@ export default tseslint.config(
       '**/*.tsbuildinfo',
       'coverage/**',
       'package-lock.json',
+      // Prisma 8 generated contract artifacts (re-emitted; do not hand-edit)
+      '**/src/prisma/contract.json',
+      '**/src/prisma/contract.d.ts',
+      '**/migrations/snapshots/**',
     ],
   },
   eslint.configs.recommended,

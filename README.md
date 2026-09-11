@@ -7,7 +7,7 @@ Roomies is a full-stack roommate and home-coordination web application. Implemen
 ```
 roomies/
 ├── frontend/   # React web client
-├── backend/    # Node/Express modular monolith
+├── backend/    # Node/Express modular monolith (+ Prisma 8 persistence)
 ├── shared/     # Shared HTTP contracts/types only (intentionally small)
 └── docs/       # Architecture and implementation documentation
 ```
@@ -24,7 +24,7 @@ Requires Node.js 24+ and npm 10+.
 
 ## Local PostgreSQL
 
-Roomies uses real PostgreSQL for local development (major version **18**). Production will use Neon; that is configured separately. Prisma is not part of this setup yet.
+Roomies uses real PostgreSQL for local development (major version **18**). Production will use Neon; that is configured separately.
 
 **Prerequisites:** Docker Engine with Compose v2 (`docker compose`).
 
@@ -72,3 +72,46 @@ Roomies uses real PostgreSQL for local development (major version **18**). Produ
 | User / password     | `roomies` / `roomies_dev_only`           |
 | Host port           | `127.0.0.1:5432`                         |
 | Volume              | `roomies_pgdata` → `/var/lib/postgresql` |
+
+## Prisma 8 (backend persistence)
+
+Prisma 8 owns the database contract and reviewed migration workflow inside `@roomies/backend`. `shared/` stays environment-neutral and does not import Prisma.
+
+| Piece               | Location                                            |
+| ------------------- | --------------------------------------------------- |
+| Config              | `backend/prisma.config.ts`                          |
+| Contract source     | `backend/src/prisma/contract.prisma` (PSL)          |
+| Generated artifacts | `backend/src/prisma/contract.json`, `contract.d.ts` |
+| Runtime client      | `backend/src/prisma/db.ts`                          |
+| Migrations          | `backend/migrations/` (`app/`, `snapshots/`)        |
+
+Connection uses `DATABASE_URL` from the environment (loaded from the monorepo-root `.env` by Prisma config). Do not hardcode credentials.
+
+### Prisma 8 RC version policy
+
+Prisma 8 is intentionally adopted during its release-candidate period. Until Prisma 8 stable:
+
+- Pin `prisma` and `@prisma/orm-postgres` to **exact** versions (no `^` / `~`).
+- Treat RC upgrades as explicit, reviewed dependency changes — do not bump merely because a newer RC exists.
+- Review migration and contract emit/verify behavior before accepting an RC upgrade.
+- Do not rely on production dependency automation to silently advance Prisma RC versions.
+
+The lockfile plus exact pins are the control mechanism; no extra tooling is required for this. CLI and ORM package RC suffixes may differ; keep the currently validated pair unless a reviewed upgrade changes both intentionally.
+
+### Reviewed migration workflow
+
+1. **Modify the contract** — edit `backend/src/prisma/contract.prisma`.
+2. **Emit the contract** — `npm run db:contract:emit` (or `npm run contract:emit --workspace=@roomies/backend`). Offline; refreshes generated artifacts.
+3. **Plan a migration** — `npm run db:migration:plan -- --name <slug>` (or backend `migration:plan`). Offline; writes a package under `backend/migrations/app/`.
+4. **Inspect / review the migration** — read `migration.ts`, `ops.json`, and the DDL preview before merging.
+5. **Apply the migration** — `npm run db:migrate` (**mutates the database**).
+6. **Verify the database** — `npm run db:verify` (compares marker + live schema to the emitted contract).
+
+Roomies does **not** use the Prisma 7 `migrate dev` workflow, and does **not** use `db push` / direct reconciliation as the normal migration path. Future schema changes go through reviewed `migration plan` artifacts.
+
+Useful non-mutating checks:
+
+- `npm run db:verify --workspace=@roomies/backend -- --schema-only` — connect and check schema against the contract without requiring a Prisma marker (from the monorepo root, use `npm run db:verify -- -- --schema-only` so the flag survives the nested workspace script).
+- `npx prisma db schema` (from `backend/`) — read-only live schema inspection.
+
+Signing / initializing Prisma’s database marker (`db sign`, `db init`) writes Prisma metadata and should be reviewed before first use on a shared database.

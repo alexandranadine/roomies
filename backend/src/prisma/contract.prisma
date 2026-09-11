@@ -1,0 +1,5 @@
+// use prisma-next
+
+// Intentionally empty: Roomies domain tables are introduced later via
+// reviewed Prisma 8 migration packages. Do not add application models here
+// until that migration workflow is in use.

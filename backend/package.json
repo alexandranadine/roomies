@@ -1,12 +1,22 @@
 {
   "name": "@roomies/backend",
+  "type": "module",
   "version": "0.0.0",
   "private": true,
   "description": "Roomies Node/Express modular monolith backend",
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "contract:emit": "prisma contract emit",
+    "migration:plan": "prisma migration plan",
+    "db:migrate": "prisma db migrate",
+    "db:verify": "prisma db verify"
   },
   "devDependencies": {
-    "@types/node": "^24.13.3"
+    "@types/node": "^24.13.3",
+    "prisma": "8.0.0-rc.13"
+  },
+  "dependencies": {
+    "@prisma/orm-postgres": "8.0.0-rc.9",
+    "dotenv": "^17.4.2"
   }
 }
