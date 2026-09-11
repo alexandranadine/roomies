@@ -22,6 +22,24 @@ npm install
 
 Requires Node.js 24+ and npm 10+.
 
+## Frontend
+
+React + Vite shell (`@roomies/frontend`). Feature screens are not built yet.
+
+```bash
+npm run dev --workspace=@roomies/frontend
+npm run build --workspace=@roomies/frontend
+npm run test --workspace=@roomies/frontend
+```
+
+Public env (no secrets in Vite — values are embedded in the client bundle):
+
+| Variable          | Notes                                                                                                                                 |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `VITE_API_ORIGIN` | API origin only. Dev defaults to `http://localhost:3000` if unset; deployed builds require an explicit value (no localhost fallback). |
+
+See `frontend/README.md` and `frontend/.env.example`.
+
 ## Local PostgreSQL
 
 Roomies uses real PostgreSQL for local development (major version **18**). Production will use Neon; that is configured separately.
