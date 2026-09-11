@@ -1,0 +1,337 @@
+[
+  {
+    "id": "schema.public",
+    "label": "Create schema \"public\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Create schema \"public\"",
+        "sql": "CREATE SCHEMA IF NOT EXISTS \"public\"",
+        "params": []
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "table.homes",
+    "label": "Create table \"homes\"",
+    "summary": "Creates table \"homes\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "homes"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"homes\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"homes\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"homes\"",
+        "sql": "CREATE TABLE \"public\".\"homes\" (\n  \"archived_at\" timestamptz,\n  \"created_at\" timestamptz DEFAULT (now()) NOT NULL,\n  \"id\" uuid NOT NULL,\n  \"name\" text NOT NULL,\n  \"timezone\" text NOT NULL,\n  \"updated_at\" timestamptz NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"homes\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"homes\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.memberships",
+    "label": "Create table \"memberships\"",
+    "summary": "Creates table \"memberships\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "memberships"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"memberships\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"memberships\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"memberships\"",
+        "sql": "CREATE TABLE \"public\".\"memberships\" (\n  \"ended_at\" timestamptz,\n  \"home_id\" uuid NOT NULL,\n  \"id\" uuid NOT NULL,\n  \"joined_at\" timestamptz DEFAULT (now()) NOT NULL,\n  \"role\" text NOT NULL,\n  \"user_id\" uuid NOT NULL,\n  PRIMARY KEY (\"id\"),\n  CONSTRAINT \"memberships_role_check_a32cd7eb\" CHECK (\"role\" IN ('ROOMMATE', 'ADMIN'))\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"memberships\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"memberships\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.users",
+    "label": "Create table \"users\"",
+    "summary": "Creates table \"users\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "users"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"users\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"users\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"users\"",
+        "sql": "CREATE TABLE \"public\".\"users\" (\n  \"created_at\" timestamptz DEFAULT (now()) NOT NULL,\n  \"id\" uuid NOT NULL,\n  \"updated_at\" timestamptz NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"users\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"users\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.memberships.memberships_home_id_f881d5c1",
+    "label": "Create index \"memberships_home_id_f881d5c1\" on \"memberships\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "memberships_home_id_f881d5c1",
+        "table": "memberships"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"memberships_home_id_f881d5c1\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"memberships_home_id_f881d5c1\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"memberships_home_id_f881d5c1\"",
+        "sql": "CREATE INDEX \"memberships_home_id_f881d5c1\" ON \"public\".\"memberships\" (\"home_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"memberships_home_id_f881d5c1\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"memberships_home_id_f881d5c1\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.memberships.memberships_one_active_per_home_user_4b7d5c14",
+    "label": "Create index \"memberships_one_active_per_home_user_4b7d5c14\" on \"memberships\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "memberships_one_active_per_home_user_4b7d5c14",
+        "table": "memberships"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"memberships_one_active_per_home_user_4b7d5c14\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"memberships_one_active_per_home_user_4b7d5c14\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"memberships_one_active_per_home_user_4b7d5c14\"",
+        "sql": "CREATE UNIQUE INDEX \"memberships_one_active_per_home_user_4b7d5c14\" ON \"public\".\"memberships\" (\"home_id\", \"user_id\") WHERE ((ended_at IS NULL))",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"memberships_one_active_per_home_user_4b7d5c14\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"memberships_one_active_per_home_user_4b7d5c14\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.memberships.memberships_user_id_6c952402",
+    "label": "Create index \"memberships_user_id_6c952402\" on \"memberships\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "memberships_user_id_6c952402",
+        "table": "memberships"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"memberships_user_id_6c952402\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"memberships_user_id_6c952402\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"memberships_user_id_6c952402\"",
+        "sql": "CREATE INDEX \"memberships_user_id_6c952402\" ON \"public\".\"memberships\" (\"user_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"memberships_user_id_6c952402\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"memberships_user_id_6c952402\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.memberships.memberships_home_id_fkey",
+    "label": "Add foreign key \"memberships_home_id_fkey\" on \"memberships\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "memberships_home_id_fkey",
+        "table": "memberships"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"memberships_home_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "memberships_home_id_fkey",
+          "public",
+          "\"public\".\"memberships\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"memberships_home_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"memberships\"\nADD CONSTRAINT \"memberships_home_id_fkey\"\nFOREIGN KEY (\"home_id\")\nREFERENCES \"public\".\"homes\" (\"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"memberships_home_id_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "memberships_home_id_fkey",
+          "public",
+          "\"public\".\"memberships\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.memberships.memberships_user_id_fkey",
+    "label": "Add foreign key \"memberships_user_id_fkey\" on \"memberships\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "memberships_user_id_fkey",
+        "table": "memberships"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"memberships_user_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "memberships_user_id_fkey",
+          "public",
+          "\"public\".\"memberships\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"memberships_user_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"memberships\"\nADD CONSTRAINT \"memberships_user_id_fkey\"\nFOREIGN KEY (\"user_id\")\nREFERENCES \"public\".\"users\" (\"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"memberships_user_id_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "memberships_user_id_fkey",
+          "public",
+          "\"public\".\"memberships\""
+        ]
+      }
+    ]
+  }
+]

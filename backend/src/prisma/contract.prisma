@@ -1,5 +1,53 @@
 // use prisma-next
 
-// Intentionally empty: Roomies domain tables are introduced later via
-// reviewed Prisma 8 migration packages. Do not add application models here
-// until that migration workflow is in use.
+// Roomies core: User, Home, Membership.
+// Last-active-Admin (never leave an active Home with zero active Admin
+// Memberships during normal structural operations) is a cross-row
+// transactional invariant. It is enforced by the application transaction
+// layer, not by a CHECK, unique index, or trigger in this contract.
+
+enum MembershipRole {
+  @@type("pg/text@1")
+  ROOMMATE
+  ADMIN
+}
+
+model User {
+  id          Uuid                 @id @default(uuid(7))
+  createdAt   temporal.createdAt() @map("created_at")
+  updatedAt   temporal.updatedAt() @map("updated_at")
+  memberships Membership[]
+
+  @@map("users")
+}
+
+model Home {
+  id          Uuid                 @id @default(uuid(7))
+  name        String
+  timezone    String
+  archivedAt  Timestamptz?         @map("archived_at")
+  createdAt   temporal.createdAt() @map("created_at")
+  updatedAt   temporal.updatedAt() @map("updated_at")
+  memberships Membership[]
+
+  @@map("homes")
+}
+
+model Membership {
+  id       Uuid            @id @default(uuid(7))
+  homeId   Uuid            @map("home_id")
+  userId   Uuid            @map("user_id")
+  role     MembershipRole
+  joinedAt Timestamptz     @default(now()) @map("joined_at")
+  endedAt  Timestamptz?    @map("ended_at")
+
+  home Home @relation(fields: [homeId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "memberships_home_id_fkey")
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "memberships_user_id_fkey")
+
+  // At most one active tenure per (home, user). Ended rows may coexist so
+  // leave-and-rejoin creates a new Membership id rather than reopening one.
+  @@index([homeId, userId], unique: true, where: "(ended_at IS NULL)", name: "memberships_one_active_per_home_user")
+  @@index([homeId], name: "memberships_home_id")
+  @@index([userId], name: "memberships_user_id")
+  @@map("memberships")
+}

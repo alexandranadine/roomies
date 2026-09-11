@@ -9,3 +9,5 @@ package-lock.json
 **/src/prisma/contract.json
 **/src/prisma/contract.d.ts
 **/migrations/snapshots/**
+# Planned migration packages are Prisma-attested; do not Prettier-rewrite hashes.
+**/migrations/app/**

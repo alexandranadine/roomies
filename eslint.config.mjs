@@ -16,6 +16,7 @@ export default tseslint.config(
       '**/src/prisma/contract.json',
       '**/src/prisma/contract.d.ts',
       '**/migrations/snapshots/**',
+      '**/migrations/app/**',
     ],
   },
   eslint.configs.recommended,
