@@ -31,3 +31,11 @@ updates:
     schedule:
       interval: monthly
     open-pull-requests-limit: 5
+
+  # Deliberately separate graph: Better Auth's optional Prisma peer metadata
+  # does not yet accept Prisma 8 in the root workspace.
+  - package-ecosystem: npm
+    directory: /backend/auth-runtime
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3

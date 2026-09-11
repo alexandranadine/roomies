@@ -18,6 +18,12 @@ export type AppConfig = Readonly<{
   port: number;
   /** PostgreSQL connection string. Never log this value. */
   databaseUrl: string;
+  /** Explicit public backend origin used by Better Auth callbacks and cookies. */
+  authBaseUrl: string;
+  /** Better Auth signing/encryption secret. Never log this value. */
+  authSecret: string;
+  /** Whether authentication cookies must carry the Secure attribute. */
+  secureAuthCookies: boolean;
   /**
    * Exact trusted frontend origins for the HTTP/CORS layer.
    * Normalized to scheme://host[:port] with no path, query, hash, or wildcards.

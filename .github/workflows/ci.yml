@@ -39,6 +39,8 @@ jobs:
       # Isolated CI database — never production Neon. No repository secrets.
       DATABASE_URL: postgresql://roomies:roomies_ci_only@127.0.0.1:5432/roomies_ci
       TEST_DATABASE_URL: postgresql://roomies:roomies_ci_only@127.0.0.1:5432/roomies_ci
+      AUTH_BASE_URL: http://localhost:3000
+      AUTH_SECRET: roomies_ci_only_auth_secret_32_characters_minimum
       # Frontend production build must not fall back to localhost.
       VITE_API_ORIGIN: https://api.example.test
 
@@ -51,6 +53,9 @@ jobs:
         with:
           node-version: '24'
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            backend/auth-runtime/package-lock.json
 
       - name: Install dependencies (lockfile)
         run: npm ci
@@ -70,6 +75,12 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Migration artifact integrity + fresh DB apply/verify
+        run: npm run db:test:migrate
+
+      - name: Auth runtime tests
+        run: npm run test:auth-runtime
+
       - name: Backend tests
         run: npm run test --workspace=@roomies/backend
 
@@ -78,9 +89,6 @@ jobs:
 
       - name: Frontend production build
         run: npm run build --workspace=@roomies/frontend
-
-      - name: Migration artifact integrity + fresh DB apply/verify
-        run: npm run db:test:migrate
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium

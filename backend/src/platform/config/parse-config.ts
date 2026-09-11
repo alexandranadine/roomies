@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import { ConfigError, SECRET_ENV_KEYS } from './errors.js';
-import { parseTrustedOriginsList } from './normalize-origin.js';
+import {
+  normalizeTrustedOrigin,
+  parseTrustedOriginsList,
+} from './normalize-origin.js';
 import { loadRuntimeEnvFiles } from './load-dotenv.js';
 import { APP_ENVS, type AppConfig, type AppEnv } from './types.js';
 
@@ -11,10 +14,22 @@ const LOCAL_DEV_ORIGINS = [
 ] as const;
 
 const DEFAULT_PORT = 3000;
+const LOCAL_AUTH_BASE_URL = 'http://localhost:3000';
+const INSECURE_AUTH_SECRETS = new Set([
+  'better-auth-secret-123456789',
+  'replace_with_a_random_secret_of_at_least_32_characters',
+]);
 /** Direct-facing default: do not trust forwarded headers. */
 const DEFAULT_TRUST_PROXY_HOPS = 0;
 /** Upper bound for hop count (guards against absurd/mis-typed values). */
 const MAX_TRUST_PROXY_HOPS = 32;
+
+function estimatedSecretEntropy(value: string): number {
+  const uniqueCharacters = new Set(value).size;
+  return uniqueCharacters === 0
+    ? 0
+    : value.length * Math.log2(uniqueCharacters);
+}
 
 export type ConfigSource = Readonly<Record<string, string | undefined>>;
 
@@ -98,12 +113,25 @@ const envSchema = z
       })
       .trim()
       .min(1, { error: 'DATABASE_URL is required' }),
+    AUTH_BASE_URL: z.string().optional(),
+    AUTH_SECRET: z
+      .string({
+        error: () => 'AUTH_SECRET is required',
+      })
+      .min(32, { error: 'AUTH_SECRET must be at least 32 characters' })
+      .refine((value) => !INSECURE_AUTH_SECRETS.has(value), {
+        error: 'AUTH_SECRET must not use a documented placeholder or default',
+      })
+      .refine((value) => estimatedSecretEntropy(value) >= 120, {
+        error: 'AUTH_SECRET must be a high-entropy random value',
+      }),
     TRUSTED_ORIGINS: z.string().optional(),
     TRUST_PROXY: trustProxySchema,
   })
   .transform((data, ctx) => {
     const appEnv = data.APP_ENV;
     const rawOrigins = data.TRUSTED_ORIGINS?.trim();
+    const rawAuthBaseUrl = data.AUTH_BASE_URL?.trim();
 
     let trustedOrigins: string[];
     if (rawOrigins === undefined || rawOrigins === '') {
@@ -131,16 +159,48 @@ const envSchema = z
       }
     }
 
+    let authBaseUrl: string;
+    if (rawAuthBaseUrl === undefined || rawAuthBaseUrl === '') {
+      if (isLocalDefaultEnv(appEnv)) {
+        authBaseUrl = LOCAL_AUTH_BASE_URL;
+      } else {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['AUTH_BASE_URL'],
+          message: `AUTH_BASE_URL is required when APP_ENV=${appEnv}`,
+        });
+        return z.NEVER;
+      }
+    } else {
+      try {
+        authBaseUrl = normalizeTrustedOrigin(rawAuthBaseUrl);
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : 'invalid value';
+        ctx.addIssue({
+          code: 'custom',
+          path: ['AUTH_BASE_URL'],
+          message: `AUTH_BASE_URL is invalid: ${detail}`,
+        });
+        return z.NEVER;
+      }
+    }
+
     return {
       appEnv,
       port: data.PORT,
       databaseUrl: data.DATABASE_URL,
+      authBaseUrl,
+      authSecret: data.AUTH_SECRET,
+      secureAuthCookies: !isLocalDefaultEnv(appEnv),
       trustedOrigins,
       trustProxyHops: data.TRUST_PROXY,
     } satisfies {
       appEnv: AppEnv;
       port: number;
       databaseUrl: string;
+      authBaseUrl: string;
+      authSecret: string;
+      secureAuthCookies: boolean;
       trustedOrigins: string[];
       trustProxyHops: number;
     };
@@ -162,8 +222,12 @@ function formatIssues(zodError: z.ZodError): string[] {
 
   for (const issue of zodError.issues) {
     const key = String(issue.path[0] ?? '');
-    if (key === 'DATABASE_URL' || SECRET_ENV_KEYS.has(key)) {
+    if (key === 'DATABASE_URL') {
       issues.push('DATABASE_URL is required');
+      continue;
+    }
+    if (key === 'AUTH_SECRET') {
+      issues.push(issue.message);
       continue;
     }
     if (key === 'APP_ENV' && issue.code === 'invalid_type') {
@@ -187,6 +251,10 @@ function formatIssues(zodError: z.ZodError): string[] {
       continue;
     }
     if (key === 'TRUSTED_ORIGINS') {
+      issues.push(issue.message);
+      continue;
+    }
+    if (key === 'AUTH_BASE_URL') {
       issues.push(issue.message);
       continue;
     }
@@ -214,6 +282,8 @@ export function parseConfig(source: ConfigSource): AppConfig {
     APP_ENV: optionalString(source['APP_ENV']),
     PORT: optionalString(source['PORT']),
     DATABASE_URL: optionalString(source['DATABASE_URL']),
+    AUTH_BASE_URL: optionalString(source['AUTH_BASE_URL']),
+    AUTH_SECRET: optionalString(source['AUTH_SECRET']),
     TRUSTED_ORIGINS: optionalString(source['TRUSTED_ORIGINS']),
     TRUST_PROXY: optionalString(source['TRUST_PROXY']),
   });
@@ -230,6 +300,9 @@ export function parseConfig(source: ConfigSource): AppConfig {
     appEnv: result.data.appEnv,
     port: result.data.port,
     databaseUrl: result.data.databaseUrl,
+    authBaseUrl: result.data.authBaseUrl,
+    authSecret: result.data.authSecret,
+    secureAuthCookies: result.data.secureAuthCookies,
     trustedOrigins: Object.freeze([...result.data.trustedOrigins]),
     trustProxyHops: result.data.trustProxyHops,
   });

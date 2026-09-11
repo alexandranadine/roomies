@@ -178,6 +178,18 @@ function checkBackend(file, importPath, line) {
   }
 
   const rel = path.relative(root, file).replaceAll('\\', '/');
+  if (
+    importPath === 'better-auth' ||
+    importPath.startsWith('better-auth/') ||
+    importPath.startsWith('@better-auth/')
+  ) {
+    fail(
+      file,
+      importPath,
+      line,
+      'backend must access Better Auth through platform/auth and auth-runtime',
+    );
+  }
   // Future domain isolation: domain A must not import domain B's repository internals.
   // Pattern: backend/src/domains/<name>/... importing .../domains/<other>/.../repository
   const domainMatch = /^backend\/src\/domains\/([^/]+)\//.exec(rel);
@@ -195,6 +207,26 @@ function checkBackend(file, importPath, line) {
         `domain "${ownDomain}" must not import domain "${otherRepo[1]}" repository internals`,
       );
     }
+  }
+}
+
+/**
+ * @param {string} file
+ * @param {string} importPath
+ * @param {number} line
+ */
+function checkAuthRuntime(file, importPath, line) {
+  if (
+    isPrismaPackage(importPath) ||
+    importPath.includes('/prisma/') ||
+    importPath.includes('/domains/')
+  ) {
+    fail(
+      file,
+      importPath,
+      line,
+      'auth-runtime must not depend on Prisma or product/domain modules',
+    );
   }
 }
 
@@ -257,6 +289,7 @@ async function scanPackage(packageDir, checker) {
 
 await scanPackage('frontend/src', checkFrontend);
 await scanPackage('backend/src', checkBackend);
+await scanPackage('backend/auth-runtime/src', checkAuthRuntime);
 await scanPackage('shared/src', checkShared);
 
 if (violations.length > 0) {

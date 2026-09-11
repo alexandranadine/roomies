@@ -14,4 +14,4 @@ export class ConfigError extends Error {
 }
 
 /** Environment keys whose raw values must never appear in error output. */
-export const SECRET_ENV_KEYS = new Set(['DATABASE_URL']);
+export const SECRET_ENV_KEYS = new Set(['DATABASE_URL', 'AUTH_SECRET']);

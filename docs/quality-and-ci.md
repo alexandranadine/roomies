@@ -1,6 +1,14 @@
 # Quality gates, CI, and test databases
 
-Concise operator notes for M0 foundation hardening. Product/auth work is out of scope.
+Concise operator notes for Roomies foundation quality and verification.
+
+## Dependency installation
+
+Root `npm install` / `npm ci` automatically runs `npm ci` for the deliberately
+non-workspace `backend/auth-runtime` package. Both lockfiles are authoritative.
+The small lifecycle wrapper clears inherited npm lifecycle metadata before the
+nested install; this prevents npm from treating the package as part of its
+parent workspace and recursively invoking the root lifecycle.
 
 ## Fast local quality (`npm run check`)
 
@@ -60,14 +68,16 @@ Playwright starts the Vite **dev** server so `/__dev/ui` is available. Productio
 
 GitHub Actions workflow: `.github/workflows/ci.yml` (pull requests + `main`).
 
-- Node 24 + `npm ci` (lockfile-reproducible; no silent version rewrites)
+- Node 24 + root `npm ci`, including the isolated auth-runtime lockfile
 - Format, lint, boundaries, typecheck, backend/frontend tests, frontend production build
 - PostgreSQL 18 service with empty `roomies_ci` database → `db:test:migrate`
 - Playwright + Axe against the Vite dev server
 - No repository secrets, no Neon/production, no deploy steps
 - Workflow permissions: `contents: read`
 
-Dependabot: `.github/dependabot.yml` (npm weekly, Actions monthly). Prisma RC packages are ignored so upgrades stay reviewed.
+Dependabot: `.github/dependabot.yml` (both npm lockfiles weekly, Actions
+monthly). Prisma RC packages are ignored so upgrades stay reviewed; the Better
+Auth graph is tracked separately.
 
 ## Test-database safety
 

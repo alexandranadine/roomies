@@ -4,11 +4,13 @@ import { ConfigError, parseConfig, type ConfigSource } from './index.js';
 
 const SECRET_DATABASE_URL =
   'postgresql://roomies:super_secret_credential_xyz@127.0.0.1:5432/roomies';
+const VALID_AUTH_SECRET = 'roomies_test_secret_32_chars_minimum_value';
 
 function validDevelopmentEnv(overrides: ConfigSource = {}): ConfigSource {
   return {
     APP_ENV: 'development',
     DATABASE_URL: SECRET_DATABASE_URL,
+    AUTH_SECRET: VALID_AUTH_SECRET,
     PORT: '3000',
     TRUSTED_ORIGINS: 'http://localhost:5173,http://127.0.0.1:5173',
     ...overrides,
@@ -22,6 +24,9 @@ void describe('parseConfig', () => {
     assert.equal(config.appEnv, 'development');
     assert.equal(config.port, 3000);
     assert.equal(config.databaseUrl, SECRET_DATABASE_URL);
+    assert.equal(config.authBaseUrl, 'http://localhost:3000');
+    assert.equal(config.authSecret, VALID_AUTH_SECRET);
+    assert.equal(config.secureAuthCookies, false);
     assert.deepEqual(config.trustedOrigins, [
       'http://localhost:5173',
       'http://127.0.0.1:5173',
@@ -99,6 +104,40 @@ void describe('parseConfig', () => {
         );
         return true;
       },
+    );
+  });
+
+  void it('fails when AUTH_SECRET is missing, short, or the insecure default', () => {
+    for (const authSecret of [
+      undefined,
+      'too-short',
+      'a'.repeat(32),
+      'better-auth-secret-123456789',
+      'replace_with_a_random_secret_of_at_least_32_characters',
+    ]) {
+      assert.throws(
+        () => parseConfig(validDevelopmentEnv({ AUTH_SECRET: authSecret })),
+        (error: unknown) => {
+          assert.ok(error instanceof ConfigError);
+          assert.match(error.message, /AUTH_SECRET/);
+          if (authSecret) {
+            assert.equal(error.message.includes(authSecret), false);
+          }
+          return true;
+        },
+      );
+    }
+
+    assert.throws(
+      () =>
+        parseConfig({
+          APP_ENV: 'production',
+          DATABASE_URL: SECRET_DATABASE_URL,
+          AUTH_BASE_URL: 'https://api.example.test',
+          AUTH_SECRET: 'replace_with_a_random_secret_of_at_least_32_characters',
+          TRUSTED_ORIGINS: 'https://app.example.test',
+        }),
+      /AUTH_SECRET/,
     );
   });
 
@@ -183,6 +222,7 @@ void describe('parseConfig', () => {
         parseConfig({
           APP_ENV: 'production',
           DATABASE_URL: SECRET_DATABASE_URL,
+          AUTH_SECRET: VALID_AUTH_SECRET,
           PORT: '8080',
         }),
       (error: unknown) => {
@@ -201,6 +241,7 @@ void describe('parseConfig', () => {
           parseConfig({
             APP_ENV: appEnv,
             DATABASE_URL: SECRET_DATABASE_URL,
+            AUTH_SECRET: VALID_AUTH_SECRET,
           }),
         (error: unknown) => {
           assert.ok(error instanceof ConfigError);
@@ -217,9 +258,38 @@ void describe('parseConfig', () => {
       DATABASE_URL: SECRET_DATABASE_URL,
       PORT: '8080',
       TRUSTED_ORIGINS: 'https://app.roomies.example',
+      AUTH_BASE_URL: 'https://api.roomies.example',
+      AUTH_SECRET: VALID_AUTH_SECRET,
     });
     assert.deepEqual(config.trustedOrigins, ['https://app.roomies.example']);
+    assert.equal(config.authBaseUrl, 'https://api.roomies.example');
+    assert.equal(config.secureAuthCookies, true);
     assert.equal(config.port, 8080);
+  });
+
+  void it('requires an explicit valid auth base URL outside local environments', () => {
+    assert.throws(
+      () =>
+        parseConfig({
+          APP_ENV: 'production',
+          DATABASE_URL: SECRET_DATABASE_URL,
+          AUTH_SECRET: VALID_AUTH_SECRET,
+          TRUSTED_ORIGINS: 'https://app.example',
+        }),
+      /AUTH_BASE_URL is required/,
+    );
+
+    assert.throws(
+      () =>
+        parseConfig({
+          APP_ENV: 'production',
+          DATABASE_URL: SECRET_DATABASE_URL,
+          AUTH_SECRET: VALID_AUTH_SECRET,
+          AUTH_BASE_URL: 'https://api.example/path',
+          TRUSTED_ORIGINS: 'https://app.example',
+        }),
+      /AUTH_BASE_URL is invalid/,
+    );
   });
 
   void it('normalizes origin trailing slashes and deduplicates', () => {
