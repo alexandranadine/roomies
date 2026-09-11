@@ -85,7 +85,11 @@ Prisma 8 owns the database contract and reviewed migration workflow inside `@roo
 | Runtime client      | `backend/src/prisma/db.ts`                          |
 | Migrations          | `backend/migrations/` (`app/`, `snapshots/`)        |
 
-Connection uses `DATABASE_URL` from the environment (loaded from the monorepo-root `.env` by Prisma config). Do not hardcode credentials.
+Connection uses `DATABASE_URL` from the environment. Prisma CLI loads it via `backend/prisma.config.ts`. Application runtime validates env through `backend/src/platform/config/` (`APP_ENV`, `PORT`, `TRUSTED_ORIGINS`, `DATABASE_URL`) and passes the typed URL into `createDb`. Do not hardcode credentials.
+
+### Fresh-database bootstrap note
+
+On a brand-new empty database, do **not** `db sign` the empty emitted contract before applying the initial `from: null` migration. The initial reviewed migration establishes the first real marker/ref. See `backend/migrations/README.md`.
 
 ### Prisma 8 RC version policy
 

@@ -6,6 +6,7 @@
   "description": "Roomies Node/Express modular monolith backend",
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "tsx --test \"src/**/*.test.ts\"",
     "contract:emit": "prisma contract emit",
     "migration:plan": "prisma migration plan",
     "db:migrate": "prisma db migrate",
@@ -13,10 +14,12 @@
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
-    "prisma": "8.0.0-rc.13"
+    "prisma": "8.0.0-rc.13",
+    "tsx": "^4.23.13"
   },
   "dependencies": {
     "@prisma/orm-postgres": "8.0.0-rc.9",
-    "dotenv": "^17.4.2"
+    "dotenv": "^17.4.2",
+    "zod": "^4.6.2"
   }
 }
