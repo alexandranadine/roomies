@@ -2,6 +2,8 @@ import {
   createAuthRuntime as createIsolatedAuthRuntime,
   type AuthRuntime,
 } from '../../../auth-runtime/src/index.js';
+
+export type { AuthRuntime };
 import type { Pool } from 'pg';
 import type { AppConfig } from '../config/index.js';
 

@@ -9,18 +9,19 @@ export type AppTestResponse = {
 };
 
 /**
- * Exercise an Express app with fetch against an ephemeral localhost port.
- * Used only by tests — production listening stays in `startHttpServer`.
+ * Keep one ephemeral HTTP server open for multi-request flows (cookies/session).
  */
-export async function appRequest(
+export async function withAppServer<T>(
   app: Express,
-  options: {
-    method?: string;
-    path: string;
-    headers?: Record<string, string>;
-    body?: string;
-  },
-): Promise<AppTestResponse> {
+  run: (
+    request: (options: {
+      method?: string;
+      path: string;
+      headers?: Record<string, string>;
+      body?: string;
+    }) => Promise<AppTestResponse>,
+  ) => Promise<T>,
+): Promise<T> {
   const server = http.createServer(app);
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
@@ -33,7 +34,12 @@ export async function appRequest(
     throw new Error('expected TCP listen address');
   }
 
-  try {
+  const request = async (options: {
+    method?: string;
+    path: string;
+    headers?: Record<string, string>;
+    body?: string;
+  }): Promise<AppTestResponse> => {
     const response = await fetch(
       `http://127.0.0.1:${address.port}${options.path}`,
       {
@@ -49,9 +55,29 @@ export async function appRequest(
       text,
       json: () => JSON.parse(text) as unknown,
     };
+  };
+
+  try {
+    return await run(request);
   } finally {
     await closeServer(server);
   }
+}
+
+/**
+ * Exercise an Express app with fetch against an ephemeral localhost port.
+ * Used only by tests — production listening stays in `startHttpServer`.
+ */
+export async function appRequest(
+  app: Express,
+  options: {
+    method?: string;
+    path: string;
+    headers?: Record<string, string>;
+    body?: string;
+  },
+): Promise<AppTestResponse> {
+  return withAppServer(app, (request) => request(options));
 }
 
 function closeServer(server: http.Server): Promise<void> {

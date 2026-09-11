@@ -1,5 +1,7 @@
 import express, { type Express } from 'express';
 import helmet from 'helmet';
+import { AUTH_HTTP_ROUTE, createAuthHttpHandler } from '../auth/http.js';
+import type { AuthRuntime } from '../auth/runtime.js';
 import type { AppConfig } from '../config/types.js';
 import type { PersistenceReadiness } from '../persistence/readiness.js';
 import { JSON_BODY_LIMIT } from './constants.js';
@@ -11,6 +13,8 @@ import { requestIdMiddleware } from './request-id.js';
 export type CreateAppOptions = {
   config: Pick<AppConfig, 'trustedOrigins' | 'trustProxyHops'>;
   readiness: PersistenceReadiness;
+  /** Isolated Better Auth runtime. Mounted at `/api/auth/*` before JSON parsing. */
+  auth?: AuthRuntime;
   /**
    * Optional composition hook (e.g. tests mounting a throwing route).
    * Runs after platform routes and before the 404/error handlers.
@@ -23,7 +27,7 @@ export type CreateAppOptions = {
  * Tests and the server runtime both consume this factory.
  */
 export function createApp(options: CreateAppOptions): Express {
-  const { config, readiness, configure } = options;
+  const { config, readiness, auth, configure } = options;
   const app = express();
 
   // Explicit hop count — never unrestricted `true`. Matters later for secure
@@ -35,6 +39,13 @@ export function createApp(options: CreateAppOptions): Express {
   app.use(requestIdMiddleware);
   app.use(helmet());
   app.use(createCorsMiddleware(config.trustedOrigins));
+
+  // Better Auth must see the native request body. Roomies JSON parsing
+  // is mounted after `/api/auth/*` and applies only to later routes.
+  if (auth) {
+    app.all(AUTH_HTTP_ROUTE, createAuthHttpHandler(auth));
+  }
+
   app.use(express.json({ limit: JSON_BODY_LIMIT }));
 
   app.use(createHealthRouter(readiness));

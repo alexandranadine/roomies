@@ -24,10 +24,8 @@ function main(): void {
   const databasePool = createDatabasePool(config);
   const db = createDb(databasePool.pool);
   const auth = createAuthRuntime(databasePool.pool, config);
-  // Route mounting is intentionally deferred to M1.3c.
-  void auth;
   const readiness = createDbReadiness(db);
-  const app = createApp({ config, readiness });
+  const app = createApp({ config, readiness, auth });
 
   startHttpServer({
     app,

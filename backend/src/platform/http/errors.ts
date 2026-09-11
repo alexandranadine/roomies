@@ -70,6 +70,7 @@ export function errorHandler(
   }
 
   const status = readHttpStatus(err);
+  const routeCategory = requestPathCategory(req);
 
   // Body-parser / entity-too-large → safe 413 without echoing body contents.
   if (status === 413) {
@@ -89,6 +90,24 @@ export function errorHandler(
     return;
   }
 
+  if (status === 401) {
+    sendApiError(
+      res,
+      401,
+      'UNAUTHENTICATED',
+      'Authentication required',
+      requestId,
+    );
+    return;
+  }
+
+  // Content-free diagnostics only: no URL query, headers, body, or exception text.
+  console.error('[http] request failed', {
+    requestId,
+    routeCategory,
+    status: 500,
+  });
+
   sendApiError(
     res,
     500,
@@ -96,4 +115,16 @@ export function errorHandler(
     'An unexpected error occurred',
     requestId,
   );
+}
+
+function requestPathCategory(req: Request): 'auth' | 'api' | 'other' {
+  const raw = req.originalUrl ?? req.url ?? '';
+  const path = raw.split('?')[0] ?? '';
+  if (path.startsWith('/api/auth')) {
+    return 'auth';
+  }
+  if (path.startsWith('/api/v1')) {
+    return 'api';
+  }
+  return 'other';
 }

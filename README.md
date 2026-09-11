@@ -22,6 +22,11 @@ npm install
 
 Requires Node.js 24+ and npm 10+.
 
+The root install lifecycle also runs a lockfile-clean install for
+`backend/auth-runtime`. That package is intentionally outside npm workspaces and
+has its own lockfile; developers and deployments do not need an undocumented
+second install step.
+
 ## Frontend
 
 React + Vite shell (`@roomies/frontend`). Feature screens are not built yet.
@@ -103,7 +108,40 @@ Prisma 8 owns the database contract and reviewed migration workflow inside `@roo
 | Runtime client      | `backend/src/prisma/db.ts`                          |
 | Migrations          | `backend/migrations/` (`app/`, `snapshots/`)        |
 
-Connection uses `DATABASE_URL` from the environment. Prisma CLI loads it via `backend/prisma.config.ts`. Application runtime validates env through `backend/src/platform/config/` (`APP_ENV`, `PORT`, `TRUSTED_ORIGINS`, `TRUST_PROXY`, `DATABASE_URL`) and passes the typed URL into `createDb`. Do not hardcode credentials.
+Connection uses `DATABASE_URL` from the environment. Prisma CLI loads it via `backend/prisma.config.ts`. Application runtime validates env through `backend/src/platform/config/` (`APP_ENV`, `PORT`, `TRUSTED_ORIGINS`, `TRUST_PROXY`, `DATABASE_URL`, `AUTH_BASE_URL`, `AUTH_SECRET`). The process composition root creates one `pg.Pool`, passes it to Prisma and Better Auth, closes Prisma, and then closes the pool exactly once. Consumers never own the pool. Do not hardcode credentials.
+
+### Better Auth runtime isolation
+
+Better Auth is exact-pinned at **1.7.4** in `backend/auth-runtime/`, a deliberately
+non-workspace package with its own `package.json` and `package-lock.json`.
+Better Auth 1.7.4 publishes optional Prisma peer metadata only through Prisma 7;
+isolating its direct PostgreSQL runtime graph lets Roomies retain Prisma 8 as the
+sole schema/migration authority without peer-resolution bypasses.
+
+The package accepts the process-owned `pg.Pool`; it does not create or close a
+pool, run migrations, provision canonical Users, or know about Home/Membership
+authorization. The accepted provisioning trigger remains authoritative (see
+[`ADR 0001`](docs/adr/0001-auth-identity-provisioning.md)).
+
+Email/password is enabled with Better Auth's password defaults. Email
+verification is not required yet because delivery and product policy are later
+tickets. Sessions are database-backed (seven-day expiry, daily rolling update,
+no cookie cache); they contain no Home or Membership authorization state.
+Better Auth logging is reduced to content-free warning/error events. The HTTP
+handler is mounted at `/api/auth/*` before Roomies JSON parsing, behind the
+same request-ID, Helmet, and exact-origin CORS middleware. Unexpected auth
+failures use the Roomies error boundary and must never return or log raw SQL,
+tokens, cookies, credentials, or authorization headers. Better Auth enforces
+its own CSRF/origin checks against the same validated `trustedOrigins` list
+(plus `SameSite=Lax` HttpOnly session cookies). Credential-endpoint rate
+limiting is not implemented yet and is required before public launch.
+
+Upgrade Better Auth by changing its exact pin inside `backend/auth-runtime`,
+running `npm install` there to review the isolated lock diff, then running the
+root clean-install and quality/database proofs. Never run Better Auth schema or
+migration commands against Roomies databases. Remove the isolated package only
+after Better Auth's published peer graph supports Prisma 8 and a reviewed root
+install succeeds without bypass flags.
 
 ### HTTP web process
 
@@ -111,8 +149,10 @@ The backend HTTP runtime lives under `backend/src/platform/http/` (app factory) 
 
 - `GET /health` — process liveness (no database dependency)
 - `GET /ready` — persistence readiness (503 when the DB probe fails)
+- `ALL /api/auth/*` — Better Auth credential/session HTTP (mounted before `express.json()`)
 - Exact-origin CORS from `TRUSTED_ORIGINS`, Helmet defaults, JSON body limit `32kb`
 - `TRUST_PROXY` is an integer hop count (default `0`). Railway should set an explicit hop count after verifying proxy topology; unrestricted `true` is rejected.
+- No auth rate limiter yet. Add credential-endpoint rate limiting before public launch.
 
 ### Fresh-database bootstrap note
 

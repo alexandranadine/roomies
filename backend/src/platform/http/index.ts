@@ -3,6 +3,7 @@ export {
   REQUEST_ID_HEADER,
   JSON_BODY_LIMIT,
   SHUTDOWN_TIMEOUT_MS,
+  HTTP_PIPELINE_ORDER,
 } from './constants.js';
 export {
   getRequestId,

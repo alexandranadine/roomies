@@ -127,6 +127,7 @@ void describe('createAuthRuntime', () => {
       secure: true,
       sameSite: 'lax',
     });
+    assert.equal(auth.options.advanced?.disableOriginCheck, false);
     assert.deepEqual(auth.options.plugins, []);
   });
 
@@ -163,6 +164,9 @@ void describe('createAuthRuntime', () => {
 
     assert.doesNotMatch(source, /\bnew\s+Pool\s*\(/);
     assert.doesNotMatch(source, /\bdatabaseHooks\s*:/);
+    assert.match(source, /\btoNodeHandler\b/);
+    assert.match(source, /\bfromNodeHeaders\b/);
+    assert.match(source, /\bgetSession\b/);
     assert.equal(
       Object.values(packageJson.scripts ?? {}).some((script) =>
         /\b(migrate|generate|schema)\b/i.test(script),

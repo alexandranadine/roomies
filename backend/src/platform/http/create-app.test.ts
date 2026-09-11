@@ -7,7 +7,10 @@ import {
   assertNoForbiddenLeak,
   COMMON_SECRET_SENTINELS,
 } from './assert-no-forbidden-leak.js';
-import { REQUEST_ID_HEADER } from './constants.js';
+import { readFile } from 'node:fs/promises';
+import { AUTH_HTTP_ROUTE } from '../auth/http.js';
+import type { AuthRuntime } from '../auth/runtime.js';
+import { HTTP_PIPELINE_ORDER, REQUEST_ID_HEADER } from './constants.js';
 import { createApp } from './create-app.js';
 import type { ApiErrorBody } from './errors.js';
 
@@ -159,6 +162,83 @@ void describe('HTTP platform app', () => {
     assert.deepEqual(res.json(), { status: 'not_ready' });
     assert.equal(res.text.includes('DATABASE_URL'), false);
     assert.equal(res.text.includes('postgresql'), false);
+  });
+
+  void it('keeps Better Auth mounted before Roomies JSON parsing', async () => {
+    const source = await readFile(
+      new URL('./create-app.ts', import.meta.url),
+      'utf8',
+    );
+    const authMount = source.indexOf('AUTH_HTTP_ROUTE');
+    const jsonParser = source.indexOf('express.json(');
+    assert.ok(authMount >= 0);
+    assert.ok(jsonParser >= 0);
+    assert.ok(authMount < jsonParser);
+    assert.equal(AUTH_HTTP_ROUTE, '/api/auth/*splat');
+    assert.deepEqual(HTTP_PIPELINE_ORDER, [
+      'trust-proxy',
+      'request-id',
+      'security-headers',
+      'cors',
+      'better-auth',
+      'json-body',
+      'health',
+      'roomies-api',
+      'not-found',
+      'error-boundary',
+    ]);
+  });
+
+  void it('unexpected auth handler errors do not leak SQL or secrets', async () => {
+    const logs: string[] = [];
+    const originalError = console.error;
+    console.error = (...args: unknown[]) => {
+      logs.push(args.map((value) => JSON.stringify(value)).join(' '));
+    };
+
+    try {
+      const app = createApp({
+        config: testConfig,
+        readiness: readyAlways(),
+        auth: {
+          handler: () => {
+            throw new Error(
+              'SELECT password FROM auth_accounts WHERE token=super_secret',
+            );
+          },
+        } as unknown as AuthRuntime,
+      });
+
+      const res = await appRequest(app, { path: '/api/auth/ok' });
+      assert.equal(res.status, 500);
+      const body = res.json() as ApiErrorBody;
+      assert.equal(body.error.code, 'INTERNAL_ERROR');
+      assert.equal(body.error.requestId, res.headers.get(REQUEST_ID_HEADER));
+      assertNoForbiddenLeak({
+        context: 'auth unexpected error response',
+        text: res.text,
+        forbidden: [
+          ...COMMON_SECRET_SENTINELS,
+          'SELECT password',
+          'auth_accounts',
+          'super_secret',
+          'stack',
+        ],
+      });
+      assertNoForbiddenLeak({
+        context: 'auth unexpected error logs',
+        text: logs.join('\n'),
+        forbidden: [
+          ...COMMON_SECRET_SENTINELS,
+          'SELECT password',
+          'super_secret',
+          'Cookie',
+          'Authorization',
+        ],
+      });
+    } finally {
+      console.error = originalError;
+    }
   });
 
   void it('security headers are present on normal API responses', async () => {

@@ -1,4 +1,6 @@
 import { betterAuth, type BetterAuthOptions } from 'better-auth';
+import { fromNodeHeaders, toNodeHandler } from 'better-auth/node';
+import type { IncomingHttpHeaders } from 'node:http';
 import type { Pool } from 'pg';
 
 const SEVEN_DAYS_SECONDS = 60 * 60 * 24 * 7;
@@ -100,6 +102,8 @@ function createOptions(input: CreateAuthRuntimeOptions): BetterAuthOptions {
         secure: input.secureCookies,
         sameSite: 'lax',
       },
+      // Better Auth skips origin/CSRF when NODE_ENV=test unless this is set.
+      disableOriginCheck: false,
     },
     plugins: [],
     logger: {
@@ -117,12 +121,35 @@ function createOptions(input: CreateAuthRuntimeOptions): BetterAuthOptions {
 /**
  * Create Better Auth around infrastructure owned by the Roomies process.
  *
- * This initializes runtime configuration only. Route mounting belongs to
- * M1.3c. There are deliberately no application database hooks: PostgreSQL's
- * accepted trigger is the sole canonical User provisioning mechanism.
+ * This initializes runtime configuration only. HTTP mounting lives in the
+ * Roomies platform/auth boundary. There are deliberately no application
+ * database hooks: PostgreSQL's accepted trigger is the sole canonical User
+ * provisioning mechanism.
  */
 export function createAuthRuntime(input: CreateAuthRuntimeOptions) {
   return betterAuth(createOptions(input));
 }
 
 export type AuthRuntime = ReturnType<typeof createAuthRuntime>;
+
+/**
+ * Official Better Auth Node/Express adapter. Callers must mount this before
+ * Express JSON body parsing so Better Auth can read the native request body.
+ */
+export function createAuthNodeHandler(auth: AuthRuntime) {
+  return toNodeHandler(auth);
+}
+
+/**
+ * Official session lookup from Node incoming headers.
+ * Returns Better Auth's session payload; Roomies principal mapping stays
+ * outside this package.
+ */
+export function getAuthSessionFromNodeHeaders(
+  auth: AuthRuntime,
+  headers: IncomingHttpHeaders,
+) {
+  return auth.api.getSession({
+    headers: fromNodeHeaders(headers),
+  });
+}
