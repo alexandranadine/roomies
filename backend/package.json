@@ -11,8 +11,10 @@
     "test": "tsx --test \"src/**/*.test.ts\"",
     "contract:emit": "prisma contract emit",
     "migration:plan": "prisma migration plan",
+    "migration:check": "prisma migration check",
     "db:migrate": "prisma db migrate",
-    "db:verify": "prisma db verify"
+    "db:verify": "prisma db verify",
+    "db:test:migrate": "tsx scripts/verify-fresh-migrations.ts"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

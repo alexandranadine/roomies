@@ -40,7 +40,7 @@ export function Alert({
       {...props}
     >
       {title ? <p className="font-semibold text-current">{title}</p> : null}
-      <div className={cn(title && 'mt-1', 'text-current/90')}>{children}</div>
+      <div className={cn(title && 'mt-1', 'text-current')}>{children}</div>
     </div>
   );
 }

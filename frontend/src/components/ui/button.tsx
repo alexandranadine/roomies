@@ -36,6 +36,13 @@ export function Button({
   ...props
 }: ButtonProps) {
   const isDisabled = Boolean(disabled || loading);
+  const { 'aria-label': ariaLabelProp, ...rest } = props;
+
+  const loadingLabel =
+    ariaLabelProp ??
+    (typeof children === 'string' || typeof children === 'number'
+      ? String(children)
+      : 'Loading');
 
   return (
     <button
@@ -49,7 +56,8 @@ export function Button({
       )}
       disabled={isDisabled}
       aria-busy={loading || undefined}
-      {...props}
+      aria-label={loading ? loadingLabel : ariaLabelProp}
+      {...rest}
     >
       {loading ? (
         <span
@@ -61,6 +69,7 @@ export function Button({
       ) : null}
       <span
         className={cn('inline-flex items-center gap-2', loading && 'invisible')}
+        aria-hidden={loading || undefined}
       >
         {icon}
         {children}

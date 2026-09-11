@@ -1,0 +1,33 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    # Reviewed updates only — do not auto-merge; Prisma RC must stay exact-pinned.
+    groups:
+      eslint-typescript:
+        patterns:
+          - 'eslint*'
+          - 'typescript-eslint'
+          - '@eslint/*'
+          - 'prettier'
+      testing:
+        patterns:
+          - 'vitest'
+          - '@testing-library/*'
+          - '@playwright/*'
+          - '@axe-core/*'
+          - 'jsdom'
+    ignore:
+      # Prisma 8 RC pair is reviewed manually (see README version policy).
+      - dependency-name: 'prisma'
+      - dependency-name: '@prisma/orm-postgres'
+      - dependency-name: '@prisma/*'
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5

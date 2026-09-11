@@ -18,6 +18,15 @@ dist-ssr
 # TypeScript
 *.tsbuildinfo
 
+# Playwright
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
+frontend/playwright/.cache/
+
+# Prisma temporary planning snapshots (never commit)
+backend/migrations/snapshots/.tmp-*/
+
 # Environment
 .env
 .env.*

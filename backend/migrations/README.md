@@ -30,3 +30,17 @@ For a **brand-new empty** Roomies database:
 Do **not** `db sign` the empty emitted contract before applying the initial `from: null` migration graph. `db sign` is not part of the normal fresh-database bootstrap before the initial migration.
 
 Manual marker deletion is **not** the standard workflow. Marker deletion during local experimental bootstrap was recovery from an orphan pre-migration marker, not the production procedure.
+
+## Integrity checks
+
+`npm run db:migration:check` (Prisma `migration check`) is the automated guard for committed migration artifacts. It is offline and verifies:
+
+- package internal consistency (hashes match attested contents)
+- manifests are complete
+- graph edges connect and refs point at valid nodes
+
+CI also applies the same committed graph to a fresh empty `roomies_ci` database and runs `prisma db verify --strict`. Do not invent a parallel custom hash/crypto framework.
+
+## Fresh test / CI database
+
+Use a dedicated database (`roomies_test` locally, `roomies_ci` in GitHub Actions). Prefer `TEST_DATABASE_URL`. See `docs/quality-and-ci.md` and `backend/scripts/verify-fresh-migrations.ts`.

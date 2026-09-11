@@ -11,6 +11,7 @@ npm run dev --workspace=@roomies/frontend
 npm run build --workspace=@roomies/frontend
 npm run typecheck --workspace=@roomies/frontend
 npm run test --workspace=@roomies/frontend
+npm run test:browser --workspace=@roomies/frontend
 ```
 
 Or from `frontend/`:
@@ -20,7 +21,10 @@ npm run dev
 npm run build
 npm run typecheck
 npm run test
+npm run test:browser
 ```
+
+Browser foundation tests (Playwright + Axe) start the Vite **dev** server so `/__dev/ui` is available. Install Chromium once with `npm run test:browser:install`. Production builds still exclude the fixture route.
 
 ## Environment
 

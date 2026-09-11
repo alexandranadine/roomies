@@ -146,3 +146,21 @@ Useful non-mutating checks:
 - `npx prisma db schema` (from `backend/`) — read-only live schema inspection.
 
 Signing / initializing Prisma’s database marker (`db sign`, `db init`) writes Prisma metadata and should be reviewed before first use on a shared database.
+
+## Quality gates and CI
+
+Local fast suite (format, lint, boundaries, typecheck, unit tests, frontend build):
+
+```bash
+npm run check
+```
+
+Database migration integrity + fresh test-DB apply/verify, and Playwright browser foundation tests, are separate. See [`docs/quality-and-ci.md`](docs/quality-and-ci.md) for commands, CI overview, test-database safety, and how `/__dev/ui` is exercised without entering production builds.
+
+```bash
+npm run db:migration:check   # offline artifact/graph integrity
+npm run db:test:migrate      # fresh empty test DB → migrate → verify (needs Postgres)
+npm run test:browser         # Playwright + Axe (Vite dev server)
+```
+
+CI (`.github/workflows/ci.yml`) runs the full set on pull requests and `main` with Node 24, `npm ci`, and an ephemeral PostgreSQL 18 service. No repository secrets and no deploy.

@@ -12,6 +12,9 @@ export default tseslint.config(
       '**/*.tsbuildinfo',
       'coverage/**',
       'package-lock.json',
+      'frontend/test-results/**',
+      'frontend/playwright-report/**',
+      'frontend/blob-report/**',
       // Vite HTML entry is not TypeScript-checked
       'frontend/index.html',
       // Prisma 8 generated contract artifacts (re-emitted; do not hand-edit)
@@ -40,7 +43,26 @@ export default tseslint.config(
     },
   },
   {
-    files: ['frontend/vite.config.ts'],
+    files: ['frontend/vite.config.ts', 'frontend/playwright.config.ts'],
+    extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+    },
+  },
+  {
+    files: ['frontend/e2e/**/*.{ts,tsx}'],
+    extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        ...globals.browser,
+      },
+    },
+  },
+  {
+    files: ['scripts/**/*.{js,mjs,cjs}', 'backend/scripts/**/*.{ts,js,mjs}'],
     extends: [tseslint.configs.disableTypeChecked],
     languageOptions: {
       globals: {

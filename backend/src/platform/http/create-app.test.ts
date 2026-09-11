@@ -3,6 +3,10 @@ import { describe, it } from 'node:test';
 import type { AppConfig } from '../config/types.js';
 import type { PersistenceReadiness } from '../persistence/readiness.js';
 import { appRequest } from './app-request.test-helper.js';
+import {
+  assertNoForbiddenLeak,
+  COMMON_SECRET_SENTINELS,
+} from './assert-no-forbidden-leak.js';
 import { REQUEST_ID_HEADER } from './constants.js';
 import { createApp } from './create-app.js';
 import type { ApiErrorBody } from './errors.js';
@@ -84,8 +88,15 @@ void describe('HTTP platform app', () => {
     assert.equal(body.error.code, 'INTERNAL_ERROR');
     assert.equal(body.error.message, 'An unexpected error occurred');
     assert.equal(body.error.requestId, res.headers.get(REQUEST_ID_HEADER));
-    assert.equal(res.text.includes('secret db detail'), false);
-    assert.equal(res.text.includes('stack'), false);
+    assertNoForbiddenLeak({
+      context: '500 response body',
+      text: res.text,
+      forbidden: [
+        ...COMMON_SECRET_SENTINELS,
+        'secret db detail should not leak',
+        'stack',
+      ],
+    });
   });
 
   void it('allowed CORS origin receives CORS headers', async () => {

@@ -17,13 +17,19 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "npm run typecheck --workspaces --if-present",
+    "check:boundaries": "node scripts/check-boundaries.mjs",
+    "check:ci-secrets": "node scripts/check-ci-no-secrets.mjs",
+    "check": "npm run format:check && npm run lint && npm run check:boundaries && npm run check:ci-secrets && npm run typecheck && npm run test && npm run build --workspace=@roomies/frontend",
+    "test:browser": "npm run test:browser --workspace=@roomies/frontend",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:logs": "docker compose logs -f roomies-postgres",
     "db:contract:emit": "npm run contract:emit --workspace=@roomies/backend",
     "db:migration:plan": "npm run migration:plan --workspace=@roomies/backend",
     "db:migrate": "npm run db:migrate --workspace=@roomies/backend",
-    "db:verify": "npm run db:verify --workspace=@roomies/backend"
+    "db:verify": "npm run db:verify --workspace=@roomies/backend",
+    "db:migration:check": "npm run migration:check --workspace=@roomies/backend",
+    "db:test:migrate": "npm run db:test:migrate --workspace=@roomies/backend"
   },
   "engines": {
     "node": ">=24 <25",

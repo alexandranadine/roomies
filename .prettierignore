@@ -4,6 +4,9 @@ dist-ssr
 coverage
 *.tsbuildinfo
 package-lock.json
+frontend/test-results
+frontend/playwright-report
+frontend/blob-report
 
 # Prisma 8 generated contract artifacts (re-emitted; do not hand-edit)
 **/src/prisma/contract.json
