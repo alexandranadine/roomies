@@ -42,3 +42,7 @@ cp .env.example .env
 ## Typography
 
 Manrope (400/500/600/700) is loaded via `@fontsource/manrope` (files served from `node_modules`, not committed as binaries). Self-hosting through the package keeps fonts off a third-party CDN; production CSP still needs to allow the app origin for font files.
+
+## UI primitives
+
+Reusable controls live in `src/components/ui/`. See [`src/components/ui/README.md`](./src/components/ui/README.md) for the headless/icon choices, token expectations, and the development-only `/__dev/ui` fixture.
