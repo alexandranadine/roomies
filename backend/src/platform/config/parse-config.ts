@@ -11,6 +11,10 @@ const LOCAL_DEV_ORIGINS = [
 ] as const;
 
 const DEFAULT_PORT = 3000;
+/** Direct-facing default: do not trust forwarded headers. */
+const DEFAULT_TRUST_PROXY_HOPS = 0;
+/** Upper bound for hop count (guards against absurd/mis-typed values). */
+const MAX_TRUST_PROXY_HOPS = 32;
 
 export type ConfigSource = Readonly<Record<string, string | undefined>>;
 
@@ -45,6 +49,42 @@ const portSchema = z
     return port;
   });
 
+const trustProxySchema = z
+  .string()
+  .trim()
+  .optional()
+  .transform((raw, ctx) => {
+    if (raw === undefined || raw === '') {
+      return DEFAULT_TRUST_PROXY_HOPS;
+    }
+    const normalized = raw.toLowerCase();
+    if (normalized === 'true' || normalized === 'false') {
+      ctx.addIssue({
+        code: 'custom',
+        message:
+          'TRUST_PROXY must be a non-negative integer hop count (boolean true/false is not allowed)',
+      });
+      return z.NEVER;
+    }
+    if (!/^\d+$/.test(raw)) {
+      ctx.addIssue({
+        code: 'custom',
+        message:
+          'TRUST_PROXY must be a non-negative integer hop count (received a non-integer value)',
+      });
+      return z.NEVER;
+    }
+    const hops = Number(raw);
+    if (!Number.isInteger(hops) || hops < 0 || hops > MAX_TRUST_PROXY_HOPS) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `TRUST_PROXY must be an integer between 0 and ${MAX_TRUST_PROXY_HOPS}`,
+      });
+      return z.NEVER;
+    }
+    return hops;
+  });
+
 const envSchema = z
   .object({
     APP_ENV: z.enum(APP_ENVS, {
@@ -59,6 +99,7 @@ const envSchema = z
       .trim()
       .min(1, { error: 'DATABASE_URL is required' }),
     TRUSTED_ORIGINS: z.string().optional(),
+    TRUST_PROXY: trustProxySchema,
   })
   .transform((data, ctx) => {
     const appEnv = data.APP_ENV;
@@ -95,11 +136,13 @@ const envSchema = z
       port: data.PORT,
       databaseUrl: data.DATABASE_URL,
       trustedOrigins,
+      trustProxyHops: data.TRUST_PROXY,
     } satisfies {
       appEnv: AppEnv;
       port: number;
       databaseUrl: string;
       trustedOrigins: string[];
+      trustProxyHops: number;
     };
   });
 
@@ -147,6 +190,14 @@ function formatIssues(zodError: z.ZodError): string[] {
       issues.push(issue.message);
       continue;
     }
+    if (key === 'TRUST_PROXY') {
+      issues.push(
+        issue.message.startsWith('TRUST_PROXY')
+          ? issue.message
+          : 'TRUST_PROXY must be a non-negative integer hop count',
+      );
+      continue;
+    }
     // Fallback: keep message but never echo unknown received blobs for secrets.
     issues.push(issue.message);
   }
@@ -164,6 +215,7 @@ export function parseConfig(source: ConfigSource): AppConfig {
     PORT: optionalString(source['PORT']),
     DATABASE_URL: optionalString(source['DATABASE_URL']),
     TRUSTED_ORIGINS: optionalString(source['TRUSTED_ORIGINS']),
+    TRUST_PROXY: optionalString(source['TRUST_PROXY']),
   });
 
   if (!result.success) {
@@ -179,6 +231,7 @@ export function parseConfig(source: ConfigSource): AppConfig {
     port: result.data.port,
     databaseUrl: result.data.databaseUrl,
     trustedOrigins: Object.freeze([...result.data.trustedOrigins]),
+    trustProxyHops: result.data.trustProxyHops,
   });
 }
 

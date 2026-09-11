@@ -85,7 +85,16 @@ Prisma 8 owns the database contract and reviewed migration workflow inside `@roo
 | Runtime client      | `backend/src/prisma/db.ts`                          |
 | Migrations          | `backend/migrations/` (`app/`, `snapshots/`)        |
 
-Connection uses `DATABASE_URL` from the environment. Prisma CLI loads it via `backend/prisma.config.ts`. Application runtime validates env through `backend/src/platform/config/` (`APP_ENV`, `PORT`, `TRUSTED_ORIGINS`, `DATABASE_URL`) and passes the typed URL into `createDb`. Do not hardcode credentials.
+Connection uses `DATABASE_URL` from the environment. Prisma CLI loads it via `backend/prisma.config.ts`. Application runtime validates env through `backend/src/platform/config/` (`APP_ENV`, `PORT`, `TRUSTED_ORIGINS`, `TRUST_PROXY`, `DATABASE_URL`) and passes the typed URL into `createDb`. Do not hardcode credentials.
+
+### HTTP web process
+
+The backend HTTP runtime lives under `backend/src/platform/http/` (app factory) and `backend/src/platform/server/` (listen + graceful shutdown). Entrypoint: `backend/src/main.ts` (`npm run start --workspace=@roomies/backend`).
+
+- `GET /health` — process liveness (no database dependency)
+- `GET /ready` — persistence readiness (503 when the DB probe fails)
+- Exact-origin CORS from `TRUSTED_ORIGINS`, Helmet defaults, JSON body limit `32kb`
+- `TRUST_PROXY` is an integer hop count (default `0`). Railway should set an explicit hop count after verifying proxy topology; unrestricted `true` is rejected.
 
 ### Fresh-database bootstrap note
 

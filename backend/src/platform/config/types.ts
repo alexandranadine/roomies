@@ -19,8 +19,15 @@ export type AppConfig = Readonly<{
   /** PostgreSQL connection string. Never log this value. */
   databaseUrl: string;
   /**
-   * Exact trusted frontend origins for the upcoming HTTP/CORS layer.
+   * Exact trusted frontend origins for the HTTP/CORS layer.
    * Normalized to scheme://host[:port] with no path, query, hash, or wildcards.
    */
   trustedOrigins: readonly string[];
+  /**
+   * Express `trust proxy` hop count.
+   * `0` means do not trust `X-Forwarded-*` (direct client). Positive integers
+   * trust that many proxy hops (right-to-left in `X-Forwarded-For`).
+   * Never unrestricted `true`.
+   */
+  trustProxyHops: number;
 }>;

@@ -26,7 +26,50 @@ void describe('parseConfig', () => {
       'http://localhost:5173',
       'http://127.0.0.1:5173',
     ]);
+    assert.equal(config.trustProxyHops, 0);
     assert.ok(Object.isFrozen(config));
+  });
+
+  void it('defaults TRUST_PROXY hop count to 0 when unset', () => {
+    const config = parseConfig(validDevelopmentEnv({ TRUST_PROXY: undefined }));
+    assert.equal(config.trustProxyHops, 0);
+  });
+
+  void it('accepts an explicit TRUST_PROXY hop count', () => {
+    const config = parseConfig(validDevelopmentEnv({ TRUST_PROXY: '1' }));
+    assert.equal(config.trustProxyHops, 1);
+  });
+
+  void it('rejects boolean TRUST_PROXY values', () => {
+    assert.throws(
+      () => parseConfig(validDevelopmentEnv({ TRUST_PROXY: 'true' })),
+      (error: unknown) => {
+        assert.ok(error instanceof ConfigError);
+        assert.match(error.message, /TRUST_PROXY/);
+        assert.match(error.message, /hop count|boolean/i);
+        return true;
+      },
+    );
+  });
+
+  void it('rejects invalid TRUST_PROXY values', () => {
+    assert.throws(
+      () => parseConfig(validDevelopmentEnv({ TRUST_PROXY: 'not-a-number' })),
+      (error: unknown) => {
+        assert.ok(error instanceof ConfigError);
+        assert.match(error.message, /TRUST_PROXY/);
+        return true;
+      },
+    );
+
+    assert.throws(
+      () => parseConfig(validDevelopmentEnv({ TRUST_PROXY: '99' })),
+      (error: unknown) => {
+        assert.ok(error instanceof ConfigError);
+        assert.match(error.message, /TRUST_PROXY/);
+        return true;
+      },
+    );
   });
 
   void it('applies development localhost origin defaults when TRUSTED_ORIGINS is omitted', () => {
