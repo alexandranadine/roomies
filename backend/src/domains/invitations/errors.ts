@@ -37,3 +37,16 @@ export class AlreadyHomeMemberError extends Error {
     super('Already a home member');
   }
 }
+
+/**
+ * Uniform external failure for invitation preview. Same contract for unknown
+ * IDs, invalid tokens, and non-pending lifecycle — not an existence oracle.
+ */
+export class InvitationNotAvailableError extends Error {
+  override readonly name = 'InvitationNotAvailableError';
+  readonly code = 'INVITATION_NOT_AVAILABLE';
+
+  constructor() {
+    super('Invitation is not available');
+  }
+}

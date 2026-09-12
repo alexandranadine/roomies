@@ -44,6 +44,13 @@ revoked_at,
 revocation_cause
 `;
 
+export const FIND_INVITATION_BY_ID_SQL = `
+SELECT ${INVITATION_COLUMNS}
+FROM invitations
+WHERE id = $1::uuid
+LIMIT 2
+`;
+
 export const FIND_INVITATION_BY_PUBLIC_ID_SQL = `
 SELECT ${INVITATION_COLUMNS}
 FROM invitations
@@ -199,6 +206,7 @@ export type LockedOpenInvitation = Readonly<{
 
 export type InvitationRepository = Readonly<{
   insert(tx: TransactionContext, invitation: NewInvitation): Promise<void>;
+  findById(invitationId: string): Promise<Invitation | null>;
   findByPublicId(
     homeId: string,
     invitationId: string,
@@ -236,6 +244,28 @@ export function createInvitationRepository(pool: Pool): InvitationRepository {
         }
         throw new InvitationPersistenceError();
       }
+    },
+
+    async findById(invitationId) {
+      let rows: InvitationRow[];
+      try {
+        rows = (
+          await pool.query<InvitationRow>(FIND_INVITATION_BY_ID_SQL, [
+            invitationId,
+          ])
+        ).rows;
+      } catch {
+        throw new InvitationPersistenceError();
+      }
+      if (rows.length === 0) return null;
+      if (rows.length !== 1 || rows[0] === undefined) {
+        throw new InvitationPersistenceError();
+      }
+      const homeId = rows[0].home_id;
+      if (!isUuid(homeId)) {
+        throw new InvitationPersistenceError();
+      }
+      return parseInvitationRow(rows[0], homeId);
     },
 
     async findByPublicId(homeId, invitationId) {

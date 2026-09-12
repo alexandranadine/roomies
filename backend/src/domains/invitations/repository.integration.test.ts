@@ -60,6 +60,15 @@ void describe('InvitationRepository PostgreSQL integration', () => {
         assert.equal(loaded?.invitedEmail, invitedEmail);
         assert.equal(loaded?.tokenHash.byteLength, 32);
 
+        const byId = await repository.findById(invitationId);
+        assert.equal(byId?.id, invitationId);
+        assert.equal(byId?.homeId, homeId);
+        assert.equal(byId?.invitedEmail, invitedEmail);
+        assert.equal(
+          await repository.findById('95000000-0000-7000-8000-000000000099'),
+          null,
+        );
+
         await runInReadCommittedTransaction(pool, async (tx) => {
           const effective = await repository.findEffectivePending(tx, {
             homeId,

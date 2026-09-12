@@ -1,4 +1,5 @@
 import { createBrowserRouter, type RouteObject } from 'react-router';
+import { InvitationLandingPage } from '../invitations/invitation-landing-page.js';
 import { AppShell } from './app-shell.js';
 import { FoundationHomePage } from './foundation-home-page.js';
 import { NotFoundPage } from './not-found-page.js';
@@ -13,8 +14,9 @@ export type CreateAppRouterOptions = {
 };
 
 /**
- * Router foundation only:
+ * Router foundation:
  * - `/` — foundation placeholder
+ * - `/invitations/:invitationId` — signed-out invitation preview landing
  * - `/__dev/ui` — development visual QA fixture (never in production)
  * - `*` — not-found
  *
@@ -40,6 +42,10 @@ export function buildAppChildRoutes(includeDevRoutes: boolean): RouteObject[] {
     {
       index: true,
       element: <FoundationHomePage />,
+    },
+    {
+      path: 'invitations/:invitationId',
+      element: <InvitationLandingPage />,
     },
   ];
 

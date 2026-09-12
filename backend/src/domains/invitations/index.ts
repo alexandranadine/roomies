@@ -4,8 +4,13 @@ export {
   type InvitationCreateDenial,
 } from './create-policy.js';
 export {
+  InvalidInvitationAuthorizationError,
+  parseInvitationAuthorization,
+} from './bearer.js';
+export {
   AlreadyHomeMemberError,
   InvitationAlreadyPendingError,
+  InvitationNotAvailableError,
   InvitationPersistenceError,
   InvitationValidityConflictError,
 } from './errors.js';

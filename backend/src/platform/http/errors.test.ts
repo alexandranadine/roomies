@@ -15,6 +15,7 @@ import { StructuralIntegrityError } from '../../domains/homes/structure-errors.j
 import {
   AlreadyHomeMemberError,
   InvitationAlreadyPendingError,
+  InvitationNotAvailableError,
   InvitationValidityConflictError,
 } from '../../domains/invitations/errors.js';
 import {
@@ -106,6 +107,17 @@ void describe('HTTP known-error mappings', () => {
     const body = res.json() as ApiErrorBody;
     assert.equal(body.error.code, 'INTERNAL_ERROR');
     assert.notEqual(body.error.code, 'INVITATION_ALREADY_PENDING');
+  });
+
+  void it('maps InvitationNotAvailableError to 404 INVITATION_NOT_AVAILABLE', async () => {
+    const res = await appRequest(
+      appThatThrows(new InvitationNotAvailableError()),
+      { path: '/throw' },
+    );
+    assert.equal(res.status, 404);
+    const body = res.json() as ApiErrorBody;
+    assert.equal(body.error.code, 'INVITATION_NOT_AVAILABLE');
+    assert.equal(body.error.message, 'Invitation is not available');
   });
 
   void it('maps AlreadyHomeMemberError to 409 ALREADY_HOME_MEMBER', async () => {

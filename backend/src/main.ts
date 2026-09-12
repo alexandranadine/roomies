@@ -1,6 +1,7 @@
 import { createChangeMembershipRoleFromPool } from './application/home-administration/change-membership-role.js';
 import { createArchiveFinalMemberHomeFromPool } from './application/home-administration/archive-final-member-home.js';
 import { createCreateInvitationFromPool } from './application/home-administration/create-invitation.js';
+import { createPreviewInvitationFromPool } from './application/invitations/preview-invitation.js';
 import { createLeaveMembershipFromPool } from './application/home-administration/leave-membership.js';
 import { createRemoveMembershipFromPool } from './application/home-administration/remove-membership.js';
 import { createHomeRepository } from './domains/homes/index.js';
@@ -65,6 +66,7 @@ function main(): void {
         createInvitation: createCreateInvitationFromPool(databasePool.pool),
         frontendOrigin: config.frontendOrigin,
       },
+      previewInvitation: createPreviewInvitationFromPool(databasePool.pool),
     }),
   });
 

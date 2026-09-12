@@ -16,6 +16,7 @@ import { FinalMemberRequiredError } from '../../domains/homes/errors.js';
 import {
   AlreadyHomeMemberError,
   InvitationAlreadyPendingError,
+  InvitationNotAvailableError,
 } from '../../domains/invitations/errors.js';
 import {
   LastAdminRequiredError,
@@ -177,6 +178,17 @@ export function errorHandler(
       409,
       'ALREADY_HOME_MEMBER',
       'Already a home member',
+      requestId,
+    );
+    return;
+  }
+
+  if (err instanceof InvitationNotAvailableError) {
+    sendApiError(
+      res,
+      404,
+      'INVITATION_NOT_AVAILABLE',
+      'Invitation is not available',
       requestId,
     );
     return;

@@ -14,6 +14,10 @@ import { createCurrentUserRouter } from '../domains/users/http.js';
 import type { PrincipalResolver } from '../platform/auth/principal.js';
 import type { ActiveHomeActorResolver } from '../platform/authz/index.js';
 import {
+  createInvitationPreviewRouter,
+  type PreviewInvitationCommand,
+} from './invitation-preview.js';
+import {
   createInvitationsRouter,
   type CreateInvitationCommand,
 } from './invitations.js';
@@ -30,6 +34,7 @@ export type CreateRoomiesApiRouterOptions = {
     createInvitation: CreateInvitationCommand;
     frontendOrigin: string;
   };
+  previewInvitation?: PreviewInvitationCommand;
 };
 
 /**
@@ -51,6 +56,14 @@ export function createRoomiesApiRouter(
         activeHomeActorResolver: options.activeHomeActorResolver,
         createInvitation: options.invitations.createInvitation,
         frontendOrigin: options.invitations.frontendOrigin,
+      }),
+    );
+  }
+  if (options.previewInvitation !== undefined) {
+    router.use(
+      '/invitations',
+      createInvitationPreviewRouter({
+        previewInvitation: options.previewInvitation,
       }),
     );
   }

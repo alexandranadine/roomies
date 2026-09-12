@@ -6,6 +6,7 @@ import {
   decodeInvitationSecret,
   generateInvitationSecret,
   hashInvitationSecretBytes,
+  invitationTokenHashesEqual,
   InvalidInvitationSecretError,
 } from './secret.js';
 import {
@@ -87,5 +88,13 @@ void describe('invitation secret primitives', () => {
       String(new InvalidInvitationSecretError()).includes(generated.encoded),
       false,
     );
+  });
+
+  void it('compares token digests with the constant-time helper', () => {
+    const digest = hashInvitationSecretBytes(new Uint8Array(32).fill(3));
+    const same = invitationTokenHash(Uint8Array.from(digest));
+    const other = hashInvitationSecretBytes(new Uint8Array(32).fill(4));
+    assert.equal(invitationTokenHashesEqual(digest, same), true);
+    assert.equal(invitationTokenHashesEqual(digest, other), false);
   });
 });
