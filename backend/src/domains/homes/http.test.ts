@@ -75,6 +75,8 @@ function buildApp(
                 timezone: 'America/Los_Angeles',
               })),
         },
+        archiveFinalMemberHome: () =>
+          Promise.reject(new Error('archive must not run for home read')),
         changeMembershipRole: () =>
           Promise.reject(new Error('role change must not run for home read')),
         leaveMembership: () =>

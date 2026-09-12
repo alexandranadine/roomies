@@ -1,5 +1,8 @@
 import { Router } from 'express';
-import { createHomesRouter } from '../domains/homes/http.js';
+import {
+  createHomesRouter,
+  type ArchiveFinalMemberCommand,
+} from '../domains/homes/http.js';
 import type { HomeReader } from '../domains/homes/index.js';
 import {
   createMembershipsRouter,
@@ -15,6 +18,7 @@ export type CreateRoomiesApiRouterOptions = {
   principalResolver: Pick<PrincipalResolver, 'requirePrincipal'>;
   activeHomeActorResolver: Pick<ActiveHomeActorResolver, 'resolve'>;
   homeReader: Pick<HomeReader, 'findActiveHomeById'>;
+  archiveFinalMemberHome: ArchiveFinalMemberCommand;
   changeMembershipRole: ChangeMembershipRoleCommand;
   leaveMembership: LeaveMembershipCommand;
   removeMembership: RemoveMembershipCommand;

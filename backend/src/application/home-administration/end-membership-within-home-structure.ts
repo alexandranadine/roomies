@@ -48,16 +48,23 @@ export type EndMembershipWithinHomeStructureDependencies = {
   ids: UuidV7Generator;
 };
 
+export type ApplyMembershipEndingWithinHomeStructureDependencies = Pick<
+  EndMembershipWithinHomeStructureDependencies,
+  'taskCleanup' | 'supplyCleanup' | 'membershipEnding'
+>;
+
+export type ApplyMembershipEndingWithinHomeStructure =
+  EndMembershipWithinHomeStructure;
+
 /**
- * Synchronous membership-ending consequences inside an already-established
- * structural transaction. Does not begin, commit, or roll back; does not
- * lock Home; does not decide whether leave/remove/archive is permitted.
+ * Internal no-event mutation primitive for callers that must sequence another
+ * structural write before appending membership.ended.v1.
  *
- * Order: Task cleanup → Supply cleanup → Membership ended_at → outbox.
+ * Order: Task cleanup → Supply cleanup → exact Membership ended_at.
  */
-export function createEndMembershipWithinHomeStructure(
-  deps: EndMembershipWithinHomeStructureDependencies,
-): EndMembershipWithinHomeStructure {
+export function createApplyMembershipEndingWithinHomeStructure(
+  deps: ApplyMembershipEndingWithinHomeStructureDependencies,
+): ApplyMembershipEndingWithinHomeStructure {
   return async (tx, input) => {
     if (!isMembershipEndedCause(input.cause)) {
       throw new Error('Invalid membership ended cause');
@@ -82,6 +89,26 @@ export function createEndMembershipWithinHomeStructure(
       throw new StructuralIntegrityError();
     }
 
+    return { membershipId: input.membershipId };
+  };
+}
+
+/**
+ * Synchronous membership-ending consequences inside an already-established
+ * structural transaction. Does not begin, commit, or roll back; does not
+ * lock Home; does not decide whether leave/remove/archive is permitted.
+ *
+ * Order: Task cleanup → Supply cleanup → Membership ended_at → outbox.
+ */
+export function createEndMembershipWithinHomeStructure(
+  deps: EndMembershipWithinHomeStructureDependencies,
+): EndMembershipWithinHomeStructure {
+  const applyMembershipEnding =
+    createApplyMembershipEndingWithinHomeStructure(deps);
+
+  return async (tx, input) => {
+    const result = await applyMembershipEnding(tx, input);
+
     await deps.outbox.append(
       tx,
       createMembershipEndedV1Event({
@@ -93,7 +120,7 @@ export function createEndMembershipWithinHomeStructure(
       }),
     );
 
-    return { membershipId: input.membershipId };
+    return result;
   };
 }
 
@@ -111,5 +138,13 @@ export function createEndMembershipWithinHomeStructureWithTemporaryNoOpCleanup()
     membershipEnding: createMembershipEndingWriter(),
     outbox: outboxWriter,
     ids: systemUuidV7,
+  });
+}
+
+export function createApplyMembershipEndingWithinHomeStructureWithTemporaryNoOpCleanup(): ApplyMembershipEndingWithinHomeStructure {
+  return createApplyMembershipEndingWithinHomeStructure({
+    taskCleanup: createTemporaryNoOpMembershipEndingTaskCleanup(),
+    supplyCleanup: createTemporaryNoOpMembershipEndingSupplyCleanup(),
+    membershipEnding: createMembershipEndingWriter(),
   });
 }

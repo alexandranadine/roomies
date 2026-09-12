@@ -1,8 +1,19 @@
 export { HOME_ACTION, type HomeAction } from './actions.js';
+export type { ArchiveFinalMemberInput } from './archive-final-member.js';
+export {
+  ARCHIVE_ACTIVE_HOME_SQL,
+  createHomeArchiveWriter,
+  type HomeArchiveWriter,
+} from './archive-home.js';
+export { FinalMemberRequiredError } from './errors.js';
 export { getHome } from './get-home.js';
 export type { Home } from './home.js';
 export { homeDtoSchema, toHomeDto, type HomeDto } from './home-dto.js';
-export { createHomesRouter, type CreateHomesRouterOptions } from './http.js';
+export {
+  createHomesRouter,
+  type ArchiveFinalMemberCommand,
+  type CreateHomesRouterOptions,
+} from './http.js';
 export { lockHomeStructure } from './lock-home-structure.js';
 export type {
   LockedActiveMembership,
@@ -10,7 +21,12 @@ export type {
   LockedHomeActor,
   LockedHomeStructure,
 } from './locked-home-structure.js';
-export { decideHomeRead, type HomeReadDenialReason } from './policies.js';
+export {
+  decideArchiveFinalMember,
+  decideHomeRead,
+  type ArchiveFinalMemberDenialReason,
+  type HomeReadDenialReason,
+} from './policies.js';
 export {
   createHomeRepository,
   type HomeReader,

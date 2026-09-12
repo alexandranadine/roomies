@@ -12,6 +12,7 @@ import {
 } from '../authz/errors.js';
 import { TransactionInfrastructureError } from '../persistence/errors.js';
 import { StructuralIntegrityError } from '../../domains/homes/structure-errors.js';
+import { FinalMemberRequiredError } from '../../domains/homes/errors.js';
 import {
   LastAdminRequiredError,
   LastRoommateRequiresArchiveError,
@@ -150,6 +151,17 @@ export function errorHandler(
       409,
       'LAST_ROOMMATE_REQUIRES_ARCHIVE',
       'Last roommate requires archive',
+      requestId,
+    );
+    return;
+  }
+
+  if (err instanceof FinalMemberRequiredError) {
+    sendApiError(
+      res,
+      409,
+      'FINAL_MEMBER_REQUIRED',
+      'Final member required',
       requestId,
     );
     return;

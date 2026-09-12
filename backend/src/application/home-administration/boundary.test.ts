@@ -135,6 +135,28 @@ void describe('home-administration application boundary', () => {
     assert.doesNotMatch(source, /endMembership\?:/);
   });
 
+  void it('owns final archive sequencing without repository or fake lock infrastructure', async () => {
+    const source = await readFile(
+      path.join(dir, 'archive-final-member-home.ts'),
+      'utf8',
+    );
+    assert.doesNotMatch(source, /memberships\/repository/);
+    assert.doesNotMatch(source, /homes\/repository/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /better-auth/);
+    assert.doesNotMatch(source, /TaskLock|SupplyLock|MaintenanceLock/);
+    assert.doesNotMatch(source, /invitationRevoker\?:/);
+    assert.doesNotMatch(source, /emitEvent|suppressEvent/);
+    assert.match(source, /lockHomeStructure/);
+    assert.match(source, /decideArchiveFinalMember/);
+    assert.match(source, /applyMembershipEnding/);
+    assert.match(source, /archiveActiveHome/);
+    assert.ok(
+      source.lastIndexOf('createMembershipEndedV1Event') <
+        source.lastIndexOf('createHomeArchivedV1Event'),
+    );
+  });
+
   void it('makes temporary Task/Supply no-op replacement obligatory and explicit', async () => {
     const composition = await readFile(
       path.join(dir, 'end-membership-within-home-structure.ts'),

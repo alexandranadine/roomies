@@ -111,12 +111,15 @@ void describe('homes domain boundary', () => {
     }
   });
 
-  void it('does not add structural mutation HTTP routes or FOR UPDATE reads', async () => {
+  void it('keeps the explicit archive route adapter-only', async () => {
     const source = await readFile(path.join(homesDir, 'http.ts'), 'utf8');
-    assert.doesNotMatch(source, /router\.(post|patch|put|delete)\s*\(/);
+    const mutations = source.match(/router\.(post|patch|put|delete)\s*\(/g);
+    assert.equal(mutations?.length, 1);
+    assert.match(source, /router\.post\('\/:homeId\/archive-final-member'/);
     assert.doesNotMatch(source, /lockHomeStructure/);
     assert.doesNotMatch(source, /FOR UPDATE/i);
-    assert.doesNotMatch(source, /leave|removeMember|archive/i);
+    assert.doesNotMatch(source, /leave|removeMember/i);
+    assert.doesNotMatch(source, /activeMemberships|actor\.role/);
   });
 
   void it('does not query Membership tables from HTTP', async () => {

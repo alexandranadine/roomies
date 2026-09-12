@@ -131,6 +131,7 @@ void describe('PATCH membership role HTTP PostgreSQL', () => {
               database.pool,
             ),
             homeReader: createHomeRepository(database.pool),
+            archiveFinalMemberHome: () => Promise.resolve(),
             changeMembershipRole: createChangeMembershipRoleFromPool(
               database.pool,
             ),

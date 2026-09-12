@@ -8,7 +8,10 @@ import type {
 } from '../../platform/events/outbox-types.js';
 import type { TransactionContext } from '../../platform/persistence/transaction.js';
 import type { MembershipEndingCleanupInput } from './membership-ending-cleanup.js';
-import { createEndMembershipWithinHomeStructure } from './end-membership-within-home-structure.js';
+import {
+  createApplyMembershipEndingWithinHomeStructure,
+  createEndMembershipWithinHomeStructure,
+} from './end-membership-within-home-structure.js';
 
 const HOME = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const MEMBERSHIP = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
@@ -90,6 +93,39 @@ function commandOf(options: {
 }
 
 void describe('endMembershipWithinHomeStructure application orchestration', () => {
+  void it('exposes a narrow no-event primitive with cleanup and exact UPDATE only', async () => {
+    const steps: string[] = [];
+    const tx = {} as TransactionContext;
+    const apply = createApplyMembershipEndingWithinHomeStructure({
+      taskCleanup: {
+        handleMembershipEnded: () => {
+          steps.push('task');
+          return Promise.resolve();
+        },
+      },
+      supplyCleanup: {
+        handleMembershipEnded: () => {
+          steps.push('supply');
+          return Promise.resolve();
+        },
+      },
+      membershipEnding: {
+        endActiveMembership: () => {
+          steps.push('membership');
+          return Promise.resolve(1);
+        },
+      },
+    });
+
+    await apply(tx, {
+      homeId: HOME,
+      membershipId: MEMBERSHIP,
+      endedAt: ENDED_AT,
+      cause: 'HOME_ARCHIVED',
+    });
+    assert.deepEqual(steps, ['task', 'supply', 'membership']);
+  });
+
   void it('invokes Task then Supply then Membership UPDATE then outbox once each', async () => {
     const {
       tx,

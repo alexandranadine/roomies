@@ -132,6 +132,7 @@ void describe('POST membership leave HTTP PostgreSQL', () => {
               database.pool,
             ),
             homeReader: createHomeRepository(database.pool),
+            archiveFinalMemberHome: () => Promise.resolve(),
             changeMembershipRole: createChangeMembershipRoleFromPool(
               database.pool,
             ),

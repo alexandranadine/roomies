@@ -66,6 +66,7 @@ function buildApp(
             (({ homeId }) => Promise.resolve({ ...actor(), homeId })),
         },
         homeReader: unusedHomeReader(),
+        archiveFinalMemberHome: () => Promise.resolve(),
         changeMembershipRole: async (input) => {
           calls.push(input);
           if (options.changeMembershipRole) {

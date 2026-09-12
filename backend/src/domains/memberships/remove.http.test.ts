@@ -64,6 +64,7 @@ function buildApp(
             (({ homeId }) => Promise.resolve({ ...actor(), homeId })),
         },
         homeReader: unusedHomeReader(),
+        archiveFinalMemberHome: () => Promise.resolve(),
         changeMembershipRole: () =>
           Promise.reject(new Error('role change must not run for remove')),
         leaveMembership: () =>
