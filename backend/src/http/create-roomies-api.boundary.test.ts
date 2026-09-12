@@ -26,4 +26,14 @@ void describe('create-roomies-api composition boundary', () => {
       /principal\.(role|membershipId|homeId|capabilities)/,
     );
   });
+
+  void it('does not add leave, remove, or archive routes', async () => {
+    const source = await readFile(
+      new URL('./create-roomies-api.ts', import.meta.url),
+      'utf8',
+    );
+    assert.doesNotMatch(source, /leave|removeMember|archiveHome/i);
+    assert.doesNotMatch(source, /endMembershipWithinHomeStructure/);
+    assert.doesNotMatch(source, /end-membership-within-home-structure/);
+  });
 });

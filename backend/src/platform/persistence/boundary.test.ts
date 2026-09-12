@@ -57,6 +57,17 @@ void describe('transaction kernel boundary', () => {
     }
   });
 
+  void it('does not import domain or application orchestration', async () => {
+    const files = await walk(persistenceDir);
+    for (const file of files) {
+      const source = await readFile(file, 'utf8');
+      const rel = file.replaceAll('\\', '/');
+      assert.doesNotMatch(source, /application\/home-administration/, rel);
+      assert.doesNotMatch(source, /endMembershipWithinHomeStructure/, rel);
+      assert.doesNotMatch(source, /from ['"].*\/domains\//, rel);
+    }
+  });
+
   void it('does not add Membership role to the auth session', async () => {
     const authFiles = await walk(path.join(backendSrc, 'platform/auth'));
     for (const file of authFiles) {

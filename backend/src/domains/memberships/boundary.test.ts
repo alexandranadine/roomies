@@ -78,6 +78,36 @@ void describe('memberships domain boundary', () => {
       const rel = file.replaceAll('\\', '/');
       assert.doesNotMatch(source, /homes\/repository/, rel);
       assert.doesNotMatch(source, /home-repository/, rel);
+      assert.doesNotMatch(source, /application\/home-administration/, rel);
+      assert.doesNotMatch(source, /domains\/tasks/, rel);
+      assert.doesNotMatch(source, /domains\/supplies/, rel);
     }
+  });
+
+  void it('owns the exact active Membership ending UPDATE', async () => {
+    const source = await readFile(
+      path.join(membershipsDir, 'update-active-membership-ended-at.ts'),
+      'utf8',
+    );
+    assert.match(source, /SET ended_at = \$1/);
+    assert.match(source, /WHERE id = \$2/);
+    assert.match(source, /AND home_id = \$3/);
+    assert.match(source, /AND ended_at IS NULL/);
+    assert.doesNotMatch(source, /user_id/);
+    assert.doesNotMatch(source, /DELETE/i);
+    assert.doesNotMatch(source, /SET role/i);
+    assert.doesNotMatch(source, /SET joined_at/i);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /better-auth/);
+    assert.doesNotMatch(source, /domains\/tasks/);
+    assert.doesNotMatch(source, /domains\/supplies/);
+    assert.doesNotMatch(source, /application\/home-administration/);
+  });
+
+  void it('does not add leave, remove, or archive HTTP routes', async () => {
+    const source = await readFile(path.join(membershipsDir, 'http.ts'), 'utf8');
+    assert.doesNotMatch(source, /router\.(post|delete)\s*\(/);
+    assert.doesNotMatch(source, /leave|removeMember|archive/i);
+    assert.doesNotMatch(source, /endMembershipWithinHomeStructure/);
   });
 });
