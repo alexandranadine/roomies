@@ -1,0 +1,608 @@
+[
+  {
+    "id": "data.public.auth_identities.normalize_canonical_email",
+    "label": "Audit and normalize canonical auth identity emails",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [
+      {
+        "description": "refuse normalized collisions or unsupported stored email values",
+        "sql": "SELECT (\n  NOT EXISTS (\n    SELECT 1\n    FROM public.auth_identities\n    GROUP BY pg_catalog.lower(pg_catalog.btrim(email))\n    HAVING COUNT(*) > 1\n  )\n  AND NOT EXISTS (\n    SELECT 1\n    FROM public.auth_identities\n    WHERE pg_catalog.char_length(pg_catalog.lower(pg_catalog.btrim(email))) NOT BETWEEN 3 AND 254\n       OR pg_catalog.lower(pg_catalog.btrim(email)) !~ '^[!-~]+$'::text\n  )\n) AS \"result\"",
+        "params": []
+      }
+    ],
+    "execute": [
+      {
+        "description": "store every auth email in canonical form",
+        "sql": "UPDATE public.auth_identities\nSET email = pg_catalog.lower(pg_catalog.btrim(email))\nWHERE email IS DISTINCT FROM pg_catalog.lower(pg_catalog.btrim(email))",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify canonical auth email storage and uniqueness",
+        "sql": "SELECT (\n  NOT EXISTS (\n    SELECT 1\n    FROM public.auth_identities\n    WHERE email IS DISTINCT FROM pg_catalog.lower(pg_catalog.btrim(email))\n  )\n  AND NOT EXISTS (\n    SELECT 1\n    FROM public.auth_identities\n    GROUP BY email\n    HAVING COUNT(*) > 1\n  )\n) AS \"result\"",
+        "params": []
+      }
+    ]
+  },
+  {
+    "id": "extension.public.btree_gist",
+    "label": "Install btree_gist for invitation temporal exclusion",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [
+      {
+        "description": "allow idempotent btree_gist extension installation",
+        "sql": "SELECT true AS \"result\"",
+        "params": []
+      }
+    ],
+    "execute": [
+      {
+        "description": "install btree_gist extension",
+        "sql": "CREATE EXTENSION IF NOT EXISTS btree_gist WITH SCHEMA public",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify btree_gist is installed",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM pg_catalog.pg_extension\n  WHERE extname = 'btree_gist'\n) AS \"result\"",
+        "params": []
+      }
+    ]
+  },
+  {
+    "id": "table.invitations",
+    "label": "Create table \"invitations\"",
+    "summary": "Creates table \"invitations\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "invitations"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"invitations\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"invitations\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"invitations\"",
+        "sql": "CREATE TABLE \"public\".\"invitations\" (\n  \"accepted_at\" timestamptz,\n  \"accepted_membership_id\" uuid,\n  \"created_at\" timestamptz NOT NULL,\n  \"created_by_membership_id\" uuid NOT NULL,\n  \"expires_at\" timestamptz NOT NULL,\n  \"home_id\" uuid NOT NULL,\n  \"id\" uuid NOT NULL,\n  \"invited_email\" text NOT NULL,\n  \"revocation_cause\" text,\n  \"revoked_at\" timestamptz,\n  \"token_hash\" bytea NOT NULL,\n  PRIMARY KEY (\"id\"),\n  CONSTRAINT \"invitations_acceptance_completeness_check\" CHECK (((accepted_at IS NULL) = (accepted_membership_id IS NULL))),\n  CONSTRAINT \"invitations_accepted_time_check\" CHECK (((accepted_at IS NULL) OR ((accepted_at >= created_at) AND (accepted_at < expires_at)))),\n  CONSTRAINT \"invitations_email_canonical_check\" CHECK (((char_length(invited_email) >= 3) AND (char_length(invited_email) <= 254) AND (invited_email = btrim(invited_email)) AND (invited_email !~ '[A-Z]'::text) AND (invited_email ~ '^[!-~]+$'::text))),\n  CONSTRAINT \"invitations_expiry_order_check\" CHECK ((expires_at > created_at)),\n  CONSTRAINT \"invitations_revocation_cause_check\" CHECK (((revocation_cause IS NULL) OR (revocation_cause = ANY (ARRAY['ADMIN_REVOKED'::text, 'HOME_ARCHIVED'::text])))),\n  CONSTRAINT \"invitations_revocation_completeness_check\" CHECK (((revoked_at IS NULL) = (revocation_cause IS NULL))),\n  CONSTRAINT \"invitations_revoked_time_check\" CHECK (((revoked_at IS NULL) OR ((revoked_at >= created_at) AND (revoked_at < expires_at)))),\n  CONSTRAINT \"invitations_terminal_state_check\" CHECK ((NOT ((accepted_at IS NOT NULL) AND (revoked_at IS NOT NULL)))),\n  CONSTRAINT \"invitations_token_hash_length_check\" CHECK ((octet_length(token_hash) = 32))\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"invitations\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"invitations\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "checkConstraint.auth_identities.auth_identities_email_canonical_check",
+    "label": "Add check constraint \"auth_identities_email_canonical_check\" on \"auth_identities\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "checkConstraint",
+        "name": "auth_identities_email_canonical_check",
+        "table": "auth_identities"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"auth_identities_email_canonical_check\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "auth_identities_email_canonical_check",
+          "public",
+          "\"public\".\"auth_identities\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add check constraint \"auth_identities_email_canonical_check\"",
+        "sql": "ALTER TABLE \"public\".\"auth_identities\" ADD CONSTRAINT \"auth_identities_email_canonical_check\" CHECK (((char_length(email) >= 3) AND (char_length(email) <= 254) AND (email = btrim(email)) AND (email !~ '[A-Z]'::text) AND (email ~ '^[!-~]+$'::text)))"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"auth_identities_email_canonical_check\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "auth_identities_email_canonical_check",
+          "public",
+          "\"public\".\"auth_identities\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.invitations.invitations_accepted_membership_uidx_b563a30a",
+    "label": "Create index \"invitations_accepted_membership_uidx_b563a30a\" on \"invitations\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "invitations_accepted_membership_uidx_b563a30a",
+        "table": "invitations"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"invitations_accepted_membership_uidx_b563a30a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"invitations_accepted_membership_uidx_b563a30a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"invitations_accepted_membership_uidx_b563a30a\"",
+        "sql": "CREATE UNIQUE INDEX \"invitations_accepted_membership_uidx_b563a30a\" ON \"public\".\"invitations\" (\"accepted_membership_id\") WHERE ((accepted_membership_id IS NOT NULL))",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"invitations_accepted_membership_uidx_b563a30a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"invitations_accepted_membership_uidx_b563a30a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.invitations.invitations_created_by_membership_idx_48d99df3",
+    "label": "Create index \"invitations_created_by_membership_idx_48d99df3\" on \"invitations\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "invitations_created_by_membership_idx_48d99df3",
+        "table": "invitations"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"invitations_created_by_membership_idx_48d99df3\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"invitations_created_by_membership_idx_48d99df3\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"invitations_created_by_membership_idx_48d99df3\"",
+        "sql": "CREATE INDEX \"invitations_created_by_membership_idx_48d99df3\" ON \"public\".\"invitations\" (\"created_by_membership_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"invitations_created_by_membership_idx_48d99df3\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"invitations_created_by_membership_idx_48d99df3\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.invitations.invitations_home_id_accepted_membership_id_idx_48aa0859",
+    "label": "Create index \"invitations_home_id_accepted_membership_id_idx_48aa0859\" on \"invitations\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "invitations_home_id_accepted_membership_id_idx_48aa0859",
+        "table": "invitations"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"invitations_home_id_accepted_membership_id_idx_48aa0859\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"invitations_home_id_accepted_membership_id_idx_48aa0859\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"invitations_home_id_accepted_membership_id_idx_48aa0859\"",
+        "sql": "CREATE INDEX \"invitations_home_id_accepted_membership_id_idx_48aa0859\" ON \"public\".\"invitations\" (\"home_id\", \"accepted_membership_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"invitations_home_id_accepted_membership_id_idx_48aa0859\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"invitations_home_id_accepted_membership_id_idx_48aa0859\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.invitations.invitations_home_id_created_by_membership_id_idx_889ed7bc",
+    "label": "Create index \"invitations_home_id_created_by_membership_id_idx_889ed7bc\" on \"invitations\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "invitations_home_id_created_by_membership_id_idx_889ed7bc",
+        "table": "invitations"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"invitations_home_id_created_by_membership_id_idx_889ed7bc\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"invitations_home_id_created_by_membership_id_idx_889ed7bc\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"invitations_home_id_created_by_membership_id_idx_889ed7bc\"",
+        "sql": "CREATE INDEX \"invitations_home_id_created_by_membership_id_idx_889ed7bc\" ON \"public\".\"invitations\" (\"home_id\", \"created_by_membership_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"invitations_home_id_created_by_membership_id_idx_889ed7bc\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"invitations_home_id_created_by_membership_id_idx_889ed7bc\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.invitations.invitations_home_id_idx_f881d5c1",
+    "label": "Create index \"invitations_home_id_idx_f881d5c1\" on \"invitations\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "invitations_home_id_idx_f881d5c1",
+        "table": "invitations"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"invitations_home_id_idx_f881d5c1\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"invitations_home_id_idx_f881d5c1\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"invitations_home_id_idx_f881d5c1\"",
+        "sql": "CREATE INDEX \"invitations_home_id_idx_f881d5c1\" ON \"public\".\"invitations\" (\"home_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"invitations_home_id_idx_f881d5c1\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"invitations_home_id_idx_f881d5c1\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.invitations.invitations_home_open_idx_585413c4",
+    "label": "Create index \"invitations_home_open_idx_585413c4\" on \"invitations\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "invitations_home_open_idx_585413c4",
+        "table": "invitations"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"invitations_home_open_idx_585413c4\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"invitations_home_open_idx_585413c4\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"invitations_home_open_idx_585413c4\"",
+        "sql": "CREATE INDEX \"invitations_home_open_idx_585413c4\" ON \"public\".\"invitations\" (\"home_id\", \"expires_at\", \"created_at\", \"id\") WHERE (((accepted_at IS NULL) AND (revoked_at IS NULL)))",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"invitations_home_open_idx_585413c4\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"invitations_home_open_idx_585413c4\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.invitations.invitations_token_hash_uidx_caa64aca",
+    "label": "Create index \"invitations_token_hash_uidx_caa64aca\" on \"invitations\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "invitations_token_hash_uidx_caa64aca",
+        "table": "invitations"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"invitations_token_hash_uidx_caa64aca\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"invitations_token_hash_uidx_caa64aca\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"invitations_token_hash_uidx_caa64aca\"",
+        "sql": "CREATE UNIQUE INDEX \"invitations_token_hash_uidx_caa64aca\" ON \"public\".\"invitations\" (\"token_hash\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"invitations_token_hash_uidx_caa64aca\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"invitations_token_hash_uidx_caa64aca\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.memberships.memberships_home_id_id_key_2f2cccd8",
+    "label": "Create index \"memberships_home_id_id_key_2f2cccd8\" on \"memberships\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "memberships_home_id_id_key_2f2cccd8",
+        "table": "memberships"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"memberships_home_id_id_key_2f2cccd8\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"memberships_home_id_id_key_2f2cccd8\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"memberships_home_id_id_key_2f2cccd8\"",
+        "sql": "CREATE UNIQUE INDEX \"memberships_home_id_id_key_2f2cccd8\" ON \"public\".\"memberships\" (\"home_id\", \"id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"memberships_home_id_id_key_2f2cccd8\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"memberships_home_id_id_key_2f2cccd8\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.invitations.invitations_home_id_fkey",
+    "label": "Add foreign key \"invitations_home_id_fkey\" on \"invitations\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "invitations_home_id_fkey",
+        "table": "invitations"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"invitations_home_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "invitations_home_id_fkey",
+          "public",
+          "\"public\".\"invitations\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"invitations_home_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"invitations\"\nADD CONSTRAINT \"invitations_home_id_fkey\"\nFOREIGN KEY (\"home_id\")\nREFERENCES \"public\".\"homes\" (\"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"invitations_home_id_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "invitations_home_id_fkey",
+          "public",
+          "\"public\".\"invitations\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.invitations.invitations_creator_home_membership_fkey",
+    "label": "Add foreign key \"invitations_creator_home_membership_fkey\" on \"invitations\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "invitations_creator_home_membership_fkey",
+        "table": "invitations"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"invitations_creator_home_membership_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "invitations_creator_home_membership_fkey",
+          "public",
+          "\"public\".\"invitations\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"invitations_creator_home_membership_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"invitations\"\nADD CONSTRAINT \"invitations_creator_home_membership_fkey\"\nFOREIGN KEY (\"home_id\", \"created_by_membership_id\")\nREFERENCES \"public\".\"memberships\" (\"home_id\", \"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"invitations_creator_home_membership_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "invitations_creator_home_membership_fkey",
+          "public",
+          "\"public\".\"invitations\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.invitations.invitations_accepted_home_membership_fkey",
+    "label": "Add foreign key \"invitations_accepted_home_membership_fkey\" on \"invitations\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "invitations_accepted_home_membership_fkey",
+        "table": "invitations"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"invitations_accepted_home_membership_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "invitations_accepted_home_membership_fkey",
+          "public",
+          "\"public\".\"invitations\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"invitations_accepted_home_membership_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"invitations\"\nADD CONSTRAINT \"invitations_accepted_home_membership_fkey\"\nFOREIGN KEY (\"home_id\", \"accepted_membership_id\")\nREFERENCES \"public\".\"memberships\" (\"home_id\", \"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"invitations_accepted_home_membership_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "invitations_accepted_home_membership_fkey",
+          "public",
+          "\"public\".\"invitations\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "constraint.public.invitations.invitations_nonoverlapping_validity",
+    "label": "Prevent overlapping effective invitation validity",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [
+      {
+        "description": "ensure invitation validity exclusion constraint is absent",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1\n  FROM pg_catalog.pg_constraint\n  WHERE conrelid = 'public.invitations'::pg_catalog.regclass\n    AND conname = 'invitations_nonoverlapping_validity'\n) AS \"result\"",
+        "params": []
+      }
+    ],
+    "execute": [
+      {
+        "description": "add invitation effective-validity exclusion constraint",
+        "sql": "ALTER TABLE public.invitations\nADD CONSTRAINT invitations_nonoverlapping_validity\nEXCLUDE USING gist (\n  home_id WITH =,\n  invited_email WITH =,\n  tstzrange(\n    created_at,\n    COALESCE(accepted_at, revoked_at, expires_at),\n    '[)'::text\n  ) WITH &&\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify invitation validity exclusion constraint",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM pg_catalog.pg_constraint\n  WHERE conrelid = 'public.invitations'::pg_catalog.regclass\n    AND conname = 'invitations_nonoverlapping_validity'\n    AND contype = 'x'\n) AS \"result\"",
+        "params": []
+      }
+    ]
+  }
+]

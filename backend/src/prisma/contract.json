@@ -24,6 +24,10 @@
       "model": "Home",
       "namespace": "public"
     },
+    "invitations": {
+      "model": "Invitation",
+      "namespace": "public"
+    },
     "memberships": {
       "model": "Membership",
       "namespace": "public"
@@ -564,6 +568,21 @@
               }
             },
             "relations": {
+              "invitations": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "homeId"
+                  ]
+                },
+                "to": {
+                  "model": "Invitation",
+                  "namespace": "public"
+                }
+              },
               "memberships": {
                 "cardinality": "1:N",
                 "on": {
@@ -603,6 +622,177 @@
               },
               "namespaceId": "public",
               "table": "homes"
+            }
+          },
+          "Invitation": {
+            "fields": {
+              "acceptedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "acceptedMembershipId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdByMembershipId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "expiresAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "homeId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "invitedEmail": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "revocationCause": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "revokedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "tokenHash": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bytea@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "acceptedMembership": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "acceptedMembershipId"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Membership",
+                  "namespace": "public"
+                }
+              },
+              "createdByMembership": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "createdByMembershipId"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Membership",
+                  "namespace": "public"
+                }
+              },
+              "home": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "homeId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Home",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "acceptedAt": {
+                  "column": "accepted_at"
+                },
+                "acceptedMembershipId": {
+                  "column": "accepted_membership_id"
+                },
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "createdByMembershipId": {
+                  "column": "created_by_membership_id"
+                },
+                "expiresAt": {
+                  "column": "expires_at"
+                },
+                "homeId": {
+                  "column": "home_id"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "invitedEmail": {
+                  "column": "invited_email"
+                },
+                "revocationCause": {
+                  "column": "revocation_cause"
+                },
+                "revokedAt": {
+                  "column": "revoked_at"
+                },
+                "tokenHash": {
+                  "column": "token_hash"
+                }
+              },
+              "namespaceId": "public",
+              "table": "invitations"
             }
           },
           "Membership": {
@@ -657,6 +847,40 @@
               }
             },
             "relations": {
+              "acceptedInvitations": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "id"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "acceptedMembershipId"
+                  ]
+                },
+                "to": {
+                  "model": "Invitation",
+                  "namespace": "public"
+                }
+              },
+              "createdInvitations": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "id"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "createdByMembershipId"
+                  ]
+                },
+                "to": {
+                  "model": "Invitation",
+                  "namespace": "public"
+                }
+              },
               "home": {
                 "cardinality": "N:1",
                 "on": {
@@ -1080,6 +1304,12 @@
               "uniques": []
             },
             "auth_identities": {
+              "checks": [
+                {
+                  "expression": "((char_length(email) >= 3) AND (char_length(email) <= 254) AND (email = btrim(email)) AND (email !~ '[A-Z]'::text) AND (email ~ '^[!-~]+$'::text))",
+                  "name": "auth_identities_email_canonical_check"
+                }
+              ],
               "columns": {
                 "created_at": {
                   "codecId": "pg/timestamptz-temporal@1",
@@ -1381,6 +1611,237 @@
               },
               "uniques": []
             },
+            "invitations": {
+              "checks": [
+                {
+                  "expression": "((accepted_at IS NULL) = (accepted_membership_id IS NULL))",
+                  "name": "invitations_acceptance_completeness_check"
+                },
+                {
+                  "expression": "((accepted_at IS NULL) OR ((accepted_at >= created_at) AND (accepted_at < expires_at)))",
+                  "name": "invitations_accepted_time_check"
+                },
+                {
+                  "expression": "((char_length(invited_email) >= 3) AND (char_length(invited_email) <= 254) AND (invited_email = btrim(invited_email)) AND (invited_email !~ '[A-Z]'::text) AND (invited_email ~ '^[!-~]+$'::text))",
+                  "name": "invitations_email_canonical_check"
+                },
+                {
+                  "expression": "(expires_at > created_at)",
+                  "name": "invitations_expiry_order_check"
+                },
+                {
+                  "expression": "((revocation_cause IS NULL) OR (revocation_cause = ANY (ARRAY['ADMIN_REVOKED'::text, 'HOME_ARCHIVED'::text])))",
+                  "name": "invitations_revocation_cause_check"
+                },
+                {
+                  "expression": "((revoked_at IS NULL) = (revocation_cause IS NULL))",
+                  "name": "invitations_revocation_completeness_check"
+                },
+                {
+                  "expression": "((revoked_at IS NULL) OR ((revoked_at >= created_at) AND (revoked_at < expires_at)))",
+                  "name": "invitations_revoked_time_check"
+                },
+                {
+                  "expression": "(NOT ((accepted_at IS NOT NULL) AND (revoked_at IS NOT NULL)))",
+                  "name": "invitations_terminal_state_check"
+                },
+                {
+                  "expression": "(octet_length(token_hash) = 32)",
+                  "name": "invitations_token_hash_length_check"
+                }
+              ],
+              "columns": {
+                "accepted_at": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "accepted_membership_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": true
+                },
+                "created_at": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "created_by_membership_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "expires_at": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "home_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "invited_email": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "revocation_cause": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "revoked_at": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "token_hash": {
+                  "codecId": "pg/bytea@1",
+                  "nativeType": "bytea",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "name": "invitations_home_id_fkey",
+                  "onDelete": "restrict",
+                  "onUpdate": "restrict",
+                  "source": {
+                    "columns": [
+                      "home_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "invitations"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "homes"
+                  }
+                },
+                {
+                  "name": "invitations_creator_home_membership_fkey",
+                  "onDelete": "restrict",
+                  "onUpdate": "restrict",
+                  "source": {
+                    "columns": [
+                      "home_id",
+                      "created_by_membership_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "invitations"
+                  },
+                  "target": {
+                    "columns": [
+                      "home_id",
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "memberships"
+                  }
+                },
+                {
+                  "name": "invitations_accepted_home_membership_fkey",
+                  "onDelete": "restrict",
+                  "onUpdate": "restrict",
+                  "source": {
+                    "columns": [
+                      "home_id",
+                      "accepted_membership_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "invitations"
+                  },
+                  "target": {
+                    "columns": [
+                      "home_id",
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "memberships"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "accepted_membership_id"
+                  ],
+                  "name": "invitations_accepted_membership_uidx_b563a30a",
+                  "prefix": "invitations_accepted_membership_uidx",
+                  "unique": true,
+                  "where": "(accepted_membership_id IS NOT NULL)"
+                },
+                {
+                  "columns": [
+                    "created_by_membership_id"
+                  ],
+                  "name": "invitations_created_by_membership_idx_48d99df3",
+                  "prefix": "invitations_created_by_membership_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "accepted_membership_id"
+                  ],
+                  "name": "invitations_home_id_accepted_membership_id_idx_48aa0859",
+                  "prefix": "invitations_home_id_accepted_membership_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "created_by_membership_id"
+                  ],
+                  "name": "invitations_home_id_created_by_membership_id_idx_889ed7bc",
+                  "prefix": "invitations_home_id_created_by_membership_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "home_id"
+                  ],
+                  "name": "invitations_home_id_idx_f881d5c1",
+                  "prefix": "invitations_home_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "expires_at",
+                    "created_at",
+                    "id"
+                  ],
+                  "name": "invitations_home_open_idx_585413c4",
+                  "prefix": "invitations_home_open_idx",
+                  "unique": false,
+                  "where": "((accepted_at IS NULL) AND (revoked_at IS NULL))"
+                },
+                {
+                  "columns": [
+                    "token_hash"
+                  ],
+                  "name": "invitations_token_hash_uidx_caa64aca",
+                  "prefix": "invitations_token_hash_uidx",
+                  "unique": true
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            },
             "memberships": {
               "checks": [
                 {
@@ -1479,6 +1940,15 @@
                   "name": "memberships_home_id_f881d5c1",
                   "prefix": "memberships_home_id",
                   "unique": false
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "id"
+                  ],
+                  "name": "memberships_home_id_id_key_2f2cccd8",
+                  "prefix": "memberships_home_id_id_key",
+                  "unique": true
                 },
                 {
                   "columns": [
@@ -1720,7 +2190,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "d4b7887fc0824662831adc8c1debc8a09589cac57eae9cf34684b7a3e31b053d"
+    "storageHash": "5a23f336d31a17bd850ac723ec043a74a198135eb678d527b560f1cc53baa7dc"
   },
   "execution": {
     "executionHash": "94afdc41ac65ba230add0f1ffd04fc66fffc995c17cbc855fe5724169ceec26f",

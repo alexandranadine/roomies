@@ -25,6 +25,7 @@ import {
   resolveTestDatabaseUrl,
 } from '../src/platform/persistence/test-database.js';
 import { verifyAuthPersistence } from './verify-auth-persistence.js';
+import { verifyInvitationSchema } from './verify-invitation-schema.js';
 import { verifyOutboxSchema } from './verify-outbox-schema.js';
 
 const backendRoot = path.resolve(
@@ -33,7 +34,9 @@ const backendRoot = path.resolve(
 );
 
 function runPrisma(args: string[], databaseUrl: string): void {
-  console.log(`> prisma ${args.join(' ')}`);
+  console.log(
+    `> prisma ${args.map((arg) => (arg === databaseUrl ? '<redacted-database-url>' : arg)).join(' ')}`,
+  );
   // Fixed CLI args only. shell:true keeps `npx` resolution reliable on Windows.
   const result = spawnSync('npx', ['prisma', ...args], {
     cwd: backendRoot,
@@ -74,7 +77,6 @@ runPrisma(['db', 'migrate', '--db', databaseUrl, '--yes'], databaseUrl);
 runPrisma(['db', 'verify', '--db', databaseUrl, '--strict'], databaseUrl);
 await verifyAuthPersistence(databaseUrl);
 await verifyOutboxSchema(databaseUrl);
+await verifyInvitationSchema(databaseUrl);
 
-console.log(
-  'Fresh-database migration, auth persistence, and outbox schema verification passed.',
-);
+console.log('Fresh migrations and strict persistence verification passed.');

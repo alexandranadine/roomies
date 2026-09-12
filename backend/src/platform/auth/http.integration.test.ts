@@ -86,6 +86,7 @@ void describe('Better Auth HTTP integration', () => {
         hasCanonicalUser: createCanonicalUserLookup(database.pool),
       });
       const email = `m13c-${crypto.randomUUID()}@example.test`;
+      const signupEmail = `  ${email.toUpperCase()}  `;
       const logs: string[] = [];
       const originalError = console.error;
       const originalWarn = console.warn;
@@ -199,7 +200,7 @@ void describe('Better Auth HTTP integration', () => {
             },
             body: JSON.stringify({
               name: 'M1.3c Integration',
-              email,
+              email: signupEmail,
               password: PASSWORD,
             }),
           });
@@ -245,12 +246,16 @@ void describe('Better Auth HTTP integration', () => {
             user_count: string;
             account_count: string;
             session_count: string;
+            stored_email: string;
+            email_verified: boolean;
           }>(
             `SELECT
                (SELECT count(*)::text FROM auth_identities WHERE id = $1) AS identity_count,
                (SELECT count(*)::text FROM users WHERE id = $1) AS user_count,
                (SELECT count(*)::text FROM auth_accounts WHERE user_id = $1) AS account_count,
-               (SELECT count(*)::text FROM auth_sessions WHERE user_id = $1) AS session_count`,
+               (SELECT count(*)::text FROM auth_sessions WHERE user_id = $1) AS session_count,
+               (SELECT email FROM auth_identities WHERE id = $1) AS stored_email,
+               (SELECT email_verified FROM auth_identities WHERE id = $1) AS email_verified`,
             [identityId],
           );
           assert.deepEqual(rows.rows[0], {
@@ -258,6 +263,8 @@ void describe('Better Auth HTTP integration', () => {
             user_count: '1',
             account_count: '1',
             session_count: '1',
+            stored_email: email,
+            email_verified: false,
           });
 
           const duplicateSignup = await request({
@@ -269,7 +276,7 @@ void describe('Better Auth HTTP integration', () => {
             },
             body: JSON.stringify({
               name: 'M1.3c Duplicate',
-              email,
+              email: ` ${email.toUpperCase()} `,
               password: PASSWORD,
             }),
           });
@@ -290,6 +297,17 @@ void describe('Better Auth HTTP integration', () => {
           assert.deepEqual(afterSignup.json(), {
             principal: { userId: identityId },
           });
+
+          const session = await request({
+            path: '/api/auth/get-session',
+            headers: { Cookie: sessionCookieHeader(signupCookie) },
+          });
+          assert.equal(session.status, 200);
+          const sessionBody = session.json() as {
+            user?: { email?: string; emailVerified?: boolean };
+          };
+          assert.equal(sessionBody.user?.email, email);
+          assert.equal(sessionBody.user?.emailVerified, false);
 
           const signOut = await request({
             method: 'POST',

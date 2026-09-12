@@ -30,6 +30,7 @@ model Home {
   createdAt   temporal.createdAt() @map("created_at")
   updatedAt   temporal.updatedAt() @map("updated_at")
   memberships Membership[]
+  invitations Invitation[]
 
   @@map("homes")
 }
@@ -44,10 +45,13 @@ model Membership {
 
   home Home @relation(fields: [homeId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "memberships_home_id_fkey")
   user User @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "memberships_user_id_fkey")
+  createdInvitations  Invitation[] @relation("InvitationCreatorMembership")
+  acceptedInvitations Invitation[] @relation("InvitationAcceptedMembership")
 
   // At most one active tenure per (home, user). Ended rows may coexist so
   // leave-and-rejoin creates a new Membership id rather than reopening one.
   @@index([homeId, userId], unique: true, where: "(ended_at IS NULL)", name: "memberships_one_active_per_home_user")
+  @@index([homeId, id], unique: true, name: "memberships_home_id_id_key")
   @@index([homeId], name: "memberships_home_id")
   @@index([userId], name: "memberships_user_id")
   @@map("memberships")
@@ -68,8 +72,72 @@ model AuthIdentity {
   accounts AuthAccount[]
   sessions AuthSession[]
 
+  @@check(
+    expression: "((char_length(email) >= 3) AND (char_length(email) <= 254) AND (email = btrim(email)) AND (email !~ '[A-Z]'::text) AND (email ~ '^[!-~]+$'::text))",
+    map: "auth_identities_email_canonical_check"
+  )
   @@index([email], unique: true, name: "auth_identities_email_uidx")
   @@map("auth_identities")
+}
+
+model Invitation {
+  id                      Uuid        @id
+  homeId                  Uuid        @map("home_id")
+  invitedEmail            String      @map("invited_email")
+  tokenHash               Bytes       @map("token_hash")
+  createdByMembershipId   Uuid        @map("created_by_membership_id")
+  createdAt               Timestamptz @map("created_at")
+  expiresAt               Timestamptz @map("expires_at")
+  acceptedAt              Timestamptz? @map("accepted_at")
+  acceptedMembershipId    Uuid?       @map("accepted_membership_id")
+  revokedAt               Timestamptz? @map("revoked_at")
+  revocationCause         String?     @map("revocation_cause")
+
+  home Home @relation(fields: [homeId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "invitations_home_id_fkey")
+  createdByMembership Membership @relation("InvitationCreatorMembership", fields: [homeId, createdByMembershipId], references: [homeId, id], onDelete: Restrict, onUpdate: Restrict, map: "invitations_creator_home_membership_fkey")
+  acceptedMembership Membership? @relation("InvitationAcceptedMembership", fields: [homeId, acceptedMembershipId], references: [homeId, id], onDelete: Restrict, onUpdate: Restrict, map: "invitations_accepted_home_membership_fkey")
+
+  @@check(
+    expression: "((char_length(invited_email) >= 3) AND (char_length(invited_email) <= 254) AND (invited_email = btrim(invited_email)) AND (invited_email !~ '[A-Z]'::text) AND (invited_email ~ '^[!-~]+$'::text))",
+    map: "invitations_email_canonical_check"
+  )
+  @@check(
+    expression: "(octet_length(token_hash) = 32)",
+    map: "invitations_token_hash_length_check"
+  )
+  @@check(
+    expression: "(expires_at > created_at)",
+    map: "invitations_expiry_order_check"
+  )
+  @@check(
+    expression: "((accepted_at IS NULL) = (accepted_membership_id IS NULL))",
+    map: "invitations_acceptance_completeness_check"
+  )
+  @@check(
+    expression: "((revoked_at IS NULL) = (revocation_cause IS NULL))",
+    map: "invitations_revocation_completeness_check"
+  )
+  @@check(
+    expression: "(NOT ((accepted_at IS NOT NULL) AND (revoked_at IS NOT NULL)))",
+    map: "invitations_terminal_state_check"
+  )
+  @@check(
+    expression: "((accepted_at IS NULL) OR ((accepted_at >= created_at) AND (accepted_at < expires_at)))",
+    map: "invitations_accepted_time_check"
+  )
+  @@check(
+    expression: "((revoked_at IS NULL) OR ((revoked_at >= created_at) AND (revoked_at < expires_at)))",
+    map: "invitations_revoked_time_check"
+  )
+  @@check(
+    expression: "((revocation_cause IS NULL) OR (revocation_cause = ANY (ARRAY['ADMIN_REVOKED'::text, 'HOME_ARCHIVED'::text])))",
+    map: "invitations_revocation_cause_check"
+  )
+  @@index([tokenHash], unique: true, name: "invitations_token_hash_uidx")
+  @@index([acceptedMembershipId], unique: true, where: "(accepted_membership_id IS NOT NULL)", name: "invitations_accepted_membership_uidx")
+  @@index([createdByMembershipId], name: "invitations_created_by_membership_idx")
+  @@index([homeId, expiresAt, createdAt, id], where: "((accepted_at IS NULL) AND (revoked_at IS NULL))", name: "invitations_home_open_idx")
+  @@map("invitations")
 }
 
 model AuthAccount {

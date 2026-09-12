@@ -1,10 +1,55 @@
 import { betterAuth, type BetterAuthOptions } from 'better-auth';
+import { APIError, createAuthMiddleware } from 'better-auth/api';
 import { fromNodeHeaders, toNodeHandler } from 'better-auth/node';
 import type { IncomingHttpHeaders } from 'node:http';
 import type { Pool } from 'pg';
+import {
+  InvalidNormalizedEmailError,
+  normalizeEmail,
+} from './normalized-email.js';
 
 const SEVEN_DAYS_SECONDS = 60 * 60 * 24 * 7;
 const ONE_DAY_SECONDS = 60 * 60 * 24;
+
+function invalidEmail(): APIError {
+  return new APIError('BAD_REQUEST', {
+    code: 'INVALID_EMAIL',
+    message: 'Invalid email address',
+  });
+}
+
+function normalizeAuthEmail(value: string): string {
+  try {
+    return normalizeEmail(value);
+  } catch (error) {
+    if (error instanceof InvalidNormalizedEmailError) {
+      throw invalidEmail();
+    }
+    throw error;
+  }
+}
+
+const normalizeEmailBeforeValidation = createAuthMiddleware((context) => {
+  const body: unknown = context.body;
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    return Promise.resolve();
+  }
+  const fields = body as Record<string, unknown>;
+  if (
+    context.path === '/sign-up/email' &&
+    typeof fields['email'] === 'string'
+  ) {
+    fields['email'] = normalizeAuthEmail(fields['email']);
+  }
+
+  if (
+    context.path === '/change-email' &&
+    typeof fields['newEmail'] === 'string'
+  ) {
+    fields['newEmail'] = normalizeAuthEmail(fields['newEmail']);
+  }
+  return Promise.resolve();
+});
 
 export type AuthRuntimeLogLevel = 'debug' | 'info' | 'warn' | 'error';
 
@@ -92,6 +137,36 @@ function createOptions(input: CreateAuthRuntimeOptions): BetterAuthOptions {
         updatedAt: 'updated_at',
       },
     },
+    hooks: {
+      before: normalizeEmailBeforeValidation,
+    },
+    databaseHooks: {
+      user: {
+        create: {
+          before(user) {
+            return Promise.resolve({
+              data: {
+                ...user,
+                email: normalizeAuthEmail(user.email),
+              },
+            });
+          },
+        },
+        update: {
+          before(user) {
+            if (typeof user.email !== 'string') {
+              return Promise.resolve();
+            }
+            return Promise.resolve({
+              data: {
+                ...user,
+                email: normalizeAuthEmail(user.email),
+              },
+            });
+          },
+        },
+      },
+    },
     advanced: {
       database: {
         generateId: 'uuid',
@@ -123,14 +198,21 @@ function createOptions(input: CreateAuthRuntimeOptions): BetterAuthOptions {
  *
  * This initializes runtime configuration only. HTTP mounting lives in the
  * Roomies platform/auth boundary. There are deliberately no application
- * database hooks: PostgreSQL's accepted trigger is the sole canonical User
- * provisioning mechanism.
+ * provisioning hooks: PostgreSQL's accepted trigger remains the sole
+ * canonical User provisioning mechanism. The user hooks only enforce the
+ * canonical email representation immediately before identity persistence.
  */
 export function createAuthRuntime(input: CreateAuthRuntimeOptions) {
   return betterAuth(createOptions(input));
 }
 
 export type AuthRuntime = ReturnType<typeof createAuthRuntime>;
+
+export {
+  InvalidNormalizedEmailError,
+  normalizeEmail,
+  type NormalizedEmail,
+} from './normalized-email.js';
 
 /**
  * Official Better Auth Node/Express adapter. Callers must mount this before

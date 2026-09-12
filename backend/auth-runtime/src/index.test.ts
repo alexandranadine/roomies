@@ -110,7 +110,15 @@ void describe('createAuthRuntime', () => {
 
     assert.equal(auth.options.advanced?.database?.generateId, 'uuid');
     assert.equal(auth.options.advanced?.database?.validateSchema, true);
-    assert.equal(auth.options.databaseHooks, undefined);
+    assert.equal(typeof auth.options.hooks?.before, 'function');
+    assert.equal(
+      typeof auth.options.databaseHooks?.user?.create?.before,
+      'function',
+    );
+    assert.equal(
+      typeof auth.options.databaseHooks?.user?.update?.before,
+      'function',
+    );
     assert.deepEqual(auth.options.emailAndPassword, {
       enabled: true,
       requireEmailVerification: false,
@@ -163,7 +171,7 @@ void describe('createAuthRuntime', () => {
     ) as { scripts?: Record<string, string> };
 
     assert.doesNotMatch(source, /\bnew\s+Pool\s*\(/);
-    assert.doesNotMatch(source, /\bdatabaseHooks\s*:/);
+    assert.doesNotMatch(source, /databaseHooks:\s*\{[^]*\bafter\s*:/);
     assert.match(source, /\btoNodeHandler\b/);
     assert.match(source, /\bfromNodeHeaders\b/);
     assert.match(source, /\bgetSession\b/);

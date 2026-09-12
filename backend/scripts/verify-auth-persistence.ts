@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
 import { Pool, type PoolClient } from 'pg';
+import { assertNoNormalizedEmailCollisions } from '../src/platform/auth/normalized-email-collision-audit.js';
 import {
   assertSafeTestDatabase,
   resolveTestDatabaseUrl,
@@ -149,7 +150,42 @@ async function verifyCatalog(client: PoolClient): Promise<void> {
   `);
   assert.equal(cascadingForeignKeysResult.rows[0]?.count, '2');
 
+  const canonicalEmailConstraint = await client.query<BooleanResult>(`
+    SELECT EXISTS (
+      SELECT 1
+      FROM pg_catalog.pg_constraint
+      WHERE conrelid = 'public.auth_identities'::pg_catalog.regclass
+        AND conname = 'auth_identities_email_canonical_check'
+        AND contype = 'c'
+        AND pg_get_constraintdef(oid) !~* '\\mnow\\s*\\('
+    ) AS result
+  `);
+  assert.equal(canonicalEmailConstraint.rows[0]?.result, true);
+
   console.log('Auth persistence catalog verification passed.');
+}
+
+async function verifyCanonicalEmailContract(client: PoolClient): Promise<void> {
+  await assertNoNormalizedEmailCollisions(client);
+  await inRollbackTransaction(client, async () => {
+    await expectSqlFailure(
+      client,
+      'uppercase_email',
+      `INSERT INTO public.auth_identities (name, email, email_verified)
+       VALUES ('Uppercase refusal', 'Uppercase@roomies.test', false)`,
+      [],
+      '23514',
+    );
+    await expectSqlFailure(
+      client,
+      'spaced_email',
+      `INSERT INTO public.auth_identities (name, email, email_verified)
+       VALUES ('Whitespace refusal', ' spaced@roomies.test ', false)`,
+      [],
+      '23514',
+    );
+  });
+  console.log('Canonical auth email contract verification passed.');
 }
 
 async function verifyProvisioning(client: PoolClient): Promise<void> {
@@ -469,6 +505,7 @@ export async function verifyAuthPersistence(
     const client = await pool.connect();
     try {
       await verifyCatalog(client);
+      await verifyCanonicalEmailContract(client);
       await verifyProvisioning(client);
       await verifyMappedAuthSchema(client);
       await verifyTriggerFailure(client);
