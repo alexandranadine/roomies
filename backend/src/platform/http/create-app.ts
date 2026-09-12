@@ -1,4 +1,4 @@
-import express, { type Express } from 'express';
+import express, { type Express, type Router } from 'express';
 import helmet from 'helmet';
 import { AUTH_HTTP_ROUTE, createAuthHttpHandler } from '../auth/http.js';
 import type { AuthRuntime } from '../auth/runtime.js';
@@ -16,6 +16,11 @@ export type CreateAppOptions = {
   /** Isolated Better Auth runtime. Mounted at `/api/auth/*` before JSON parsing. */
   auth?: AuthRuntime;
   /**
+   * Product API mounted at `/api/v1`. Auth is applied by the composed router,
+   * not globally — health and `/api/auth` stay unauthenticated.
+   */
+  roomiesApi?: Router;
+  /**
    * Optional composition hook (e.g. tests mounting a throwing route).
    * Runs after platform routes and before the 404/error handlers.
    */
@@ -27,7 +32,7 @@ export type CreateAppOptions = {
  * Tests and the server runtime both consume this factory.
  */
 export function createApp(options: CreateAppOptions): Express {
-  const { config, readiness, auth, configure } = options;
+  const { config, readiness, auth, roomiesApi, configure } = options;
   const app = express();
 
   // Explicit hop count — never unrestricted `true`. Matters later for secure
@@ -50,8 +55,7 @@ export function createApp(options: CreateAppOptions): Express {
 
   app.use(createHealthRouter(readiness));
 
-  // Future domain API surface. No product routes yet.
-  app.use('/api/v1', express.Router());
+  app.use('/api/v1', roomiesApi ?? express.Router());
 
   configure?.(app);
 

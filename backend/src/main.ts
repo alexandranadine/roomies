@@ -1,5 +1,12 @@
-import { loadConfig } from './platform/config/index.js';
+import { createHomeRepository } from './domains/homes/index.js';
+import { createActiveHomeActorResolver } from './domains/memberships/index.js';
+import { createRoomiesApiRouter } from './http/create-roomies-api.js';
+import {
+  createCanonicalUserLookup,
+  createPrincipalResolver,
+} from './platform/auth/principal.js';
 import { createAuthRuntime } from './platform/auth/runtime.js';
+import { loadConfig } from './platform/config/index.js';
 import { createApp } from './platform/http/create-app.js';
 import { createDatabasePool } from './platform/persistence/pool.js';
 import { createDbReadiness } from './platform/persistence/readiness.js';
@@ -24,8 +31,25 @@ function main(): void {
   const databasePool = createDatabasePool(config);
   const db = createDb(databasePool.pool);
   const auth = createAuthRuntime(databasePool.pool, config);
+  const principalResolver = createPrincipalResolver({
+    auth,
+    hasCanonicalUser: createCanonicalUserLookup(databasePool.pool),
+  });
+  const activeHomeActorResolver = createActiveHomeActorResolver(
+    databasePool.pool,
+  );
+  const homeReader = createHomeRepository(databasePool.pool);
   const readiness = createDbReadiness(db);
-  const app = createApp({ config, readiness, auth });
+  const app = createApp({
+    config,
+    readiness,
+    auth,
+    roomiesApi: createRoomiesApiRouter({
+      principalResolver,
+      activeHomeActorResolver,
+      homeReader,
+    }),
+  });
 
   startHttpServer({
     app,

@@ -1,4 +1,14 @@
 import type { NextFunction, Request, Response } from 'express';
+import {
+  AuthInfrastructureError,
+  UnauthenticatedError,
+} from '../auth/errors.js';
+import {
+  AuthorizationIntegrityError,
+  ConcealedNotFoundError,
+  ForbiddenError,
+  InvalidPathInputError,
+} from '../authz/errors.js';
 import { getRequestId } from './request-id.js';
 
 export type ApiErrorBody = {
@@ -22,17 +32,17 @@ function sendApiError(
   res.status(status).json(body);
 }
 
-function readHttpStatus(err: unknown): number {
+function isExpressPayloadTooLarge(err: unknown): boolean {
   if (typeof err !== 'object' || err === null) {
-    return 500;
+    return false;
   }
-  if ('status' in err && typeof err.status === 'number') {
-    return err.status;
-  }
-  if ('statusCode' in err && typeof err.statusCode === 'number') {
-    return err.statusCode;
-  }
-  return 500;
+  const status =
+    'status' in err && typeof err.status === 'number' ? err.status : undefined;
+  const statusCode =
+    'statusCode' in err && typeof err.statusCode === 'number'
+      ? err.statusCode
+      : undefined;
+  return status === 413 || statusCode === 413;
 }
 
 function isEntityParseFailed(err: unknown): boolean {
@@ -69,11 +79,10 @@ export function errorHandler(
     return;
   }
 
-  const status = readHttpStatus(err);
   const routeCategory = requestPathCategory(req);
 
   // Body-parser / entity-too-large → safe 413 without echoing body contents.
-  if (status === 413) {
+  if (isExpressPayloadTooLarge(err)) {
     sendApiError(
       res,
       413,
@@ -85,12 +94,12 @@ export function errorHandler(
   }
 
   // Malformed JSON → safe 400.
-  if (status === 400 && isEntityParseFailed(err)) {
+  if (isEntityParseFailed(err)) {
     sendApiError(res, 400, 'BAD_REQUEST', 'Invalid JSON body', requestId);
     return;
   }
 
-  if (status === 401) {
+  if (err instanceof UnauthenticatedError) {
     sendApiError(
       res,
       401,
@@ -101,7 +110,49 @@ export function errorHandler(
     return;
   }
 
+  if (err instanceof InvalidPathInputError) {
+    sendApiError(
+      res,
+      400,
+      'INVALID_PATH_INPUT',
+      'Invalid path input',
+      requestId,
+    );
+    return;
+  }
+
+  if (err instanceof ForbiddenError) {
+    sendApiError(res, 403, 'FORBIDDEN', 'Forbidden', requestId);
+    return;
+  }
+
+  if (err instanceof ConcealedNotFoundError) {
+    sendApiError(res, 404, 'NOT_FOUND', 'Not found', requestId);
+    return;
+  }
+
+  if (
+    err instanceof AuthorizationIntegrityError ||
+    err instanceof AuthInfrastructureError
+  ) {
+    console.error('[http] request failed', {
+      requestId,
+      routeCategory,
+      status: 500,
+      errorClass: err.name,
+    });
+    sendApiError(
+      res,
+      500,
+      'INTERNAL_ERROR',
+      'An unexpected error occurred',
+      requestId,
+    );
+    return;
+  }
+
   // Content-free diagnostics only: no URL query, headers, body, or exception text.
+  // Arbitrary objects with status/code/message do not control the response.
   console.error('[http] request failed', {
     requestId,
     routeCategory,
