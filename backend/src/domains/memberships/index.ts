@@ -18,6 +18,7 @@ export {
   type ChangeMembershipRoleCommand,
   type CreateMembershipsRouterOptions,
   type LeaveMembershipCommand,
+  type RemoveMembershipCommand,
 } from './http.js';
 export type { LeaveMembershipInput } from './leave.js';
 export {
@@ -26,6 +27,16 @@ export {
   type MembershipLeaveDenial,
   type MembershipLeaveSelfDenial,
 } from './leave-policy.js';
+export type { RemoveMembershipInput } from './remove.js';
+export {
+  decideMembershipRemove,
+  decideMembershipRemoveProposed,
+  decideMembershipRemoveSelf,
+  decideMembershipRemoveTarget,
+  type MembershipRemoveDenial,
+  type MembershipRemoveSelfDenial,
+  type MembershipRemoveTargetDenial,
+} from './remove-policy.js';
 export {
   decideMembershipChangeRole,
   decideProposedAdminInvariant,

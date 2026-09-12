@@ -79,6 +79,8 @@ function buildApp(
           Promise.reject(new Error('role change must not run for home read')),
         leaveMembership: () =>
           Promise.reject(new Error('leave must not run for home read')),
+        removeMembership: () =>
+          Promise.reject(new Error('remove must not run for home read')),
       }),
     }),
   };

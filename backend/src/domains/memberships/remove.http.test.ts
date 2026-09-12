@@ -4,7 +4,6 @@ import { createRoomiesApiRouter } from '../../http/create-roomies-api.js';
 import { UnauthenticatedError } from '../../platform/auth/errors.js';
 import type { PrincipalResolver } from '../../platform/auth/principal.js';
 import type { ActiveHomeActor } from '../../platform/authz/context.js';
-import { LastAdminRequiredError } from './errors.js';
 import { appRequest } from '../../platform/http/app-request.test-helper.js';
 import {
   assertNoForbiddenLeak,
@@ -13,7 +12,8 @@ import {
 import { REQUEST_ID_HEADER } from '../../platform/http/constants.js';
 import { createApp } from '../../platform/http/create-app.js';
 import type { ApiErrorBody } from '../../platform/http/errors.js';
-import type { ChangeMembershipRoleInput } from './change-role.js';
+import { LastAdminRequiredError } from './errors.js';
+import type { RemoveMembershipInput } from './remove.js';
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 const HOME_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -32,7 +32,7 @@ function actor(role: ActiveHomeActor['role'] = 'ADMIN'): ActiveHomeActor {
 function unusedHomeReader() {
   return {
     findActiveHomeById: () =>
-      Promise.reject(new Error('home reader must not run for role change')),
+      Promise.reject(new Error('home reader must not run for remove')),
   };
 }
 
@@ -43,12 +43,10 @@ function buildApp(
       userId: string;
       homeId: string;
     }) => Promise<ActiveHomeActor | null>;
-    changeMembershipRole?: (
-      input: ChangeMembershipRoleInput,
-    ) => Promise<unknown>;
+    removeMembership?: (input: RemoveMembershipInput) => Promise<unknown>;
   } = {},
 ) {
-  const calls: ChangeMembershipRoleInput[] = [];
+  const calls: RemoveMembershipInput[] = [];
   return {
     calls,
     app: createApp({
@@ -66,38 +64,38 @@ function buildApp(
             (({ homeId }) => Promise.resolve({ ...actor(), homeId })),
         },
         homeReader: unusedHomeReader(),
-        changeMembershipRole: async (input) => {
+        changeMembershipRole: () =>
+          Promise.reject(new Error('role change must not run for remove')),
+        leaveMembership: () =>
+          Promise.reject(new Error('leave must not run for remove')),
+        removeMembership: async (input) => {
           calls.push(input);
-          if (options.changeMembershipRole) {
-            return options.changeMembershipRole(input);
+          if (options.removeMembership) {
+            return options.removeMembership(input);
           }
         },
-        leaveMembership: () =>
-          Promise.reject(new Error('leave must not run for role change')),
-        removeMembership: () =>
-          Promise.reject(new Error('remove must not run for role change')),
       }),
     }),
   };
 }
 
-function rolePath(
+function removePath(
   homeId: string = HOME_ID,
   membershipId: string = MEMBERSHIP_ID,
 ): string {
-  return `/api/v1/homes/${homeId}/memberships/${membershipId}/role`;
+  return `/api/v1/homes/${homeId}/memberships/${membershipId}/remove`;
 }
 
-void describe('PATCH /api/v1/homes/:homeId/memberships/:membershipId/role', () => {
+void describe('POST /api/v1/homes/:homeId/memberships/:membershipId/remove', () => {
   void it('returns 401 for unauthenticated requests without invoking the command', async () => {
     const { app, calls } = buildApp({
       requirePrincipal: () => Promise.reject(new UnauthenticatedError()),
     });
     const res = await appRequest(app, {
-      method: 'PATCH',
-      path: rolePath(),
+      method: 'POST',
+      path: removePath(),
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ role: 'ADMIN' }),
+      body: JSON.stringify({}),
     });
     assert.equal(res.status, 401);
     const body = res.json() as ApiErrorBody;
@@ -109,10 +107,10 @@ void describe('PATCH /api/v1/homes/:homeId/memberships/:membershipId/role', () =
   void it('returns 400 for a malformed Home id', async () => {
     const { app, calls } = buildApp();
     const res = await appRequest(app, {
-      method: 'PATCH',
-      path: rolePath('not-a-uuid'),
+      method: 'POST',
+      path: removePath('not-a-uuid'),
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ role: 'ADMIN' }),
+      body: JSON.stringify({}),
     });
     assert.equal(res.status, 400);
     const body = res.json() as ApiErrorBody;
@@ -123,10 +121,10 @@ void describe('PATCH /api/v1/homes/:homeId/memberships/:membershipId/role', () =
   void it('returns 400 for a malformed Membership id', async () => {
     const { app, calls } = buildApp();
     const res = await appRequest(app, {
-      method: 'PATCH',
-      path: rolePath(HOME_ID, 'nope'),
+      method: 'POST',
+      path: removePath(HOME_ID, 'nope'),
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ role: 'ADMIN' }),
+      body: JSON.stringify({}),
     });
     assert.equal(res.status, 400);
     const body = res.json() as ApiErrorBody;
@@ -134,22 +132,14 @@ void describe('PATCH /api/v1/homes/:homeId/memberships/:membershipId/role', () =
     assert.deepEqual(calls, []);
   });
 
-  void it('returns 400 for an invalid body role and extra fields', async () => {
+  void it('returns 400 INVALID_REQUEST for valid JSON with the wrong shape', async () => {
     const { app, calls } = buildApp();
-    const invalidBodies = [
-      null,
-      [],
-      {},
-      { role: null },
-      { role: 'OWNER' },
-      { role: ['ADMIN'] },
-      { role: 'ADMIN', userId: USER_ID },
-    ];
+    const invalidBodies = [null, [], { anything: true }];
 
     for (const body of invalidBodies) {
       const res = await appRequest(app, {
-        method: 'PATCH',
-        path: rolePath(),
+        method: 'POST',
+        path: removePath(),
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body),
       });
@@ -160,13 +150,28 @@ void describe('PATCH /api/v1/homes/:homeId/memberships/:membershipId/role', () =
     assert.deepEqual(calls, []);
   });
 
-  void it('returns 204 with no body and still invokes the command for same-role', async () => {
+  void it('returns 400 BAD_REQUEST for malformed JSON syntax', async () => {
     const { app, calls } = buildApp();
     const res = await appRequest(app, {
-      method: 'PATCH',
-      path: rolePath(),
+      method: 'POST',
+      path: removePath(),
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ role: 'ROOMMATE' }),
+      body: '{not-json',
+    });
+    assert.equal(res.status, 400);
+    const body = res.json() as ApiErrorBody;
+    assert.equal(body.error.code, 'BAD_REQUEST');
+    assert.equal(body.error.message, 'Invalid JSON body');
+    assert.deepEqual(calls, []);
+  });
+
+  void it('returns 204 with an empty body and private/no-store headers', async () => {
+    const { app, calls } = buildApp();
+    const res = await appRequest(app, {
+      method: 'POST',
+      path: removePath(),
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({}),
     });
     assert.equal(res.status, 204);
     assert.equal(res.text, '');
@@ -177,27 +182,26 @@ void describe('PATCH /api/v1/homes/:homeId/memberships/:membershipId/role', () =
         actor: actor(),
         homeId: HOME_ID,
         membershipId: MEMBERSHIP_ID,
-        role: 'ROOMMATE',
       },
     ]);
   });
 
   void it('maps LAST_ADMIN_REQUIRED to 409', async () => {
     const { app } = buildApp({
-      changeMembershipRole: () => Promise.reject(new LastAdminRequiredError()),
+      removeMembership: () => Promise.reject(new LastAdminRequiredError()),
     });
     const res = await appRequest(app, {
-      method: 'PATCH',
-      path: rolePath(),
+      method: 'POST',
+      path: removePath(),
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ role: 'ROOMMATE' }),
+      body: JSON.stringify({}),
     });
     assert.equal(res.status, 409);
     const body = res.json() as ApiErrorBody;
     assert.equal(body.error.code, 'LAST_ADMIN_REQUIRED');
     assert.equal(body.error.message, 'Last admin required');
     assertNoForbiddenLeak({
-      context: 'last admin 409',
+      context: 'last admin remove 409',
       text: res.text,
       forbidden: [...COMMON_SECRET_SENTINELS, 'SELECT', 'memberships_role'],
     });

@@ -1,5 +1,6 @@
 import { createChangeMembershipRoleFromPool } from './application/home-administration/change-membership-role.js';
 import { createLeaveMembershipFromPool } from './application/home-administration/leave-membership.js';
+import { createRemoveMembershipFromPool } from './application/home-administration/remove-membership.js';
 import { createHomeRepository } from './domains/homes/index.js';
 import { createActiveHomeActorResolver } from './domains/memberships/index.js';
 import { createRoomiesApiRouter } from './http/create-roomies-api.js';
@@ -54,6 +55,7 @@ function main(): void {
         databasePool.pool,
       ),
       leaveMembership: createLeaveMembershipFromPool(databasePool.pool),
+      removeMembership: createRemoveMembershipFromPool(databasePool.pool),
     }),
   });
 

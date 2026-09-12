@@ -9,6 +9,7 @@ import {
 } from '../../platform/authz/index.js';
 import type { ChangeMembershipRoleInput } from './change-role.js';
 import type { LeaveMembershipInput } from './leave.js';
+import type { RemoveMembershipInput } from './remove.js';
 import {
   createRequireHomeContext,
   getActiveHomeActor,
@@ -24,6 +25,7 @@ const changeRoleBodySchema = z
   .strict();
 
 const leaveBodySchema = z.object({}).strict();
+const removeBodySchema = z.object({}).strict();
 
 export type ChangeMembershipRoleCommand = (
   input: ChangeMembershipRoleInput,
@@ -33,11 +35,16 @@ export type LeaveMembershipCommand = (
   input: LeaveMembershipInput,
 ) => Promise<unknown>;
 
+export type RemoveMembershipCommand = (
+  input: RemoveMembershipInput,
+) => Promise<unknown>;
+
 export type CreateMembershipsRouterOptions = {
   principalResolver: Pick<PrincipalResolver, 'requirePrincipal'>;
   activeHomeActorResolver: Pick<ActiveHomeActorResolver, 'resolve'>;
   changeMembershipRole: ChangeMembershipRoleCommand;
   leaveMembership: LeaveMembershipCommand;
+  removeMembership: RemoveMembershipCommand;
 };
 
 function parseChangeRoleBody(body: unknown): MembershipRole {
@@ -50,6 +57,13 @@ function parseChangeRoleBody(body: unknown): MembershipRole {
 
 function parseLeaveBody(body: unknown): void {
   const parsed = leaveBodySchema.safeParse(body);
+  if (!parsed.success) {
+    throw new InvalidRequestError();
+  }
+}
+
+function parseRemoveBody(body: unknown): void {
+  const parsed = removeBodySchema.safeParse(body);
   if (!parsed.success) {
     throw new InvalidRequestError();
   }
@@ -92,6 +106,21 @@ export function createMembershipsRouter(
       const membershipId = parsePathUuid(req.params['membershipId']);
       parseLeaveBody(req.body);
       await options.leaveMembership({
+        actor,
+        homeId,
+        membershipId,
+      });
+      res.status(204).end();
+    })().catch(next);
+  });
+
+  router.post('/:homeId/memberships/:membershipId/remove', (req, res, next) => {
+    void (async () => {
+      const actor = getActiveHomeActor(res);
+      const homeId = parsePathUuid(req.params['homeId']);
+      const membershipId = parsePathUuid(req.params['membershipId']);
+      parseRemoveBody(req.body);
+      await options.removeMembership({
         actor,
         homeId,
         membershipId,

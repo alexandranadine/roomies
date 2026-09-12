@@ -27,15 +27,17 @@ void describe('create-roomies-api composition boundary', () => {
     );
   });
 
-  void it('wires leave without remove, archive, or ending-seam internals', async () => {
+  void it('wires leave and remove without archive or ending-seam internals', async () => {
     const source = await readFile(
       new URL('./create-roomies-api.ts', import.meta.url),
       'utf8',
     );
     assert.match(source, /leaveMembership/);
-    assert.doesNotMatch(source, /removeMember|archiveHome/i);
+    assert.match(source, /removeMembership/);
+    assert.doesNotMatch(source, /archiveHome/i);
     assert.doesNotMatch(source, /endMembershipWithinHomeStructure/);
     assert.doesNotMatch(source, /end-membership-within-home-structure/);
     assert.doesNotMatch(source, /decideMembershipLeave/);
+    assert.doesNotMatch(source, /decideMembershipRemove/);
   });
 });

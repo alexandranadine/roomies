@@ -155,6 +155,8 @@ void describe('GET /api/v1/homes/:homeId PostgreSQL authorization', () => {
               ),
             leaveMembership: () =>
               Promise.reject(new Error('leave must not run for home read')),
+            removeMembership: () =>
+              Promise.reject(new Error('remove must not run for home read')),
           }),
         });
 

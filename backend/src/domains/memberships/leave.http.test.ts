@@ -75,6 +75,8 @@ function buildApp(
             return options.leaveMembership(input);
           }
         },
+        removeMembership: () =>
+          Promise.reject(new Error('remove must not run for leave')),
       }),
     }),
   };

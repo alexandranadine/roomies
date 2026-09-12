@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { describe, it } from 'node:test';
 import type { Pool } from 'pg';
 import { createChangeMembershipRoleFromPool } from '../../application/home-administration/change-membership-role.js';
+import { createLeaveMembershipFromPool } from '../../application/home-administration/leave-membership.js';
+import { createRemoveMembershipFromPool } from '../../application/home-administration/remove-membership.js';
 import { createHomeRepository } from '../homes/index.js';
 import { createRoomiesApiRouter } from '../../http/create-roomies-api.js';
 import {
@@ -53,8 +55,8 @@ function sessionCookieHeader(setCookie: string): string {
   return setCookie.split(';', 1)[0] ?? '';
 }
 
-function rolePath(homeId: string, membershipId: string): string {
-  return `/api/v1/homes/${homeId}/memberships/${membershipId}/role`;
+function removePath(homeId: string, membershipId: string): string {
+  return `/api/v1/homes/${homeId}/memberships/${membershipId}/remove`;
 }
 
 async function insertHome(
@@ -91,7 +93,7 @@ async function insertMembership(
   );
 }
 
-void describe('PATCH membership role HTTP PostgreSQL', () => {
+void describe('POST membership remove HTTP PostgreSQL', () => {
   void it(
     'uses only a dedicated safe TEST_DATABASE_URL',
     { skip: skipWithoutDatabase },
@@ -104,7 +106,7 @@ void describe('PATCH membership role HTTP PostgreSQL', () => {
   );
 
   void it(
-    'covers success, concealment, validation, and last-Admin conflict',
+    'covers success, concealment, authorization, validation, and self-remove',
     { skip: skipWithoutDatabase, timeout: 60_000 },
     async () => {
       const databaseUrl = resolveSafeDedicatedTestDatabaseUrl();
@@ -134,16 +136,14 @@ void describe('PATCH membership role HTTP PostgreSQL', () => {
             changeMembershipRole: createChangeMembershipRoleFromPool(
               database.pool,
             ),
-            leaveMembership: () =>
-              Promise.reject(new Error('leave must not run for role change')),
-            removeMembership: () =>
-              Promise.reject(new Error('remove must not run for role change')),
+            leaveMembership: createLeaveMembershipFromPool(database.pool),
+            removeMembership: createRemoveMembershipFromPool(database.pool),
           }),
         });
 
         await withAppServer(app, async (request) => {
           async function signUp(name: string) {
-            const email = `m21d-${name}-${randomUUID()}@example.test`;
+            const email = `m21g-${name}-${randomUUID()}@example.test`;
             const signup = await request({
               method: 'POST',
               path: '/api/auth/sign-up/email',
@@ -162,59 +162,70 @@ void describe('PATCH membership role HTTP PostgreSQL', () => {
             return { id, cookie: sessionCookieHeader(cookie) };
           }
 
-          async function patchRole(input: {
+          async function postRemove(input: {
             cookie: string;
             homeId: string;
             membershipId: string;
-            role: string;
+            body?: unknown;
+            rawBody?: string;
           }) {
             return request({
-              method: 'PATCH',
-              path: rolePath(input.homeId, input.membershipId),
+              method: 'POST',
+              path: removePath(input.homeId, input.membershipId),
               headers: {
                 Origin: TRUSTED_ORIGIN,
                 Cookie: input.cookie,
                 'content-type': 'application/json',
               },
-              body: JSON.stringify({ role: input.role }),
+              body:
+                input.rawBody ??
+                JSON.stringify(input.body === undefined ? {} : input.body),
             });
           }
 
           const admin = await signUp('Admin');
           const roommate = await signUp('Roommate');
+          const peerAdmin = await signUp('PeerAdmin');
           const otherHomeAdmin = await signUp('OtherAdmin');
           const rejoiner = await signUp('Rejoiner');
+          const roommateTarget = await signUp('RoommateTarget');
 
           const homeA = randomUUID();
           const homeB = randomUUID();
-          const lastAdminHome = randomUUID();
           const twoAdminHome = randomUUID();
           const rejoinHome = randomUUID();
-          homeIds.push(homeA, homeB, lastAdminHome, twoAdminHome, rejoinHome);
+          const roommateDenyHome = randomUUID();
+          homeIds.push(
+            homeA,
+            homeB,
+            twoAdminHome,
+            rejoinHome,
+            roommateDenyHome,
+          );
 
           const membershipAdminA = randomUUID();
           const membershipRoommateA = randomUUID();
           const membershipAdminB = randomUUID();
-          const lastAdminMembership = randomUUID();
-          const lastRoommateMembership = randomUUID();
           const twoAdminA = randomUUID();
           const twoAdminB = randomUUID();
           const rejoinAdmin = randomUUID();
           const rejoinOld = randomUUID();
           const rejoinNew = randomUUID();
           const endedInA = randomUUID();
+          const roommateDenyAdmin = randomUUID();
+          const roommateDenyRoommate = randomUUID();
 
           await insertHome(database.pool, { id: homeA, name: 'Home A' });
           await insertHome(database.pool, { id: homeB, name: 'Home B' });
-          await insertHome(database.pool, {
-            id: lastAdminHome,
-            name: 'Last Admin Home',
-          });
           await insertHome(database.pool, {
             id: twoAdminHome,
             name: 'Two Admin Home',
           });
           await insertHome(database.pool, { id: rejoinHome, name: 'Rejoin' });
+          await insertHome(database.pool, {
+            id: roommateDenyHome,
+            name: 'Roommate Deny',
+          });
 
           await insertMembership(database.pool, {
             id: membershipAdminA,
@@ -225,7 +236,7 @@ void describe('PATCH membership role HTTP PostgreSQL', () => {
           await insertMembership(database.pool, {
             id: membershipRoommateA,
             homeId: homeA,
-            userId: roommate.id,
+            userId: roommateTarget.id,
             role: 'ROOMMATE',
           });
           await insertMembership(database.pool, {
@@ -242,18 +253,6 @@ void describe('PATCH membership role HTTP PostgreSQL', () => {
             role: 'ADMIN',
           });
           await insertMembership(database.pool, {
-            id: lastAdminMembership,
-            homeId: lastAdminHome,
-            userId: admin.id,
-            role: 'ADMIN',
-          });
-          await insertMembership(database.pool, {
-            id: lastRoommateMembership,
-            homeId: lastAdminHome,
-            userId: roommate.id,
-            role: 'ROOMMATE',
-          });
-          await insertMembership(database.pool, {
             id: twoAdminA,
             homeId: twoAdminHome,
             userId: admin.id,
@@ -262,7 +261,7 @@ void describe('PATCH membership role HTTP PostgreSQL', () => {
           await insertMembership(database.pool, {
             id: twoAdminB,
             homeId: twoAdminHome,
-            userId: otherHomeAdmin.id,
+            userId: peerAdmin.id,
             role: 'ADMIN',
           });
           await insertMembership(database.pool, {
@@ -284,12 +283,24 @@ void describe('PATCH membership role HTTP PostgreSQL', () => {
             userId: rejoiner.id,
             role: 'ROOMMATE',
           });
+          await insertMembership(database.pool, {
+            id: roommateDenyAdmin,
+            homeId: roommateDenyHome,
+            userId: admin.id,
+            role: 'ADMIN',
+          });
+          await insertMembership(database.pool, {
+            id: roommateDenyRoommate,
+            homeId: roommateDenyHome,
+            userId: roommate.id,
+            role: 'ROOMMATE',
+          });
 
           const unauthenticated = await request({
-            method: 'PATCH',
-            path: rolePath(homeA, membershipRoommateA),
+            method: 'POST',
+            path: removePath(homeA, membershipRoommateA),
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ role: 'ADMIN' }),
+            body: JSON.stringify({}),
           });
           assert.equal(unauthenticated.status, 401);
           assert.equal(
@@ -301,11 +312,10 @@ void describe('PATCH membership role HTTP PostgreSQL', () => {
             'private, no-store',
           );
 
-          const malformedHome = await patchRole({
+          const malformedHome = await postRemove({
             cookie: admin.cookie,
             homeId: 'not-a-uuid',
             membershipId: membershipRoommateA,
-            role: 'ADMIN',
           });
           assert.equal(malformedHome.status, 400);
           assert.equal(
@@ -313,11 +323,10 @@ void describe('PATCH membership role HTTP PostgreSQL', () => {
             'INVALID_PATH_INPUT',
           );
 
-          const malformedMembership = await patchRole({
+          const malformedMembership = await postRemove({
             cookie: admin.cookie,
             homeId: homeA,
             membershipId: 'nope',
-            role: 'ADMIN',
           });
           assert.equal(malformedMembership.status, 400);
           assert.equal(
@@ -325,67 +334,58 @@ void describe('PATCH membership role HTTP PostgreSQL', () => {
             'INVALID_PATH_INPUT',
           );
 
-          const invalidRole = await patchRole({
+          const nullBody = await postRemove({
             cookie: admin.cookie,
             homeId: homeA,
             membershipId: membershipRoommateA,
-            role: 'SUPERADMIN',
+            body: null,
           });
-          assert.equal(invalidRole.status, 400);
+          assert.equal(nullBody.status, 400);
           assert.equal(
-            (invalidRole.json() as ApiErrorBody).error.code,
+            (nullBody.json() as ApiErrorBody).error.code,
             'INVALID_REQUEST',
           );
 
-          const promote = await patchRole({
+          const arrayBody = await postRemove({
             cookie: admin.cookie,
             homeId: homeA,
             membershipId: membershipRoommateA,
-            role: 'ADMIN',
+            body: [],
           });
-          assert.equal(promote.status, 204);
-          assert.equal(promote.text, '');
+          assert.equal(arrayBody.status, 400);
           assert.equal(
-            promote.headers.get('cache-control'),
-            'private, no-store',
-          );
-          assert.match(
-            promote.headers.get(REQUEST_ID_HEADER) ?? '',
-            /^[0-9a-f-]{36}$/i,
+            (arrayBody.json() as ApiErrorBody).error.code,
+            'INVALID_REQUEST',
           );
 
-          const demoteAllowed = await patchRole({
+          const extraFieldBody = await postRemove({
             cookie: admin.cookie,
             homeId: homeA,
             membershipId: membershipRoommateA,
-            role: 'ROOMMATE',
+            body: { anything: true },
           });
-          assert.equal(demoteAllowed.status, 204);
-          assert.equal(demoteAllowed.text, '');
+          assert.equal(extraFieldBody.status, 400);
+          assert.equal(
+            (extraFieldBody.json() as ApiErrorBody).error.code,
+            'INVALID_REQUEST',
+          );
 
-          const sameRole = await patchRole({
+          const malformedJson = await postRemove({
             cookie: admin.cookie,
             homeId: homeA,
             membershipId: membershipRoommateA,
-            role: 'ROOMMATE',
+            rawBody: '{not-json',
           });
-          assert.equal(sameRole.status, 204);
-          const sameRoleEvents = await database.pool.query<{
-            event_id: string;
-          }>(
-            `SELECT event_id FROM outbox_events
-             WHERE home_id = $1 AND payload->>'membershipId' = $2
-               AND payload->>'previousRole' = 'ROOMMATE'
-               AND payload->>'newRole' = 'ROOMMATE'`,
-            [homeA, membershipRoommateA],
+          assert.equal(malformedJson.status, 400);
+          assert.equal(
+            (malformedJson.json() as ApiErrorBody).error.code,
+            'BAD_REQUEST',
           );
-          assert.equal(sameRoleEvents.rows.length, 0);
 
-          const roommateAttempt = await patchRole({
+          const roommateAttempt = await postRemove({
             cookie: roommate.cookie,
-            homeId: homeA,
-            membershipId: membershipAdminA,
-            role: 'ROOMMATE',
+            homeId: roommateDenyHome,
+            membershipId: roommateDenyAdmin,
           });
           assert.equal(roommateAttempt.status, 403);
           assert.equal(
@@ -393,55 +393,43 @@ void describe('PATCH membership role HTTP PostgreSQL', () => {
             'FORBIDDEN',
           );
 
-          const lastAdmin = await patchRole({
-            cookie: admin.cookie,
-            homeId: lastAdminHome,
-            membershipId: lastAdminMembership,
-            role: 'ROOMMATE',
-          });
-          assert.equal(lastAdmin.status, 409);
-          assert.equal(
-            (lastAdmin.json() as ApiErrorBody).error.code,
-            'LAST_ADMIN_REQUIRED',
-          );
-
-          const selfDemote = await patchRole({
+          const selfRemove = await postRemove({
             cookie: admin.cookie,
             homeId: twoAdminHome,
             membershipId: twoAdminA,
-            role: 'ROOMMATE',
           });
-          assert.equal(selfDemote.status, 204);
+          assert.equal(selfRemove.status, 403);
+          assert.equal(
+            (selfRemove.json() as ApiErrorBody).error.code,
+            'FORBIDDEN',
+          );
+          assert.notEqual(
+            (selfRemove.json() as ApiErrorBody).error.code,
+            'LAST_ROOMMATE_REQUIRES_ARCHIVE',
+          );
 
-          const nonexistent = await patchRole({
+          const missingTarget = await postRemove({
             cookie: admin.cookie,
             homeId: homeA,
             membershipId: randomUUID(),
-            role: 'ADMIN',
           });
-          assert.equal(nonexistent.status, 404);
+          assert.equal(missingTarget.status, 404);
           assert.equal(
-            (nonexistent.json() as ApiErrorBody).error.code,
+            (missingTarget.json() as ApiErrorBody).error.code,
             'NOT_FOUND',
           );
-          assert.equal(
-            (nonexistent.json() as ApiErrorBody).error.message,
-            'Not found',
-          );
 
-          const ended = await patchRole({
+          const ended = await postRemove({
             cookie: admin.cookie,
             homeId: homeA,
             membershipId: endedInA,
-            role: 'ADMIN',
           });
           assert.equal(ended.status, 404);
 
-          const crossHome = await patchRole({
+          const crossHome = await postRemove({
             cookie: admin.cookie,
             homeId: homeA,
             membershipId: membershipAdminB,
-            role: 'ROOMMATE',
           });
           assert.equal(crossHome.status, 404);
           assert.equal(
@@ -449,18 +437,41 @@ void describe('PATCH membership role HTTP PostgreSQL', () => {
             'Not found',
           );
 
-          const oldTenure = await patchRole({
+          const oldTenure = await postRemove({
             cookie: admin.cookie,
             homeId: rejoinHome,
             membershipId: rejoinOld,
-            role: 'ADMIN',
           });
           assert.equal(oldTenure.status, 404);
-          const newTenure = await database.pool.query<{ role: string }>(
-            'SELECT role FROM memberships WHERE id = $1',
-            [rejoinNew],
+          const newTenureBefore = await database.pool.query<{
+            ended_at: Date | null;
+          }>('SELECT ended_at FROM memberships WHERE id = $1', [rejoinNew]);
+          assert.equal(newTenureBefore.rows[0]?.ended_at, null);
+
+          const adminRemovesRoommate = await postRemove({
+            cookie: admin.cookie,
+            homeId: homeA,
+            membershipId: membershipRoommateA,
+            body: {},
+          });
+          assert.equal(adminRemovesRoommate.status, 204);
+          assert.equal(adminRemovesRoommate.text, '');
+          assert.equal(
+            adminRemovesRoommate.headers.get('cache-control'),
+            'private, no-store',
           );
-          assert.equal(newTenure.rows[0]?.role, 'ROOMMATE');
+          assert.match(
+            adminRemovesRoommate.headers.get(REQUEST_ID_HEADER) ?? '',
+            /^[0-9a-f-]{36}$/i,
+          );
+
+          const adminRemovesAdmin = await postRemove({
+            cookie: admin.cookie,
+            homeId: twoAdminHome,
+            membershipId: twoAdminB,
+          });
+          assert.equal(adminRemovesAdmin.status, 204);
+          assert.equal(adminRemovesAdmin.text, '');
         });
       } finally {
         await database.pool.query(

@@ -136,6 +136,8 @@ void describe('POST membership leave HTTP PostgreSQL', () => {
               database.pool,
             ),
             leaveMembership: createLeaveMembershipFromPool(database.pool),
+            removeMembership: () =>
+              Promise.reject(new Error('remove must not run for leave')),
           }),
         });
 
