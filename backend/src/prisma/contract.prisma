@@ -121,3 +121,68 @@ model AuthVerification {
   @@index([identifier], name: "auth_verifications_identifier_idx")
   @@map("auth_verifications")
 }
+
+// Platform transactional outbox. home_id is routing/context only — no domain FK.
+model OutboxEvent {
+  eventId       Uuid          @id @map("event_id")
+  eventType     VarChar(200)  @map("event_type")
+  occurredAt    Timestamptz   @map("occurred_at")
+  createdAt     Timestamptz   @default(now()) @map("created_at")
+  availableAt   Timestamptz   @default(now()) @map("available_at")
+  homeId        Uuid?         @map("home_id")
+  payload       Jsonb
+  attemptCount  Int           @default(0) @map("attempt_count")
+  leaseOwner    Uuid?         @map("lease_owner")
+  leasedAt      Timestamptz?  @map("leased_at")
+  leaseUntil    Timestamptz?  @map("lease_until")
+  processedAt   Timestamptz?  @map("processed_at")
+  deadAt        Timestamptz?  @map("dead_at")
+  lastFailedAt  Timestamptz?  @map("last_failed_at")
+  lastErrorCode VarChar(100)? @map("last_error_code")
+
+  @@check(
+    expression: "((event_type)::text ~ '^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*([.][a-z][a-z0-9_]*)*[.]v[1-9][0-9]*$'::text)",
+    map: "outbox_events_event_type_format_check"
+  )
+  @@check(
+    expression: "(jsonb_typeof(payload) = 'object'::text)",
+    map: "outbox_events_payload_object_check"
+  )
+  @@check(expression: "(attempt_count >= 0)", map: "outbox_events_attempt_count_check")
+  @@check(
+    expression: "(NOT ((processed_at IS NOT NULL) AND (dead_at IS NOT NULL)))",
+    map: "outbox_events_terminal_state_check"
+  )
+  @@check(
+    expression: "(((lease_owner IS NULL) AND (leased_at IS NULL) AND (lease_until IS NULL)) OR ((lease_owner IS NOT NULL) AND (leased_at IS NOT NULL) AND (lease_until IS NOT NULL)))",
+    map: "outbox_events_lease_completeness_check"
+  )
+  @@check(
+    expression: "((lease_until IS NULL) OR (lease_until > leased_at))",
+    map: "outbox_events_lease_order_check"
+  )
+  @@check(
+    expression: "(((processed_at IS NULL) AND (dead_at IS NULL)) OR (lease_owner IS NULL))",
+    map: "outbox_events_terminal_not_leased_check"
+  )
+  @@check(
+    expression: "((last_error_code IS NULL) OR ((last_error_code)::text ~ '^[A-Z][A-Z0-9_]{0,99}$'::text))",
+    map: "outbox_events_error_code_format_check"
+  )
+  @@index(
+    [availableAt, createdAt, eventId],
+    where: "((processed_at IS NULL) AND (dead_at IS NULL))",
+    map: "outbox_events_claim_idx"
+  )
+  @@index(
+    [processedAt, eventId],
+    where: "(processed_at IS NOT NULL)",
+    map: "outbox_events_processed_prune_idx"
+  )
+  @@index(
+    [deadAt, eventId],
+    where: "(dead_at IS NOT NULL)",
+    map: "outbox_events_dead_prune_idx"
+  )
+  @@map("outbox_events")
+}

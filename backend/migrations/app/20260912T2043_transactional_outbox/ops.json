@@ -1,0 +1,158 @@
+[
+  {
+    "id": "table.outbox_events",
+    "label": "Create table \"outbox_events\"",
+    "summary": "Creates table \"outbox_events\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "outbox_events"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"outbox_events\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"outbox_events\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"outbox_events\"",
+        "sql": "CREATE TABLE \"public\".\"outbox_events\" (\n  \"attempt_count\" int4 DEFAULT 0 NOT NULL,\n  \"available_at\" timestamptz DEFAULT (now()) NOT NULL,\n  \"created_at\" timestamptz DEFAULT (now()) NOT NULL,\n  \"dead_at\" timestamptz,\n  \"event_id\" uuid NOT NULL,\n  \"event_type\" character varying(200) NOT NULL,\n  \"home_id\" uuid,\n  \"last_error_code\" character varying(100),\n  \"last_failed_at\" timestamptz,\n  \"lease_owner\" uuid,\n  \"lease_until\" timestamptz,\n  \"leased_at\" timestamptz,\n  \"occurred_at\" timestamptz NOT NULL,\n  \"payload\" jsonb NOT NULL,\n  \"processed_at\" timestamptz,\n  PRIMARY KEY (\"event_id\"),\n  CONSTRAINT \"outbox_events_attempt_count_check\" CHECK ((attempt_count >= 0)),\n  CONSTRAINT \"outbox_events_error_code_format_check\" CHECK (((last_error_code IS NULL) OR ((last_error_code)::text ~ '^[A-Z][A-Z0-9_]{0,99}$'::text))),\n  CONSTRAINT \"outbox_events_event_type_format_check\" CHECK (((event_type)::text ~ '^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*([.][a-z][a-z0-9_]*)*[.]v[1-9][0-9]*$'::text)),\n  CONSTRAINT \"outbox_events_lease_completeness_check\" CHECK ((((lease_owner IS NULL) AND (leased_at IS NULL) AND (lease_until IS NULL)) OR ((lease_owner IS NOT NULL) AND (leased_at IS NOT NULL) AND (lease_until IS NOT NULL)))),\n  CONSTRAINT \"outbox_events_lease_order_check\" CHECK (((lease_until IS NULL) OR (lease_until > leased_at))),\n  CONSTRAINT \"outbox_events_payload_object_check\" CHECK ((jsonb_typeof(payload) = 'object'::text)),\n  CONSTRAINT \"outbox_events_terminal_not_leased_check\" CHECK ((((processed_at IS NULL) AND (dead_at IS NULL)) OR (lease_owner IS NULL))),\n  CONSTRAINT \"outbox_events_terminal_state_check\" CHECK ((NOT ((processed_at IS NOT NULL) AND (dead_at IS NOT NULL))))\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"outbox_events\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"outbox_events\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.outbox_events.outbox_events_claim_idx",
+    "label": "Create index \"outbox_events_claim_idx\" on \"outbox_events\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "outbox_events_claim_idx",
+        "table": "outbox_events"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"outbox_events_claim_idx\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"outbox_events_claim_idx\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"outbox_events_claim_idx\"",
+        "sql": "CREATE INDEX \"outbox_events_claim_idx\" ON \"public\".\"outbox_events\" (\"available_at\", \"created_at\", \"event_id\") WHERE (((processed_at IS NULL) AND (dead_at IS NULL)))",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"outbox_events_claim_idx\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"outbox_events_claim_idx\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.outbox_events.outbox_events_dead_prune_idx",
+    "label": "Create index \"outbox_events_dead_prune_idx\" on \"outbox_events\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "outbox_events_dead_prune_idx",
+        "table": "outbox_events"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"outbox_events_dead_prune_idx\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"outbox_events_dead_prune_idx\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"outbox_events_dead_prune_idx\"",
+        "sql": "CREATE INDEX \"outbox_events_dead_prune_idx\" ON \"public\".\"outbox_events\" (\"dead_at\", \"event_id\") WHERE ((dead_at IS NOT NULL))",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"outbox_events_dead_prune_idx\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"outbox_events_dead_prune_idx\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.outbox_events.outbox_events_processed_prune_idx",
+    "label": "Create index \"outbox_events_processed_prune_idx\" on \"outbox_events\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "outbox_events_processed_prune_idx",
+        "table": "outbox_events"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"outbox_events_processed_prune_idx\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"outbox_events_processed_prune_idx\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"outbox_events_processed_prune_idx\"",
+        "sql": "CREATE INDEX \"outbox_events_processed_prune_idx\" ON \"public\".\"outbox_events\" (\"processed_at\", \"event_id\") WHERE ((processed_at IS NOT NULL))",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"outbox_events_processed_prune_idx\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"outbox_events_processed_prune_idx\""
+        ]
+      }
+    ]
+  }
+]

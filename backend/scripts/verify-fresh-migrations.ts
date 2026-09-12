@@ -25,6 +25,7 @@ import {
   resolveTestDatabaseUrl,
 } from '../src/platform/persistence/test-database.js';
 import { verifyAuthPersistence } from './verify-auth-persistence.js';
+import { verifyOutboxSchema } from './verify-outbox-schema.js';
 
 const backendRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -72,7 +73,8 @@ runPrisma(['migration', 'check'], databaseUrl);
 runPrisma(['db', 'migrate', '--db', databaseUrl, '--yes'], databaseUrl);
 runPrisma(['db', 'verify', '--db', databaseUrl, '--strict'], databaseUrl);
 await verifyAuthPersistence(databaseUrl);
+await verifyOutboxSchema(databaseUrl);
 
 console.log(
-  'Fresh-database migration and auth persistence verification passed.',
+  'Fresh-database migration, auth persistence, and outbox schema verification passed.',
 );
