@@ -13,6 +13,10 @@ import {
 import { createCurrentUserRouter } from '../domains/users/http.js';
 import type { PrincipalResolver } from '../platform/auth/principal.js';
 import type { ActiveHomeActorResolver } from '../platform/authz/index.js';
+import {
+  createInvitationsRouter,
+  type CreateInvitationCommand,
+} from './invitations.js';
 
 export type CreateRoomiesApiRouterOptions = {
   principalResolver: Pick<PrincipalResolver, 'requirePrincipal'>;
@@ -22,6 +26,10 @@ export type CreateRoomiesApiRouterOptions = {
   changeMembershipRole: ChangeMembershipRoleCommand;
   leaveMembership: LeaveMembershipCommand;
   removeMembership: RemoveMembershipCommand;
+  invitations?: {
+    createInvitation: CreateInvitationCommand;
+    frontendOrigin: string;
+  };
 };
 
 /**
@@ -35,5 +43,16 @@ export function createRoomiesApiRouter(
   router.use('/me', createCurrentUserRouter(options));
   router.use('/homes', createHomesRouter(options));
   router.use('/homes', createMembershipsRouter(options));
+  if (options.invitations !== undefined) {
+    router.use(
+      '/homes',
+      createInvitationsRouter({
+        principalResolver: options.principalResolver,
+        activeHomeActorResolver: options.activeHomeActorResolver,
+        createInvitation: options.invitations.createInvitation,
+        frontendOrigin: options.invitations.frontendOrigin,
+      }),
+    );
+  }
   return router;
 }

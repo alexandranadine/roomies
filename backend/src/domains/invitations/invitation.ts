@@ -1,6 +1,9 @@
 import type { NormalizedEmail } from '../../platform/auth/index.js';
 import type { InvitationTokenHash } from './token-hash.js';
 
+/** Server-side October invitation lifetime. Clients cannot choose expiry. */
+export const INVITATION_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000;
+
 export const INVITATION_REVOCATION_CAUSES = [
   'ADMIN_REVOKED',
   'HOME_ARCHIVED',

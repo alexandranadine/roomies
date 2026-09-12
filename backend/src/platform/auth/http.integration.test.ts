@@ -38,6 +38,7 @@ function authConfig(
     authBaseUrl: 'http://localhost:3000',
     authSecret: TEST_SECRET,
     secureAuthCookies: false,
+    frontendOrigin: TRUSTED_ORIGIN,
     trustedOrigins: [TRUSTED_ORIGIN],
     trustProxyHops: 0,
     ...overrides,

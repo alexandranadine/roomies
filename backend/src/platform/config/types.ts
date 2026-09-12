@@ -25,6 +25,11 @@ export type AppConfig = Readonly<{
   /** Whether authentication cookies must carry the Secure attribute. */
   secureAuthCookies: boolean;
   /**
+   * Canonical public frontend origin for invite URLs and other app links.
+   * Normalized to scheme://host[:port] with no path, query, hash, or wildcards.
+   */
+  frontendOrigin: string;
+  /**
    * Exact trusted frontend origins for the HTTP/CORS layer.
    * Normalized to scheme://host[:port] with no path, query, hash, or wildcards.
    */

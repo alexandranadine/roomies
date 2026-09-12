@@ -42,6 +42,7 @@ function authConfig(databaseUrl: string): AppConfig {
     authBaseUrl: 'http://localhost:3000',
     authSecret: TEST_SECRET,
     secureAuthCookies: false,
+    frontendOrigin: 'http://localhost:5173',
     trustedOrigins: [TRUSTED_ORIGIN],
     trustProxyHops: 0,
   };

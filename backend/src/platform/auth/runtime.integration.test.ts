@@ -25,6 +25,7 @@ void describe('Prisma and Better Auth shared-pool integration', () => {
         authBaseUrl: 'http://localhost:3000',
         authSecret: TEST_SECRET,
         secureAuthCookies: false,
+        frontendOrigin: 'http://localhost:5173',
         trustedOrigins: ['http://localhost:5173'],
         trustProxyHops: 0,
       };

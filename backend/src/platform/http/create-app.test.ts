@@ -155,7 +155,10 @@ void describe('HTTP platform app', () => {
     const res = await appRequest(app, {
       method: 'POST',
       path: '/api/v1/anything',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        Origin: 'http://localhost:5173',
+        'content-type': 'application/json',
+      },
       body: '{not-json',
     });
     assert.equal(res.status, 400);
@@ -170,7 +173,10 @@ void describe('HTTP platform app', () => {
     const res = await appRequest(app, {
       method: 'POST',
       path: '/api/v1/anything',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        Origin: 'http://localhost:5173',
+        'content-type': 'application/json',
+      },
       body: oversized,
     });
     assert.equal(res.status, 413);
@@ -201,11 +207,16 @@ void describe('HTTP platform app', () => {
       new URL('./create-app.ts', import.meta.url),
       'utf8',
     );
-    const authMount = source.indexOf('AUTH_HTTP_ROUTE');
+    const authMount = source.indexOf('app.all(AUTH_HTTP_ROUTE');
+    const originGuard = source.indexOf(
+      "app.use('/api/v1', createApiMutationOriginGuard",
+    );
     const jsonParser = source.indexOf('express.json(');
     assert.ok(authMount >= 0);
+    assert.ok(originGuard >= 0);
     assert.ok(jsonParser >= 0);
-    assert.ok(authMount < jsonParser);
+    assert.ok(authMount < originGuard);
+    assert.ok(originGuard < jsonParser);
     assert.equal(AUTH_HTTP_ROUTE, '/api/auth/*splat');
     assert.deepEqual(HTTP_PIPELINE_ORDER, [
       'trust-proxy',
@@ -213,6 +224,7 @@ void describe('HTTP platform app', () => {
       'security-headers',
       'cors',
       'better-auth',
+      'api-mutation-origin',
       'json-body',
       'health',
       'roomies-api',

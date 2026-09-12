@@ -27,6 +27,7 @@ import { createActiveHomeActorResolver } from './active-home-actor-resolver.js';
 
 const TEST_SECRET = 'roomies_test_secret_32_chars_minimum_value';
 const TRUSTED_ORIGIN = 'http://localhost:5173';
+const HOSTILE_ORIGIN = 'https://evil.example';
 const PASSWORD = 'test-password-only';
 const skipWithoutDatabase = skipUnlessDedicatedTestDatabase();
 
@@ -38,6 +39,7 @@ function authConfig(databaseUrl: string): AppConfig {
     authBaseUrl: 'http://localhost:3000',
     authSecret: TEST_SECRET,
     secureAuthCookies: false,
+    frontendOrigin: 'http://localhost:5173',
     trustedOrigins: [TRUSTED_ORIGIN],
     trustProxyHops: 0,
   };
@@ -289,7 +291,10 @@ void describe('PATCH membership role HTTP PostgreSQL', () => {
           const unauthenticated = await request({
             method: 'PATCH',
             path: rolePath(homeA, membershipRoommateA),
-            headers: { 'content-type': 'application/json' },
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              'content-type': 'application/json',
+            },
             body: JSON.stringify({ role: 'ADMIN' }),
           });
           assert.equal(unauthenticated.status, 401);
@@ -363,6 +368,30 @@ void describe('PATCH membership role HTTP PostgreSQL', () => {
           });
           assert.equal(demoteAllowed.status, 204);
           assert.equal(demoteAllowed.text, '');
+
+          const hostilePromote = await request({
+            method: 'PATCH',
+            path: rolePath(homeA, membershipRoommateA),
+            headers: {
+              Origin: HOSTILE_ORIGIN,
+              Cookie: admin.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({ role: 'ADMIN' }),
+          });
+          assert.equal(hostilePromote.status, 403);
+          assert.equal(
+            (hostilePromote.json() as ApiErrorBody).error.code,
+            'FORBIDDEN',
+          );
+          assert.equal(hostilePromote.text.includes(HOSTILE_ORIGIN), false);
+          assert.equal(hostilePromote.text.includes(TRUSTED_ORIGIN), false);
+          assert.equal('inviteUrl' in (hostilePromote.json() as object), false);
+          const roleAfterHostile = await database.pool.query<{ role: string }>(
+            'SELECT role FROM memberships WHERE id = $1',
+            [membershipRoommateA],
+          );
+          assert.equal(roleAfterHostile.rows[0]?.role, 'ROOMMATE');
 
           const sameRole = await patchRole({
             cookie: admin.cookie,

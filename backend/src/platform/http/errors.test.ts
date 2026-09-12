@@ -13,6 +13,11 @@ import {
 } from '../authz/errors.js';
 import { StructuralIntegrityError } from '../../domains/homes/structure-errors.js';
 import {
+  AlreadyHomeMemberError,
+  InvitationAlreadyPendingError,
+  InvitationValidityConflictError,
+} from '../../domains/invitations/errors.js';
+import {
   LastAdminRequiredError,
   LastRoommateRequiresArchiveError,
 } from '../../domains/memberships/errors.js';
@@ -79,6 +84,38 @@ void describe('HTTP known-error mappings', () => {
     const body = res.json() as ApiErrorBody;
     assert.equal(body.error.code, 'LAST_ROOMMATE_REQUIRES_ARCHIVE');
     assert.equal(body.error.message, 'Last roommate requires archive');
+  });
+
+  void it('maps InvitationAlreadyPendingError to 409 INVITATION_ALREADY_PENDING', async () => {
+    const res = await appRequest(
+      appThatThrows(new InvitationAlreadyPendingError()),
+      { path: '/throw' },
+    );
+    assert.equal(res.status, 409);
+    const body = res.json() as ApiErrorBody;
+    assert.equal(body.error.code, 'INVITATION_ALREADY_PENDING');
+    assert.equal(body.error.message, 'Invitation already pending');
+  });
+
+  void it('does not map InvitationValidityConflictError to a pending 409', async () => {
+    const res = await appRequest(
+      appThatThrows(new InvitationValidityConflictError()),
+      { path: '/throw' },
+    );
+    assert.equal(res.status, 500);
+    const body = res.json() as ApiErrorBody;
+    assert.equal(body.error.code, 'INTERNAL_ERROR');
+    assert.notEqual(body.error.code, 'INVITATION_ALREADY_PENDING');
+  });
+
+  void it('maps AlreadyHomeMemberError to 409 ALREADY_HOME_MEMBER', async () => {
+    const res = await appRequest(appThatThrows(new AlreadyHomeMemberError()), {
+      path: '/throw',
+    });
+    assert.equal(res.status, 409);
+    const body = res.json() as ApiErrorBody;
+    assert.equal(body.error.code, 'ALREADY_HOME_MEMBER');
+    assert.equal(body.error.message, 'Already a home member');
   });
 
   void it('maps InvalidPathInputError to 400 INVALID_PATH_INPUT', async () => {

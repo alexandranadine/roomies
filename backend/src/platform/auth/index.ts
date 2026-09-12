@@ -5,6 +5,13 @@ export {
   createAuthHttpHandler,
 } from './http.js';
 export {
+  createCanonicalIdentityByEmailLookup,
+  findCanonicalIdentityByEmail,
+  type CanonicalIdentity,
+  type CanonicalIdentityByEmailLookup,
+  type CanonicalIdentityQuery,
+} from './canonical-identity-by-email.js';
+export {
   createCanonicalUserLookup,
   createPrincipalResolver,
   type AuthenticatedPrincipal,

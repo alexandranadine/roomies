@@ -15,6 +15,7 @@ const LOCAL_DEV_ORIGINS = [
 
 const DEFAULT_PORT = 3000;
 const LOCAL_AUTH_BASE_URL = 'http://localhost:3000';
+const LOCAL_DEFAULT_FRONTEND_ORIGIN = 'http://localhost:5173';
 const INSECURE_AUTH_SECRETS = new Set([
   'better-auth-secret-123456789',
   'replace_with_a_random_secret_of_at_least_32_characters',
@@ -126,12 +127,14 @@ const envSchema = z
         error: 'AUTH_SECRET must be a high-entropy random value',
       }),
     TRUSTED_ORIGINS: z.string().optional(),
+    FRONTEND_ORIGIN: z.string().optional(),
     TRUST_PROXY: trustProxySchema,
   })
   .transform((data, ctx) => {
     const appEnv = data.APP_ENV;
     const rawOrigins = data.TRUSTED_ORIGINS?.trim();
     const rawAuthBaseUrl = data.AUTH_BASE_URL?.trim();
+    const rawFrontendOrigin = data.FRONTEND_ORIGIN?.trim();
 
     let trustedOrigins: string[];
     if (rawOrigins === undefined || rawOrigins === '') {
@@ -185,6 +188,32 @@ const envSchema = z
       }
     }
 
+    let frontendOrigin: string;
+    if (rawFrontendOrigin === undefined || rawFrontendOrigin === '') {
+      if (isLocalDefaultEnv(appEnv)) {
+        frontendOrigin = LOCAL_DEFAULT_FRONTEND_ORIGIN;
+      } else {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['FRONTEND_ORIGIN'],
+          message: `FRONTEND_ORIGIN is required when APP_ENV=${appEnv}`,
+        });
+        return z.NEVER;
+      }
+    } else {
+      try {
+        frontendOrigin = normalizeTrustedOrigin(rawFrontendOrigin);
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : 'invalid value';
+        ctx.addIssue({
+          code: 'custom',
+          path: ['FRONTEND_ORIGIN'],
+          message: `FRONTEND_ORIGIN is invalid: ${detail}`,
+        });
+        return z.NEVER;
+      }
+    }
+
     return {
       appEnv,
       port: data.PORT,
@@ -192,6 +221,7 @@ const envSchema = z
       authBaseUrl,
       authSecret: data.AUTH_SECRET,
       secureAuthCookies: !isLocalDefaultEnv(appEnv),
+      frontendOrigin,
       trustedOrigins,
       trustProxyHops: data.TRUST_PROXY,
     } satisfies {
@@ -201,6 +231,7 @@ const envSchema = z
       authBaseUrl: string;
       authSecret: string;
       secureAuthCookies: boolean;
+      frontendOrigin: string;
       trustedOrigins: string[];
       trustProxyHops: number;
     };
@@ -250,7 +281,7 @@ function formatIssues(zodError: z.ZodError): string[] {
       );
       continue;
     }
-    if (key === 'TRUSTED_ORIGINS') {
+    if (key === 'TRUSTED_ORIGINS' || key === 'FRONTEND_ORIGIN') {
       issues.push(issue.message);
       continue;
     }
@@ -285,6 +316,7 @@ export function parseConfig(source: ConfigSource): AppConfig {
     AUTH_BASE_URL: optionalString(source['AUTH_BASE_URL']),
     AUTH_SECRET: optionalString(source['AUTH_SECRET']),
     TRUSTED_ORIGINS: optionalString(source['TRUSTED_ORIGINS']),
+    FRONTEND_ORIGIN: optionalString(source['FRONTEND_ORIGIN']),
     TRUST_PROXY: optionalString(source['TRUST_PROXY']),
   });
 
@@ -303,6 +335,7 @@ export function parseConfig(source: ConfigSource): AppConfig {
     authBaseUrl: result.data.authBaseUrl,
     authSecret: result.data.authSecret,
     secureAuthCookies: result.data.secureAuthCookies,
+    frontendOrigin: result.data.frontendOrigin,
     trustedOrigins: Object.freeze([...result.data.trustedOrigins]),
     trustProxyHops: result.data.trustProxyHops,
   });

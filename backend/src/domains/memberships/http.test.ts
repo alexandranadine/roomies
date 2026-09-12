@@ -97,7 +97,10 @@ void describe('PATCH /api/v1/homes/:homeId/memberships/:membershipId/role', () =
     const res = await appRequest(app, {
       method: 'PATCH',
       path: rolePath(),
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        Origin: TRUSTED_ORIGIN,
+        'content-type': 'application/json',
+      },
       body: JSON.stringify({ role: 'ADMIN' }),
     });
     assert.equal(res.status, 401);
@@ -112,7 +115,10 @@ void describe('PATCH /api/v1/homes/:homeId/memberships/:membershipId/role', () =
     const res = await appRequest(app, {
       method: 'PATCH',
       path: rolePath('not-a-uuid'),
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        Origin: TRUSTED_ORIGIN,
+        'content-type': 'application/json',
+      },
       body: JSON.stringify({ role: 'ADMIN' }),
     });
     assert.equal(res.status, 400);
@@ -126,7 +132,10 @@ void describe('PATCH /api/v1/homes/:homeId/memberships/:membershipId/role', () =
     const res = await appRequest(app, {
       method: 'PATCH',
       path: rolePath(HOME_ID, 'nope'),
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        Origin: TRUSTED_ORIGIN,
+        'content-type': 'application/json',
+      },
       body: JSON.stringify({ role: 'ADMIN' }),
     });
     assert.equal(res.status, 400);
@@ -151,7 +160,10 @@ void describe('PATCH /api/v1/homes/:homeId/memberships/:membershipId/role', () =
       const res = await appRequest(app, {
         method: 'PATCH',
         path: rolePath(),
-        headers: { 'content-type': 'application/json' },
+        headers: {
+          Origin: TRUSTED_ORIGIN,
+          'content-type': 'application/json',
+        },
         body: JSON.stringify(body),
       });
       assert.equal(res.status, 400);
@@ -166,7 +178,10 @@ void describe('PATCH /api/v1/homes/:homeId/memberships/:membershipId/role', () =
     const res = await appRequest(app, {
       method: 'PATCH',
       path: rolePath(),
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        Origin: TRUSTED_ORIGIN,
+        'content-type': 'application/json',
+      },
       body: JSON.stringify({ role: 'ROOMMATE' }),
     });
     assert.equal(res.status, 204);
@@ -190,7 +205,10 @@ void describe('PATCH /api/v1/homes/:homeId/memberships/:membershipId/role', () =
     const res = await appRequest(app, {
       method: 'PATCH',
       path: rolePath(),
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        Origin: TRUSTED_ORIGIN,
+        'content-type': 'application/json',
+      },
       body: JSON.stringify({ role: 'ROOMMATE' }),
     });
     assert.equal(res.status, 409);

@@ -45,6 +45,7 @@ function testConfig(databaseUrl: string): AppConfig {
     authBaseUrl: 'http://localhost:3000',
     authSecret: 'roomies_test_secret_32_chars_minimum_value',
     secureAuthCookies: false,
+    frontendOrigin: 'http://localhost:5173',
     trustedOrigins: ['http://localhost:5173'],
     trustProxyHops: 0,
   };

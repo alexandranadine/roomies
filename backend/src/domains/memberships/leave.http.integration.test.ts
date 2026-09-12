@@ -39,6 +39,7 @@ function authConfig(databaseUrl: string): AppConfig {
     authBaseUrl: 'http://localhost:3000',
     authSecret: TEST_SECRET,
     secureAuthCookies: false,
+    frontendOrigin: 'http://localhost:5173',
     trustedOrigins: [TRUSTED_ORIGIN],
     trustProxyHops: 0,
   };
@@ -310,7 +311,10 @@ void describe('POST membership leave HTTP PostgreSQL', () => {
           const unauthenticated = await request({
             method: 'POST',
             path: leavePath(homeA, membershipRoommateA),
-            headers: { 'content-type': 'application/json' },
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              'content-type': 'application/json',
+            },
             body: JSON.stringify({}),
           });
           assert.equal(unauthenticated.status, 401);

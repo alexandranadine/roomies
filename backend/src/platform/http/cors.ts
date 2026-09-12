@@ -6,7 +6,9 @@ import { normalizeTrustedOrigin } from '../config/normalize-origin.js';
  * Exact-origin CORS from configured trusted origins.
  * Credentials-compatible (no wildcard). Requests without Origin remain allowed
  * (health probes / server-to-server). Unknown origins are denied without reflecting
- * the request Origin.
+ * the request Origin — CORS withholds ACAO; it does not reject the request
+ * and is not CSRF protection. `/api/v1` mutation origin enforcement lives in
+ * `createApiMutationOriginGuard`.
  */
 export function createCorsMiddleware(
   trustedOrigins: readonly string[],

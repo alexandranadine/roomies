@@ -181,4 +181,25 @@ void describe('home-administration application boundary', () => {
       assert.doesNotMatch(source, /from ['"]pg['"]/, rel);
     }
   });
+
+  void it('orchestrates invitation creation without outbox, HTTP, or Date.now', async () => {
+    const source = await readFile(
+      path.join(dir, 'create-invitation.ts'),
+      'utf8',
+    );
+    assert.match(source, /lockHomeStructure/);
+    assert.match(source, /decideInvitationCreate/);
+    assert.match(source, /findEffectivePending/);
+    assert.match(source, /findCanonicalIdentityByEmail/);
+    assert.match(source, /normalizeEmail/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /better-auth/);
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+    assert.doesNotMatch(source, /Date\.now/);
+    assert.doesNotMatch(source, /outbox/);
+    assert.doesNotMatch(source, /invitation\.created/);
+    assert.doesNotMatch(source, /membership\.started/);
+    assert.doesNotMatch(source, /SERIALIZABLE/);
+    assert.doesNotMatch(source, /pg_advisory/i);
+  });
 });

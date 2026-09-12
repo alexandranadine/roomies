@@ -8,6 +8,7 @@ import { JSON_BODY_LIMIT } from './constants.js';
 import { createCorsMiddleware } from './cors.js';
 import { errorHandler, notFoundHandler } from './errors.js';
 import { createHealthRouter } from './health.js';
+import { createApiMutationOriginGuard } from './mutation-origin.js';
 import { requestIdMiddleware } from './request-id.js';
 
 export type CreateAppOptions = {
@@ -50,6 +51,11 @@ export function createApp(options: CreateAppOptions): Express {
   if (auth) {
     app.all(AUTH_HTTP_ROUTE, createAuthHttpHandler(auth));
   }
+
+  // Cookie CSRF: reject untrusted/missing Origin on /api/v1 mutations after
+  // request IDs exist and before JSON parsing or application handlers.
+  // /api/auth/* is not wrapped — Better Auth owns its own origin checks.
+  app.use('/api/v1', createApiMutationOriginGuard(config.trustedOrigins));
 
   // Syntactically valid JSON, including primitives such as `null`, must reach
   // endpoint Zod schemas. `strict: false` keeps malformed JSON as a parser

@@ -1,8 +1,16 @@
+export { INVITATION_ACTION, type InvitationAction } from './actions.js';
 export {
+  decideInvitationCreate,
+  type InvitationCreateDenial,
+} from './create-policy.js';
+export {
+  AlreadyHomeMemberError,
+  InvitationAlreadyPendingError,
   InvitationPersistenceError,
   InvitationValidityConflictError,
 } from './errors.js';
 export {
+  INVITATION_LIFETIME_MS,
   INVITATION_REVOCATION_CAUSES,
   projectInvitationLifecycle,
   type Invitation,
@@ -15,6 +23,15 @@ export {
   type LockedOpenInvitation,
   type NewInvitation,
 } from './repository.js';
+export {
+  decodeInvitationSecret,
+  generateInvitationSecret,
+  hashInvitationSecretBytes,
+  invitationTokenHashesEqual,
+  InvalidInvitationSecretError,
+  type GeneratedInvitationSecret,
+  type InvitationSecret,
+} from './secret.js';
 export {
   InvalidInvitationTokenHashError,
   invitationTokenHash,

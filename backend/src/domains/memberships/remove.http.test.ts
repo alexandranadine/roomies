@@ -95,7 +95,10 @@ void describe('POST /api/v1/homes/:homeId/memberships/:membershipId/remove', () 
     const res = await appRequest(app, {
       method: 'POST',
       path: removePath(),
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        Origin: TRUSTED_ORIGIN,
+        'content-type': 'application/json',
+      },
       body: JSON.stringify({}),
     });
     assert.equal(res.status, 401);
@@ -110,7 +113,10 @@ void describe('POST /api/v1/homes/:homeId/memberships/:membershipId/remove', () 
     const res = await appRequest(app, {
       method: 'POST',
       path: removePath('not-a-uuid'),
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        Origin: TRUSTED_ORIGIN,
+        'content-type': 'application/json',
+      },
       body: JSON.stringify({}),
     });
     assert.equal(res.status, 400);
@@ -124,7 +130,10 @@ void describe('POST /api/v1/homes/:homeId/memberships/:membershipId/remove', () 
     const res = await appRequest(app, {
       method: 'POST',
       path: removePath(HOME_ID, 'nope'),
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        Origin: TRUSTED_ORIGIN,
+        'content-type': 'application/json',
+      },
       body: JSON.stringify({}),
     });
     assert.equal(res.status, 400);
@@ -141,7 +150,10 @@ void describe('POST /api/v1/homes/:homeId/memberships/:membershipId/remove', () 
       const res = await appRequest(app, {
         method: 'POST',
         path: removePath(),
-        headers: { 'content-type': 'application/json' },
+        headers: {
+          Origin: TRUSTED_ORIGIN,
+          'content-type': 'application/json',
+        },
         body: JSON.stringify(body),
       });
       assert.equal(res.status, 400);
@@ -156,7 +168,10 @@ void describe('POST /api/v1/homes/:homeId/memberships/:membershipId/remove', () 
     const res = await appRequest(app, {
       method: 'POST',
       path: removePath(),
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        Origin: TRUSTED_ORIGIN,
+        'content-type': 'application/json',
+      },
       body: '{not-json',
     });
     assert.equal(res.status, 400);
@@ -171,7 +186,10 @@ void describe('POST /api/v1/homes/:homeId/memberships/:membershipId/remove', () 
     const res = await appRequest(app, {
       method: 'POST',
       path: removePath(),
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        Origin: TRUSTED_ORIGIN,
+        'content-type': 'application/json',
+      },
       body: JSON.stringify({}),
     });
     assert.equal(res.status, 204);
@@ -194,7 +212,10 @@ void describe('POST /api/v1/homes/:homeId/memberships/:membershipId/remove', () 
     const res = await appRequest(app, {
       method: 'POST',
       path: removePath(),
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        Origin: TRUSTED_ORIGIN,
+        'content-type': 'application/json',
+      },
       body: JSON.stringify({}),
     });
     assert.equal(res.status, 409);

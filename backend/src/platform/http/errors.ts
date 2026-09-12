@@ -14,6 +14,10 @@ import { TransactionInfrastructureError } from '../persistence/errors.js';
 import { StructuralIntegrityError } from '../../domains/homes/structure-errors.js';
 import { FinalMemberRequiredError } from '../../domains/homes/errors.js';
 import {
+  AlreadyHomeMemberError,
+  InvitationAlreadyPendingError,
+} from '../../domains/invitations/errors.js';
+import {
   LastAdminRequiredError,
   LastRoommateRequiresArchiveError,
 } from '../../domains/memberships/errors.js';
@@ -151,6 +155,28 @@ export function errorHandler(
       409,
       'LAST_ROOMMATE_REQUIRES_ARCHIVE',
       'Last roommate requires archive',
+      requestId,
+    );
+    return;
+  }
+
+  if (err instanceof InvitationAlreadyPendingError) {
+    sendApiError(
+      res,
+      409,
+      'INVITATION_ALREADY_PENDING',
+      'Invitation already pending',
+      requestId,
+    );
+    return;
+  }
+
+  if (err instanceof AlreadyHomeMemberError) {
+    sendApiError(
+      res,
+      409,
+      'ALREADY_HOME_MEMBER',
+      'Already a home member',
       requestId,
     );
     return;

@@ -33,7 +33,7 @@ function buildApp(
   return {
     calls,
     app: createApp({
-      config: { trustedOrigins: [], trustProxyHops: 0 },
+      config: { trustedOrigins: ['http://localhost:5173'], trustProxyHops: 0 },
       readiness: { checkReady: () => Promise.resolve(true) },
       roomiesApi: createRoomiesApiRouter({
         principalResolver: {
@@ -67,7 +67,10 @@ async function post(
   return appRequest(app, {
     method: 'POST',
     path: `/api/v1/homes/${homeId}/archive-final-member`,
-    headers: { 'content-type': 'application/json' },
+    headers: {
+      Origin: 'http://localhost:5173',
+      'content-type': 'application/json',
+    },
     body,
   });
 }

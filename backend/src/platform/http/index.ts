@@ -21,3 +21,7 @@ export {
 } from './home-context.js';
 export { parsePathUuid, pathUuidSchema, PATH_UUID_PATTERN } from './path-id.js';
 export { setPrivateNoStoreHeaders } from './private-response.js';
+export {
+  createApiMutationOriginGuard,
+  API_MUTATION_METHODS,
+} from './mutation-origin.js';

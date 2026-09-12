@@ -27,6 +27,7 @@ void describe('parseConfig', () => {
     assert.equal(config.authBaseUrl, 'http://localhost:3000');
     assert.equal(config.authSecret, VALID_AUTH_SECRET);
     assert.equal(config.secureAuthCookies, false);
+    assert.equal(config.frontendOrigin, 'http://localhost:5173');
     assert.deepEqual(config.trustedOrigins, [
       'http://localhost:5173',
       'http://127.0.0.1:5173',
@@ -258,10 +259,12 @@ void describe('parseConfig', () => {
       DATABASE_URL: SECRET_DATABASE_URL,
       PORT: '8080',
       TRUSTED_ORIGINS: 'https://app.roomies.example',
+      FRONTEND_ORIGIN: 'https://app.roomies.example',
       AUTH_BASE_URL: 'https://api.roomies.example',
       AUTH_SECRET: VALID_AUTH_SECRET,
     });
     assert.deepEqual(config.trustedOrigins, ['https://app.roomies.example']);
+    assert.equal(config.frontendOrigin, 'https://app.roomies.example');
     assert.equal(config.authBaseUrl, 'https://api.roomies.example');
     assert.equal(config.secureAuthCookies, true);
     assert.equal(config.port, 8080);
@@ -289,6 +292,67 @@ void describe('parseConfig', () => {
           TRUSTED_ORIGINS: 'https://app.example',
         }),
       /AUTH_BASE_URL is invalid/,
+    );
+  });
+
+  void it('defaults FRONTEND_ORIGIN in development when omitted', () => {
+    const config = parseConfig(
+      validDevelopmentEnv({ FRONTEND_ORIGIN: undefined }),
+    );
+    assert.equal(config.frontendOrigin, 'http://localhost:5173');
+  });
+
+  void it('uses FRONTEND_ORIGIN independently of TRUSTED_ORIGINS order', () => {
+    const config = parseConfig(
+      validDevelopmentEnv({
+        FRONTEND_ORIGIN: 'https://app.example.test',
+        TRUSTED_ORIGINS:
+          'http://127.0.0.1:5173,http://localhost:5173,https://app.example.test',
+      }),
+    );
+    assert.equal(config.frontendOrigin, 'https://app.example.test');
+    assert.deepEqual(config.trustedOrigins, [
+      'http://127.0.0.1:5173',
+      'http://localhost:5173',
+      'https://app.example.test',
+    ]);
+  });
+
+  void it('normalizes FRONTEND_ORIGIN trailing slashes', () => {
+    const config = parseConfig(
+      validDevelopmentEnv({
+        FRONTEND_ORIGIN: 'https://app.example.test/',
+      }),
+    );
+    assert.equal(config.frontendOrigin, 'https://app.example.test');
+  });
+
+  void it('fails on malformed FRONTEND_ORIGIN', () => {
+    assert.throws(
+      () => parseConfig(validDevelopmentEnv({ FRONTEND_ORIGIN: 'not a url' })),
+      (error: unknown) => {
+        assert.ok(error instanceof ConfigError);
+        assert.match(error.message, /FRONTEND_ORIGIN/);
+        return true;
+      },
+    );
+  });
+
+  void it('requires FRONTEND_ORIGIN outside local environments', () => {
+    assert.throws(
+      () =>
+        parseConfig({
+          APP_ENV: 'production',
+          DATABASE_URL: SECRET_DATABASE_URL,
+          AUTH_SECRET: VALID_AUTH_SECRET,
+          AUTH_BASE_URL: 'https://api.example.test',
+          TRUSTED_ORIGINS: 'https://app.example.test',
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof ConfigError);
+        assert.match(error.message, /FRONTEND_ORIGIN is required/);
+        return true;
+      },
     );
   });
 
