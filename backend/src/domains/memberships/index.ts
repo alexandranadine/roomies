@@ -4,7 +4,10 @@ export {
 } from './active-home-actor-resolver.js';
 export { MEMBERSHIP_ACTION, type MembershipAction } from './actions.js';
 export type { ChangeMembershipRoleInput } from './change-role.js';
-export { LastAdminRequiredError } from './errors.js';
+export {
+  LastAdminRequiredError,
+  LastRoommateRequiresArchiveError,
+} from './errors.js';
 export {
   isMembershipEndedCause,
   MEMBERSHIP_ENDED_CAUSES,
@@ -14,7 +17,15 @@ export {
   createMembershipsRouter,
   type ChangeMembershipRoleCommand,
   type CreateMembershipsRouterOptions,
+  type LeaveMembershipCommand,
 } from './http.js';
+export type { LeaveMembershipInput } from './leave.js';
+export {
+  decideMembershipLeave,
+  decideMembershipLeaveSelf,
+  type MembershipLeaveDenial,
+  type MembershipLeaveSelfDenial,
+} from './leave-policy.js';
 export {
   decideMembershipChangeRole,
   decideProposedAdminInvariant,

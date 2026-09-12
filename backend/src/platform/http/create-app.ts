@@ -51,7 +51,10 @@ export function createApp(options: CreateAppOptions): Express {
     app.all(AUTH_HTTP_ROUTE, createAuthHttpHandler(auth));
   }
 
-  app.use(express.json({ limit: JSON_BODY_LIMIT }));
+  // Syntactically valid JSON, including primitives such as `null`, must reach
+  // endpoint Zod schemas. `strict: false` keeps malformed JSON as a parser
+  // failure (BAD_REQUEST) and does not classify wrong shapes here.
+  app.use(express.json({ limit: JSON_BODY_LIMIT, strict: false }));
 
   app.use(createHealthRouter(readiness));
 

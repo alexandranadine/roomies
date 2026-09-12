@@ -91,6 +91,8 @@ void describe('GET /api/v1/me HTTP integration', () => {
             },
             changeMembershipRole: () =>
               Promise.reject(new Error('role change must not run for /me')),
+            leaveMembership: () =>
+              Promise.reject(new Error('leave must not run for /me')),
           }),
         });
 

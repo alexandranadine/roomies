@@ -10,3 +10,17 @@ export class LastAdminRequiredError extends Error {
     super('Last admin required');
   }
 }
+
+/**
+ * Visible structural conflict: ordinary leave of the sole valid active
+ * Membership is forbidden. The later explicit final-member archive is required.
+ * Not an auto-archive and not last-Admin conflict.
+ */
+export class LastRoommateRequiresArchiveError extends Error {
+  override readonly name = 'LastRoommateRequiresArchiveError';
+  readonly code = 'LAST_ROOMMATE_REQUIRES_ARCHIVE';
+
+  constructor() {
+    super('Last roommate requires archive');
+  }
+}

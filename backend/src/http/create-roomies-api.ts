@@ -4,6 +4,7 @@ import type { HomeReader } from '../domains/homes/index.js';
 import {
   createMembershipsRouter,
   type ChangeMembershipRoleCommand,
+  type LeaveMembershipCommand,
 } from '../domains/memberships/http.js';
 import { createCurrentUserRouter } from '../domains/users/http.js';
 import type { PrincipalResolver } from '../platform/auth/principal.js';
@@ -14,6 +15,7 @@ export type CreateRoomiesApiRouterOptions = {
   activeHomeActorResolver: Pick<ActiveHomeActorResolver, 'resolve'>;
   homeReader: Pick<HomeReader, 'findActiveHomeById'>;
   changeMembershipRole: ChangeMembershipRoleCommand;
+  leaveMembership: LeaveMembershipCommand;
 };
 
 /**

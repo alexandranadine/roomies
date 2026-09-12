@@ -12,7 +12,10 @@ import {
   InvalidRequestError,
 } from '../authz/errors.js';
 import { StructuralIntegrityError } from '../../domains/homes/structure-errors.js';
-import { LastAdminRequiredError } from '../../domains/memberships/errors.js';
+import {
+  LastAdminRequiredError,
+  LastRoommateRequiresArchiveError,
+} from '../../domains/memberships/errors.js';
 import { TransactionInfrastructureError } from '../persistence/errors.js';
 import { appRequest } from './app-request.test-helper.js';
 import {
@@ -65,6 +68,17 @@ void describe('HTTP known-error mappings', () => {
     const body = res.json() as ApiErrorBody;
     assert.equal(body.error.code, 'LAST_ADMIN_REQUIRED');
     assert.equal(body.error.message, 'Last admin required');
+  });
+
+  void it('maps LastRoommateRequiresArchiveError to 409 LAST_ROOMMATE_REQUIRES_ARCHIVE', async () => {
+    const res = await appRequest(
+      appThatThrows(new LastRoommateRequiresArchiveError()),
+      { path: '/throw' },
+    );
+    assert.equal(res.status, 409);
+    const body = res.json() as ApiErrorBody;
+    assert.equal(body.error.code, 'LAST_ROOMMATE_REQUIRES_ARCHIVE');
+    assert.equal(body.error.message, 'Last roommate requires archive');
   });
 
   void it('maps InvalidPathInputError to 400 INVALID_PATH_INPUT', async () => {

@@ -12,7 +12,10 @@ import {
 } from '../authz/errors.js';
 import { TransactionInfrastructureError } from '../persistence/errors.js';
 import { StructuralIntegrityError } from '../../domains/homes/structure-errors.js';
-import { LastAdminRequiredError } from '../../domains/memberships/errors.js';
+import {
+  LastAdminRequiredError,
+  LastRoommateRequiresArchiveError,
+} from '../../domains/memberships/errors.js';
 import { getRequestId } from './request-id.js';
 
 export type ApiErrorBody = {
@@ -97,7 +100,7 @@ export function errorHandler(
     return;
   }
 
-  // Malformed JSON → safe 400.
+  // Malformed JSON syntax only. Valid JSON primitives reach route schemas.
   if (isEntityParseFailed(err)) {
     sendApiError(res, 400, 'BAD_REQUEST', 'Invalid JSON body', requestId);
     return;
@@ -136,6 +139,17 @@ export function errorHandler(
       409,
       'LAST_ADMIN_REQUIRED',
       'Last admin required',
+      requestId,
+    );
+    return;
+  }
+
+  if (err instanceof LastRoommateRequiresArchiveError) {
+    sendApiError(
+      res,
+      409,
+      'LAST_ROOMMATE_REQUIRES_ARCHIVE',
+      'Last roommate requires archive',
       requestId,
     );
     return;

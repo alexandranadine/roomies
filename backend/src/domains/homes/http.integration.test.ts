@@ -153,6 +153,8 @@ void describe('GET /api/v1/homes/:homeId PostgreSQL authorization', () => {
               Promise.reject(
                 new Error('role change must not run for home read'),
               ),
+            leaveMembership: () =>
+              Promise.reject(new Error('leave must not run for home read')),
           }),
         });
 

@@ -132,6 +132,38 @@ void describe('HTTP platform app', () => {
     assert.deepEqual(res.json(), { status: 'ok' });
   });
 
+  void it('lets a syntactically valid JSON null reach the route', async () => {
+    const app = buildApp(readyAlways(), (expressApp) => {
+      expressApp.post('/echo-body', (req, res) => {
+        res
+          .status(200)
+          .json({ received: req.body === null ? 'null' : 'other' });
+      });
+    });
+    const res = await appRequest(app, {
+      method: 'POST',
+      path: '/echo-body',
+      headers: { 'content-type': 'application/json' },
+      body: 'null',
+    });
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.json(), { received: 'null' });
+  });
+
+  void it('maps malformed JSON syntax to BAD_REQUEST', async () => {
+    const app = buildApp();
+    const res = await appRequest(app, {
+      method: 'POST',
+      path: '/api/v1/anything',
+      headers: { 'content-type': 'application/json' },
+      body: '{not-json',
+    });
+    assert.equal(res.status, 400);
+    const body = res.json() as ApiErrorBody;
+    assert.equal(body.error.code, 'BAD_REQUEST');
+    assert.equal(body.error.message, 'Invalid JSON body');
+  });
+
   void it('oversized JSON body is rejected safely', async () => {
     const app = buildApp();
     const oversized = JSON.stringify({ data: 'x'.repeat(40 * 1024) });

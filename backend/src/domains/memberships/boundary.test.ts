@@ -46,6 +46,24 @@ void describe('memberships domain boundary', () => {
     assert.doesNotMatch(source, /ForbiddenError/);
   });
 
+  void it('keeps leave policy free of persistence, HTTP, and SQL', async () => {
+    const source = await readFile(
+      path.join(membershipsDir, 'leave-policy.ts'),
+      'utf8',
+    );
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /FOR UPDATE/i);
+    assert.doesNotMatch(source, /UPDATE memberships/i);
+    assert.doesNotMatch(source, /ended_at/);
+    assert.doesNotMatch(source, /from ['"].*\/http['"]/);
+    assert.doesNotMatch(source, /LastAdminRequiredError/);
+    assert.doesNotMatch(source, /LastRoommateRequiresArchiveError/);
+    assert.doesNotMatch(source, /ForbiddenError/);
+    assert.doesNotMatch(source, /userId/);
+    assert.doesNotMatch(source, /SET role/i);
+  });
+
   void it('keeps domain event contracts typed against platform events only', async () => {
     const source = await readFile(
       path.join(membershipsDir, 'events.ts'),
@@ -104,10 +122,17 @@ void describe('memberships domain boundary', () => {
     assert.doesNotMatch(source, /application\/home-administration/);
   });
 
-  void it('does not add leave, remove, or archive HTTP routes', async () => {
+  void it('exposes voluntary leave without remove, archive, or ending-seam internals', async () => {
     const source = await readFile(path.join(membershipsDir, 'http.ts'), 'utf8');
-    assert.doesNotMatch(source, /router\.(post|delete)\s*\(/);
-    assert.doesNotMatch(source, /leave|removeMember|archive/i);
+    assert.match(
+      source,
+      /router\.post\('\/:homeId\/memberships\/:membershipId\/leave'/,
+    );
+    assert.doesNotMatch(source, /router\.delete\s*\(/);
+    assert.doesNotMatch(source, /removeMember|archive/i);
     assert.doesNotMatch(source, /endMembershipWithinHomeStructure/);
+    assert.doesNotMatch(source, /decideMembershipLeave/);
+    assert.doesNotMatch(source, /LastAdminRequiredError/);
+    assert.doesNotMatch(source, /LastRoommateRequiresArchiveError/);
   });
 });

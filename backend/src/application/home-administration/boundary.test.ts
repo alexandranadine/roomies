@@ -73,6 +73,36 @@ void describe('home-administration application boundary', () => {
     assert.match(source, /createTemporaryNoOpMembershipEndingSupplyCleanup/);
   });
 
+  void it('orchestrates voluntary leave through the locked structure and ending seam', async () => {
+    const source = await readFile(
+      path.join(dir, 'leave-membership.ts'),
+      'utf8',
+    );
+    assert.doesNotMatch(source, /memberships\/repository/);
+    assert.doesNotMatch(source, /homes\/repository/);
+    assert.doesNotMatch(source, /home-repository/);
+    assert.doesNotMatch(source, /active-home-actor-lookup/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /better-auth/);
+    assert.doesNotMatch(source, /SERIALIZABLE/);
+    assert.doesNotMatch(source, /pg_advisory/i);
+    assert.doesNotMatch(source, /ended_at\s*=/);
+    assert.doesNotMatch(source, /user_id\s*=/);
+    assert.doesNotMatch(source, /decideMembershipChangeRole/);
+    assert.doesNotMatch(source, /updateActiveRole/);
+    assert.doesNotMatch(source, /membership\.remove/);
+    assert.doesNotMatch(source, /home\.archiveFinalMember/);
+    assert.match(source, /lockHomeStructure/);
+    assert.match(source, /decideMembershipLeave/);
+    assert.match(source, /decideMembershipLeaveSelf/);
+    assert.match(source, /VOLUNTARY_LEAVE/);
+    assert.match(
+      source,
+      /createEndMembershipWithinHomeStructureWithTemporaryNoOpCleanup/,
+    );
+    assert.doesNotMatch(source, /endMembership\?:/);
+  });
+
   void it('makes temporary Task/Supply no-op replacement obligatory and explicit', async () => {
     const composition = await readFile(
       path.join(dir, 'end-membership-within-home-structure.ts'),
