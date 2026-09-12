@@ -1,3 +1,4 @@
+import { createChangeMembershipRoleFromPool } from './application/home-administration/change-membership-role.js';
 import { createHomeRepository } from './domains/homes/index.js';
 import { createActiveHomeActorResolver } from './domains/memberships/index.js';
 import { createRoomiesApiRouter } from './http/create-roomies-api.js';
@@ -48,6 +49,9 @@ function main(): void {
       principalResolver,
       activeHomeActorResolver,
       homeReader,
+      changeMembershipRole: createChangeMembershipRoleFromPool(
+        databasePool.pool,
+      ),
     }),
   });
 

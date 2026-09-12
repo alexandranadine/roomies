@@ -89,6 +89,8 @@ void describe('GET /api/v1/me HTTP integration', () => {
               findActiveHomeById: () =>
                 Promise.reject(new Error('home reader must not run for /me')),
             },
+            changeMembershipRole: () =>
+              Promise.reject(new Error('role change must not run for /me')),
           }),
         });
 

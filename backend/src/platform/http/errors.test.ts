@@ -9,8 +9,10 @@ import {
   ConcealedNotFoundError,
   ForbiddenError,
   InvalidPathInputError,
+  InvalidRequestError,
 } from '../authz/errors.js';
 import { StructuralIntegrityError } from '../../domains/homes/structure-errors.js';
+import { LastAdminRequiredError } from '../../domains/memberships/errors.js';
 import { TransactionInfrastructureError } from '../persistence/errors.js';
 import { appRequest } from './app-request.test-helper.js';
 import {
@@ -43,6 +45,26 @@ void describe('HTTP known-error mappings', () => {
     assert.equal(body.error.code, 'UNAUTHENTICATED');
     assert.equal(body.error.message, 'Authentication required');
     assert.equal(body.error.requestId, res.headers.get(REQUEST_ID_HEADER));
+  });
+
+  void it('maps InvalidRequestError to 400 INVALID_REQUEST', async () => {
+    const res = await appRequest(appThatThrows(new InvalidRequestError()), {
+      path: '/throw',
+    });
+    assert.equal(res.status, 400);
+    const body = res.json() as ApiErrorBody;
+    assert.equal(body.error.code, 'INVALID_REQUEST');
+    assert.equal(body.error.message, 'Invalid request');
+  });
+
+  void it('maps LastAdminRequiredError to 409 LAST_ADMIN_REQUIRED', async () => {
+    const res = await appRequest(appThatThrows(new LastAdminRequiredError()), {
+      path: '/throw',
+    });
+    assert.equal(res.status, 409);
+    const body = res.json() as ApiErrorBody;
+    assert.equal(body.error.code, 'LAST_ADMIN_REQUIRED');
+    assert.equal(body.error.message, 'Last admin required');
   });
 
   void it('maps InvalidPathInputError to 400 INVALID_PATH_INPUT', async () => {

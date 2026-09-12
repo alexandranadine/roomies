@@ -32,6 +32,20 @@ void describe('memberships domain boundary', () => {
     assert.doesNotMatch(source, /from ['"]express['"]/);
   });
 
+  void it('keeps role policy free of persistence, HTTP, and SQL', async () => {
+    const source = await readFile(
+      path.join(membershipsDir, 'role-policy.ts'),
+      'utf8',
+    );
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /FOR UPDATE/i);
+    assert.doesNotMatch(source, /UPDATE memberships/i);
+    assert.doesNotMatch(source, /from ['"].*\/http['"]/);
+    assert.doesNotMatch(source, /LastAdminRequiredError/);
+    assert.doesNotMatch(source, /ForbiddenError/);
+  });
+
   void it('keeps domain event contracts typed against platform events only', async () => {
     const source = await readFile(
       path.join(membershipsDir, 'events.ts'),

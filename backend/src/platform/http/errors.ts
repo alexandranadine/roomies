@@ -8,9 +8,11 @@ import {
   ConcealedNotFoundError,
   ForbiddenError,
   InvalidPathInputError,
+  InvalidRequestError,
 } from '../authz/errors.js';
 import { TransactionInfrastructureError } from '../persistence/errors.js';
 import { StructuralIntegrityError } from '../../domains/homes/structure-errors.js';
+import { LastAdminRequiredError } from '../../domains/memberships/errors.js';
 import { getRequestId } from './request-id.js';
 
 export type ApiErrorBody = {
@@ -118,6 +120,22 @@ export function errorHandler(
       400,
       'INVALID_PATH_INPUT',
       'Invalid path input',
+      requestId,
+    );
+    return;
+  }
+
+  if (err instanceof InvalidRequestError) {
+    sendApiError(res, 400, 'INVALID_REQUEST', 'Invalid request', requestId);
+    return;
+  }
+
+  if (err instanceof LastAdminRequiredError) {
+    sendApiError(
+      res,
+      409,
+      'LAST_ADMIN_REQUIRED',
+      'Last admin required',
       requestId,
     );
     return;

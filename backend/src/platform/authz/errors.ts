@@ -10,6 +10,14 @@ export class InvalidPathInputError extends Error {
   }
 }
 
+export class InvalidRequestError extends Error {
+  override readonly name = 'InvalidRequestError';
+
+  constructor() {
+    super('Invalid request');
+  }
+}
+
 export class ForbiddenError extends Error {
   override readonly name = 'ForbiddenError';
 

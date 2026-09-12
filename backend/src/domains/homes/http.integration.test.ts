@@ -149,6 +149,10 @@ void describe('GET /api/v1/homes/:homeId PostgreSQL authorization', () => {
             principalResolver,
             activeHomeActorResolver,
             homeReader,
+            changeMembershipRole: () =>
+              Promise.reject(
+                new Error('role change must not run for home read'),
+              ),
           }),
         });
 

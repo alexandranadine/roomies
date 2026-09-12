@@ -13,4 +13,5 @@ export {
   ConcealedNotFoundError,
   ForbiddenError,
   InvalidPathInputError,
+  InvalidRequestError,
 } from './errors.js';
