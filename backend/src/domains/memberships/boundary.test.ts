@@ -32,6 +32,30 @@ void describe('memberships domain boundary', () => {
     assert.doesNotMatch(source, /from ['"]express['"]/);
   });
 
+  void it('keeps domain event contracts typed against platform events only', async () => {
+    const source = await readFile(
+      path.join(membershipsDir, 'events.ts'),
+      'utf8',
+    );
+    assert.match(source, /import type \{ OutboxEventInput \}/);
+    assert.doesNotMatch(source, /from ['"].*\/http['"]/);
+    assert.doesNotMatch(source, /home-dto/);
+    assert.doesNotMatch(source, /current-user-dto/);
+    assert.doesNotMatch(source, /better-auth/);
+    assert.doesNotMatch(source, /auth-runtime/);
+    assert.doesNotMatch(source, /session/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /createOutboxWriter/);
+    assert.doesNotMatch(source, /email/);
+    assert.match(source, /MembershipRole/);
+    assert.match(source, /VOLUNTARY_LEAVE/);
+    assert.match(source, /ADMIN_REMOVAL/);
+    assert.match(source, /HOME_ARCHIVED/);
+    assert.match(source, /previousRole/);
+    assert.match(source, /newRole/);
+    assert.doesNotMatch(source, /payload: Object.freeze\(\{[^}]*\brole:/);
+  });
+
   void it('does not import Home repository internals', async () => {
     const files = await walk(membershipsDir);
 

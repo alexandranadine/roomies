@@ -7,13 +7,19 @@
 
 export type TestDatabaseUrlOptions = {
   /**
-   * Preferred source. Falls back to process.env.DATABASE_URL / TEST_DATABASE_URL.
+   * Preferred source. Falls back to process.env.DATABASE_URL / TEST_DATABASE_URL
+   * unless requireDedicatedTestUrl is set.
    */
   url?: string;
   /**
    * Environment map (tests may inject a fake process.env).
    */
   env?: NodeJS.ProcessEnv;
+  /**
+   * Refuse DATABASE_URL fallback. Dedicated suites such as the outbox writer
+   * integration tests must set TEST_DATABASE_URL (or options.url) explicitly.
+   */
+  requireDedicatedTestUrl?: boolean;
 };
 
 const SAFE_DB_NAME =
@@ -29,13 +35,44 @@ export function resolveTestDatabaseUrl(
   options: TestDatabaseUrlOptions = {},
 ): string {
   const env = options.env ?? process.env;
-  const raw = options.url ?? env['TEST_DATABASE_URL'] ?? env['DATABASE_URL'];
+  const raw = options.requireDedicatedTestUrl
+    ? (options.url ?? env['TEST_DATABASE_URL'])
+    : (options.url ?? env['TEST_DATABASE_URL'] ?? env['DATABASE_URL']);
   if (!raw || raw.trim().length === 0) {
     throw new Error(
-      'Test database URL is missing. Set TEST_DATABASE_URL (preferred) or DATABASE_URL to a local test database.',
+      options.requireDedicatedTestUrl
+        ? 'Test database URL is missing. Set TEST_DATABASE_URL to a local test database.'
+        : 'Test database URL is missing. Set TEST_DATABASE_URL (preferred) or DATABASE_URL to a local test database.',
     );
   }
   return raw.trim();
+}
+
+/**
+ * Skip reason for suites that must never fall back to DATABASE_URL.
+ * Missing or blank TEST_DATABASE_URL skips; an explicit unsafe URL is refused later.
+ */
+export function skipUnlessDedicatedTestDatabase(
+  env: NodeJS.ProcessEnv = process.env,
+): string | false {
+  return !env['TEST_DATABASE_URL']?.trim()
+    ? 'requires a migrated PostgreSQL test database'
+    : false;
+}
+
+/**
+ * Resolve a dedicated TEST_DATABASE_URL and refuse ordinary development DBs.
+ * Does not fall back to DATABASE_URL.
+ */
+export function resolveSafeDedicatedTestDatabaseUrl(
+  options: TestDatabaseUrlOptions = {},
+): string {
+  const url = resolveTestDatabaseUrl({
+    ...options,
+    requireDedicatedTestUrl: true,
+  });
+  assertSafeTestDatabase(url);
+  return url;
 }
 
 export type ParsedDatabaseUrl = {

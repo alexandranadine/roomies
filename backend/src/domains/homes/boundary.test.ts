@@ -23,6 +23,20 @@ async function walk(dir: string): Promise<string[]> {
 }
 
 void describe('homes domain boundary', () => {
+  void it('keeps domain event contracts typed against platform events only', async () => {
+    const source = await readFile(path.join(homesDir, 'events.ts'), 'utf8');
+    assert.match(source, /import type \{ OutboxEventInput \}/);
+    assert.doesNotMatch(source, /from ['"].*\/http['"]/);
+    assert.doesNotMatch(source, /home-dto/);
+    assert.doesNotMatch(source, /better-auth/);
+    assert.doesNotMatch(source, /auth-runtime/);
+    assert.doesNotMatch(source, /session/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /createOutboxWriter/);
+    assert.doesNotMatch(source, /email/);
+    assert.doesNotMatch(source, /actorId/);
+  });
+
   void it('keeps policies free of persistence and Express', async () => {
     const source = await readFile(path.join(homesDir, 'policies.ts'), 'utf8');
     assert.doesNotMatch(source, /from ['"]pg['"]/);
