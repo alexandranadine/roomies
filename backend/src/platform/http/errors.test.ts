@@ -10,6 +10,8 @@ import {
   ForbiddenError,
   InvalidPathInputError,
 } from '../authz/errors.js';
+import { StructuralIntegrityError } from '../../domains/homes/structure-errors.js';
+import { TransactionInfrastructureError } from '../persistence/errors.js';
 import { appRequest } from './app-request.test-helper.js';
 import {
   assertNoForbiddenLeak,
@@ -111,6 +113,35 @@ void describe('HTTP known-error mappings', () => {
     } finally {
       console.error = originalError;
     }
+  });
+
+  void it('maps StructuralIntegrityError to a safe 500', async () => {
+    const res = await appRequest(
+      appThatThrows(new StructuralIntegrityError()),
+      {
+        path: '/throw',
+      },
+    );
+    assert.equal(res.status, 500);
+    const body = res.json() as ApiErrorBody;
+    assert.equal(body.error.code, 'INTERNAL_ERROR');
+    assert.equal(body.error.message, 'An unexpected error occurred');
+    assert.equal(res.text.includes('Home structure integrity failure'), false);
+  });
+
+  void it('maps TransactionInfrastructureError to a safe 500', async () => {
+    const res = await appRequest(
+      appThatThrows(new TransactionInfrastructureError()),
+      { path: '/throw' },
+    );
+    assert.equal(res.status, 500);
+    const body = res.json() as ApiErrorBody;
+    assert.equal(body.error.code, 'INTERNAL_ERROR');
+    assert.equal(body.error.message, 'An unexpected error occurred');
+    assert.equal(
+      res.text.includes('Transaction infrastructure failure'),
+      false,
+    );
   });
 
   void it('maps AuthInfrastructureError to a safe 500', async () => {

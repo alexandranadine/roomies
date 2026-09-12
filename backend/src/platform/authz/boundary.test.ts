@@ -48,6 +48,8 @@ void describe('authorization platform boundary', () => {
       assert.doesNotMatch(source, /from ['"]@prisma\//);
       assert.doesNotMatch(source, /from ['"].*\/prisma\//);
       assert.doesNotMatch(source, /from ['"].*\/domains\//);
+      assert.doesNotMatch(source, /StructuralIntegrityError/);
+      assert.doesNotMatch(source, /TransactionInfrastructureError/);
     }
   });
 

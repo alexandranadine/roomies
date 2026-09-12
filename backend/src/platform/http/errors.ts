@@ -9,6 +9,8 @@ import {
   ForbiddenError,
   InvalidPathInputError,
 } from '../authz/errors.js';
+import { TransactionInfrastructureError } from '../persistence/errors.js';
+import { StructuralIntegrityError } from '../../domains/homes/structure-errors.js';
 import { getRequestId } from './request-id.js';
 
 export type ApiErrorBody = {
@@ -133,6 +135,8 @@ export function errorHandler(
 
   if (
     err instanceof AuthorizationIntegrityError ||
+    err instanceof StructuralIntegrityError ||
+    err instanceof TransactionInfrastructureError ||
     err instanceof AuthInfrastructureError
   ) {
     console.error('[http] request failed', {

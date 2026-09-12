@@ -33,6 +33,47 @@ void describe('homes domain boundary', () => {
     assert.doesNotMatch(source, /FROM\s+memberships/i);
   });
 
+  void it('keeps Home structural integrity errors free of authz ownership', async () => {
+    const source = await readFile(
+      path.join(homesDir, 'structure-errors.ts'),
+      'utf8',
+    );
+    assert.doesNotMatch(source, /platform\/authz/);
+    assert.doesNotMatch(source, /AuthorizationIntegrityError/);
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+    assert.doesNotMatch(source, /FOR UPDATE/i);
+    assert.doesNotMatch(source, /FROM\s+/);
+  });
+
+  void it('keeps the structure invariant evaluator free of persistence and Express', async () => {
+    const source = await readFile(
+      path.join(homesDir, 'structure-invariant.ts'),
+      'utf8',
+    );
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+    assert.doesNotMatch(source, /from ['"]@prisma\//);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /FOR UPDATE/i);
+    assert.doesNotMatch(source, /better-auth/);
+    assert.doesNotMatch(source, /AuthorizationIntegrityError/);
+    assert.doesNotMatch(source, /platform\/authz\/errors/);
+  });
+
+  void it('keeps structural locking free of Express, Better Auth, and sibling writers', async () => {
+    const source = await readFile(
+      path.join(homesDir, 'lock-home-structure.ts'),
+      'utf8',
+    );
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /better-auth/);
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+    assert.doesNotMatch(source, /tasks?\//i);
+    assert.doesNotMatch(source, /supplies?\//i);
+    assert.doesNotMatch(source, /outbox/i);
+    assert.doesNotMatch(source, /user_id\s*=\s*\$1/);
+    assert.match(source, /FROM homes[\s\S]*FOR UPDATE[\s\S]*FROM memberships/i);
+  });
+
   void it('does not import Membership repository internals', async () => {
     const files = await walk(homesDir);
 
@@ -42,6 +83,26 @@ void describe('homes domain boundary', () => {
       assert.doesNotMatch(source, /memberships\/repository/, rel);
       assert.doesNotMatch(source, /active-home-actor-lookup/, rel);
     }
+  });
+
+  void it('does not route Home reads through FOR UPDATE', async () => {
+    const readFiles = [
+      path.join(homesDir, 'get-home.ts'),
+      path.join(homesDir, 'repository/home-repository.ts'),
+      path.join(homesDir, 'http.ts'),
+    ];
+    for (const file of readFiles) {
+      const source = await readFile(file, 'utf8');
+      assert.doesNotMatch(source, /FOR UPDATE/i);
+    }
+  });
+
+  void it('does not add structural mutation HTTP routes or FOR UPDATE reads', async () => {
+    const source = await readFile(path.join(homesDir, 'http.ts'), 'utf8');
+    assert.doesNotMatch(source, /router\.(post|patch|put|delete)\s*\(/);
+    assert.doesNotMatch(source, /lockHomeStructure/);
+    assert.doesNotMatch(source, /FOR UPDATE/i);
+    assert.doesNotMatch(source, /leave|removeMember|archive/i);
   });
 
   void it('does not query Membership tables from HTTP', async () => {
