@@ -334,22 +334,151 @@ void describe('invitation acceptance PostgreSQL concurrency', () => {
 
   void it(
     'acceptance racing final-member archive has one structurally valid outcome',
+    { skip: skipWithoutDatabase, timeout: 60_000 },
+    async () => {
+      const pool = new Pool({
+        connectionString: resolveSafeDedicatedTestDatabaseUrl(),
+        max: 8,
+      });
+      const homeIds: string[] = [];
+      try {
+        for (let iteration = 0; iteration < 10; iteration += 1) {
+          const seed = await seedAcceptance(
+            pool,
+            `${randomUUID()}-${iteration}`,
+          );
+          homeIds.push(seed.homeId);
+          const accept = createAcceptInvitationFromPool(pool);
+          const archive = createArchiveFinalMemberHomeFromPool(pool);
+          const settled = await Promise.allSettled([
+            accept({
+              invitationId: seed.invitationId,
+              userId: seed.userId,
+              secret: seed.secret.encoded,
+            }),
+            archive({
+              homeId: seed.homeId,
+              actor: {
+                userId: seed.adminId,
+                membershipId: seed.adminMembershipId,
+                homeId: seed.homeId,
+                role: 'ADMIN',
+              },
+            }),
+          ]);
+
+          const home = await pool.query<{ archived_at: Date | null }>(
+            'SELECT archived_at FROM homes WHERE id = $1',
+            [seed.homeId],
+          );
+          const invitation = await pool.query<{
+            accepted_at: Date | null;
+            revoked_at: Date | null;
+            revocation_cause: string | null;
+          }>(
+            `SELECT accepted_at, revoked_at, revocation_cause
+             FROM invitations WHERE id = $1`,
+            [seed.invitationId],
+          );
+          const joined = await pool.query<{ count: string }>(
+            `SELECT count(*)::text AS count FROM memberships
+             WHERE home_id = $1 AND user_id = $2`,
+            [seed.homeId, seed.userId],
+          );
+          const admin = await pool.query<{ ended_at: Date | null }>(
+            'SELECT ended_at FROM memberships WHERE id = $1',
+            [seed.adminMembershipId],
+          );
+          const events = await pool.query<{ event_type: string }>(
+            `SELECT event_type FROM outbox_events WHERE home_id = $1`,
+            [seed.homeId],
+          );
+          const eventTypes = events.rows.map((row) => row.event_type);
+          const invite = invitation.rows[0];
+          assert.ok(invite);
+          assert.equal(
+            invite.accepted_at !== null && invite.revoked_at !== null,
+            false,
+          );
+
+          if (home.rows[0]?.archived_at === null) {
+            assert.equal(settled[0]?.status, 'fulfilled');
+            assert.equal(settled[1]?.status, 'rejected');
+            assert.ok(invite.accepted_at instanceof Date);
+            assert.equal(invite.revoked_at, null);
+            assert.equal(joined.rows[0]?.count, '1');
+            assert.equal(admin.rows[0]?.ended_at, null);
+            assert.equal(
+              eventTypes.filter((type) => type === 'membership.started.v1')
+                .length,
+              1,
+            );
+            assert.equal(
+              eventTypes.includes('membership.ended.v1') ||
+                eventTypes.includes('home.archived.v1'),
+              false,
+            );
+          } else {
+            assert.equal(settled[0]?.status, 'rejected');
+            assert.equal(settled[1]?.status, 'fulfilled');
+            assert.equal(invite.accepted_at, null);
+            assert.ok(invite.revoked_at instanceof Date);
+            assert.equal(invite.revocation_cause, 'HOME_ARCHIVED');
+            assert.equal(joined.rows[0]?.count, '0');
+            assert.ok(admin.rows[0]?.ended_at instanceof Date);
+            assert.equal(
+              eventTypes.filter((type) => type === 'membership.started.v1')
+                .length,
+              0,
+            );
+            assert.equal(
+              eventTypes.filter((type) => type === 'membership.ended.v1')
+                .length,
+              1,
+            );
+            assert.equal(
+              eventTypes.filter((type) => type === 'home.archived.v1').length,
+              1,
+            );
+          }
+          await cleanup(pool, seed);
+        }
+      } finally {
+        if (homeIds.length > 0) {
+          await pool.query(
+            'DELETE FROM outbox_events WHERE home_id = ANY($1::uuid[])',
+            [homeIds],
+          );
+          await pool.query(
+            'DELETE FROM invitations WHERE home_id = ANY($1::uuid[])',
+            [homeIds],
+          );
+        }
+        await pool.end();
+      }
+    },
+  );
+
+  void it(
+    'multiple acceptance attempts racing archive reach one allowed outcome',
     { skip: skipWithoutDatabase, timeout: 30_000 },
     async () => {
       const pool = new Pool({
         connectionString: resolveSafeDedicatedTestDatabaseUrl(),
-        max: 6,
+        max: 8,
       });
       const seed = await seedAcceptance(pool, randomUUID());
       try {
         const accept = createAcceptInvitationFromPool(pool);
         const archive = createArchiveFinalMemberHomeFromPool(pool);
+        const input = {
+          invitationId: seed.invitationId,
+          userId: seed.userId,
+          secret: seed.secret.encoded,
+        };
         const settled = await Promise.allSettled([
-          accept({
-            invitationId: seed.invitationId,
-            userId: seed.userId,
-            secret: seed.secret.encoded,
-          }),
+          accept(input),
+          accept(input),
           archive({
             homeId: seed.homeId,
             actor: {
@@ -365,19 +494,50 @@ void describe('invitation acceptance PostgreSQL concurrency', () => {
           'SELECT archived_at FROM homes WHERE id = $1',
           [seed.homeId],
         );
-        const target = await pool.query<{ count: string }>(
+        const invitation = await pool.query<{
+          accepted_at: Date | null;
+          revoked_at: Date | null;
+          revocation_cause: string | null;
+        }>(
+          `SELECT accepted_at, revoked_at, revocation_cause
+           FROM invitations WHERE id = $1`,
+          [seed.invitationId],
+        );
+        const joined = await pool.query<{ count: string }>(
           `SELECT count(*)::text AS count FROM memberships
            WHERE home_id = $1 AND user_id = $2 AND ended_at IS NULL`,
           [seed.homeId, seed.userId],
         );
+        const started = await pool.query<{ count: string }>(
+          `SELECT count(*)::text AS count FROM outbox_events
+           WHERE home_id = $1 AND event_type = 'membership.started.v1'`,
+          [seed.homeId],
+        );
+        const invite = invitation.rows[0];
+        assert.ok(invite);
+        const acceptFulfilled = settled
+          .slice(0, 2)
+          .filter((result) => result.status === 'fulfilled').length;
+        assert.ok(acceptFulfilled <= 1);
+        assert.equal(
+          invite.accepted_at !== null && invite.revoked_at !== null,
+          false,
+        );
+
         if (home.rows[0]?.archived_at === null) {
-          assert.equal(target.rows[0]?.count, '1');
-          assert.equal(settled[0]?.status, 'fulfilled');
-          assert.equal(settled[1]?.status, 'rejected');
+          assert.equal(acceptFulfilled, 1);
+          assert.equal(settled[2]?.status, 'rejected');
+          assert.ok(invite.accepted_at instanceof Date);
+          assert.equal(invite.revoked_at, null);
+          assert.equal(joined.rows[0]?.count, '1');
+          assert.equal(started.rows[0]?.count, '1');
         } else {
-          assert.equal(target.rows[0]?.count, '0');
-          assert.equal(settled[0]?.status, 'rejected');
-          assert.equal(settled[1]?.status, 'fulfilled');
+          assert.equal(acceptFulfilled, 0);
+          assert.equal(settled[2]?.status, 'fulfilled');
+          assert.equal(invite.accepted_at, null);
+          assert.equal(invite.revocation_cause, 'HOME_ARCHIVED');
+          assert.equal(joined.rows[0]?.count, '0');
+          assert.equal(started.rows[0]?.count, '0');
         }
       } finally {
         await cleanup(pool, seed);

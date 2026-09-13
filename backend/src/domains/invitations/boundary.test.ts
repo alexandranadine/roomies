@@ -21,4 +21,23 @@ void describe('invitations domain boundary', () => {
       assert.doesNotMatch(source, /\buser_id\b/i, name);
     }
   });
+
+  void it('keeps home-archive cleanup on persistence without outbox or a clock read', async () => {
+    const source = await readFile(
+      path.join(invitationsDir, 'home-archive-cleanup.ts'),
+      'utf8',
+    );
+    assert.match(source, /lockEffectivePendingForHomeArchive/);
+    assert.match(source, /revokeLocked/);
+    assert.match(source, /projectInvitationLifecycle/);
+    assert.match(source, /HOME_ARCHIVED/);
+    assert.doesNotMatch(source, /Date\.now/);
+    assert.doesNotMatch(source, /outbox/);
+    assert.doesNotMatch(source, /invitation\.revoked/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+    assert.doesNotMatch(source, /BEGIN/);
+    assert.doesNotMatch(source, /COMMIT/);
+    assert.doesNotMatch(source, /runInReadCommittedTransaction/);
+  });
 });

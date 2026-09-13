@@ -115,6 +115,17 @@ ORDER BY expires_at, created_at, id
 FOR UPDATE
 `;
 
+export const LOCK_EFFECTIVE_PENDING_INVITATIONS_FOR_HOME_ARCHIVE_SQL = `
+SELECT ${INVITATION_COLUMNS}
+FROM invitations
+WHERE home_id = $1::uuid
+  AND accepted_at IS NULL
+  AND revoked_at IS NULL
+  AND expires_at > $2::timestamptz
+ORDER BY id
+FOR UPDATE
+`;
+
 type InvitationRow = {
   id: unknown;
   home_id: unknown;
@@ -267,6 +278,10 @@ export type InvitationRepository = Readonly<{
     tx: TransactionContext,
     input: { homeId: string; at: Date },
   ): Promise<readonly LockedOpenInvitation[]>;
+  lockEffectivePendingForHomeArchive(
+    tx: TransactionContext,
+    input: { homeId: string; at: Date },
+  ): Promise<readonly Invitation[]>;
 }>;
 
 export function createInvitationRepository(pool: Pool): InvitationRepository {
@@ -417,6 +432,29 @@ export function createInvitationRepository(pool: Pool): InvitationRepository {
             throw new InvitationPersistenceError();
           }
           return Object.freeze({ invitation, lifecycle });
+        }),
+      );
+    },
+
+    async lockEffectivePendingForHomeArchive(tx, input) {
+      let rows: InvitationRow[];
+      try {
+        rows = (
+          await tx.query<InvitationRow>(
+            LOCK_EFFECTIVE_PENDING_INVITATIONS_FOR_HOME_ARCHIVE_SQL,
+            [input.homeId, input.at],
+          )
+        ).rows;
+      } catch {
+        throw new InvitationPersistenceError();
+      }
+      return Object.freeze(
+        rows.map((row) => {
+          const invitation = parseInvitationRow(row, input.homeId);
+          if (projectInvitationLifecycle(invitation, input.at) !== 'PENDING') {
+            throw new InvitationPersistenceError();
+          }
+          return invitation;
         }),
       );
     },

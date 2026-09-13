@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { describe, it } from 'node:test';
 import type { Pool } from 'pg';
 import { createArchiveFinalMemberHomeFromPool } from '../../application/home-administration/archive-final-member-home.js';
@@ -197,6 +197,8 @@ void describe('POST archive final member HTTP PostgreSQL', () => {
           const inactiveHomeAdmin = await signUp('InactiveHomeAdmin');
 
           const soleHome = randomUUID();
+          const soleMembershipId = randomUUID();
+          const pendingInvitationId = randomUUID();
           const multiAdminHome = randomUUID();
           const roommateHome = randomUUID();
           const archivedHome = randomUUID();
@@ -232,11 +234,27 @@ void describe('POST archive final member HTTP PostgreSQL', () => {
           });
 
           await insertMembership(database.pool, {
-            id: randomUUID(),
+            id: soleMembershipId,
             homeId: soleHome,
             userId: soleAdmin.id,
             role: 'ADMIN',
           });
+          await database.pool.query(
+            `INSERT INTO invitations (
+               id, home_id, invited_email, token_hash, created_by_membership_id,
+               created_at, expires_at
+             ) VALUES (
+               $1::uuid, $2::uuid, $3::text, $4::bytea, $5::uuid,
+               NOW() - interval '1 minute', NOW() + interval '7 days'
+             )`,
+            [
+              pendingInvitationId,
+              soleHome,
+              `pending-${soleHome}@example.com`,
+              randomBytes(32),
+              soleMembershipId,
+            ],
+          );
           await insertMembership(database.pool, {
             id: randomUUID(),
             homeId: multiAdminHome,
@@ -380,10 +398,29 @@ void describe('POST archive final member HTTP PostgreSQL', () => {
             success.headers.get(REQUEST_ID_HEADER) ?? '',
             /^[0-9a-f-]{36}$/i,
           );
+          const archivedInvite = await database.pool.query<{
+            accepted_at: Date | null;
+            revoked_at: Date | null;
+            revocation_cause: string | null;
+          }>(
+            `SELECT accepted_at, revoked_at, revocation_cause
+             FROM invitations WHERE id = $1`,
+            [pendingInvitationId],
+          );
+          assert.equal(archivedInvite.rows[0]?.accepted_at, null);
+          assert.ok(archivedInvite.rows[0]?.revoked_at instanceof Date);
+          assert.equal(
+            archivedInvite.rows[0]?.revocation_cause,
+            'HOME_ARCHIVED',
+          );
         });
       } finally {
         await database.pool.query(
           'DELETE FROM outbox_events WHERE home_id = ANY($1::uuid[])',
+          [homeIds],
+        );
+        await database.pool.query(
+          'DELETE FROM invitations WHERE home_id = ANY($1::uuid[])',
           [homeIds],
         );
         await database.pool.query(

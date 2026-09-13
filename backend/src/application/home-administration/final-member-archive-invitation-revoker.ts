@@ -7,13 +7,13 @@ export type FinalMemberArchiveInvitationInput = Readonly<{
 }>;
 
 /**
- * Required invitation boundary. Before invitations launch, the temporary
- * adapter must be replaced by a transactional implementation whose locks fit
- * after Task/Supply/Maintenance in the frozen global lock order.
+ * Invitation cleanup seam for final-member Home archive. The real adapter
+ * locks effective invitation rows in ID order on the already-open Home
+ * transaction, then revokes only those still pending at the archive timestamp.
  *
- * Future invitation acceptance/join/rejoin must lock Home first: acceptance
- * committing first makes archive observe another active Membership; archive
- * committing first makes acceptance observe an archived Home.
+ * Acceptance/revoke/archive all lock Home first: acceptance committing first
+ * makes archive observe another active Membership; archive committing first
+ * makes acceptance observe an archived Home.
  */
 export interface FinalMemberArchiveInvitationRevoker {
   lockPendingForHomeArchive(
@@ -24,5 +24,5 @@ export interface FinalMemberArchiveInvitationRevoker {
   revokeLockedPendingForHomeArchive(
     tx: TransactionContext,
     input: FinalMemberArchiveInvitationInput,
-  ): Promise<void>;
+  ): Promise<void | number>;
 }

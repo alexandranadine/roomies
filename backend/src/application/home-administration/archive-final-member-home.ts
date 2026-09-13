@@ -28,8 +28,8 @@ import {
   createApplyMembershipEndingWithinHomeStructureWithTemporaryNoOpCleanup,
   type ApplyMembershipEndingWithinHomeStructure,
 } from './end-membership-within-home-structure.js';
+import { createInvitationHomeArchiveCleanupFromPool } from '../../domains/invitations/home-archive-cleanup.js';
 import type { FinalMemberArchiveInvitationRevoker } from './final-member-archive-invitation-revoker.js';
-import { createTemporaryNoOpFinalMemberArchiveInvitationRevoker } from './temporary-noop-final-member-archive-invitation-revoker.js';
 
 export type ArchiveFinalMemberHomeDependencies = {
   runTransaction: <T>(
@@ -57,8 +57,6 @@ export function createArchiveFinalMemberHome(
   deps: ArchiveFinalMemberHomeDependencies,
 ): (input: ArchiveFinalMemberInput) => Promise<void> {
   return async (input) => {
-    const archivedAt = deps.clock.now();
-
     await deps.runTransaction(async (tx) => {
       const locked = await deps.lockHomeStructure(tx, input);
 
@@ -80,6 +78,8 @@ export function createArchiveFinalMemberHome(
         }
         throw new StructuralIntegrityError();
       }
+
+      const archivedAt = deps.clock.now();
 
       const invitationInput = Object.freeze({
         homeId: locked.home.id,
@@ -139,7 +139,9 @@ export function createArchiveFinalMemberHomeFromPool(
     runTransaction: (work) => runInReadCommittedTransaction(pool, work),
     lockHomeStructure,
     clock: systemClock,
-    invitationRevoker: createTemporaryNoOpFinalMemberArchiveInvitationRevoker(),
+    invitationRevoker: createInvitationHomeArchiveCleanupFromPool(
+      pool as Parameters<typeof createInvitationHomeArchiveCleanupFromPool>[0],
+    ),
     applyMembershipEnding:
       createApplyMembershipEndingWithinHomeStructureWithTemporaryNoOpCleanup(),
     homeArchive: createHomeArchiveWriter(),

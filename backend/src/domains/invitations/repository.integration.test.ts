@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
 import { describe, it } from 'node:test';
 import { Pool } from 'pg';
 import { normalizeEmail } from '../../platform/auth/index.js';
@@ -202,6 +203,112 @@ void describe('InvitationRepository PostgreSQL integration', () => {
           membershipId,
         ]);
         await pool.query('DELETE FROM homes WHERE id = $1', [homeId]);
+        await pool.query('DELETE FROM users WHERE id = $1', [userId]);
+        await pool.end();
+      }
+    },
+  );
+
+  void it(
+    'locks only effective pending invitations for Home archive in ID order',
+    { skip: skipUnlessDedicatedTestDatabase() },
+    async () => {
+      const pool = new Pool({
+        connectionString: resolveSafeDedicatedTestDatabaseUrl(),
+        max: 2,
+      });
+      const userId = '91000000-0000-4000-8000-000000000003';
+      const homeId = '92000000-0000-4000-8000-000000000003';
+      const otherHomeId = '92000000-0000-4000-8000-000000000098';
+      const membershipId = '93000000-0000-4000-8000-000000000003';
+      const otherMembershipId = '93000000-0000-4000-8000-000000000098';
+      const laterPendingId = '94000000-0000-7000-8000-000000000013';
+      const earlierPendingId = '94000000-0000-7000-8000-000000000011';
+      const expiredId = '94000000-0000-7000-8000-000000000012';
+      const otherHomePendingId = '94000000-0000-7000-8000-000000000099';
+      const createdAt = new Date('2026-10-01T00:00:00.000Z');
+      const expiresAt = new Date('2026-10-08T00:00:00.000Z');
+      const archiveAt = new Date('2026-10-04T00:00:00.000Z');
+      const repository = createInvitationRepository(pool);
+
+      try {
+        await pool.query(
+          'INSERT INTO users (id, updated_at) VALUES ($1, now())',
+          [userId],
+        );
+        await pool.query(
+          `INSERT INTO homes (id, name, timezone, updated_at)
+           VALUES ($1, 'Archive lock test', 'UTC', now()),
+                  ($2, 'Other archive lock', 'UTC', now())`,
+          [homeId, otherHomeId],
+        );
+        await pool.query(
+          `INSERT INTO memberships (id, home_id, user_id, role)
+           VALUES ($1, $2, $3, 'ADMIN'), ($4, $5, $3, 'ADMIN')`,
+          [membershipId, homeId, userId, otherMembershipId, otherHomeId],
+        );
+        for (const [id, targetHome, membership, email, expiry] of [
+          [
+            laterPendingId,
+            homeId,
+            membershipId,
+            'later@example.com',
+            expiresAt,
+          ],
+          [
+            earlierPendingId,
+            homeId,
+            membershipId,
+            'earlier@example.com',
+            expiresAt,
+          ],
+          [expiredId, homeId, membershipId, 'expired@example.com', archiveAt],
+          [
+            otherHomePendingId,
+            otherHomeId,
+            otherMembershipId,
+            'other-home@example.com',
+            expiresAt,
+          ],
+        ] as const) {
+          await runInReadCommittedTransaction(pool, (tx) =>
+            repository.insert(tx, {
+              id,
+              homeId: targetHome,
+              invitedEmail: normalizeEmail(email),
+              tokenHash: invitationTokenHash(randomBytes(32)),
+              createdByMembershipId: membership,
+              createdAt,
+              expiresAt: expiry,
+            }),
+          );
+        }
+
+        const locked = await runInReadCommittedTransaction(pool, (tx) =>
+          repository.lockEffectivePendingForHomeArchive(tx, {
+            homeId,
+            at: archiveAt,
+          }),
+        );
+        assert.deepEqual(
+          locked.map((row) => row.id),
+          [earlierPendingId, laterPendingId],
+        );
+        assert.ok(
+          locked.every(
+            (row) => row.homeId === homeId && row.revokedAt === null,
+          ),
+        );
+      } finally {
+        await pool.query('DELETE FROM invitations WHERE id = ANY($1::uuid[])', [
+          [laterPendingId, earlierPendingId, expiredId, otherHomePendingId],
+        ]);
+        await pool.query('DELETE FROM memberships WHERE id = ANY($1::uuid[])', [
+          [membershipId, otherMembershipId],
+        ]);
+        await pool.query('DELETE FROM homes WHERE id = ANY($1::uuid[])', [
+          [homeId, otherHomeId],
+        ]);
         await pool.query('DELETE FROM users WHERE id = $1', [userId]);
         await pool.end();
       }

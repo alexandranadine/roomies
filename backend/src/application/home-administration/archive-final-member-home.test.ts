@@ -62,6 +62,7 @@ function harness(
     clock: {
       now() {
         clockCalls += 1;
+        steps.push('clock-now');
         return NOW;
       },
     },
@@ -169,6 +170,7 @@ void describe('archive final member Home orchestration', () => {
 
     assert.deepEqual(steps, [
       'lock-home-structure',
+      'clock-now',
       'invitation-lock',
       'invitation-revoke',
       'membership-ending',
@@ -177,6 +179,9 @@ void describe('archive final member Home orchestration', () => {
       'outbox-home.archived.v1',
     ]);
     assert.deepEqual(stats(), { clockCalls: 1, transactionCalls: 1 });
+    assert.ok(
+      steps.indexOf('clock-now') > steps.indexOf('lock-home-structure'),
+    );
     assert.deepEqual(
       events.map((event) => ({
         eventId: event.eventId,
@@ -202,6 +207,71 @@ void describe('archive final member Home orchestration', () => {
         },
       ],
     );
+  });
+
+  void it('does not request clock.now until the Home structural lock is established', async () => {
+    let lockResolved = false;
+    let clockBeforeLock = false;
+    let resolveLock!: () => void;
+    const lockHeld = new Promise<void>((resolve) => {
+      resolveLock = resolve;
+    });
+    let resolveReached!: () => void;
+    const reachedLock = new Promise<void>((resolve) => {
+      resolveReached = resolve;
+    });
+
+    const command = createArchiveFinalMemberHome({
+      clock: {
+        now() {
+          if (!lockResolved) {
+            clockBeforeLock = true;
+          }
+          return NOW;
+        },
+      },
+      runTransaction: async (work) =>
+        work({
+          query: () => Promise.reject(new Error('unexpected SQL')),
+        } as TransactionContext),
+      lockHomeStructure: async (_tx, received) => {
+        assert.equal(received.actor.role, 'ROOMMATE');
+        resolveReached();
+        await lockHeld;
+        lockResolved = true;
+        return locked();
+      },
+      invitationRevoker: {
+        lockPendingForHomeArchive() {
+          return Promise.resolve();
+        },
+        revokeLockedPendingForHomeArchive() {
+          return Promise.resolve();
+        },
+      },
+      applyMembershipEnding: () =>
+        Promise.resolve({ membershipId: MEMBERSHIP }),
+      homeArchive: {
+        archiveActiveHome() {
+          return Promise.resolve(1);
+        },
+      },
+      outbox: {
+        append() {
+          return Promise.resolve();
+        },
+      },
+      ids: { next: () => EVENT_ONE },
+    });
+
+    const pending = command(input);
+    await reachedLock;
+    assert.equal(lockResolved, false);
+    assert.equal(clockBeforeLock, false);
+    resolveLock();
+    await pending;
+    assert.equal(lockResolved, true);
+    assert.equal(clockBeforeLock, false);
   });
 
   void it('returns FINAL_MEMBER_REQUIRED for a locked Admin with another member', async () => {

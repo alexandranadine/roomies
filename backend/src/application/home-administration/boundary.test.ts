@@ -149,8 +149,15 @@ void describe('home-administration application boundary', () => {
     assert.doesNotMatch(source, /emitEvent|suppressEvent/);
     assert.match(source, /lockHomeStructure/);
     assert.match(source, /decideArchiveFinalMember/);
+    assert.match(source, /createInvitationHomeArchiveCleanupFromPool/);
     assert.match(source, /applyMembershipEnding/);
     assert.match(source, /archiveActiveHome/);
+    assert.doesNotMatch(
+      source,
+      /TemporaryNoOpFinalMemberArchiveInvitationRevoker/,
+    );
+    assert.doesNotMatch(source, /invitations\/repository/);
+    assert.doesNotMatch(source, /Date\.now/);
     assert.ok(
       source.lastIndexOf('createMembershipEndedV1Event') <
         source.lastIndexOf('createHomeArchivedV1Event'),

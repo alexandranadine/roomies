@@ -29,6 +29,12 @@ export {
   type InvitationRevocationCause,
 } from './invitation.js';
 export {
+  createInvitationHomeArchiveCleanup,
+  createInvitationHomeArchiveCleanupFromPool,
+  type InvitationHomeArchiveCleanup,
+  type InvitationHomeArchiveCleanupInput,
+} from './home-archive-cleanup.js';
+export {
   createInvitationRepository,
   type InvitationRepository,
   type LockedOpenInvitation,

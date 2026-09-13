@@ -929,7 +929,8 @@ void describe('revokeInvitation PostgreSQL concurrency', () => {
             settled[0]?.status === 'rejected' &&
               settled[0].reason instanceof ConcealedNotFoundError,
           );
-          assert.equal(invitation.revoked_at, null);
+          assert.equal(invitation.revocation_cause, 'HOME_ARCHIVED');
+          assert.ok(invitation.revoked_at instanceof Date);
         }
         assert.equal(settled[1]?.status, 'fulfilled');
       } finally {
