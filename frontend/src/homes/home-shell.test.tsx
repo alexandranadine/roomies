@@ -103,7 +103,9 @@ describe('active Home discovery and shell', () => {
     expect(
       screen.getByRole('heading', { name: 'Your Homes', level: 1 }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/create a home/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Create a Home' }),
+    ).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/owner|membership/i);
     expect(queryClient.getQueryData(currentUserQueryKey)).toEqual({
       id: USER_ID,

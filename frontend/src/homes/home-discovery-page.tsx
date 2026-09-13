@@ -1,13 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Link, Navigate } from 'react-router';
 import { DocumentTitle } from '../components/document-title.js';
-import { Card, EmptyState, Spinner } from '../components/ui/index.js';
+import { Button, Card, EmptyState, Spinner } from '../components/ui/index.js';
 import { ApiError } from '../platform/api/index.js';
+import { CreateHomeForm } from './create-home-form.js';
 import { currentUserHomesQueryKey } from './home-query-keys.js';
 import { homeRoleLabel } from './home-role-label.js';
 import { listCurrentUserHomes } from './homes-api.js';
 
 export function HomeDiscoveryPage() {
+  const [showCreateForm, setShowCreateForm] = useState(false);
   const homesQuery = useQuery({
     queryKey: currentUserHomesQueryKey,
     queryFn: ({ signal }) => listCurrentUserHomes(signal),
@@ -54,10 +57,31 @@ export function HomeDiscoveryPage() {
           <h1 className="text-2xl font-semibold tracking-tight text-text-primary sm:text-3xl">
             Your Homes
           </h1>
-          <EmptyState
-            title="You’re not currently in a Home"
-            description="Create a Home to start coordinating with your roommates."
-          />
+          {showCreateForm ? (
+            <Card padding="lg" className="max-w-xl">
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1">
+                  <h2 className="text-lg font-semibold text-text-primary">
+                    Create a Home
+                  </h2>
+                  <p className="text-sm text-text-secondary">
+                    Set up the Home you share with your roommates.
+                  </p>
+                </div>
+                <CreateHomeForm />
+              </div>
+            </Card>
+          ) : (
+            <EmptyState
+              title="You’re not currently in a Home"
+              description="Create a Home to start coordinating with your roommates."
+              action={
+                <Button type="button" onClick={() => setShowCreateForm(true)}>
+                  Create a Home
+                </Button>
+              }
+            />
+          )}
         </div>
       </DocumentTitle>
     );
