@@ -17,6 +17,12 @@ export {
   LastRoommateRequiresArchiveError,
 } from './errors.js';
 export {
+  FIND_ACTIVE_EXACT_MEMBERSHIP_IDS_IN_HOME_SQL,
+  findActiveExactMembershipIdsInHome,
+  type FindActiveExactMembershipIdsInHome,
+  type FindActiveExactMembershipIdsInHomeInput,
+} from './find-active-exact-membership-ids-in-home.js';
+export {
   FIND_ACTIVE_HOME_MEMBERSHIP_SQL,
   findActiveHomeMembership,
   type ActiveHomeMembership,

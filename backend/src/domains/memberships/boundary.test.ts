@@ -121,6 +121,31 @@ void describe('memberships domain boundary', () => {
     }
   });
 
+  void it('keeps same-Home active Membership validation a read-only public seam', async () => {
+    const source = await readFile(
+      path.join(membershipsDir, 'find-active-exact-membership-ids-in-home.ts'),
+      'utf8',
+    );
+    assert.match(source, /FIND_ACTIVE_EXACT_MEMBERSHIP_IDS_IN_HOME_SQL/);
+    assert.match(source, /m\.home_id = \$1::uuid/);
+    assert.match(source, /m\.id = ANY\(\$2::uuid\[\]\)/);
+    assert.match(source, /ended_at IS NULL/);
+    assert.match(source, /ORDER BY m\.id ASC/);
+    assert.doesNotMatch(source, /FOR UPDATE/i);
+    assert.doesNotMatch(source, /user_id/);
+    assert.doesNotMatch(source, /userId/);
+    assert.doesNotMatch(source, /\brole\b/);
+    assert.doesNotMatch(source, /INSERT |UPDATE |DELETE /i);
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /better-auth/);
+    assert.doesNotMatch(source, /memberships\/repository/);
+    assert.doesNotMatch(source, /homes\/repository/);
+    assert.doesNotMatch(source, /domains\/maintenance/);
+    assert.doesNotMatch(source, /domains\/tasks/);
+    assert.doesNotMatch(source, /domains\/supplies/);
+  });
+
   void it('keeps active Membership insert an ordinary tenure write', async () => {
     const source = await readFile(
       path.join(membershipsDir, 'insert-active-membership.ts'),
