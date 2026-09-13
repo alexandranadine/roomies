@@ -26,29 +26,35 @@ import {
 } from './platform/auth/principal.js';
 import { createAuthRuntime } from './platform/auth/runtime.js';
 import { loadConfig } from './platform/config/index.js';
+import type {
+  AppConfig,
+  ProcessRuntimeConfig,
+} from './platform/config/types.js';
 import { createApp } from './platform/http/create-app.js';
-import { createDatabasePool } from './platform/persistence/pool.js';
+import {
+  createDatabasePool,
+  type DatabasePoolRuntime,
+} from './platform/persistence/pool.js';
 import { createDbReadiness } from './platform/persistence/readiness.js';
+import {
+  startsHttpServer,
+  startsRecurrenceWorker,
+} from './platform/runtime/process-mode.js';
+import { startProcess } from './platform/runtime/start-process.js';
+import type { ClosableResource } from './platform/server/start-http-server.js';
 import { startHttpServer } from './platform/server/start-http-server.js';
+import { createRecurrenceWorkerFromPool } from './platform/workers/create-recurrence-worker-from-pool.js';
 import { createDb } from './prisma/db.js';
 
-/**
- * Web process entrypoint.
- *
- * Startup sequence:
- * 1. load validated config once
- * 2. create the process-owned PostgreSQL pool
- * 3. create Prisma and Better Auth over that same pool
- * 4. create Express app
- * 5. start HTTP server
- *
- * DB connectivity is not required to bind the port. Transient DB unavailability
- * keeps `/ready` at 503 instead of crashing the process into a restart loop.
- */
-function main(): void {
-  const config = loadConfig();
-  const databasePool = createDatabasePool(config);
+type RuntimeConfig = AppConfig & ProcessRuntimeConfig;
+
+function createWebHttpRuntime(
+  config: RuntimeConfig,
+  databasePool: DatabasePoolRuntime,
+  resources: ClosableResource[],
+) {
   const db = createDb(databasePool.pool);
+  resources.unshift(db);
   const auth = createAuthRuntime(databasePool.pool, config);
   const principalResolver = createPrincipalResolver({
     auth,
@@ -104,20 +110,68 @@ function main(): void {
     }),
   });
 
-  startHttpServer({
+  return startHttpServer({
     app,
     port: config.port,
-    resources: [db, databasePool],
+    resources: [],
+    installSignalHandlers: false,
   });
 }
 
-try {
-  main();
-} catch (error: unknown) {
-  console.error('[http] startup failed');
+/**
+ * Process entrypoint.
+ *
+ * Startup sequence:
+ * 1. load validated config once, including PROCESS_MODE
+ * 2. create the process-owned PostgreSQL pool
+ * 3. start HTTP and/or the recurrence worker from that same pool
+ * 4. own SIGTERM/SIGINT and close the pool exactly once after collaborators stop
+ *
+ * DB connectivity is not required to bind the HTTP port. Transient DB
+ * unavailability keeps `/ready` at 503 instead of crashing the process into a
+ * restart loop. Worker-only mode does not listen for HTTP.
+ */
+async function main(): Promise<void> {
+  const config = loadConfig();
+  const databasePool = createDatabasePool(config);
+  let poolClosed = false;
+  const resources: ClosableResource[] = [
+    {
+      async close() {
+        poolClosed = true;
+        await databasePool.close();
+      },
+    },
+  ];
+
+  try {
+    startProcess({
+      mode: config.processMode,
+      resources,
+      createHttp: startsHttpServer(config.processMode)
+        ? () => createWebHttpRuntime(config, databasePool, resources)
+        : undefined,
+      createWorker: startsRecurrenceWorker(config.processMode)
+        ? () =>
+            createRecurrenceWorkerFromPool(databasePool.pool, {
+              pollIntervalMs: config.recurrencePollIntervalMs,
+              isInfrastructureClosed: () => poolClosed,
+            })
+        : undefined,
+    });
+  } catch (error) {
+    for (const resource of resources) {
+      await resource.close();
+    }
+    throw error;
+  }
+}
+
+void main().catch((error: unknown) => {
+  console.error('[process] startup failed');
   // Avoid logging raw env/secret material if a ConfigError wraps issues only.
   if (error instanceof Error && error.message.length > 0) {
     console.error(error.message);
   }
   process.exit(1);
-}
+});

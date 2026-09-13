@@ -8,6 +8,27 @@ export const APP_ENVS = [
 
 export type AppEnv = (typeof APP_ENVS)[number];
 
+export const PROCESS_MODES = ['web', 'worker', 'combined'] as const;
+
+export type ProcessMode = (typeof PROCESS_MODES)[number];
+
+/** Initial Railway deployment and local default: one process serves HTTP and polls. */
+export const DEFAULT_PROCESS_MODE: ProcessMode = 'combined';
+
+export const DEFAULT_RECURRENCE_POLL_INTERVAL_MS = 30_000;
+export const MIN_RECURRENCE_POLL_INTERVAL_MS = 1_000;
+export const MAX_RECURRENCE_POLL_INTERVAL_MS = 300_000;
+
+export type ProcessRuntimeConfig = Readonly<{
+  /**
+   * Explicit process role. Never inferred from unrelated variables.
+   * `combined` is the default and the initial production deployment.
+   */
+  processMode: ProcessMode;
+  /** Recurrence polling sleep when no immediate due work remains. */
+  recurrencePollIntervalMs: number;
+}>;
+
 /**
  * Immutable, typed application configuration.
  * Parsed once at process startup; modules consume this object, not `process.env`.

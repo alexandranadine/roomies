@@ -214,6 +214,9 @@ void describe('tasks application boundary', () => {
     assert.doesNotMatch(source, /Date\.now|new Date\(/);
     assert.doesNotMatch(source, /from ['"]pg['"]/);
     assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /platform\/workers/);
+    assert.doesNotMatch(source, /platform\/runtime/);
+    assert.doesNotMatch(source, /PROCESS_MODE/);
   });
 
   void it('does not import repository internals or Express', async () => {

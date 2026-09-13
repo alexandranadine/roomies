@@ -5,7 +5,18 @@ import {
   parseTrustedOriginsList,
 } from './normalize-origin.js';
 import { loadRuntimeEnvFiles } from './load-dotenv.js';
-import { APP_ENVS, type AppConfig, type AppEnv } from './types.js';
+import {
+  APP_ENVS,
+  DEFAULT_PROCESS_MODE,
+  DEFAULT_RECURRENCE_POLL_INTERVAL_MS,
+  MAX_RECURRENCE_POLL_INTERVAL_MS,
+  MIN_RECURRENCE_POLL_INTERVAL_MS,
+  PROCESS_MODES,
+  type AppConfig,
+  type AppEnv,
+  type ProcessMode,
+  type ProcessRuntimeConfig,
+} from './types.js';
 
 /** Default Vite-style local frontend origins (development / test only). */
 const LOCAL_DEV_ORIGINS = [
@@ -101,6 +112,56 @@ const trustProxySchema = z
     return hops;
   });
 
+const processModeSchema = z
+  .string()
+  .trim()
+  .optional()
+  .transform((raw, ctx) => {
+    if (raw === undefined || raw === '') {
+      return DEFAULT_PROCESS_MODE;
+    }
+    if ((PROCESS_MODES as readonly string[]).includes(raw)) {
+      return raw as ProcessMode;
+    }
+    ctx.addIssue({
+      code: 'custom',
+      message: `PROCESS_MODE must be one of: ${PROCESS_MODES.join(', ')}`,
+    });
+    return z.NEVER;
+  });
+
+const recurrencePollIntervalSchema = z
+  .string()
+  .trim()
+  .optional()
+  .transform((raw, ctx) => {
+    if (raw === undefined || raw === '') {
+      return DEFAULT_RECURRENCE_POLL_INTERVAL_MS;
+    }
+    if (!/^\d+$/.test(raw)) {
+      ctx.addIssue({
+        code: 'custom',
+        message:
+          'RECURRENCE_POLL_INTERVAL_MS must be an integer between 1000 and 300000 (received a non-integer value)',
+      });
+      return z.NEVER;
+    }
+    const intervalMs = Number(raw);
+    if (
+      !Number.isInteger(intervalMs) ||
+      intervalMs < MIN_RECURRENCE_POLL_INTERVAL_MS ||
+      intervalMs > MAX_RECURRENCE_POLL_INTERVAL_MS
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message:
+          'RECURRENCE_POLL_INTERVAL_MS must be an integer between 1000 and 300000',
+      });
+      return z.NEVER;
+    }
+    return intervalMs;
+  });
+
 const envSchema = z
   .object({
     APP_ENV: z.enum(APP_ENVS, {
@@ -129,6 +190,8 @@ const envSchema = z
     TRUSTED_ORIGINS: z.string().optional(),
     FRONTEND_ORIGIN: z.string().optional(),
     TRUST_PROXY: trustProxySchema,
+    PROCESS_MODE: processModeSchema,
+    RECURRENCE_POLL_INTERVAL_MS: recurrencePollIntervalSchema,
   })
   .transform((data, ctx) => {
     const appEnv = data.APP_ENV;
@@ -224,6 +287,8 @@ const envSchema = z
       frontendOrigin,
       trustedOrigins,
       trustProxyHops: data.TRUST_PROXY,
+      processMode: data.PROCESS_MODE,
+      recurrencePollIntervalMs: data.RECURRENCE_POLL_INTERVAL_MS,
     } satisfies {
       appEnv: AppEnv;
       port: number;
@@ -234,6 +299,8 @@ const envSchema = z
       frontendOrigin: string;
       trustedOrigins: string[];
       trustProxyHops: number;
+      processMode: ProcessMode;
+      recurrencePollIntervalMs: number;
     };
   });
 
@@ -297,6 +364,22 @@ function formatIssues(zodError: z.ZodError): string[] {
       );
       continue;
     }
+    if (key === 'PROCESS_MODE') {
+      issues.push(
+        issue.message.startsWith('PROCESS_MODE')
+          ? issue.message
+          : `PROCESS_MODE must be one of: ${PROCESS_MODES.join(', ')}`,
+      );
+      continue;
+    }
+    if (key === 'RECURRENCE_POLL_INTERVAL_MS') {
+      issues.push(
+        issue.message.startsWith('RECURRENCE_POLL_INTERVAL_MS')
+          ? issue.message
+          : 'RECURRENCE_POLL_INTERVAL_MS must be an integer between 1000 and 300000',
+      );
+      continue;
+    }
     // Fallback: keep message but never echo unknown received blobs for secrets.
     issues.push(issue.message);
   }
@@ -308,7 +391,9 @@ function formatIssues(zodError: z.ZodError): string[] {
  * Parse configuration from an explicit env-like record.
  * Pure: does not read `process.env` or load dotenv files.
  */
-export function parseConfig(source: ConfigSource): AppConfig {
+export function parseConfig(
+  source: ConfigSource,
+): AppConfig & ProcessRuntimeConfig {
   const result = envSchema.safeParse({
     APP_ENV: optionalString(source['APP_ENV']),
     PORT: optionalString(source['PORT']),
@@ -318,6 +403,10 @@ export function parseConfig(source: ConfigSource): AppConfig {
     TRUSTED_ORIGINS: optionalString(source['TRUSTED_ORIGINS']),
     FRONTEND_ORIGIN: optionalString(source['FRONTEND_ORIGIN']),
     TRUST_PROXY: optionalString(source['TRUST_PROXY']),
+    PROCESS_MODE: optionalString(source['PROCESS_MODE']),
+    RECURRENCE_POLL_INTERVAL_MS: optionalString(
+      source['RECURRENCE_POLL_INTERVAL_MS'],
+    ),
   });
 
   if (!result.success) {
@@ -338,6 +427,8 @@ export function parseConfig(source: ConfigSource): AppConfig {
     frontendOrigin: result.data.frontendOrigin,
     trustedOrigins: Object.freeze([...result.data.trustedOrigins]),
     trustProxyHops: result.data.trustProxyHops,
+    processMode: result.data.processMode,
+    recurrencePollIntervalMs: result.data.recurrencePollIntervalMs,
   });
 }
 
@@ -348,7 +439,7 @@ export function parseConfig(source: ConfigSource): AppConfig {
 export function loadConfig(
   env: NodeJS.ProcessEnv = process.env,
   options: { loadDotenv?: boolean } = {},
-): AppConfig {
+): AppConfig & ProcessRuntimeConfig {
   if (options.loadDotenv !== false) {
     loadRuntimeEnvFiles();
   }

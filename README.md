@@ -108,7 +108,7 @@ Prisma 8 owns the database contract and reviewed migration workflow inside `@roo
 | Runtime client      | `backend/src/prisma/db.ts`                          |
 | Migrations          | `backend/migrations/` (`app/`, `snapshots/`)        |
 
-Connection uses `DATABASE_URL` from the environment. Prisma CLI loads it via `backend/prisma.config.ts`. Application runtime validates env through `backend/src/platform/config/` (`APP_ENV`, `PORT`, `TRUSTED_ORIGINS`, `TRUST_PROXY`, `DATABASE_URL`, `AUTH_BASE_URL`, `AUTH_SECRET`). The process composition root creates one `pg.Pool`, passes it to Prisma and Better Auth, closes Prisma, and then closes the pool exactly once. Consumers never own the pool. Do not hardcode credentials.
+Connection uses `DATABASE_URL` from the environment. Prisma CLI loads it via `backend/prisma.config.ts`. Application runtime validates env through `backend/src/platform/config/` (`APP_ENV`, `PORT`, `PROCESS_MODE`, `RECURRENCE_POLL_INTERVAL_MS`, `TRUSTED_ORIGINS`, `TRUST_PROXY`, `DATABASE_URL`, `AUTH_BASE_URL`, `AUTH_SECRET`). The process composition root creates one `pg.Pool`, passes it to Prisma, Better Auth, and the recurrence worker, closes Prisma, and then closes the pool exactly once. Consumers never own the pool. Do not hardcode credentials.
 
 ### Better Auth runtime isolation
 
@@ -147,11 +147,14 @@ install succeeds without bypass flags.
 
 The backend HTTP runtime lives under `backend/src/platform/http/` (app factory) and `backend/src/platform/server/` (listen + graceful shutdown). Entrypoint: `backend/src/main.ts` (`npm run start --workspace=@roomies/backend`).
 
+`PROCESS_MODE` selects `web`, `worker`, or `combined` (default `combined`). Combined mode is the initial production deployment: one process serves HTTP and runs the recurrence polling worker against the shared pool. Worker-only mode does not listen for HTTP.
+
 - `GET /health` — process liveness (no database dependency)
 - `GET /ready` — persistence readiness (503 when the DB probe fails)
 - `ALL /api/auth/*` — Better Auth credential/session HTTP (mounted before `express.json()`)
 - Exact-origin CORS from `TRUSTED_ORIGINS`, Helmet defaults, JSON body limit `32kb`
 - `TRUST_PROXY` is an integer hop count (default `0`). Railway should set an explicit hop count after verifying proxy topology; unrestricted `true` is rejected.
+- `RECURRENCE_POLL_INTERVAL_MS` is the worker sleep when no immediate due work remains (default `30000`, range `1000`–`300000`).
 - No auth rate limiter yet. Add credential-endpoint rate limiting before public launch.
 
 ### Fresh-database bootstrap note

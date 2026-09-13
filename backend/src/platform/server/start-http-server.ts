@@ -18,6 +18,8 @@ export type StartHttpServerOptions = {
 
 export type HttpServerRuntime = {
   server: Server;
+  /** Stop accepting new connections without closing persistence resources. */
+  stopAccepting: () => Promise<void>;
   /** Initiate graceful shutdown (idempotent). */
   shutdown: (reason?: string) => Promise<void>;
 };
@@ -39,6 +41,22 @@ export function startHttpServer(
 
   const server = app.listen(port);
   let shuttingDown = false;
+  let closePromise: Promise<void> | undefined;
+
+  const stopAccepting = (): Promise<void> => {
+    if (!closePromise) {
+      closePromise = new Promise<void>((resolve, reject) => {
+        server.close((error) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+          resolve();
+        });
+      });
+    }
+    return closePromise;
+  };
 
   const shutdown = async (reason = 'shutdown'): Promise<void> => {
     if (shuttingDown) {
@@ -55,15 +73,7 @@ export function startHttpServer(
     forceExit.unref();
 
     try {
-      await new Promise<void>((resolve, reject) => {
-        server.close((error) => {
-          if (error) {
-            reject(error);
-            return;
-          }
-          resolve();
-        });
-      });
+      await stopAccepting();
 
       for (const resource of resources) {
         await resource.close();
@@ -96,5 +106,5 @@ export function startHttpServer(
     console.info(`[http] listening on port ${port}`);
   });
 
-  return { server, shutdown };
+  return { server, stopAccepting, shutdown };
 }

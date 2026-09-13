@@ -89,4 +89,36 @@ void describe('startHttpServer lifecycle', () => {
     assert.equal(server.listening, false);
     server = undefined;
   });
+
+  void it('can stop accepting connections without closing resources', async () => {
+    const app = express();
+    let closeCount = 0;
+    const runtime = startHttpServer({
+      app,
+      port: 0,
+      resources: [
+        {
+          close: () => {
+            closeCount += 1;
+            return Promise.resolve();
+          },
+        },
+      ],
+      installSignalHandlers: false,
+    });
+    server = runtime.server;
+
+    await new Promise<void>((resolve, reject) => {
+      server!.once('listening', () => resolve());
+      server!.once('error', reject);
+    });
+
+    await runtime.stopAccepting();
+    assert.equal(closeCount, 0);
+    assert.equal(server.listening, false);
+
+    await runtime.shutdown('after-stop');
+    assert.equal(closeCount, 1);
+    server = undefined;
+  });
 });

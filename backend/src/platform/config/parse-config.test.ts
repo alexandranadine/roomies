@@ -33,7 +33,90 @@ void describe('parseConfig', () => {
       'http://127.0.0.1:5173',
     ]);
     assert.equal(config.trustProxyHops, 0);
+    assert.equal(config.processMode, 'combined');
+    assert.equal(config.recurrencePollIntervalMs, 30_000);
     assert.ok(Object.isFrozen(config));
+  });
+
+  void it('defaults PROCESS_MODE to combined when absent', () => {
+    const config = parseConfig(
+      validDevelopmentEnv({ PROCESS_MODE: undefined }),
+    );
+    assert.equal(config.processMode, 'combined');
+  });
+
+  void it('accepts explicit PROCESS_MODE values', () => {
+    assert.equal(
+      parseConfig(validDevelopmentEnv({ PROCESS_MODE: 'web' })).processMode,
+      'web',
+    );
+    assert.equal(
+      parseConfig(validDevelopmentEnv({ PROCESS_MODE: 'worker' })).processMode,
+      'worker',
+    );
+    assert.equal(
+      parseConfig(validDevelopmentEnv({ PROCESS_MODE: 'combined' }))
+        .processMode,
+      'combined',
+    );
+  });
+
+  void it('rejects invalid PROCESS_MODE before runtime starts', () => {
+    assert.throws(
+      () => parseConfig(validDevelopmentEnv({ PROCESS_MODE: 'daemon' })),
+      (error: unknown) => {
+        assert.ok(error instanceof ConfigError);
+        assert.match(error.message, /PROCESS_MODE/);
+        assert.match(error.message, /web, worker, combined/);
+        return true;
+      },
+    );
+
+    assert.throws(
+      () => parseConfig(validDevelopmentEnv({ PROCESS_MODE: 'WEB' })),
+      (error: unknown) => {
+        assert.ok(error instanceof ConfigError);
+        assert.match(error.message, /PROCESS_MODE/);
+        return true;
+      },
+    );
+  });
+
+  void it('defaults RECURRENCE_POLL_INTERVAL_MS to 30000', () => {
+    const config = parseConfig(
+      validDevelopmentEnv({ RECURRENCE_POLL_INTERVAL_MS: undefined }),
+    );
+    assert.equal(config.recurrencePollIntervalMs, 30_000);
+  });
+
+  void it('accepts RECURRENCE_POLL_INTERVAL_MS within the operational range', () => {
+    assert.equal(
+      parseConfig(validDevelopmentEnv({ RECURRENCE_POLL_INTERVAL_MS: '1000' }))
+        .recurrencePollIntervalMs,
+      1000,
+    );
+    assert.equal(
+      parseConfig(
+        validDevelopmentEnv({ RECURRENCE_POLL_INTERVAL_MS: '300000' }),
+      ).recurrencePollIntervalMs,
+      300_000,
+    );
+  });
+
+  void it('rejects RECURRENCE_POLL_INTERVAL_MS outside 1000-300000', () => {
+    for (const value of ['999', '300001', 'not-a-number', '30.5', '-1000']) {
+      assert.throws(
+        () =>
+          parseConfig(
+            validDevelopmentEnv({ RECURRENCE_POLL_INTERVAL_MS: value }),
+          ),
+        (error: unknown) => {
+          assert.ok(error instanceof ConfigError);
+          assert.match(error.message, /RECURRENCE_POLL_INTERVAL_MS/);
+          return true;
+        },
+      );
+    }
   });
 
   void it('defaults TRUST_PROXY hop count to 0 when unset', () => {
