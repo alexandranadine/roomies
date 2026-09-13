@@ -57,6 +57,39 @@ void describe('tasks application boundary', () => {
     assert.doesNotMatch(source, /completedAt/);
   });
 
+  void it('completes Tasks through Home-first locks without assignee or outbox writes', async () => {
+    const source = await readFile(path.join(dir, 'complete-task.ts'), 'utf8');
+    assert.match(source, /decideTaskComplete/);
+    assert.match(source, /lockHomeAndExactMemberships/);
+    assert.match(source, /lockByHomeAndId/);
+    assert.match(source, /completeOpenTask/);
+    assert.match(source, /runInReadCommittedTransaction/);
+    assert.match(source, /TaskAlreadyCompletedError/);
+    assert.match(source, /userId/);
+    assert.doesNotMatch(source, /decideHomeRead/);
+    assert.doesNotMatch(source, /decideTaskList/);
+    assert.doesNotMatch(source, /decideTaskCreate/);
+    assert.doesNotMatch(source, /findActiveHomeMembership/);
+    assert.doesNotMatch(source, /memberships\/repository/);
+    assert.doesNotMatch(source, /homes\/repository/);
+    assert.doesNotMatch(source, /home-repository/);
+    assert.doesNotMatch(source, /active-home-actor-lookup/);
+    assert.doesNotMatch(source, /lockHomeStructure/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /better-auth/);
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+    assert.doesNotMatch(source, /Date\.now/);
+    assert.doesNotMatch(source, /new Date\(/);
+    assert.doesNotMatch(source, /outbox/);
+    assert.doesNotMatch(source, /task\.completed\.v1/);
+    assert.doesNotMatch(source, /SERIALIZABLE/);
+    assert.doesNotMatch(source, /pg_advisory/i);
+    assert.doesNotMatch(source, /user_id/);
+    assert.doesNotMatch(source, /task_definitions/);
+    assert.doesNotMatch(source, /reopenedAt/);
+    assert.doesNotMatch(source, /completedBy/);
+  });
+
   void it('lists Home Tasks through the public repository without definition joins', async () => {
     const source = await readFile(path.join(dir, 'list-home-tasks.ts'), 'utf8');
     assert.match(source, /decideTaskList/);

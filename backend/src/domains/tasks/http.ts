@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import type { CompleteTaskInput } from '../../application/tasks/complete-task.js';
 import type { CreateManualTaskInput } from '../../application/tasks/create-manual-task.js';
 import type { ListHomeTasksInput } from '../../application/tasks/list-home-tasks.js';
 import type { PrincipalResolver } from '../../platform/auth/principal.js';
@@ -28,6 +29,8 @@ const createTaskBodySchema = z
   })
   .strict();
 
+const completeTaskBodySchema = z.object({}).strict();
+
 export type CreateManualTaskCommand = (
   input: CreateManualTaskInput,
 ) => Promise<TaskInstance>;
@@ -36,12 +39,27 @@ export type ListHomeTasksCommand = (
   input: ListHomeTasksInput,
 ) => Promise<readonly TaskInstance[]>;
 
+export type CompleteTaskCommand = (
+  input: CompleteTaskInput,
+) => Promise<TaskInstance>;
+
 export type CreateTasksRouterOptions = {
   principalResolver: Pick<PrincipalResolver, 'requirePrincipal'>;
   activeHomeActorResolver: Pick<ActiveHomeActorResolver, 'resolve'>;
   createManualTask: CreateManualTaskCommand;
   listHomeTasks: ListHomeTasksCommand;
+  completeTask: CompleteTaskCommand;
 };
+
+function parseCompleteTaskBody(body: unknown): void {
+  if (body === undefined || body === null) {
+    return;
+  }
+  const parsed = completeTaskBodySchema.safeParse(body);
+  if (!parsed.success) {
+    throw new InvalidRequestError();
+  }
+}
 
 function parseCreateTaskBody(body: unknown): {
   title: string;
@@ -108,6 +126,21 @@ export function createTasksRouter(options: CreateTasksRouterOptions): Router {
       const homeId = parsePathUuid(req.params['homeId']);
       const tasks = await options.listHomeTasks({ actor, homeId });
       res.status(200).json(toTaskListDto(tasks));
+    })().catch(next);
+  });
+
+  router.post('/:homeId/tasks/:taskId/complete', (req, res, next) => {
+    void (async () => {
+      const actor = getActiveHomeActor(res);
+      const homeId = parsePathUuid(req.params['homeId']);
+      const taskId = parsePathUuid(req.params['taskId']);
+      parseCompleteTaskBody(req.body);
+      const completed = await options.completeTask({
+        actor,
+        homeId,
+        taskId,
+      });
+      res.status(200).json(toTaskDto(completed));
     })().catch(next);
   });
 

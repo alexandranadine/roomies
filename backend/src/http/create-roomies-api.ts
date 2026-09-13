@@ -17,6 +17,7 @@ import {
 } from '../domains/memberships/http.js';
 import {
   createTasksRouter,
+  type CompleteTaskCommand,
   type CreateManualTaskCommand,
   type ListHomeTasksCommand,
 } from '../domains/tasks/http.js';
@@ -57,6 +58,7 @@ export type CreateRoomiesApiRouterOptions = {
   tasks?: {
     createManualTask: CreateManualTaskCommand;
     listHomeTasks: ListHomeTasksCommand;
+    completeTask: CompleteTaskCommand;
   };
 };
 
@@ -117,6 +119,7 @@ export function createRoomiesApiRouter(
         activeHomeActorResolver: options.activeHomeActorResolver,
         createManualTask: options.tasks.createManualTask,
         listHomeTasks: options.tasks.listHomeTasks,
+        completeTask: options.tasks.completeTask,
       }),
     );
   }

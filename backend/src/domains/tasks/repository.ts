@@ -70,6 +70,28 @@ ORDER BY
   id ASC
 `;
 
+export const LOCK_TASK_INSTANCE_BY_HOME_AND_ID_SQL = `
+SELECT ${TASK_INSTANCE_COLUMNS}
+FROM task_instances
+WHERE home_id = $1::uuid
+  AND id = $2::uuid
+LIMIT 2
+FOR UPDATE
+`;
+
+export const COMPLETE_OPEN_TASK_INSTANCE_SQL = `
+UPDATE task_instances
+SET
+  status = 'COMPLETED',
+  completed_at = $3::timestamptz,
+  updated_at = $4::timestamptz
+WHERE home_id = $1::uuid
+  AND id = $2::uuid
+  AND status = 'OPEN'
+  AND completed_at IS NULL
+RETURNING ${TASK_INSTANCE_COLUMNS}
+`;
+
 export type NewManualTaskInstance = Readonly<{
   id: string;
   homeId: string;
@@ -79,6 +101,13 @@ export type NewManualTaskInstance = Readonly<{
   createdAt: Date;
 }>;
 
+export type CompleteOpenTaskInstance = Readonly<{
+  homeId: string;
+  taskId: string;
+  completedAt: Date;
+  updatedAt: Date;
+}>;
+
 export type TaskRepository = Readonly<{
   insertManual(
     tx: TransactionContext,
@@ -86,6 +115,15 @@ export type TaskRepository = Readonly<{
   ): Promise<TaskInstance>;
   findByHomeAndId(homeId: string, taskId: string): Promise<TaskInstance | null>;
   listByHome(homeId: string): Promise<readonly TaskInstance[]>;
+  lockByHomeAndId(
+    tx: TransactionContext,
+    homeId: string,
+    taskId: string,
+  ): Promise<TaskInstance | null>;
+  completeOpenTask(
+    tx: TransactionContext,
+    input: CompleteOpenTaskInstance,
+  ): Promise<TaskInstance | null>;
 }>;
 
 type TaskInstanceRow = {
@@ -247,6 +285,50 @@ export function createTaskRepository(pool: Pool): TaskRepository {
       return Object.freeze(
         rows.map((row) => parseTaskInstanceRow(row, homeId)),
       );
+    },
+
+    async lockByHomeAndId(tx, homeId, taskId) {
+      let rows: TaskInstanceRow[];
+      try {
+        rows = (
+          await tx.query<TaskInstanceRow>(
+            LOCK_TASK_INSTANCE_BY_HOME_AND_ID_SQL,
+            [homeId, taskId],
+          )
+        ).rows;
+      } catch (error) {
+        if (error instanceof TaskPersistenceError) {
+          throw error;
+        }
+        throw new TaskPersistenceError();
+      }
+      if (rows.length === 0) {
+        return null;
+      }
+      return oneRow(rows, homeId);
+    },
+
+    async completeOpenTask(tx, input) {
+      let rows: TaskInstanceRow[];
+      try {
+        rows = (
+          await tx.query<TaskInstanceRow>(COMPLETE_OPEN_TASK_INSTANCE_SQL, [
+            input.homeId,
+            input.taskId,
+            input.completedAt,
+            input.updatedAt,
+          ])
+        ).rows;
+      } catch (error) {
+        if (error instanceof TaskPersistenceError) {
+          throw error;
+        }
+        throw new TaskPersistenceError();
+      }
+      if (rows.length === 0) {
+        return null;
+      }
+      return oneRow(rows, input.homeId);
     },
   });
 }

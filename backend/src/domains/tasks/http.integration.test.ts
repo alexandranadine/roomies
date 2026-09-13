@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { describe, it } from 'node:test';
 import type { Pool } from 'pg';
+import { createCompleteTaskFromPool } from '../../application/tasks/complete-task.js';
 import { createCreateManualTaskFromPool } from '../../application/tasks/create-manual-task.js';
 import { createListHomeTasksFromPool } from '../../application/tasks/list-home-tasks.js';
 import { createHomeRepository } from '../homes/index.js';
@@ -151,6 +152,7 @@ void describe('Task HTTP PostgreSQL', () => {
             tasks: {
               createManualTask: createCreateManualTaskFromPool(database.pool),
               listHomeTasks: createListHomeTasksFromPool(database.pool),
+              completeTask: createCompleteTaskFromPool(database.pool),
             },
           }),
         });
@@ -377,6 +379,307 @@ void describe('Task HTTP PostgreSQL', () => {
 
           assertNoForbiddenLeak({
             context: 'task HTTP logs',
+            text: logs.join('\n'),
+            forbidden: [...COMMON_SECRET_SENTINELS, PASSWORD],
+          });
+        });
+      } finally {
+        console.error = originalError;
+        await database.pool.query(
+          'DELETE FROM task_instances WHERE home_id = ANY($1::uuid[])',
+          [homeIds],
+        );
+        await database.pool.query(
+          'DELETE FROM task_definitions WHERE home_id = ANY($1::uuid[])',
+          [homeIds],
+        );
+        await database.pool.query(
+          'DELETE FROM memberships WHERE home_id = ANY($1::uuid[])',
+          [homeIds],
+        );
+        await database.pool.query(
+          'DELETE FROM homes WHERE id = ANY($1::uuid[])',
+          [homeIds],
+        );
+        for (const id of identityIds) {
+          await database.pool.query(
+            'DELETE FROM auth_sessions WHERE user_id = $1',
+            [id],
+          );
+          await database.pool.query(
+            'DELETE FROM auth_accounts WHERE user_id = $1',
+            [id],
+          );
+          await database.pool.query(
+            'DELETE FROM auth_identities WHERE id = $1',
+            [id],
+          );
+          await database.pool.query('DELETE FROM users WHERE id = $1', [id]);
+        }
+        await db.close();
+        await database.close();
+      }
+    },
+  );
+
+  void it(
+    'covers complete authorization, Origin, 409, concealment, and safe DTOs',
+    { skip: skipWithoutDatabase, timeout: 60_000 },
+    async () => {
+      const databaseUrl = resolveSafeDedicatedTestDatabaseUrl();
+      const config = authConfig(databaseUrl);
+      const database = createDatabasePool(config);
+      const db = createDb(database.pool);
+      const auth = createAuthRuntime(database.pool, config);
+      const principalResolver = createPrincipalResolver({
+        auth,
+        hasCanonicalUser: createCanonicalUserLookup(database.pool),
+      });
+      const identityIds: string[] = [];
+      const homeIds: string[] = [];
+      const logs: string[] = [];
+      const originalError = console.error;
+      console.error = (...args: unknown[]) => {
+        logs.push(args.map((value) => JSON.stringify(value)).join(' '));
+      };
+
+      try {
+        await db.connect();
+        const app = createApp({
+          config,
+          readiness: createDbReadiness(db),
+          auth,
+          roomiesApi: createRoomiesApiRouter({
+            principalResolver,
+            activeHomeActorResolver: createActiveHomeActorResolver(
+              database.pool,
+            ),
+            homeReader: createHomeRepository(database.pool),
+            archiveFinalMemberHome: () => Promise.resolve(),
+            changeMembershipRole: () =>
+              Promise.reject(new Error('role change must not run')),
+            leaveMembership: () =>
+              Promise.reject(new Error('leave must not run')),
+            removeMembership: () =>
+              Promise.reject(new Error('remove must not run')),
+            tasks: {
+              createManualTask: createCreateManualTaskFromPool(database.pool),
+              listHomeTasks: createListHomeTasksFromPool(database.pool),
+              completeTask: createCompleteTaskFromPool(database.pool),
+            },
+          }),
+        });
+
+        await withAppServer(app, async (request) => {
+          async function signUp(name: string) {
+            const email = `m31b-${name}-${randomUUID()}@example.test`;
+            const signup = await request({
+              method: 'POST',
+              path: '/api/auth/sign-up/email',
+              headers: {
+                Origin: TRUSTED_ORIGIN,
+                'content-type': 'application/json',
+              },
+              body: JSON.stringify({ name, email, password: PASSWORD }),
+            });
+            assert.ok(signup.status >= 200 && signup.status < 300);
+            const id = (signup.json() as { user?: { id?: string } }).user?.id;
+            assert.ok(id);
+            identityIds.push(id);
+            const cookie = findSessionSetCookie(signup.headers);
+            assert.ok(cookie);
+            return { id, cookie: sessionCookieHeader(cookie) };
+          }
+
+          const roommate = await signUp('roommate');
+          const other = await signUp('other');
+          const ended = await signUp('ended');
+
+          const homeA = createUuidV7();
+          const homeB = createUuidV7();
+          homeIds.push(homeA, homeB);
+          const membershipA = createUuidV7();
+          const membershipB = createUuidV7();
+          const endedMembership = createUuidV7();
+
+          await insertHome(database.pool, { id: homeA, name: 'Home A' });
+          await insertHome(database.pool, { id: homeB, name: 'Home B' });
+          await insertMembership(database.pool, {
+            id: membershipA,
+            homeId: homeA,
+            userId: roommate.id,
+            role: 'ROOMMATE',
+          });
+          await insertMembership(database.pool, {
+            id: membershipB,
+            homeId: homeB,
+            userId: other.id,
+            role: 'ROOMMATE',
+          });
+          await insertMembership(database.pool, {
+            id: endedMembership,
+            homeId: homeA,
+            userId: ended.id,
+            role: 'ROOMMATE',
+            ended: true,
+          });
+
+          const created = await request({
+            method: 'POST',
+            path: `/api/v1/homes/${homeA}/tasks`,
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: roommate.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({ title: 'Complete me' }),
+          });
+          assert.equal(created.status, 201);
+          const createdBody = taskDtoSchema.parse(created.json());
+
+          const completed = await request({
+            method: 'POST',
+            path: `/api/v1/homes/${homeA}/tasks/${createdBody.id}/complete`,
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: roommate.cookie,
+            },
+          });
+          assert.equal(completed.status, 200);
+          assert.equal(
+            completed.headers.get('cache-control'),
+            'private, no-store',
+          );
+          const completedBody = taskDtoSchema.parse(completed.json());
+          assert.equal(completedBody.status, 'COMPLETED');
+          assert.equal(completedBody.title, 'Complete me');
+          assert.equal(completedBody.source, 'MANUAL');
+          assert.deepEqual(Object.keys(completedBody), [
+            'id',
+            'title',
+            'status',
+            'source',
+            'scheduledFor',
+            'assignedMembershipId',
+            'createdAt',
+            'updatedAt',
+          ]);
+          assert.equal('completedAt' in (completed.json() as object), false);
+
+          const emptyObject = await request({
+            method: 'POST',
+            path: `/api/v1/homes/${homeA}/tasks/${createdBody.id}/complete`,
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: roommate.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          });
+          assert.equal(emptyObject.status, 409);
+          assert.equal(
+            (emptyObject.json() as ApiErrorBody).error.code,
+            'TASK_ALREADY_COMPLETED',
+          );
+
+          const hostile = await request({
+            method: 'POST',
+            path: `/api/v1/homes/${homeA}/tasks/${createdBody.id}/complete`,
+            headers: {
+              Origin: HOSTILE_ORIGIN,
+              Cookie: roommate.cookie,
+            },
+          });
+          assert.equal(hostile.status, 403);
+
+          const missingAuth = await request({
+            method: 'POST',
+            path: `/api/v1/homes/${homeA}/tasks/${createdBody.id}/complete`,
+            headers: { Origin: TRUSTED_ORIGIN },
+          });
+          assert.equal(missingAuth.status, 401);
+
+          const otherTask = await request({
+            method: 'POST',
+            path: `/api/v1/homes/${homeB}/tasks`,
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: other.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({ title: 'Other secret' }),
+          });
+          assert.equal(otherTask.status, 201);
+          const otherTaskId = taskDtoSchema.parse(otherTask.json()).id;
+
+          const crossHome = await request({
+            method: 'POST',
+            path: `/api/v1/homes/${homeA}/tasks/${otherTaskId}/complete`,
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: roommate.cookie,
+            },
+          });
+          assert.equal(crossHome.status, 404);
+          assert.equal(
+            (crossHome.json() as ApiErrorBody).error.code,
+            'NOT_FOUND',
+          );
+
+          const unknown = await request({
+            method: 'POST',
+            path: `/api/v1/homes/${homeA}/tasks/${createUuidV7()}/complete`,
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: roommate.cookie,
+            },
+          });
+          assert.equal(unknown.status, 404);
+
+          const inaccessible = await request({
+            method: 'POST',
+            path: `/api/v1/homes/${homeB}/tasks/${otherTaskId}/complete`,
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: roommate.cookie,
+            },
+          });
+          assert.equal(inaccessible.status, 404);
+
+          const endedActor = await request({
+            method: 'POST',
+            path: `/api/v1/homes/${homeA}/tasks/${createdBody.id}/complete`,
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: ended.cookie,
+            },
+          });
+          assert.equal(endedActor.status, 404);
+
+          const rejectedBody = await request({
+            method: 'POST',
+            path: `/api/v1/homes/${homeA}/tasks/${createdBody.id}/complete`,
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: roommate.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({ completedAt: new Date().toISOString() }),
+          });
+          assert.equal(rejectedBody.status, 400);
+          assert.equal(
+            (rejectedBody.json() as ApiErrorBody).error.code,
+            'INVALID_REQUEST',
+          );
+
+          const otherStillOpen = await database.pool.query<{ status: string }>(
+            'SELECT status FROM task_instances WHERE id = $1',
+            [otherTaskId],
+          );
+          assert.equal(otherStillOpen.rows[0]?.status, 'OPEN');
+
+          assertNoForbiddenLeak({
+            context: 'task complete HTTP logs',
             text: logs.join('\n'),
             forbidden: [...COMMON_SECRET_SENTINELS, PASSWORD],
           });

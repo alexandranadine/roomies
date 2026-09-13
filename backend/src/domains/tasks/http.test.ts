@@ -4,8 +4,13 @@ import { createRoomiesApiRouter } from '../../http/create-roomies-api.js';
 import { UnauthenticatedError } from '../../platform/auth/errors.js';
 import type { PrincipalResolver } from '../../platform/auth/principal.js';
 import type { ActiveHomeActor } from '../../platform/authz/context.js';
-import { InvalidRequestError } from '../../platform/authz/errors.js';
+import {
+  ConcealedNotFoundError,
+  InvalidRequestError,
+} from '../../platform/authz/errors.js';
+import type { CompleteTaskInput } from '../../application/tasks/complete-task.js';
 import type { CreateManualTaskInput } from '../../application/tasks/create-manual-task.js';
+import { TaskAlreadyCompletedError } from './errors.js';
 import { appRequest } from '../../platform/http/app-request.test-helper.js';
 import {
   assertNoForbiddenLeak,
@@ -69,13 +74,16 @@ function buildApp(
       actor: ActiveHomeActor;
       homeId: string;
     }) => Promise<readonly TaskInstance[]>;
+    completeTask?: (input: CompleteTaskInput) => Promise<TaskInstance>;
   } = {},
 ) {
   const createCalls: CreateManualTaskInput[] = [];
   const listCalls: { actor: ActiveHomeActor; homeId: string }[] = [];
+  const completeCalls: CompleteTaskInput[] = [];
   return {
     createCalls,
     listCalls,
+    completeCalls,
     app: createApp({
       config: { trustedOrigins: [TRUSTED_ORIGIN], trustProxyHops: 0 },
       readiness: { checkReady: () => Promise.resolve(true) },
@@ -118,6 +126,18 @@ function buildApp(
             }
             return [];
           },
+          completeTask: async (input) => {
+            completeCalls.push(input);
+            if (options.completeTask) {
+              return options.completeTask(input);
+            }
+            return instance({
+              id: input.taskId,
+              status: 'COMPLETED',
+              completedAt: CREATED,
+              updatedAt: CREATED,
+            });
+          },
         },
       }),
     }),
@@ -126,6 +146,13 @@ function buildApp(
 
 function taskPath(homeId: string = HOME_ID): string {
   return `/api/v1/homes/${homeId}/tasks`;
+}
+
+function completePath(
+  homeId: string = HOME_ID,
+  taskId: string = TASK_ID,
+): string {
+  return `/api/v1/homes/${homeId}/tasks/${taskId}/complete`;
 }
 
 const leakSentinels = [
@@ -350,6 +377,163 @@ void describe('GET /api/v1/homes/:homeId/tasks', () => {
     assert.deepEqual(listCalls, []);
     assertNoForbiddenLeak({
       context: 'concealed task list',
+      text: res.text,
+      forbidden: leakSentinels,
+    });
+  });
+});
+
+void describe('POST /api/v1/homes/:homeId/tasks/:taskId/complete', () => {
+  void it('returns 200 with the exact safe DTO from a trusted Origin', async () => {
+    const { app, completeCalls } = buildApp();
+    const res = await appRequest(app, {
+      method: 'POST',
+      path: completePath(),
+      headers: { Origin: TRUSTED_ORIGIN },
+    });
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('cache-control'), 'private, no-store');
+    const body = taskDtoSchema.parse(res.json());
+    assert.deepEqual(Object.keys(body), [
+      'id',
+      'title',
+      'status',
+      'source',
+      'scheduledFor',
+      'assignedMembershipId',
+      'createdAt',
+      'updatedAt',
+    ]);
+    assert.equal(body.status, 'COMPLETED');
+    assert.equal(body.id, TASK_ID);
+    assert.equal('completedAt' in (res.json() as object), false);
+    assert.equal('taskDefinitionId' in (res.json() as object), false);
+    assert.equal('homeId' in (res.json() as object), false);
+    assert.deepEqual(completeCalls, [
+      {
+        actor: actor(),
+        homeId: HOME_ID,
+        taskId: TASK_ID,
+      },
+    ]);
+  });
+
+  void it('accepts an empty JSON object body', async () => {
+    const { app, completeCalls } = buildApp();
+    const res = await appRequest(app, {
+      method: 'POST',
+      path: completePath(),
+      headers: {
+        Origin: TRUSTED_ORIGIN,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    });
+    assert.equal(res.status, 200);
+    assert.equal(completeCalls.length, 1);
+  });
+
+  void it('rejects client-supplied completion fields', async () => {
+    const { app, completeCalls } = buildApp();
+    const invalidBodies = [
+      { completedAt: CREATED.toISOString() },
+      { status: 'COMPLETED' },
+      { userId: USER_ID },
+      { membershipId: MEMBERSHIP_ID },
+      { source: 'MANUAL' },
+      { title: 'changed' },
+      [],
+    ];
+    for (const body of invalidBodies) {
+      const res = await appRequest(app, {
+        method: 'POST',
+        path: completePath(),
+        headers: {
+          Origin: TRUSTED_ORIGIN,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+      assert.equal(res.status, 400);
+      assert.equal((res.json() as ApiErrorBody).error.code, 'INVALID_REQUEST');
+    }
+    assert.deepEqual(completeCalls, []);
+  });
+
+  void it('rejects a hostile Origin without invoking the command', async () => {
+    const { app, completeCalls } = buildApp();
+    const res = await appRequest(app, {
+      method: 'POST',
+      path: completePath(),
+      headers: { Origin: HOSTILE_ORIGIN },
+    });
+    assert.equal(res.status, 403);
+    assert.equal((res.json() as ApiErrorBody).error.code, 'FORBIDDEN');
+    assert.deepEqual(completeCalls, []);
+    assert.equal(res.text.includes(HOSTILE_ORIGIN), false);
+  });
+
+  void it('returns 401 for unauthenticated requests without invoking the command', async () => {
+    const { app, completeCalls } = buildApp({
+      requirePrincipal: () => Promise.reject(new UnauthenticatedError()),
+    });
+    const res = await appRequest(app, {
+      method: 'POST',
+      path: completePath(),
+      headers: { Origin: TRUSTED_ORIGIN },
+    });
+    assert.equal(res.status, 401);
+    assert.equal((res.json() as ApiErrorBody).error.code, 'UNAUTHENTICATED');
+    assert.deepEqual(completeCalls, []);
+  });
+
+  void it('conceals an inaccessible Home, unknown Task, and ended actor', async () => {
+    const hiddenHome = buildApp({
+      resolve: () => Promise.resolve(null),
+    });
+    const unknownTask = buildApp({
+      completeTask: () => Promise.reject(new ConcealedNotFoundError()),
+    });
+
+    const hidden = await appRequest(hiddenHome.app, {
+      method: 'POST',
+      path: completePath(OTHER_HOME_ID),
+      headers: { Origin: TRUSTED_ORIGIN },
+    });
+    assert.equal(hidden.status, 404);
+    assert.equal((hidden.json() as ApiErrorBody).error.code, 'NOT_FOUND');
+    assert.deepEqual(hiddenHome.completeCalls, []);
+
+    const missing = await appRequest(unknownTask.app, {
+      method: 'POST',
+      path: completePath(),
+      headers: { Origin: TRUSTED_ORIGIN },
+    });
+    assert.equal(missing.status, 404);
+    assert.equal((missing.json() as ApiErrorBody).error.code, 'NOT_FOUND');
+    assertNoForbiddenLeak({
+      context: 'unknown task complete HTTP',
+      text: missing.text,
+      forbidden: leakSentinels,
+    });
+  });
+
+  void it('maps already-completed to 409 TASK_ALREADY_COMPLETED', async () => {
+    const { app } = buildApp({
+      completeTask: () => Promise.reject(new TaskAlreadyCompletedError()),
+    });
+    const res = await appRequest(app, {
+      method: 'POST',
+      path: completePath(),
+      headers: { Origin: TRUSTED_ORIGIN },
+    });
+    assert.equal(res.status, 409);
+    assert.equal(
+      (res.json() as ApiErrorBody).error.code,
+      'TASK_ALREADY_COMPLETED',
+    );
+    assertNoForbiddenLeak({
+      context: 'already completed HTTP',
       text: res.text,
       forbidden: leakSentinels,
     });

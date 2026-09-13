@@ -1,5 +1,11 @@
 export { TASK_ACTION, type TaskAction } from './actions.js';
 export {
+  decideTaskComplete,
+  isTaskCompleteCapableRole,
+  TASK_COMPLETE_CAPABLE_ROLES,
+  type TaskCompleteDenial,
+} from './complete-policy.js';
+export {
   decideTaskCreate,
   isTaskCreateCapableRole,
   TASK_CREATE_CAPABLE_ROLES,
@@ -8,6 +14,7 @@ export {
 export {
   InvalidHomeLocalDateError,
   InvalidTaskTitleError,
+  TaskAlreadyCompletedError,
   TaskPersistenceError,
 } from './errors.js';
 export {
@@ -22,15 +29,19 @@ export {
 } from './list-policy.js';
 export {
   createTasksRouter,
+  type CompleteTaskCommand,
   type CreateManualTaskCommand,
   type CreateTasksRouterOptions,
   type ListHomeTasksCommand,
 } from './http.js';
 export {
+  COMPLETE_OPEN_TASK_INSTANCE_SQL,
   createTaskRepository,
   FIND_TASK_INSTANCE_BY_HOME_AND_ID_SQL,
   INSERT_MANUAL_TASK_INSTANCE_SQL,
   LIST_TASK_INSTANCES_BY_HOME_SQL,
+  LOCK_TASK_INSTANCE_BY_HOME_AND_ID_SQL,
+  type CompleteOpenTaskInstance,
   type NewManualTaskInstance,
   type TaskRepository,
 } from './repository.js';

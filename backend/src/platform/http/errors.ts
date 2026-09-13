@@ -24,7 +24,10 @@ import {
   LastAdminRequiredError,
   LastRoommateRequiresArchiveError,
 } from '../../domains/memberships/errors.js';
-import { TaskPersistenceError } from '../../domains/tasks/errors.js';
+import {
+  TaskAlreadyCompletedError,
+  TaskPersistenceError,
+} from '../../domains/tasks/errors.js';
 import { getRequestId } from './request-id.js';
 
 export type ApiErrorBody = {
@@ -225,6 +228,17 @@ export function errorHandler(
       409,
       'FINAL_MEMBER_REQUIRED',
       'Final member required',
+      requestId,
+    );
+    return;
+  }
+
+  if (err instanceof TaskAlreadyCompletedError) {
+    sendApiError(
+      res,
+      409,
+      'TASK_ALREADY_COMPLETED',
+      'Task already completed',
       requestId,
     );
     return;

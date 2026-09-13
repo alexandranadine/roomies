@@ -37,6 +37,7 @@ void describe('create-roomies-api composition boundary', () => {
     assert.match(source, /createTasksRouter/);
     assert.match(source, /createManualTask/);
     assert.match(source, /listHomeTasks/);
+    assert.match(source, /completeTask/);
     assert.match(source, /activeHomeActorResolver/);
     assert.doesNotMatch(source, /createTaskActorResolver/);
     assert.doesNotMatch(source, /taskActor/);

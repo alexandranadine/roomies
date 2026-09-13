@@ -21,3 +21,16 @@ export class TaskPersistenceError extends Error {
     super('Task persistence failure');
   }
 }
+
+/**
+ * Visible state conflict: completion is OPEN → COMPLETED exactly once.
+ * A second complete does not update completedAt or emit another transition.
+ */
+export class TaskAlreadyCompletedError extends Error {
+  override readonly name = 'TaskAlreadyCompletedError';
+  readonly code = 'TASK_ALREADY_COMPLETED';
+
+  constructor() {
+    super('Task already completed');
+  }
+}

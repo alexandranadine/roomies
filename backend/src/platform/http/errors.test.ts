@@ -22,7 +22,10 @@ import {
   LastAdminRequiredError,
   LastRoommateRequiresArchiveError,
 } from '../../domains/memberships/errors.js';
-import { TaskPersistenceError } from '../../domains/tasks/errors.js';
+import {
+  TaskAlreadyCompletedError,
+  TaskPersistenceError,
+} from '../../domains/tasks/errors.js';
 import { TransactionInfrastructureError } from '../persistence/errors.js';
 import { appRequest } from './app-request.test-helper.js';
 import {
@@ -119,6 +122,17 @@ void describe('HTTP known-error mappings', () => {
     const body = res.json() as ApiErrorBody;
     assert.equal(body.error.code, 'INVITATION_NOT_AVAILABLE');
     assert.equal(body.error.message, 'Invitation is not available');
+  });
+
+  void it('maps TaskAlreadyCompletedError to 409 TASK_ALREADY_COMPLETED', async () => {
+    const res = await appRequest(
+      appThatThrows(new TaskAlreadyCompletedError()),
+      { path: '/throw' },
+    );
+    assert.equal(res.status, 409);
+    const body = res.json() as ApiErrorBody;
+    assert.equal(body.error.code, 'TASK_ALREADY_COMPLETED');
+    assert.equal(body.error.message, 'Task already completed');
   });
 
   void it('maps AlreadyHomeMemberError to 409 ALREADY_HOME_MEMBER', async () => {

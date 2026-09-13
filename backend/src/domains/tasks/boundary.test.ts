@@ -52,11 +52,16 @@ void describe('tasks domain boundary', () => {
     assert.match(source, /insertManual/);
     assert.match(source, /listByHome/);
     assert.match(source, /findByHomeAndId/);
+    assert.match(source, /lockByHomeAndId/);
+    assert.match(source, /completeOpenTask/);
     assert.match(source, /scheduled_for::text/);
     assert.match(source, /\$4::date/);
     assert.match(source, /'MANUAL'/);
     assert.match(source, /'OPEN'/);
+    assert.match(source, /'COMPLETED'/);
     assert.match(source, /NULLS LAST/);
+    assert.match(source, /FOR UPDATE/i);
+    assert.match(source, /completed_at IS NULL/);
     assert.doesNotMatch(source, /findById\(/);
     assert.doesNotMatch(source, /new Date\(/);
     assert.doesNotMatch(source, /Date\.UTC/);
@@ -68,7 +73,12 @@ void describe('tasks domain boundary', () => {
   });
 
   void it('keeps Task policies free of Home-read authz and Admin bypass', async () => {
-    for (const name of ['create-policy.ts', 'list-policy.ts', 'actions.ts']) {
+    for (const name of [
+      'create-policy.ts',
+      'list-policy.ts',
+      'complete-policy.ts',
+      'actions.ts',
+    ]) {
       const source = await readFile(path.join(tasksDir, name), 'utf8');
       assert.doesNotMatch(source, /decideHomeRead/);
       assert.doesNotMatch(source, /isHomeAdmin/);
@@ -79,12 +89,14 @@ void describe('tasks domain boundary', () => {
     const actions = await readFile(path.join(tasksDir, 'actions.ts'), 'utf8');
     assert.match(actions, /task\.create/);
     assert.match(actions, /task\.list/);
+    assert.match(actions, /task\.complete/);
   });
 
   void it('keeps Task HTTP adapter-only on the existing Home authz path', async () => {
     const source = await readFile(path.join(tasksDir, 'http.ts'), 'utf8');
     assert.match(source, /router\.post\('\/:homeId\/tasks'/);
     assert.match(source, /router\.get\('\/:homeId\/tasks'/);
+    assert.match(source, /router\.post\('\/:homeId\/tasks\/:taskId\/complete'/);
     assert.match(source, /createRequireHomeContext/);
     assert.match(source, /createRequireAuth/);
     assert.match(source, /setPrivateNoStoreHeaders/);
