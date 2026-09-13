@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { resetApiClientForTests } from '../platform/api/index.js';
 import {
+  createMaintenanceEntry,
   getMaintenanceEntry,
   listHomeMaintenance,
   maintenanceDetailSchema,
   maintenanceListItemSchema,
   maintenanceListPageSchema,
+  resolveMaintenanceEntry,
 } from './maintenance-api.js';
 import {
   detailFromListItem,
@@ -14,6 +16,7 @@ import {
   jsonResponse,
   listPage,
   TEST_HOME_A,
+  TEST_MEMBERSHIP_B,
 } from './test-fixtures.js';
 
 afterEach(() => {
@@ -116,5 +119,94 @@ describe('maintenance API contracts', () => {
       audienceNames: ['Sam'],
     };
     expect(maintenanceListItemSchema.safeParse(withExtra).success).toBe(false);
+  });
+
+  it('POSTs HOUSEHOLD create without audienceMembershipIds', async () => {
+    const created = detailFromListItem(
+      { ...FIXTURE_H, id: 'c1111111-1111-4111-8111-111111111111' },
+      null,
+    );
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(201, created));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await createMaintenanceEntry(TEST_HOME_A, {
+      visibility: 'HOUSEHOLD',
+      title: 'New item',
+      details: 'Optional notes',
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(new URL(url).pathname).toBe(
+      `/api/v1/homes/${TEST_HOME_A}/maintenance`,
+    );
+    expect(init.method).toBe('POST');
+    expect(init.credentials).toBe('include');
+    expect(typeof init.body).toBe('string');
+    expect(JSON.parse(init.body as string)).toEqual({
+      visibility: 'HOUSEHOLD',
+      title: 'New item',
+      details: 'Optional notes',
+    });
+    expect(JSON.parse(init.body as string)).not.toHaveProperty(
+      'audienceMembershipIds',
+    );
+  });
+
+  it('POSTs PRIVATE create with audienceMembershipIds including empty array', async () => {
+    const created = detailFromListItem(FIXTURE_A, null);
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(() => Promise.resolve(jsonResponse(201, created)));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await createMaintenanceEntry(TEST_HOME_A, {
+      visibility: 'PRIVATE',
+      title: 'Quiet',
+      audienceMembershipIds: [],
+    });
+    const firstInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(typeof firstInit.body).toBe('string');
+    expect(JSON.parse(firstInit.body as string)).toEqual({
+      visibility: 'PRIVATE',
+      title: 'Quiet',
+      audienceMembershipIds: [],
+    });
+
+    await createMaintenanceEntry(TEST_HOME_A, {
+      visibility: 'PRIVATE',
+      title: 'Quiet with roommate',
+      audienceMembershipIds: [TEST_MEMBERSHIP_B],
+    });
+    const secondInit = fetchMock.mock.calls[1]?.[1] as RequestInit;
+    expect(typeof secondInit.body).toBe('string');
+    expect(JSON.parse(secondInit.body as string)).toEqual({
+      visibility: 'PRIVATE',
+      title: 'Quiet with roommate',
+      audienceMembershipIds: [TEST_MEMBERSHIP_B],
+    });
+  });
+
+  it('POSTs resolve with empty body on the entry path', async () => {
+    const resolved = detailFromListItem(
+      {
+        ...FIXTURE_H,
+        status: 'RESOLVED',
+        resolvedAt: '2026-09-13T12:00:00.000Z',
+      },
+      null,
+    );
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, resolved));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await resolveMaintenanceEntry(TEST_HOME_A, FIXTURE_H.id);
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(new URL(url).pathname).toBe(
+      `/api/v1/homes/${TEST_HOME_A}/maintenance/${FIXTURE_H.id}/resolve`,
+    );
+    expect(init.method).toBe('POST');
+    expect(init.credentials).toBe('include');
+    expect(typeof init.body).toBe('string');
+    expect(JSON.parse(init.body as string)).toEqual({});
   });
 });

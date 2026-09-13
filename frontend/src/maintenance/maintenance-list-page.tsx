@@ -1,8 +1,10 @@
+import { useEffect, useState } from 'react';
 import { useOutletContext, useParams, useSearchParams } from 'react-router';
 import { DocumentTitle } from '../components/document-title.js';
 import { Alert, Button, EmptyState, Skeleton } from '../components/ui/index.js';
 import type { HomeShellOutletContext } from '../homes/home-overview-page.js';
 import { ApiError } from '../platform/api/index.js';
+import { CreateMaintenanceDialog } from './create-maintenance-dialog.js';
 import type { MaintenanceStatus } from './maintenance-api.js';
 import { MaintenanceListItemRow } from './maintenance-list-item-row.js';
 import { useMaintenanceList } from './use-maintenance-list.js';
@@ -45,11 +47,17 @@ export function MaintenanceListPage() {
   const { home } = useOutletContext<HomeShellOutletContext>();
   const { homeId: routeHomeId = '' } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [createOpen, setCreateOpen] = useState(false);
   const filter = parseStatusFilter(searchParams.get('status'));
   const status = filter === 'ALL' ? undefined : filter;
 
   // URL homeId is authoritative; never render another Home's keyed data here.
   const homeId = home.id === routeHomeId ? home.id : '';
+
+  // Create draft stays bound to the Home where it opened — close on Home switch.
+  useEffect(() => {
+    setCreateOpen(false);
+  }, [homeId]);
 
   const listQuery = useMaintenanceList({
     homeId,
@@ -97,15 +105,34 @@ export function MaintenanceListPage() {
   return (
     <DocumentTitle title={`Maintenance · ${home.name} · Roomies`}>
       <div className="flex flex-col gap-5">
-        <header className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
-            Maintenance
-          </h1>
-          <p className="max-w-prose text-sm text-text-secondary">
-            Household upkeep that needs attention — calm, useful, and shared
-            only when it should be.
-          </p>
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+          <div className="flex min-w-0 flex-col gap-1">
+            <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
+              Maintenance
+            </h1>
+            <p className="max-w-prose text-sm text-text-secondary">
+              Household upkeep that needs attention — calm, useful, and shared
+              only when it should be.
+            </p>
+          </div>
+          <div className="w-full shrink-0 sm:w-auto">
+            <Button
+              type="button"
+              className="w-full sm:w-auto"
+              onClick={() => {
+                setCreateOpen(true);
+              }}
+            >
+              Add maintenance
+            </Button>
+          </div>
         </header>
+
+        <CreateMaintenanceDialog
+          homeId={homeId}
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+        />
 
         <div
           role="group"

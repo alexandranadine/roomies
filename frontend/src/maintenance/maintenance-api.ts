@@ -95,3 +95,49 @@ export async function getMaintenanceEntry(
   });
   return maintenanceDetailSchema.parse(body);
 }
+
+export type CreateMaintenanceHouseholdBody = {
+  visibility: 'HOUSEHOLD';
+  title: string;
+  details?: string;
+};
+
+export type CreateMaintenancePrivateBody = {
+  visibility: 'PRIVATE';
+  title: string;
+  details?: string;
+  audienceMembershipIds: string[];
+};
+
+export type CreateMaintenanceBody =
+  CreateMaintenanceHouseholdBody | CreateMaintenancePrivateBody;
+
+/** POST /api/v1/homes/:homeId/maintenance */
+export async function createMaintenanceEntry(
+  homeId: string,
+  input: CreateMaintenanceBody,
+  signal?: AbortSignal,
+): Promise<MaintenanceDetail> {
+  const body = await getApiClient().request<unknown>({
+    method: 'POST',
+    path: `/api/v1/homes/${encodeURIComponent(homeId)}/maintenance`,
+    body: input,
+    signal,
+  });
+  return maintenanceDetailSchema.parse(body);
+}
+
+/** POST /api/v1/homes/:homeId/maintenance/:maintenanceEntryId/resolve */
+export async function resolveMaintenanceEntry(
+  homeId: string,
+  maintenanceEntryId: string,
+  signal?: AbortSignal,
+): Promise<MaintenanceDetail> {
+  const body = await getApiClient().request<unknown>({
+    method: 'POST',
+    path: `/api/v1/homes/${encodeURIComponent(homeId)}/maintenance/${encodeURIComponent(maintenanceEntryId)}/resolve`,
+    body: {},
+    signal,
+  });
+  return maintenanceDetailSchema.parse(body);
+}

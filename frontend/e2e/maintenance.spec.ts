@@ -4,6 +4,8 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 const HOME_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 const MEMBERSHIP_A = 'm1111111-1111-4111-8111-111111111111';
+const MEMBERSHIP_B = 'm2222222-2222-4222-8222-222222222222';
+const CREATED_ID = 'c1111111-1111-4111-8111-111111111111';
 
 const VIEWPORTS = [
   { name: '360', width: 360, height: 800 },
@@ -47,10 +49,19 @@ async function json(route: Route, status: number, body: unknown) {
   });
 }
 
-async function mockAuthenticatedMaintenanceApis(page: Page): Promise<void> {
+type MockOptions = {
+  resolveFixtureAWith404?: boolean;
+};
+
+async function mockAuthenticatedMaintenanceApis(
+  page: Page,
+  options: MockOptions = {},
+): Promise<void> {
   await page.route('**/api/v1/**', async (route) => {
-    const url = new URL(route.request().url());
+    const request = route.request();
+    const url = new URL(request.url());
     const path = url.pathname;
+    const method = request.method();
 
     if (path.endsWith('/api/v1/me')) {
       await json(route, 200, { id: USER_ID });
@@ -75,7 +86,38 @@ async function mockAuthenticatedMaintenanceApis(page: Page): Promise<void> {
       });
       return;
     }
-    if (path === `/api/v1/homes/${HOME_A}/maintenance`) {
+    if (path === `/api/v1/homes/${HOME_A}/memberships` && method === 'GET') {
+      await json(route, 200, {
+        currentMembershipId: MEMBERSHIP_A,
+        memberships: [
+          { membershipId: MEMBERSHIP_A, name: 'Alex' },
+          { membershipId: MEMBERSHIP_B, name: 'Jamie' },
+        ],
+      });
+      return;
+    }
+    if (path === `/api/v1/homes/${HOME_A}/maintenance` && method === 'POST') {
+      const body = request.postDataJSON() as {
+        visibility: string;
+        title: string;
+        details?: string;
+        audienceMembershipIds?: string[];
+      };
+      await json(route, 201, {
+        id: CREATED_ID,
+        title: body.title,
+        status: 'OPEN',
+        visibility: body.visibility,
+        createdByMembershipId: MEMBERSHIP_A,
+        resolvedByMembershipId: null,
+        resolvedAt: null,
+        createdAt: '2026-09-13T12:00:00.000Z',
+        updatedAt: '2026-09-13T12:00:00.000Z',
+        details: body.details ?? null,
+      });
+      return;
+    }
+    if (path === `/api/v1/homes/${HOME_A}/maintenance` && method === 'GET') {
       await json(route, 200, {
         items: [FIXTURE_H, FIXTURE_A],
         hasMore: false,
@@ -83,10 +125,49 @@ async function mockAuthenticatedMaintenanceApis(page: Page): Promise<void> {
       });
       return;
     }
+    if (
+      path === `/api/v1/homes/${HOME_A}/maintenance/${FIXTURE_A.id}/resolve` &&
+      method === 'POST'
+    ) {
+      if (options.resolveFixtureAWith404) {
+        await json(route, 404, {
+          error: { code: 'NOT_FOUND', message: 'Not found' },
+        });
+        return;
+      }
+      await json(route, 200, {
+        ...FIXTURE_A,
+        status: 'RESOLVED',
+        resolvedAt: '2026-09-13T12:00:00.000Z',
+        resolvedByMembershipId: MEMBERSHIP_A,
+        details: 'Keep this between us.\nSecond line.',
+      });
+      return;
+    }
+    if (
+      path === `/api/v1/homes/${HOME_A}/maintenance/${FIXTURE_H.id}/resolve` &&
+      method === 'POST'
+    ) {
+      await json(route, 200, {
+        ...FIXTURE_H,
+        status: 'RESOLVED',
+        resolvedAt: '2026-09-13T12:00:00.000Z',
+        resolvedByMembershipId: MEMBERSHIP_A,
+        details: null,
+      });
+      return;
+    }
     if (path === `/api/v1/homes/${HOME_A}/maintenance/${FIXTURE_A.id}`) {
       await json(route, 200, {
         ...FIXTURE_A,
         details: 'Keep this between us.\nSecond line.',
+      });
+      return;
+    }
+    if (path === `/api/v1/homes/${HOME_A}/maintenance/${FIXTURE_H.id}`) {
+      await json(route, 200, {
+        ...FIXTURE_H,
+        details: null,
       });
       return;
     }
@@ -211,5 +292,91 @@ test.describe('Maintenance authenticated UI', () => {
       document.documentElement.style.zoom = '2';
     });
     await assertNoHorizontalOverflow(page);
+  });
+
+  test('create HOUSEHOLD, PRIVATE creator-only, and PRIVATE with roommate', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`/homes/${HOME_A}/maintenance`);
+    await expect(
+      page.getByRole('heading', { name: 'Maintenance', level: 1 }),
+    ).toBeVisible();
+
+    await page.getByRole('button', { name: 'Add maintenance' }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(
+      dialog.getByRole('heading', { name: 'Add maintenance' }),
+    ).toBeVisible();
+    await assertNoSeriousAxeViolations(page, 'maintenance create');
+
+    await dialog.getByRole('textbox', { name: /title/i }).fill('Household e2e');
+    await dialog
+      .getByRole('button', { name: 'Add maintenance', exact: true })
+      .click();
+    await expect(dialog).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Add maintenance' }).click();
+    const dialog2 = page.getByRole('dialog');
+    await dialog2.getByRole('radio', { name: /Private/i }).click();
+    await expect(
+      dialog2.getByText('You’re included automatically.'),
+    ).toBeVisible();
+    await dialog2.getByRole('textbox', { name: /title/i }).fill('Solo private');
+    await dialog2
+      .getByRole('button', { name: 'Add maintenance', exact: true })
+      .click();
+    await expect(dialog2).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Add maintenance' }).click();
+    const dialog3 = page.getByRole('dialog');
+    await dialog3.getByRole('radio', { name: /Private/i }).click();
+    await dialog3.getByRole('checkbox', { name: 'Jamie' }).click();
+    await dialog3
+      .getByRole('textbox', { name: /title/i })
+      .fill('Shared private');
+    await dialog3
+      .getByRole('button', { name: 'Add maintenance', exact: true })
+      .click();
+    await expect(dialog3).toHaveCount(0);
+    await assertNoHorizontalOverflow(page);
+  });
+
+  test('resolve visible OPEN item and hide Resolve afterward', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await page.goto(`/homes/${HOME_A}/maintenance/${FIXTURE_H.id}`);
+    await expect(
+      page.getByRole('heading', { name: 'Replace furnace filter', level: 1 }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Mark resolved' }).click();
+    await expect(page.getByText('Resolved')).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Mark resolved' }),
+    ).toHaveCount(0);
+    await assertNoSeriousAxeViolations(page, 'maintenance resolved detail');
+  });
+
+  test('404-on-resolve clears protected PRIVATE content', async ({ page }) => {
+    await page.unroute('**/api/v1/**');
+    await mockAuthenticatedMaintenanceApis(page, {
+      resolveFixtureAWith404: true,
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`/homes/${HOME_A}/maintenance/${FIXTURE_A.id}`);
+    await expect(
+      page.getByRole('heading', { name: 'Quiet leak under sink', level: 1 }),
+    ).toBeVisible();
+    await expect(page.getByText(/Keep this between us/)).toBeVisible();
+    await page.getByRole('button', { name: 'Mark resolved' }).click();
+    await expect(
+      page.getByRole('heading', {
+        name: 'Maintenance item unavailable',
+        level: 1,
+      }),
+    ).toBeVisible();
+    await expect(page.getByText('Quiet leak under sink')).toHaveCount(0);
+    await expect(page.getByText(/Keep this between us/)).toHaveCount(0);
   });
 });

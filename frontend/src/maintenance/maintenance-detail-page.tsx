@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Link, useOutletContext, useParams } from 'react-router';
 import { DocumentTitle } from '../components/document-title.js';
 import { Alert, Button, Skeleton } from '../components/ui/index.js';
@@ -7,11 +8,20 @@ import { formatMaintenanceTimestamp } from './maintenance-format.js';
 import { MaintenanceStatusBadge } from './maintenance-status-badge.js';
 import { PrivateIndicator } from './private-indicator.js';
 import { useMaintenanceDetail } from './use-maintenance-detail.js';
+import { useResolveMaintenance } from './use-resolve-maintenance.js';
 
 function isUnavailableError(error: unknown): boolean {
   return (
     error instanceof ApiError &&
     (error.status === 404 || error.code === 'NOT_FOUND')
+  );
+}
+
+function isAlreadyResolvedError(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    error.status === 409 &&
+    error.code === 'MAINTENANCE_NOT_OPEN'
   );
 }
 
@@ -41,24 +51,38 @@ function MaintenanceUnavailableState({ homeId }: { homeId: string }) {
 export function MaintenanceDetailPage() {
   const { home } = useOutletContext<HomeShellOutletContext>();
   const { homeId: routeHomeId = '', maintenanceEntryId = '' } = useParams();
+  const [resolveMessage, setResolveMessage] = useState<string | null>(null);
+  const [forcedUnavailable, setForcedUnavailable] = useState(false);
 
   const homeId = home.id === routeHomeId ? home.id : '';
+
+  useEffect(() => {
+    setResolveMessage(null);
+    setForcedUnavailable(false);
+  }, [homeId, maintenanceEntryId]);
 
   const detailQuery = useMaintenanceDetail({
     homeId,
     maintenanceEntryId,
-    enabled: homeId.length > 0 && maintenanceEntryId.length > 0,
+    enabled:
+      !forcedUnavailable && homeId.length > 0 && maintenanceEntryId.length > 0,
   });
+
+  const resolveMutation = useResolveMaintenance();
 
   // Only render detail when it belongs to the current route keys.
   const entry =
+    !forcedUnavailable &&
     detailQuery.data !== undefined &&
     detailQuery.data.id === maintenanceEntryId &&
     homeId === routeHomeId
       ? detailQuery.data
       : undefined;
 
-  if (detailQuery.isError && isUnavailableError(detailQuery.error)) {
+  if (
+    forcedUnavailable ||
+    (detailQuery.isError && isUnavailableError(detailQuery.error))
+  ) {
     return <MaintenanceUnavailableState homeId={routeHomeId || home.id} />;
   }
 
@@ -105,6 +129,31 @@ export function MaintenanceDetailPage() {
       </DocumentTitle>
     );
   }
+
+  const resolvePending = resolveMutation.isPending;
+
+  const onResolve = async () => {
+    setResolveMessage(null);
+    resolveMutation.reset();
+    try {
+      await resolveMutation.mutateAsync({
+        homeId,
+        maintenanceEntryId: entry.id,
+      });
+      setResolveMessage(null);
+    } catch (error) {
+      if (isUnavailableError(error)) {
+        setForcedUnavailable(true);
+        return;
+      }
+      if (isAlreadyResolvedError(error)) {
+        setResolveMessage('This item has already been resolved.');
+        void detailQuery.refetch();
+        return;
+      }
+      setResolveMessage('Couldn’t resolve this item. Try again.');
+    }
+  };
 
   return (
     <DocumentTitle title={`${entry.title} · Maintenance · Roomies`}>
@@ -153,6 +202,34 @@ export function MaintenanceDetailPage() {
             </div>
           ) : null}
         </dl>
+
+        {entry.status === 'OPEN' ? (
+          <div className="flex flex-col gap-3">
+            <Button
+              type="button"
+              variant="secondary"
+              loading={resolvePending}
+              disabled={resolvePending}
+              aria-label="Mark resolved"
+              onClick={() => {
+                void onResolve();
+              }}
+            >
+              Mark resolved
+            </Button>
+            {resolveMessage !== null ? (
+              <Alert
+                variant={
+                  resolveMessage.includes('already been resolved')
+                    ? 'info'
+                    : 'danger'
+                }
+              >
+                {resolveMessage}
+              </Alert>
+            ) : null}
+          </div>
+        ) : null}
       </article>
     </DocumentTitle>
   );
