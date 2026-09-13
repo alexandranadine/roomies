@@ -14,6 +14,8 @@ void describe('create-roomies-api composition boundary', () => {
     assert.doesNotMatch(source, /FROM\s+homes/i);
     assert.doesNotMatch(source, /from ['"]pg['"]/);
     assert.doesNotMatch(source, /better-auth/);
+    assert.doesNotMatch(source, /LIST_ACTIVE_HOMES_FOR_USER_SQL/);
+    assert.doesNotMatch(source, /active-homes-for-user/);
   });
 
   void it('does not add Home role or capabilities to the principal', async () => {

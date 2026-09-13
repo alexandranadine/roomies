@@ -5,11 +5,8 @@ import { DocumentTitle } from '../components/document-title.js';
 import { Alert, Button, Card, Spinner } from '../components/ui/index.js';
 import { ApiError } from '../platform/api/index.js';
 import { shouldRetryQuery } from '../platform/query/query-client.js';
-import {
-  acceptInvitation,
-  currentUserHomesQueryKey,
-  homeListQueryKey,
-} from './accept-api.js';
+import { currentUserHomesQueryKey } from '../homes/home-query-keys.js';
+import { acceptInvitation } from './accept-api.js';
 import {
   getInvitationAuthSession,
   invitationAuthSessionQueryKey,
@@ -83,10 +80,9 @@ export function InvitationLandingPage() {
         queryKey: invitationPreviewQueryKey(invitationId),
         exact: true,
       });
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: homeListQueryKey }),
-        queryClient.invalidateQueries({ queryKey: currentUserHomesQueryKey }),
-      ]);
+      await queryClient.invalidateQueries({
+        queryKey: currentUserHomesQueryKey,
+      });
       void navigate(`/homes/${encodeURIComponent(result.homeId)}`, {
         replace: true,
       });

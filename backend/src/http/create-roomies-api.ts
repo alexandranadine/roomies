@@ -1,5 +1,9 @@
 import { Router } from 'express';
 import {
+  createCurrentUserHomesRouter,
+  type ListActiveHomesCommand,
+} from '../domains/homes/current-user-homes-http.js';
+import {
   createHomesRouter,
   type ArchiveFinalMemberCommand,
   type CreateHomeCommand,
@@ -34,6 +38,7 @@ export type CreateRoomiesApiRouterOptions = {
   homeReader: Pick<HomeReader, 'findActiveHomeById'>;
   archiveFinalMemberHome: ArchiveFinalMemberCommand;
   createHome?: CreateHomeCommand;
+  listActiveHomes?: ListActiveHomesCommand;
   changeMembershipRole: ChangeMembershipRoleCommand;
   leaveMembership: LeaveMembershipCommand;
   removeMembership: RemoveMembershipCommand;
@@ -54,6 +59,15 @@ export function createRoomiesApiRouter(
   options: CreateRoomiesApiRouterOptions,
 ): Router {
   const router = Router();
+  if (options.listActiveHomes !== undefined) {
+    router.use(
+      '/me/homes',
+      createCurrentUserHomesRouter({
+        principalResolver: options.principalResolver,
+        listActiveHomes: options.listActiveHomes,
+      }),
+    );
+  }
   router.use('/me', createCurrentUserRouter(options));
   router.use('/homes', createHomesRouter(options));
   router.use('/homes', createMembershipsRouter(options));

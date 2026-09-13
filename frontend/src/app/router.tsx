@@ -1,8 +1,10 @@
 import { createBrowserRouter, type RouteObject } from 'react-router';
+import { HomeDiscoveryPage } from '../homes/home-discovery-page.js';
+import { HomeShellPage } from '../homes/home-shell-page.js';
 import { InvitationLandingPage } from '../invitations/invitation-landing-page.js';
 import { AppShell } from './app-shell.js';
-import { FoundationHomePage } from './foundation-home-page.js';
 import { NotFoundPage } from './not-found-page.js';
+import { RequireAuth } from './require-auth.js';
 import { RouteErrorPage } from './route-error-page.js';
 
 export type CreateAppRouterOptions = {
@@ -15,13 +17,14 @@ export type CreateAppRouterOptions = {
 
 /**
  * Router foundation:
- * - `/` — foundation placeholder
+ * - `/` — authenticated active-Home discovery
+ * - `/homes/:homeId` — URL-backed authorized Home shell
  * - `/invitations/:invitationId` — signed-out invitation preview landing
  * - `/__dev/ui` — development visual QA fixture (never in production)
  * - `*` — not-found
  *
- * Future URL-backed Home context must not invent a final hierarchy here.
- * Active Home must not live in frontend global state or localStorage.
+ * Active Home is the URL plus server authorization. It must not live in
+ * frontend global state or localStorage.
  */
 export function createAppRouter(options: CreateAppRouterOptions = {}) {
   const includeDevRoutes = options.includeDevRoutes ?? import.meta.env.DEV;
@@ -41,7 +44,19 @@ export function buildAppChildRoutes(includeDevRoutes: boolean): RouteObject[] {
   const routes: RouteObject[] = [
     {
       index: true,
-      element: <FoundationHomePage />,
+      element: (
+        <RequireAuth>
+          <HomeDiscoveryPage />
+        </RequireAuth>
+      ),
+    },
+    {
+      path: 'homes/:homeId',
+      element: (
+        <RequireAuth>
+          <HomeShellPage />
+        </RequireAuth>
+      ),
     },
     {
       path: 'invitations/:invitationId',

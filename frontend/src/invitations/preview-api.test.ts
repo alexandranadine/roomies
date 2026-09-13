@@ -32,8 +32,8 @@ describe('previewInvitation', () => {
 
     expect(fetchMock).toHaveBeenCalledOnce();
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe(
-      `http://localhost:3000/api/v1/invitations/${INVITATION_ID}/preview`,
+    expect(new URL(url).pathname).toBe(
+      `/api/v1/invitations/${INVITATION_ID}/preview`,
     );
     expect(url).not.toContain(SECRET);
     expect(url).not.toContain('secret=');

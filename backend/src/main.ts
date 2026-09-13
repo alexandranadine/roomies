@@ -7,7 +7,11 @@ import { createAcceptInvitationFromPool } from './application/invitations/accept
 import { createPreviewInvitationFromPool } from './application/invitations/preview-invitation.js';
 import { createLeaveMembershipFromPool } from './application/home-administration/leave-membership.js';
 import { createRemoveMembershipFromPool } from './application/home-administration/remove-membership.js';
-import { createHomeRepository } from './domains/homes/index.js';
+import {
+  createActiveHomesForUserReader,
+  createHomeRepository,
+  listActiveHomesForUser,
+} from './domains/homes/index.js';
 import { createActiveHomeActorResolver } from './domains/memberships/index.js';
 import { createRoomiesApiRouter } from './http/create-roomies-api.js';
 import {
@@ -48,6 +52,9 @@ function main(): void {
     databasePool.pool,
   );
   const homeReader = createHomeRepository(databasePool.pool);
+  const activeHomesForUserReader = createActiveHomesForUserReader(
+    databasePool.pool,
+  );
   const readiness = createDbReadiness(db);
   const app = createApp({
     config,
@@ -58,6 +65,8 @@ function main(): void {
       activeHomeActorResolver,
       homeReader,
       createHome: createCreateHomeFromPool(databasePool.pool),
+      listActiveHomes: (input) =>
+        listActiveHomesForUser(input, activeHomesForUserReader),
       archiveFinalMemberHome: createArchiveFinalMemberHomeFromPool(
         databasePool.pool,
       ),

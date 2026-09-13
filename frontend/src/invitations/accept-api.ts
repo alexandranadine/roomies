@@ -1,5 +1,8 @@
 import { z } from 'zod';
+import { currentUserHomesQueryKey } from '../homes/home-query-keys.js';
 import { getApiClient } from '../platform/api/index.js';
+
+export { currentUserHomesQueryKey };
 
 const acceptanceSchema = z
   .object({
@@ -9,9 +12,6 @@ const acceptanceSchema = z
   .strict();
 
 export type InvitationAcceptance = z.infer<typeof acceptanceSchema>;
-
-export const homeListQueryKey = ['homes'] as const;
-export const currentUserHomesQueryKey = ['current-user', 'homes'] as const;
 
 export async function acceptInvitation(input: {
   invitationId: string;

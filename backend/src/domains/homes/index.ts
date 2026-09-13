@@ -1,3 +1,11 @@
+export type { ActiveHomeSummary } from './active-home-summary.js';
+export {
+  activeHomeSummaryDtoSchema,
+  activeHomesDtoSchema,
+  toActiveHomeSummaryDto,
+  toActiveHomesDto,
+  type ActiveHomeSummaryDto,
+} from './active-home-summary-dto.js';
 export { HOME_ACTION, type HomeAction } from './actions.js';
 export type { ArchiveFinalMemberInput } from './archive-final-member.js';
 export {
@@ -10,8 +18,17 @@ export {
   toCreatedHomeDto,
   type CreatedHomeDto,
 } from './created-home-dto.js';
+export {
+  createCurrentUserHomesRouter,
+  type CreateCurrentUserHomesRouterOptions,
+  type ListActiveHomesCommand,
+} from './current-user-homes-http.js';
 export { FinalMemberRequiredError } from './errors.js';
 export { getHome } from './get-home.js';
+export {
+  assertUniqueActiveHomeIds,
+  listActiveHomesForUser,
+} from './list-active-homes.js';
 export type { Home } from './home.js';
 export { homeDtoSchema, toHomeDto, type HomeDto } from './home-dto.js';
 export {
@@ -45,6 +62,11 @@ export {
   type ArchiveFinalMemberDenialReason,
   type HomeReadDenialReason,
 } from './policies.js';
+export {
+  createActiveHomesForUserReader,
+  LIST_ACTIVE_HOMES_FOR_USER_SQL,
+  type ActiveHomesForUserReader,
+} from './repository/active-homes-for-user.js';
 export {
   createHomeRepository,
   type HomeReader,

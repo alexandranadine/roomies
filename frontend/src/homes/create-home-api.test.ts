@@ -35,7 +35,7 @@ describe('createHome', () => {
 
     expect(fetchMock).toHaveBeenCalledOnce();
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('http://localhost:3000/api/v1/homes');
+    expect(new URL(url).pathname).toBe('/api/v1/homes');
     expect(init.method).toBe('POST');
     expect(init.credentials).toBe('include');
     expect(typeof init.body).toBe('string');

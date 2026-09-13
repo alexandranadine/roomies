@@ -102,8 +102,11 @@ void describe('homes domain boundary', () => {
   void it('does not route Home reads through FOR UPDATE', async () => {
     const readFiles = [
       path.join(homesDir, 'get-home.ts'),
+      path.join(homesDir, 'list-active-homes.ts'),
       path.join(homesDir, 'repository/home-repository.ts'),
+      path.join(homesDir, 'repository/active-homes-for-user.ts'),
       path.join(homesDir, 'http.ts'),
+      path.join(homesDir, 'current-user-homes-http.ts'),
     ];
     for (const file of readFiles) {
       const source = await readFile(file, 'utf8');
@@ -129,6 +132,7 @@ void describe('homes domain boundary', () => {
   void it('does not query Membership tables from HTTP', async () => {
     const httpFiles = [
       path.join(homesDir, 'http.ts'),
+      path.join(homesDir, 'current-user-homes-http.ts'),
       path.resolve(homesDir, '../../platform/http/home-context.ts'),
     ];
     for (const file of httpFiles) {

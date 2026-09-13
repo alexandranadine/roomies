@@ -252,6 +252,43 @@ describe('invitation landing page', () => {
           ),
         );
       }
+      if (String(url).endsWith('/api/v1/me')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              id: '11111111-1111-4111-8111-111111111111',
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        );
+      }
+      if (String(url).includes(`/api/v1/homes/${homeId}`)) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              id: homeId,
+              name: HOME_NAME,
+              timezone: 'UTC',
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        );
+      }
+      if (String(url).includes('/api/v1/me/homes')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify([
+              {
+                id: homeId,
+                name: HOME_NAME,
+                timezone: 'UTC',
+                role: 'ROOMMATE',
+              },
+            ]),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        );
+      }
       return Promise.resolve(
         new Response(JSON.stringify(previewBody()), {
           status: 200,
