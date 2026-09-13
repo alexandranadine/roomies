@@ -88,6 +88,30 @@ void describe('homes domain boundary', () => {
     assert.match(source, /FROM homes[\s\S]*FOR UPDATE[\s\S]*FROM memberships/i);
   });
 
+  void it('keeps exact Home/Membership content locks on the frozen order', async () => {
+    const source = await readFile(
+      path.join(homesDir, 'lock-home-and-exact-memberships.ts'),
+      'utf8',
+    );
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /better-auth/);
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+    assert.doesNotMatch(source, /tasks?\//i);
+    assert.doesNotMatch(source, /supplies?\//i);
+    assert.doesNotMatch(source, /outbox/i);
+    assert.match(source, /LOCK_HOME_FOR_UPDATE_SQL/);
+    const membershipLockSql = source.match(
+      /LOCK_EXACT_MEMBERSHIP_FOR_UPDATE_SQL = `([\s\S]*?)`;/,
+    )?.[1];
+    assert.ok(membershipLockSql);
+    assert.match(
+      membershipLockSql,
+      /FROM memberships[\s\S]*WHERE id = \$1[\s\S]*FOR UPDATE/i,
+    );
+    assert.doesNotMatch(membershipLockSql, /FOR KEY SHARE/i);
+    assert.match(source, /uniqueSortedMembershipIds/);
+  });
+
   void it('does not import Membership repository internals', async () => {
     const files = await walk(homesDir);
 

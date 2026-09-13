@@ -15,6 +15,11 @@ import {
   type LeaveMembershipCommand,
   type RemoveMembershipCommand,
 } from '../domains/memberships/http.js';
+import {
+  createTasksRouter,
+  type CreateManualTaskCommand,
+  type ListHomeTasksCommand,
+} from '../domains/tasks/http.js';
 import { createCurrentUserRouter } from '../domains/users/http.js';
 import type { PrincipalResolver } from '../platform/auth/principal.js';
 import type { ActiveHomeActorResolver } from '../platform/authz/index.js';
@@ -49,6 +54,10 @@ export type CreateRoomiesApiRouterOptions = {
   };
   previewInvitation?: PreviewInvitationCommand;
   acceptInvitation?: AcceptInvitationCommand;
+  tasks?: {
+    createManualTask: CreateManualTaskCommand;
+    listHomeTasks: ListHomeTasksCommand;
+  };
 };
 
 /**
@@ -97,6 +106,17 @@ export function createRoomiesApiRouter(
       createInvitationAcceptanceRouter({
         principalResolver: options.principalResolver,
         acceptInvitation: options.acceptInvitation,
+      }),
+    );
+  }
+  if (options.tasks !== undefined) {
+    router.use(
+      '/homes',
+      createTasksRouter({
+        principalResolver: options.principalResolver,
+        activeHomeActorResolver: options.activeHomeActorResolver,
+        createManualTask: options.tasks.createManualTask,
+        listHomeTasks: options.tasks.listHomeTasks,
       }),
     );
   }

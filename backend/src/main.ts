@@ -7,6 +7,8 @@ import { createAcceptInvitationFromPool } from './application/invitations/accept
 import { createPreviewInvitationFromPool } from './application/invitations/preview-invitation.js';
 import { createLeaveMembershipFromPool } from './application/home-administration/leave-membership.js';
 import { createRemoveMembershipFromPool } from './application/home-administration/remove-membership.js';
+import { createCreateManualTaskFromPool } from './application/tasks/create-manual-task.js';
+import { createListHomeTasksFromPool } from './application/tasks/list-home-tasks.js';
 import {
   createActiveHomesForUserReader,
   createHomeRepository,
@@ -82,6 +84,10 @@ function main(): void {
       },
       previewInvitation: createPreviewInvitationFromPool(databasePool.pool),
       acceptInvitation: createAcceptInvitationFromPool(databasePool.pool),
+      tasks: {
+        createManualTask: createCreateManualTaskFromPool(databasePool.pool),
+        listHomeTasks: createListHomeTasksFromPool(databasePool.pool),
+      },
     }),
   });
 

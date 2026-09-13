@@ -29,6 +29,24 @@ void describe('create-roomies-api composition boundary', () => {
     );
   });
 
+  void it('wires Tasks through the existing Home context without a parallel authz path', async () => {
+    const source = await readFile(
+      new URL('./create-roomies-api.ts', import.meta.url),
+      'utf8',
+    );
+    assert.match(source, /createTasksRouter/);
+    assert.match(source, /createManualTask/);
+    assert.match(source, /listHomeTasks/);
+    assert.match(source, /activeHomeActorResolver/);
+    assert.doesNotMatch(source, /createTaskActorResolver/);
+    assert.doesNotMatch(source, /taskActor/);
+    assert.doesNotMatch(source, /memberships\/repository/);
+    assert.doesNotMatch(source, /homes\/repository/);
+    assert.doesNotMatch(source, /tasks\/repository/);
+    assert.doesNotMatch(source, /FROM\s+task_instances/i);
+    assert.doesNotMatch(source, /better-auth/);
+  });
+
   void it('wires leave and remove without archive or ending-seam internals', async () => {
     const source = await readFile(
       new URL('./create-roomies-api.ts', import.meta.url),

@@ -24,6 +24,7 @@ import {
   LastAdminRequiredError,
   LastRoommateRequiresArchiveError,
 } from '../../domains/memberships/errors.js';
+import { TaskPersistenceError } from '../../domains/tasks/errors.js';
 import { getRequestId } from './request-id.js';
 
 export type ApiErrorBody = {
@@ -242,6 +243,7 @@ export function errorHandler(
   if (
     err instanceof AuthorizationIntegrityError ||
     err instanceof StructuralIntegrityError ||
+    err instanceof TaskPersistenceError ||
     err instanceof TransactionInfrastructureError ||
     err instanceof AuthInfrastructureError
   ) {

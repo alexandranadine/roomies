@@ -22,6 +22,7 @@ import {
   LastAdminRequiredError,
   LastRoommateRequiresArchiveError,
 } from '../../domains/memberships/errors.js';
+import { TaskPersistenceError } from '../../domains/tasks/errors.js';
 import { TransactionInfrastructureError } from '../persistence/errors.js';
 import { appRequest } from './app-request.test-helper.js';
 import {
@@ -212,6 +213,17 @@ void describe('HTTP known-error mappings', () => {
     assert.equal(body.error.code, 'INTERNAL_ERROR');
     assert.equal(body.error.message, 'An unexpected error occurred');
     assert.equal(res.text.includes('Home structure integrity failure'), false);
+  });
+
+  void it('maps TaskPersistenceError to a safe 500', async () => {
+    const res = await appRequest(appThatThrows(new TaskPersistenceError()), {
+      path: '/throw',
+    });
+    assert.equal(res.status, 500);
+    const body = res.json() as ApiErrorBody;
+    assert.equal(body.error.code, 'INTERNAL_ERROR');
+    assert.equal(body.error.message, 'An unexpected error occurred');
+    assert.equal(res.text.includes('Task persistence failure'), false);
   });
 
   void it('maps TransactionInfrastructureError to a safe 500', async () => {

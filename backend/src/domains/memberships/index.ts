@@ -17,6 +17,12 @@ export {
   LastRoommateRequiresArchiveError,
 } from './errors.js';
 export {
+  FIND_ACTIVE_HOME_MEMBERSHIP_SQL,
+  findActiveHomeMembership,
+  type ActiveHomeMembership,
+  type ActiveHomeMembershipLookup,
+} from './find-active-home-membership.js';
+export {
   createMembershipStartedV1Event,
   isMembershipEndedCause,
   MEMBERSHIP_ENDED_CAUSES,
