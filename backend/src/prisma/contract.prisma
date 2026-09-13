@@ -12,6 +12,25 @@ enum MembershipRole {
   ADMIN
 }
 
+enum TaskSource {
+  @@type("pg/text@1")
+  MANUAL
+  RECURRING
+}
+
+enum TaskStatus {
+  @@type("pg/text@1")
+  OPEN
+  COMPLETED
+}
+
+enum TaskRecurrenceFrequency {
+  @@type("pg/text@1")
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
 model User {
   id          Uuid                 @id @default(uuid(7))
   createdAt   temporal.createdAt() @map("created_at")
@@ -29,8 +48,10 @@ model Home {
   archivedAt  Timestamptz?         @map("archived_at")
   createdAt   temporal.createdAt() @map("created_at")
   updatedAt   temporal.updatedAt() @map("updated_at")
-  memberships Membership[]
-  invitations Invitation[]
+  memberships      Membership[]
+  invitations      Invitation[]
+  taskInstances    TaskInstance[]
+  taskDefinitions  TaskDefinition[]
 
   @@map("homes")
 }
@@ -45,8 +66,11 @@ model Membership {
 
   home Home @relation(fields: [homeId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "memberships_home_id_fkey")
   user User @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "memberships_user_id_fkey")
-  createdInvitations  Invitation[] @relation("InvitationCreatorMembership")
-  acceptedInvitations Invitation[] @relation("InvitationAcceptedMembership")
+  createdInvitations       Invitation[]      @relation("InvitationCreatorMembership")
+  acceptedInvitations      Invitation[]      @relation("InvitationAcceptedMembership")
+  assignedTaskInstances    TaskInstance[]    @relation("TaskInstanceAssignedMembership")
+  assignedTaskDefinitions  TaskDefinition[]  @relation("TaskDefinitionAssignedMembership")
+  createdTaskDefinitions   TaskDefinition[]  @relation("TaskDefinitionCreatorMembership")
 
   // At most one active tenure per (home, user). Ended rows may coexist so
   // leave-and-rejoin creates a new Membership id rather than reopening one.
@@ -253,4 +277,86 @@ model OutboxEvent {
     map: "outbox_events_dead_prune_idx"
   )
   @@map("outbox_events")
+}
+
+// Task persistence. Recurrence math is application/worker runtime later:
+// for next calendar date D, D 00:00:00 in Home.timezone is resolved with
+// Temporal-compatible "compatible" disambiguation to nextOccurrenceAt
+// (normal local time → sole instant; nonexistent → shift forward by the
+// timezone gap; ambiguous → earlier instant/offset). Timezone changes
+// later preserve the logical next recurrence date and re-resolve it.
+// No time-of-day column. No Task outbox events in this contract.
+model TaskDefinition {
+  id                     Uuid                      @id @default(uuid(7))
+  homeId                 Uuid                      @map("home_id")
+  title                  String
+  assignedMembershipId   Uuid?                     @map("assigned_membership_id")
+  creatorMembershipId    Uuid                      @map("creator_membership_id")
+  recurrenceFrequency    TaskRecurrenceFrequency   @map("recurrence_frequency")
+  recurrenceWeekday      Int?                      @map("recurrence_weekday")
+  recurrenceDayOfMonth   Int?                      @map("recurrence_day_of_month")
+  nextOccurrenceAt       Timestamptz?              @map("next_occurrence_at")
+  deactivatedAt          Timestamptz?              @map("deactivated_at")
+  createdAt              temporal.createdAt()      @map("created_at")
+  updatedAt              temporal.updatedAt()      @map("updated_at")
+
+  home Home @relation(fields: [homeId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "task_definitions_home_id_fkey")
+  assignedMembership Membership? @relation("TaskDefinitionAssignedMembership", fields: [homeId, assignedMembershipId], references: [homeId, id], onDelete: Restrict, onUpdate: Restrict, map: "task_definitions_assigned_home_membership_fkey")
+  creatorMembership Membership @relation("TaskDefinitionCreatorMembership", fields: [homeId, creatorMembershipId], references: [homeId, id], onDelete: Restrict, onUpdate: Restrict, map: "task_definitions_creator_home_membership_fkey")
+  instances TaskInstance[] @relation("TaskInstanceDefinition")
+
+  @@check(
+    expression: "(((recurrence_frequency = 'DAILY'::text) AND (recurrence_weekday IS NULL) AND (recurrence_day_of_month IS NULL)) OR ((recurrence_frequency = 'WEEKLY'::text) AND (recurrence_weekday IS NOT NULL) AND ((recurrence_weekday >= 1) AND (recurrence_weekday <= 7)) AND (recurrence_day_of_month IS NULL)) OR ((recurrence_frequency = 'MONTHLY'::text) AND (recurrence_weekday IS NULL) AND (recurrence_day_of_month IS NOT NULL) AND ((recurrence_day_of_month >= 1) AND (recurrence_day_of_month <= 31))))",
+    map: "task_definitions_recurrence_config_check"
+  )
+  @@check(
+    expression: "((deactivated_at IS NULL) = (next_occurrence_at IS NOT NULL))",
+    map: "task_definitions_scheduling_lifecycle_check"
+  )
+  @@check(
+    expression: "((deactivated_at IS NULL) OR (deactivated_at >= created_at))",
+    map: "task_definitions_deactivated_time_check"
+  )
+  @@index([homeId, id], unique: true, name: "task_definitions_home_id_id_key")
+  @@index([homeId, createdAt, id], where: "(deactivated_at IS NULL)", name: "task_definitions_home_active_idx")
+  @@index([nextOccurrenceAt, id], where: "(deactivated_at IS NULL)", name: "task_definitions_worker_due_idx")
+  @@index([homeId, creatorMembershipId], name: "task_definitions_home_creator_idx")
+  @@index([homeId, assignedMembershipId, id], where: "((deactivated_at IS NULL) AND (assigned_membership_id IS NOT NULL))", name: "task_definitions_home_active_assignee_idx")
+  @@map("task_definitions")
+}
+
+model TaskInstance {
+  id                   Uuid         @id @default(uuid(7))
+  homeId               Uuid         @map("home_id")
+  source               TaskSource
+  status               TaskStatus   @default(OPEN)
+  title                String
+  scheduledFor         DateString?  @map("scheduled_for")
+  assignedMembershipId Uuid?        @map("assigned_membership_id")
+  taskDefinitionId     Uuid?        @map("task_definition_id")
+  completedAt          Timestamptz? @map("completed_at")
+  createdAt            temporal.createdAt() @map("created_at")
+  updatedAt            temporal.updatedAt() @map("updated_at")
+
+  home Home @relation(fields: [homeId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "task_instances_home_id_fkey")
+  assignedMembership Membership? @relation("TaskInstanceAssignedMembership", fields: [homeId, assignedMembershipId], references: [homeId, id], onDelete: Restrict, onUpdate: Restrict, map: "task_instances_assigned_home_membership_fkey")
+  taskDefinition TaskDefinition? @relation("TaskInstanceDefinition", fields: [homeId, taskDefinitionId], references: [homeId, id], onDelete: Restrict, onUpdate: Restrict, map: "task_instances_definition_home_fkey")
+
+  @@check(
+    expression: "(((source = 'MANUAL'::text) AND (task_definition_id IS NULL)) OR ((source = 'RECURRING'::text) AND (task_definition_id IS NOT NULL) AND (scheduled_for IS NOT NULL)))",
+    map: "task_instances_source_definition_check"
+  )
+  @@check(
+    expression: "(((status = 'OPEN'::text) AND (completed_at IS NULL)) OR ((status = 'COMPLETED'::text) AND (completed_at IS NOT NULL)))",
+    map: "task_instances_completion_state_check"
+  )
+  @@check(
+    expression: "((completed_at IS NULL) OR (completed_at >= created_at))",
+    map: "task_instances_completed_time_check"
+  )
+  @@index([homeId, scheduledFor, createdAt, id], where: "(status = 'OPEN')", name: "task_instances_home_open_idx")
+  @@index([homeId, completedAt, id], where: "(status = 'COMPLETED')", name: "task_instances_home_completed_idx")
+  @@index([homeId, assignedMembershipId, id], where: "((status = 'OPEN') AND (assigned_membership_id IS NOT NULL))", name: "task_instances_home_open_assignee_idx")
+  @@index([taskDefinitionId, scheduledFor], unique: true, where: "(task_definition_id IS NOT NULL)", name: "task_instances_definition_occurrence_uidx")
+  @@map("task_instances")
 }

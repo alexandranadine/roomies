@@ -27,6 +27,7 @@ import {
 import { verifyAuthPersistence } from './verify-auth-persistence.js';
 import { verifyInvitationSchema } from './verify-invitation-schema.js';
 import { verifyOutboxSchema } from './verify-outbox-schema.js';
+import { verifyTaskSchema } from './verify-task-schema.js';
 
 const backendRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -78,5 +79,6 @@ runPrisma(['db', 'verify', '--db', databaseUrl, '--strict'], databaseUrl);
 await verifyAuthPersistence(databaseUrl);
 await verifyOutboxSchema(databaseUrl);
 await verifyInvitationSchema(databaseUrl);
+await verifyTaskSchema(databaseUrl);
 
 console.log('Fresh migrations and strict persistence verification passed.');

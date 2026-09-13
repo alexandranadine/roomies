@@ -1,0 +1,878 @@
+[
+  {
+    "id": "table.task_definitions",
+    "label": "Create table \"task_definitions\"",
+    "summary": "Creates table \"task_definitions\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "task_definitions"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"task_definitions\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_definitions\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"task_definitions\"",
+        "sql": "CREATE TABLE \"public\".\"task_definitions\" (\n  \"assigned_membership_id\" uuid,\n  \"created_at\" timestamptz DEFAULT (now()) NOT NULL,\n  \"creator_membership_id\" uuid NOT NULL,\n  \"deactivated_at\" timestamptz,\n  \"home_id\" uuid NOT NULL,\n  \"id\" uuid NOT NULL,\n  \"next_occurrence_at\" timestamptz,\n  \"recurrence_day_of_month\" int4,\n  \"recurrence_frequency\" text NOT NULL,\n  \"recurrence_weekday\" int4,\n  \"title\" text NOT NULL,\n  \"updated_at\" timestamptz NOT NULL,\n  PRIMARY KEY (\"id\"),\n  CONSTRAINT \"task_definitions_deactivated_time_check\" CHECK (((deactivated_at IS NULL) OR (deactivated_at >= created_at))),\n  CONSTRAINT \"task_definitions_recurrence_config_check\" CHECK ((((recurrence_frequency = 'DAILY'::text) AND (recurrence_weekday IS NULL) AND (recurrence_day_of_month IS NULL)) OR ((recurrence_frequency = 'WEEKLY'::text) AND (recurrence_weekday IS NOT NULL) AND ((recurrence_weekday >= 1) AND (recurrence_weekday <= 7)) AND (recurrence_day_of_month IS NULL)) OR ((recurrence_frequency = 'MONTHLY'::text) AND (recurrence_weekday IS NULL) AND (recurrence_day_of_month IS NOT NULL) AND ((recurrence_day_of_month >= 1) AND (recurrence_day_of_month <= 31))))),\n  CONSTRAINT \"task_definitions_recurrence_frequency_check_979d6261\" CHECK (\"recurrence_frequency\" IN ('DAILY', 'WEEKLY', 'MONTHLY')),\n  CONSTRAINT \"task_definitions_scheduling_lifecycle_check\" CHECK (((deactivated_at IS NULL) = (next_occurrence_at IS NOT NULL)))\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"task_definitions\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_definitions\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.task_instances",
+    "label": "Create table \"task_instances\"",
+    "summary": "Creates table \"task_instances\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "task_instances"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"task_instances\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_instances\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"task_instances\"",
+        "sql": "CREATE TABLE \"public\".\"task_instances\" (\n  \"assigned_membership_id\" uuid,\n  \"completed_at\" timestamptz,\n  \"created_at\" timestamptz DEFAULT (now()) NOT NULL,\n  \"home_id\" uuid NOT NULL,\n  \"id\" uuid NOT NULL,\n  \"scheduled_for\" date,\n  \"source\" text NOT NULL,\n  \"status\" text DEFAULT 'OPEN' NOT NULL,\n  \"task_definition_id\" uuid,\n  \"title\" text NOT NULL,\n  \"updated_at\" timestamptz NOT NULL,\n  PRIMARY KEY (\"id\"),\n  CONSTRAINT \"task_instances_completed_time_check\" CHECK (((completed_at IS NULL) OR (completed_at >= created_at))),\n  CONSTRAINT \"task_instances_completion_state_check\" CHECK ((((status = 'OPEN'::text) AND (completed_at IS NULL)) OR ((status = 'COMPLETED'::text) AND (completed_at IS NOT NULL)))),\n  CONSTRAINT \"task_instances_source_check_2dc6a827\" CHECK (\"source\" IN ('MANUAL', 'RECURRING')),\n  CONSTRAINT \"task_instances_source_definition_check\" CHECK ((((source = 'MANUAL'::text) AND (task_definition_id IS NULL)) OR ((source = 'RECURRING'::text) AND (task_definition_id IS NOT NULL) AND (scheduled_for IS NOT NULL)))),\n  CONSTRAINT \"task_instances_status_check_6df9db95\" CHECK (\"status\" IN ('OPEN', 'COMPLETED'))\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"task_instances\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_instances\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.task_definitions.task_definitions_home_active_assignee_idx_573b0e84",
+    "label": "Create index \"task_definitions_home_active_assignee_idx_573b0e84\" on \"task_definitions\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "task_definitions_home_active_assignee_idx_573b0e84",
+        "table": "task_definitions"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"task_definitions_home_active_assignee_idx_573b0e84\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_definitions_home_active_assignee_idx_573b0e84\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"task_definitions_home_active_assignee_idx_573b0e84\"",
+        "sql": "CREATE INDEX \"task_definitions_home_active_assignee_idx_573b0e84\" ON \"public\".\"task_definitions\" (\"home_id\", \"assigned_membership_id\", \"id\") WHERE (((deactivated_at IS NULL) AND (assigned_membership_id IS NOT NULL)))",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"task_definitions_home_active_assignee_idx_573b0e84\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_definitions_home_active_assignee_idx_573b0e84\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.task_definitions.task_definitions_home_active_idx_db669dcd",
+    "label": "Create index \"task_definitions_home_active_idx_db669dcd\" on \"task_definitions\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "task_definitions_home_active_idx_db669dcd",
+        "table": "task_definitions"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"task_definitions_home_active_idx_db669dcd\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_definitions_home_active_idx_db669dcd\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"task_definitions_home_active_idx_db669dcd\"",
+        "sql": "CREATE INDEX \"task_definitions_home_active_idx_db669dcd\" ON \"public\".\"task_definitions\" (\"home_id\", \"created_at\", \"id\") WHERE ((deactivated_at IS NULL))",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"task_definitions_home_active_idx_db669dcd\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_definitions_home_active_idx_db669dcd\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.task_definitions.task_definitions_home_creator_idx_ac77ea12",
+    "label": "Create index \"task_definitions_home_creator_idx_ac77ea12\" on \"task_definitions\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "task_definitions_home_creator_idx_ac77ea12",
+        "table": "task_definitions"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"task_definitions_home_creator_idx_ac77ea12\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_definitions_home_creator_idx_ac77ea12\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"task_definitions_home_creator_idx_ac77ea12\"",
+        "sql": "CREATE INDEX \"task_definitions_home_creator_idx_ac77ea12\" ON \"public\".\"task_definitions\" (\"home_id\", \"creator_membership_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"task_definitions_home_creator_idx_ac77ea12\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_definitions_home_creator_idx_ac77ea12\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.task_definitions.task_definitions_home_id_assigned_membership_id_idx_8e6c14e4",
+    "label": "Create index \"task_definitions_home_id_assigned_membership_id_idx_8e6c14e4\" on \"task_definitions\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "task_definitions_home_id_assigned_membership_id_idx_8e6c14e4",
+        "table": "task_definitions"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"task_definitions_home_id_assigned_membership_id_idx_8e6c14e4\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_definitions_home_id_assigned_membership_id_idx_8e6c14e4\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"task_definitions_home_id_assigned_membership_id_idx_8e6c14e4\"",
+        "sql": "CREATE INDEX \"task_definitions_home_id_assigned_membership_id_idx_8e6c14e4\" ON \"public\".\"task_definitions\" (\"home_id\", \"assigned_membership_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"task_definitions_home_id_assigned_membership_id_idx_8e6c14e4\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_definitions_home_id_assigned_membership_id_idx_8e6c14e4\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.task_definitions.task_definitions_home_id_id_key_2f2cccd8",
+    "label": "Create index \"task_definitions_home_id_id_key_2f2cccd8\" on \"task_definitions\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "task_definitions_home_id_id_key_2f2cccd8",
+        "table": "task_definitions"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"task_definitions_home_id_id_key_2f2cccd8\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_definitions_home_id_id_key_2f2cccd8\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"task_definitions_home_id_id_key_2f2cccd8\"",
+        "sql": "CREATE UNIQUE INDEX \"task_definitions_home_id_id_key_2f2cccd8\" ON \"public\".\"task_definitions\" (\"home_id\", \"id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"task_definitions_home_id_id_key_2f2cccd8\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_definitions_home_id_id_key_2f2cccd8\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.task_definitions.task_definitions_home_id_idx_f881d5c1",
+    "label": "Create index \"task_definitions_home_id_idx_f881d5c1\" on \"task_definitions\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "task_definitions_home_id_idx_f881d5c1",
+        "table": "task_definitions"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"task_definitions_home_id_idx_f881d5c1\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_definitions_home_id_idx_f881d5c1\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"task_definitions_home_id_idx_f881d5c1\"",
+        "sql": "CREATE INDEX \"task_definitions_home_id_idx_f881d5c1\" ON \"public\".\"task_definitions\" (\"home_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"task_definitions_home_id_idx_f881d5c1\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_definitions_home_id_idx_f881d5c1\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.task_definitions.task_definitions_worker_due_idx_3a11af30",
+    "label": "Create index \"task_definitions_worker_due_idx_3a11af30\" on \"task_definitions\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "task_definitions_worker_due_idx_3a11af30",
+        "table": "task_definitions"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"task_definitions_worker_due_idx_3a11af30\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_definitions_worker_due_idx_3a11af30\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"task_definitions_worker_due_idx_3a11af30\"",
+        "sql": "CREATE INDEX \"task_definitions_worker_due_idx_3a11af30\" ON \"public\".\"task_definitions\" (\"next_occurrence_at\", \"id\") WHERE ((deactivated_at IS NULL))",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"task_definitions_worker_due_idx_3a11af30\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_definitions_worker_due_idx_3a11af30\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.task_instances.task_instances_definition_occurrence_uidx_0046b96b",
+    "label": "Create index \"task_instances_definition_occurrence_uidx_0046b96b\" on \"task_instances\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "task_instances_definition_occurrence_uidx_0046b96b",
+        "table": "task_instances"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"task_instances_definition_occurrence_uidx_0046b96b\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_instances_definition_occurrence_uidx_0046b96b\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"task_instances_definition_occurrence_uidx_0046b96b\"",
+        "sql": "CREATE UNIQUE INDEX \"task_instances_definition_occurrence_uidx_0046b96b\" ON \"public\".\"task_instances\" (\"task_definition_id\", \"scheduled_for\") WHERE ((task_definition_id IS NOT NULL))",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"task_instances_definition_occurrence_uidx_0046b96b\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_instances_definition_occurrence_uidx_0046b96b\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.task_instances.task_instances_home_completed_idx_cb8f99ae",
+    "label": "Create index \"task_instances_home_completed_idx_cb8f99ae\" on \"task_instances\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "task_instances_home_completed_idx_cb8f99ae",
+        "table": "task_instances"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"task_instances_home_completed_idx_cb8f99ae\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_instances_home_completed_idx_cb8f99ae\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"task_instances_home_completed_idx_cb8f99ae\"",
+        "sql": "CREATE INDEX \"task_instances_home_completed_idx_cb8f99ae\" ON \"public\".\"task_instances\" (\"home_id\", \"completed_at\", \"id\") WHERE ((status = 'COMPLETED'))",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"task_instances_home_completed_idx_cb8f99ae\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_instances_home_completed_idx_cb8f99ae\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.task_instances.task_instances_home_id_assigned_membership_id_idx_8e6c14e4",
+    "label": "Create index \"task_instances_home_id_assigned_membership_id_idx_8e6c14e4\" on \"task_instances\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "task_instances_home_id_assigned_membership_id_idx_8e6c14e4",
+        "table": "task_instances"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"task_instances_home_id_assigned_membership_id_idx_8e6c14e4\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_instances_home_id_assigned_membership_id_idx_8e6c14e4\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"task_instances_home_id_assigned_membership_id_idx_8e6c14e4\"",
+        "sql": "CREATE INDEX \"task_instances_home_id_assigned_membership_id_idx_8e6c14e4\" ON \"public\".\"task_instances\" (\"home_id\", \"assigned_membership_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"task_instances_home_id_assigned_membership_id_idx_8e6c14e4\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_instances_home_id_assigned_membership_id_idx_8e6c14e4\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.task_instances.task_instances_home_id_idx_f881d5c1",
+    "label": "Create index \"task_instances_home_id_idx_f881d5c1\" on \"task_instances\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "task_instances_home_id_idx_f881d5c1",
+        "table": "task_instances"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"task_instances_home_id_idx_f881d5c1\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_instances_home_id_idx_f881d5c1\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"task_instances_home_id_idx_f881d5c1\"",
+        "sql": "CREATE INDEX \"task_instances_home_id_idx_f881d5c1\" ON \"public\".\"task_instances\" (\"home_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"task_instances_home_id_idx_f881d5c1\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_instances_home_id_idx_f881d5c1\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.task_instances.task_instances_home_id_task_definition_id_idx_5ae5c128",
+    "label": "Create index \"task_instances_home_id_task_definition_id_idx_5ae5c128\" on \"task_instances\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "task_instances_home_id_task_definition_id_idx_5ae5c128",
+        "table": "task_instances"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"task_instances_home_id_task_definition_id_idx_5ae5c128\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_instances_home_id_task_definition_id_idx_5ae5c128\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"task_instances_home_id_task_definition_id_idx_5ae5c128\"",
+        "sql": "CREATE INDEX \"task_instances_home_id_task_definition_id_idx_5ae5c128\" ON \"public\".\"task_instances\" (\"home_id\", \"task_definition_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"task_instances_home_id_task_definition_id_idx_5ae5c128\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_instances_home_id_task_definition_id_idx_5ae5c128\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.task_instances.task_instances_home_open_assignee_idx_cf14ba37",
+    "label": "Create index \"task_instances_home_open_assignee_idx_cf14ba37\" on \"task_instances\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "task_instances_home_open_assignee_idx_cf14ba37",
+        "table": "task_instances"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"task_instances_home_open_assignee_idx_cf14ba37\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_instances_home_open_assignee_idx_cf14ba37\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"task_instances_home_open_assignee_idx_cf14ba37\"",
+        "sql": "CREATE INDEX \"task_instances_home_open_assignee_idx_cf14ba37\" ON \"public\".\"task_instances\" (\"home_id\", \"assigned_membership_id\", \"id\") WHERE (((status = 'OPEN') AND (assigned_membership_id IS NOT NULL)))",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"task_instances_home_open_assignee_idx_cf14ba37\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_instances_home_open_assignee_idx_cf14ba37\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.task_instances.task_instances_home_open_idx_6e659718",
+    "label": "Create index \"task_instances_home_open_idx_6e659718\" on \"task_instances\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "task_instances_home_open_idx_6e659718",
+        "table": "task_instances"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"task_instances_home_open_idx_6e659718\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_instances_home_open_idx_6e659718\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"task_instances_home_open_idx_6e659718\"",
+        "sql": "CREATE INDEX \"task_instances_home_open_idx_6e659718\" ON \"public\".\"task_instances\" (\"home_id\", \"scheduled_for\", \"created_at\", \"id\") WHERE ((status = 'OPEN'))",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"task_instances_home_open_idx_6e659718\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_instances_home_open_idx_6e659718\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.task_definitions.task_definitions_home_id_fkey",
+    "label": "Add foreign key \"task_definitions_home_id_fkey\" on \"task_definitions\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "task_definitions_home_id_fkey",
+        "table": "task_definitions"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"task_definitions_home_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "task_definitions_home_id_fkey",
+          "public",
+          "\"public\".\"task_definitions\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"task_definitions_home_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"task_definitions\"\nADD CONSTRAINT \"task_definitions_home_id_fkey\"\nFOREIGN KEY (\"home_id\")\nREFERENCES \"public\".\"homes\" (\"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"task_definitions_home_id_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "task_definitions_home_id_fkey",
+          "public",
+          "\"public\".\"task_definitions\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.task_definitions.task_definitions_assigned_home_membership_fkey",
+    "label": "Add foreign key \"task_definitions_assigned_home_membership_fkey\" on \"task_definitions\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "task_definitions_assigned_home_membership_fkey",
+        "table": "task_definitions"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"task_definitions_assigned_home_membership_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "task_definitions_assigned_home_membership_fkey",
+          "public",
+          "\"public\".\"task_definitions\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"task_definitions_assigned_home_membership_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"task_definitions\"\nADD CONSTRAINT \"task_definitions_assigned_home_membership_fkey\"\nFOREIGN KEY (\"home_id\", \"assigned_membership_id\")\nREFERENCES \"public\".\"memberships\" (\"home_id\", \"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"task_definitions_assigned_home_membership_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "task_definitions_assigned_home_membership_fkey",
+          "public",
+          "\"public\".\"task_definitions\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.task_definitions.task_definitions_creator_home_membership_fkey",
+    "label": "Add foreign key \"task_definitions_creator_home_membership_fkey\" on \"task_definitions\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "task_definitions_creator_home_membership_fkey",
+        "table": "task_definitions"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"task_definitions_creator_home_membership_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "task_definitions_creator_home_membership_fkey",
+          "public",
+          "\"public\".\"task_definitions\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"task_definitions_creator_home_membership_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"task_definitions\"\nADD CONSTRAINT \"task_definitions_creator_home_membership_fkey\"\nFOREIGN KEY (\"home_id\", \"creator_membership_id\")\nREFERENCES \"public\".\"memberships\" (\"home_id\", \"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"task_definitions_creator_home_membership_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "task_definitions_creator_home_membership_fkey",
+          "public",
+          "\"public\".\"task_definitions\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.task_instances.task_instances_home_id_fkey",
+    "label": "Add foreign key \"task_instances_home_id_fkey\" on \"task_instances\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "task_instances_home_id_fkey",
+        "table": "task_instances"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"task_instances_home_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "task_instances_home_id_fkey",
+          "public",
+          "\"public\".\"task_instances\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"task_instances_home_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"task_instances\"\nADD CONSTRAINT \"task_instances_home_id_fkey\"\nFOREIGN KEY (\"home_id\")\nREFERENCES \"public\".\"homes\" (\"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"task_instances_home_id_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "task_instances_home_id_fkey",
+          "public",
+          "\"public\".\"task_instances\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.task_instances.task_instances_assigned_home_membership_fkey",
+    "label": "Add foreign key \"task_instances_assigned_home_membership_fkey\" on \"task_instances\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "task_instances_assigned_home_membership_fkey",
+        "table": "task_instances"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"task_instances_assigned_home_membership_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "task_instances_assigned_home_membership_fkey",
+          "public",
+          "\"public\".\"task_instances\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"task_instances_assigned_home_membership_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"task_instances\"\nADD CONSTRAINT \"task_instances_assigned_home_membership_fkey\"\nFOREIGN KEY (\"home_id\", \"assigned_membership_id\")\nREFERENCES \"public\".\"memberships\" (\"home_id\", \"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"task_instances_assigned_home_membership_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "task_instances_assigned_home_membership_fkey",
+          "public",
+          "\"public\".\"task_instances\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.task_instances.task_instances_definition_home_fkey",
+    "label": "Add foreign key \"task_instances_definition_home_fkey\" on \"task_instances\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "task_instances_definition_home_fkey",
+        "table": "task_instances"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"task_instances_definition_home_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "task_instances_definition_home_fkey",
+          "public",
+          "\"public\".\"task_instances\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"task_instances_definition_home_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"task_instances\"\nADD CONSTRAINT \"task_instances_definition_home_fkey\"\nFOREIGN KEY (\"home_id\", \"task_definition_id\")\nREFERENCES \"public\".\"task_definitions\" (\"home_id\", \"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"task_instances_definition_home_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "task_instances_definition_home_fkey",
+          "public",
+          "\"public\".\"task_instances\""
+        ]
+      }
+    ]
+  }
+]

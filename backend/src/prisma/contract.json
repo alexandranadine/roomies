@@ -36,6 +36,14 @@
       "model": "OutboxEvent",
       "namespace": "public"
     },
+    "task_definitions": {
+      "model": "TaskDefinition",
+      "namespace": "public"
+    },
+    "task_instances": {
+      "model": "TaskInstance",
+      "namespace": "public"
+    },
     "users": {
       "model": "User",
       "namespace": "public"
@@ -55,6 +63,49 @@
               {
                 "name": "ADMIN",
                 "value": "ADMIN"
+              }
+            ]
+          },
+          "TaskRecurrenceFrequency": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "DAILY",
+                "value": "DAILY"
+              },
+              {
+                "name": "WEEKLY",
+                "value": "WEEKLY"
+              },
+              {
+                "name": "MONTHLY",
+                "value": "MONTHLY"
+              }
+            ]
+          },
+          "TaskSource": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "MANUAL",
+                "value": "MANUAL"
+              },
+              {
+                "name": "RECURRING",
+                "value": "RECURRING"
+              }
+            ]
+          },
+          "TaskStatus": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "OPEN",
+                "value": "OPEN"
+              },
+              {
+                "name": "COMPLETED",
+                "value": "COMPLETED"
               }
             ]
           }
@@ -597,6 +648,36 @@
                   "model": "Membership",
                   "namespace": "public"
                 }
+              },
+              "taskDefinitions": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "homeId"
+                  ]
+                },
+                "to": {
+                  "model": "TaskDefinition",
+                  "namespace": "public"
+                }
+              },
+              "taskInstances": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "homeId"
+                  ]
+                },
+                "to": {
+                  "model": "TaskInstance",
+                  "namespace": "public"
+                }
               }
             },
             "storage": {
@@ -864,6 +945,40 @@
                   "namespace": "public"
                 }
               },
+              "assignedTaskDefinitions": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "id"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "assignedMembershipId"
+                  ]
+                },
+                "to": {
+                  "model": "TaskDefinition",
+                  "namespace": "public"
+                }
+              },
+              "assignedTaskInstances": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "id"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "assignedMembershipId"
+                  ]
+                },
+                "to": {
+                  "model": "TaskInstance",
+                  "namespace": "public"
+                }
+              },
               "createdInvitations": {
                 "cardinality": "1:N",
                 "on": {
@@ -878,6 +993,23 @@
                 },
                 "to": {
                   "model": "Invitation",
+                  "namespace": "public"
+                }
+              },
+              "createdTaskDefinitions": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "id"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "creatorMembershipId"
+                  ]
+                },
+                "to": {
+                  "model": "TaskDefinition",
                   "namespace": "public"
                 }
               },
@@ -1102,6 +1234,393 @@
               },
               "namespaceId": "public",
               "table": "outbox_events"
+            }
+          },
+          "TaskDefinition": {
+            "fields": {
+              "assignedMembershipId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "creatorMembershipId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "deactivatedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "homeId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "nextOccurrenceAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "recurrenceDayOfMonth": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "recurrenceFrequency": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "TaskRecurrenceFrequency",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "recurrenceWeekday": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "title": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "assignedMembership": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "assignedMembershipId"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Membership",
+                  "namespace": "public"
+                }
+              },
+              "creatorMembership": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "creatorMembershipId"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Membership",
+                  "namespace": "public"
+                }
+              },
+              "home": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "homeId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Home",
+                  "namespace": "public"
+                }
+              },
+              "instances": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "id"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "taskDefinitionId"
+                  ]
+                },
+                "to": {
+                  "model": "TaskInstance",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "assignedMembershipId": {
+                  "column": "assigned_membership_id"
+                },
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "creatorMembershipId": {
+                  "column": "creator_membership_id"
+                },
+                "deactivatedAt": {
+                  "column": "deactivated_at"
+                },
+                "homeId": {
+                  "column": "home_id"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "nextOccurrenceAt": {
+                  "column": "next_occurrence_at"
+                },
+                "recurrenceDayOfMonth": {
+                  "column": "recurrence_day_of_month"
+                },
+                "recurrenceFrequency": {
+                  "column": "recurrence_frequency"
+                },
+                "recurrenceWeekday": {
+                  "column": "recurrence_weekday"
+                },
+                "title": {
+                  "column": "title"
+                },
+                "updatedAt": {
+                  "column": "updated_at"
+                }
+              },
+              "namespaceId": "public",
+              "table": "task_definitions"
+            }
+          },
+          "TaskInstance": {
+            "fields": {
+              "assignedMembershipId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "completedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "homeId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "scheduledFor": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/date-string@1",
+                  "kind": "scalar"
+                }
+              },
+              "source": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "TaskSource",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "status": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "TaskStatus",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "taskDefinitionId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "title": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "assignedMembership": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "assignedMembershipId"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Membership",
+                  "namespace": "public"
+                }
+              },
+              "home": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "homeId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Home",
+                  "namespace": "public"
+                }
+              },
+              "taskDefinition": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "taskDefinitionId"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "TaskDefinition",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "assignedMembershipId": {
+                  "column": "assigned_membership_id"
+                },
+                "completedAt": {
+                  "column": "completed_at"
+                },
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "homeId": {
+                  "column": "home_id"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "scheduledFor": {
+                  "column": "scheduled_for"
+                },
+                "source": {
+                  "column": "source"
+                },
+                "status": {
+                  "column": "status"
+                },
+                "taskDefinitionId": {
+                  "column": "task_definition_id"
+                },
+                "title": {
+                  "column": "title"
+                },
+                "updatedAt": {
+                  "column": "updated_at"
+                }
+              },
+              "namespaceId": "public",
+              "table": "task_instances"
             }
           },
           "User": {
@@ -2144,6 +2663,481 @@
               },
               "uniques": []
             },
+            "task_definitions": {
+              "checks": [
+                {
+                  "expression": "((deactivated_at IS NULL) OR (deactivated_at >= created_at))",
+                  "name": "task_definitions_deactivated_time_check"
+                },
+                {
+                  "expression": "(((recurrence_frequency = 'DAILY'::text) AND (recurrence_weekday IS NULL) AND (recurrence_day_of_month IS NULL)) OR ((recurrence_frequency = 'WEEKLY'::text) AND (recurrence_weekday IS NOT NULL) AND ((recurrence_weekday >= 1) AND (recurrence_weekday <= 7)) AND (recurrence_day_of_month IS NULL)) OR ((recurrence_frequency = 'MONTHLY'::text) AND (recurrence_weekday IS NULL) AND (recurrence_day_of_month IS NOT NULL) AND ((recurrence_day_of_month >= 1) AND (recurrence_day_of_month <= 31))))",
+                  "name": "task_definitions_recurrence_config_check"
+                },
+                {
+                  "expression": "\"recurrence_frequency\" IN ('DAILY', 'WEEKLY', 'MONTHLY')",
+                  "name": "task_definitions_recurrence_frequency_check_979d6261",
+                  "prefix": "task_definitions_recurrence_frequency_check"
+                },
+                {
+                  "expression": "((deactivated_at IS NULL) = (next_occurrence_at IS NOT NULL))",
+                  "name": "task_definitions_scheduling_lifecycle_check"
+                }
+              ],
+              "columns": {
+                "assigned_membership_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": true
+                },
+                "created_at": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "creator_membership_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "deactivated_at": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "home_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "next_occurrence_at": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "recurrence_day_of_month": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": true
+                },
+                "recurrence_frequency": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "TaskRecurrenceFrequency",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "recurrence_weekday": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": true
+                },
+                "title": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "updated_at": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "name": "task_definitions_home_id_fkey",
+                  "onDelete": "restrict",
+                  "onUpdate": "restrict",
+                  "source": {
+                    "columns": [
+                      "home_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "task_definitions"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "homes"
+                  }
+                },
+                {
+                  "name": "task_definitions_assigned_home_membership_fkey",
+                  "onDelete": "restrict",
+                  "onUpdate": "restrict",
+                  "source": {
+                    "columns": [
+                      "home_id",
+                      "assigned_membership_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "task_definitions"
+                  },
+                  "target": {
+                    "columns": [
+                      "home_id",
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "memberships"
+                  }
+                },
+                {
+                  "name": "task_definitions_creator_home_membership_fkey",
+                  "onDelete": "restrict",
+                  "onUpdate": "restrict",
+                  "source": {
+                    "columns": [
+                      "home_id",
+                      "creator_membership_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "task_definitions"
+                  },
+                  "target": {
+                    "columns": [
+                      "home_id",
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "memberships"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "home_id",
+                    "assigned_membership_id",
+                    "id"
+                  ],
+                  "name": "task_definitions_home_active_assignee_idx_573b0e84",
+                  "prefix": "task_definitions_home_active_assignee_idx",
+                  "unique": false,
+                  "where": "((deactivated_at IS NULL) AND (assigned_membership_id IS NOT NULL))"
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "created_at",
+                    "id"
+                  ],
+                  "name": "task_definitions_home_active_idx_db669dcd",
+                  "prefix": "task_definitions_home_active_idx",
+                  "unique": false,
+                  "where": "(deactivated_at IS NULL)"
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "creator_membership_id"
+                  ],
+                  "name": "task_definitions_home_creator_idx_ac77ea12",
+                  "prefix": "task_definitions_home_creator_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "assigned_membership_id"
+                  ],
+                  "name": "task_definitions_home_id_assigned_membership_id_idx_8e6c14e4",
+                  "prefix": "task_definitions_home_id_assigned_membership_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "id"
+                  ],
+                  "name": "task_definitions_home_id_id_key_2f2cccd8",
+                  "prefix": "task_definitions_home_id_id_key",
+                  "unique": true
+                },
+                {
+                  "columns": [
+                    "home_id"
+                  ],
+                  "name": "task_definitions_home_id_idx_f881d5c1",
+                  "prefix": "task_definitions_home_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "next_occurrence_at",
+                    "id"
+                  ],
+                  "name": "task_definitions_worker_due_idx_3a11af30",
+                  "prefix": "task_definitions_worker_due_idx",
+                  "unique": false,
+                  "where": "(deactivated_at IS NULL)"
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            },
+            "task_instances": {
+              "checks": [
+                {
+                  "expression": "((completed_at IS NULL) OR (completed_at >= created_at))",
+                  "name": "task_instances_completed_time_check"
+                },
+                {
+                  "expression": "(((status = 'OPEN'::text) AND (completed_at IS NULL)) OR ((status = 'COMPLETED'::text) AND (completed_at IS NOT NULL)))",
+                  "name": "task_instances_completion_state_check"
+                },
+                {
+                  "expression": "\"source\" IN ('MANUAL', 'RECURRING')",
+                  "name": "task_instances_source_check_2dc6a827",
+                  "prefix": "task_instances_source_check"
+                },
+                {
+                  "expression": "(((source = 'MANUAL'::text) AND (task_definition_id IS NULL)) OR ((source = 'RECURRING'::text) AND (task_definition_id IS NOT NULL) AND (scheduled_for IS NOT NULL)))",
+                  "name": "task_instances_source_definition_check"
+                },
+                {
+                  "expression": "\"status\" IN ('OPEN', 'COMPLETED')",
+                  "name": "task_instances_status_check_6df9db95",
+                  "prefix": "task_instances_status_check"
+                }
+              ],
+              "columns": {
+                "assigned_membership_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": true
+                },
+                "completed_at": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "created_at": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "home_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "scheduled_for": {
+                  "codecId": "pg/date-string@1",
+                  "nativeType": "date",
+                  "nullable": true
+                },
+                "source": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "TaskSource",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "status": {
+                  "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": "OPEN"
+                  },
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "TaskStatus",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "task_definition_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": true
+                },
+                "title": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "updated_at": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "name": "task_instances_home_id_fkey",
+                  "onDelete": "restrict",
+                  "onUpdate": "restrict",
+                  "source": {
+                    "columns": [
+                      "home_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "task_instances"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "homes"
+                  }
+                },
+                {
+                  "name": "task_instances_assigned_home_membership_fkey",
+                  "onDelete": "restrict",
+                  "onUpdate": "restrict",
+                  "source": {
+                    "columns": [
+                      "home_id",
+                      "assigned_membership_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "task_instances"
+                  },
+                  "target": {
+                    "columns": [
+                      "home_id",
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "memberships"
+                  }
+                },
+                {
+                  "name": "task_instances_definition_home_fkey",
+                  "onDelete": "restrict",
+                  "onUpdate": "restrict",
+                  "source": {
+                    "columns": [
+                      "home_id",
+                      "task_definition_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "task_instances"
+                  },
+                  "target": {
+                    "columns": [
+                      "home_id",
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "task_definitions"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "task_definition_id",
+                    "scheduled_for"
+                  ],
+                  "name": "task_instances_definition_occurrence_uidx_0046b96b",
+                  "prefix": "task_instances_definition_occurrence_uidx",
+                  "unique": true,
+                  "where": "(task_definition_id IS NOT NULL)"
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "completed_at",
+                    "id"
+                  ],
+                  "name": "task_instances_home_completed_idx_cb8f99ae",
+                  "prefix": "task_instances_home_completed_idx",
+                  "unique": false,
+                  "where": "(status = 'COMPLETED')"
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "assigned_membership_id"
+                  ],
+                  "name": "task_instances_home_id_assigned_membership_id_idx_8e6c14e4",
+                  "prefix": "task_instances_home_id_assigned_membership_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "home_id"
+                  ],
+                  "name": "task_instances_home_id_idx_f881d5c1",
+                  "prefix": "task_instances_home_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "task_definition_id"
+                  ],
+                  "name": "task_instances_home_id_task_definition_id_idx_5ae5c128",
+                  "prefix": "task_instances_home_id_task_definition_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "assigned_membership_id",
+                    "id"
+                  ],
+                  "name": "task_instances_home_open_assignee_idx_cf14ba37",
+                  "prefix": "task_instances_home_open_assignee_idx",
+                  "unique": false,
+                  "where": "((status = 'OPEN') AND (assigned_membership_id IS NOT NULL))"
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "scheduled_for",
+                    "created_at",
+                    "id"
+                  ],
+                  "name": "task_instances_home_open_idx_6e659718",
+                  "prefix": "task_instances_home_open_idx",
+                  "unique": false,
+                  "where": "(status = 'OPEN')"
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            },
             "users": {
               "columns": {
                 "created_at": {
@@ -2183,6 +3177,28 @@
                 "ROOMMATE",
                 "ADMIN"
               ]
+            },
+            "TaskRecurrenceFrequency": {
+              "kind": "valueSet",
+              "values": [
+                "DAILY",
+                "WEEKLY",
+                "MONTHLY"
+              ]
+            },
+            "TaskSource": {
+              "kind": "valueSet",
+              "values": [
+                "MANUAL",
+                "RECURRING"
+              ]
+            },
+            "TaskStatus": {
+              "kind": "valueSet",
+              "values": [
+                "OPEN",
+                "COMPLETED"
+              ]
             }
           }
         },
@@ -2190,10 +3206,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "5a23f336d31a17bd850ac723ec043a74a198135eb678d527b560f1cc53baa7dc"
+    "storageHash": "64d43d201edd6675c3b3665ec0c764020e54aff2ff974646026e0eeaedbdb534"
   },
   "execution": {
-    "executionHash": "94afdc41ac65ba230add0f1ffd04fc66fffc995c17cbc855fe5724169ceec26f",
+    "executionHash": "2c32da5aa443bc1c55f740849de1e5958905b617fc075f2a59fdf5eb3493b181",
     "mutations": {
       "defaults": [
         {
@@ -2231,6 +3247,58 @@
             "column": "id",
             "namespace": "public",
             "table": "memberships"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv7",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "public",
+            "table": "task_definitions"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "instantNow",
+            "kind": "generator"
+          },
+          "onUpdate": {
+            "id": "instantNow",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "updated_at",
+            "namespace": "public",
+            "table": "task_definitions"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv7",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "public",
+            "table": "task_instances"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "instantNow",
+            "kind": "generator"
+          },
+          "onUpdate": {
+            "id": "instantNow",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "updated_at",
+            "namespace": "public",
+            "table": "task_instances"
           }
         },
         {
