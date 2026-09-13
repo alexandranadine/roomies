@@ -1,4 +1,5 @@
 export const MEMBERSHIP_ACTION = {
+  listActive: 'membership.list_active',
   changeRole: 'membership.changeRole',
   leave: 'membership.leave',
   remove: 'membership.remove',

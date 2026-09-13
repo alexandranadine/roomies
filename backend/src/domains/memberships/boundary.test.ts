@@ -202,4 +202,54 @@ void describe('memberships domain boundary', () => {
     assert.doesNotMatch(source, /LastAdminRequiredError/);
     assert.doesNotMatch(source, /LastRoommateRequiresArchiveError/);
   });
+
+  void it('lists active Memberships through the command and DTO without SQL', async () => {
+    const source = await readFile(path.join(membershipsDir, 'http.ts'), 'utf8');
+    assert.match(source, /router\.get\('\/:homeId\/memberships'/);
+    assert.match(source, /listActiveHomeMemberships/);
+    assert.match(source, /toActiveHomeMembershipsDto/);
+    assert.match(source, /currentMembershipId: actor\.membershipId/);
+    assert.doesNotMatch(source, /LIST_ACTIVE_HOME_MEMBERSHIPS_SQL/);
+    assert.doesNotMatch(source, /FROM\s+memberships/i);
+    assert.doesNotMatch(source, /FROM\s+auth_identities/i);
+    assert.doesNotMatch(source, /better-auth/);
+    assert.doesNotMatch(source, /isSelf/);
+    assert.doesNotMatch(source, /userId/);
+    assert.doesNotMatch(source, /email/);
+  });
+
+  void it('keeps list-active policy free of persistence, HTTP, and SQL', async () => {
+    const source = await readFile(
+      path.join(membershipsDir, 'list-active-policy.ts'),
+      'utf8',
+    );
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /FOR UPDATE/i);
+    assert.doesNotMatch(source, /FROM\s+memberships/i);
+    assert.doesNotMatch(source, /from ['"].*\/http['"]/);
+    assert.doesNotMatch(source, /ForbiddenError/);
+    assert.doesNotMatch(source, /isHomeAdmin/);
+    assert.doesNotMatch(source, /structural-owner/);
+  });
+
+  void it('keeps the active list reader Home-scoped and invitation-free', async () => {
+    const source = await readFile(
+      path.join(membershipsDir, 'list-active-home-memberships-reader.ts'),
+      'utf8',
+    );
+    assert.match(source, /LIST_ACTIVE_HOME_MEMBERSHIPS_SQL/);
+    assert.match(source, /m\.home_id = \$1::uuid/);
+    assert.match(source, /ended_at IS NULL/);
+    assert.match(source, /ORDER BY i\.name ASC, m\.id ASC/);
+    assert.doesNotMatch(source, /invitations/);
+    assert.doesNotMatch(source, /\bemail\b/);
+    assert.doesNotMatch(source, /FOR UPDATE/i);
+    assert.doesNotMatch(source, /INSERT |UPDATE |DELETE /i);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /better-auth/);
+    assert.doesNotMatch(source, /memberships\/repository/);
+    assert.doesNotMatch(source, /homes\/repository/);
+    assert.doesNotMatch(source, /domains\/maintenance/);
+  });
 });

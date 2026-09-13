@@ -13,6 +13,7 @@ import {
   createMembershipsRouter,
   type ChangeMembershipRoleCommand,
   type LeaveMembershipCommand,
+  type ListActiveHomeMembershipsCommand,
   type RemoveMembershipCommand,
 } from '../domains/memberships/http.js';
 import {
@@ -67,6 +68,7 @@ export type CreateRoomiesApiRouterOptions = {
   changeMembershipRole: ChangeMembershipRoleCommand;
   leaveMembership: LeaveMembershipCommand;
   removeMembership: RemoveMembershipCommand;
+  listActiveHomeMemberships?: ListActiveHomeMembershipsCommand;
   invitations?: {
     createInvitation: CreateInvitationCommand;
     revokeInvitation: RevokeInvitationCommand;

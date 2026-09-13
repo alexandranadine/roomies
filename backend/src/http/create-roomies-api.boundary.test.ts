@@ -61,4 +61,16 @@ void describe('create-roomies-api composition boundary', () => {
     assert.doesNotMatch(source, /decideMembershipLeave/);
     assert.doesNotMatch(source, /decideMembershipRemove/);
   });
+
+  void it('wires active Membership list through Home context without SQL', async () => {
+    const source = await readFile(
+      new URL('./create-roomies-api.ts', import.meta.url),
+      'utf8',
+    );
+    assert.match(source, /listActiveHomeMemberships/);
+    assert.doesNotMatch(source, /LIST_ACTIVE_HOME_MEMBERSHIPS_SQL/);
+    assert.doesNotMatch(source, /list-active-home-memberships-reader/);
+    assert.doesNotMatch(source, /FROM\s+auth_identities/i);
+    assert.doesNotMatch(source, /createMembershipActorResolver/);
+  });
 });

@@ -2,6 +2,17 @@ export {
   createActiveHomeActorResolver,
   type ActiveHomeActorResolver,
 } from './active-home-actor-resolver.js';
+export {
+  activeHomeMembershipDtoSchema,
+  activeHomeMembershipsDtoSchema,
+  toActiveHomeMembershipsDto,
+  type ActiveHomeMembershipDto,
+  type ActiveHomeMembershipsDto,
+} from './active-home-membership-dto.js';
+export type {
+  ActiveHomeMembershipListItem,
+  ListActiveHomeMembershipsInput,
+} from './active-home-membership-list.js';
 export { MEMBERSHIP_ACTION, type MembershipAction } from './actions.js';
 export type { ChangeMembershipRoleInput } from './change-role.js';
 export {
@@ -41,8 +52,21 @@ export {
   type ChangeMembershipRoleCommand,
   type CreateMembershipsRouterOptions,
   type LeaveMembershipCommand,
+  type ListActiveHomeMembershipsCommand,
   type RemoveMembershipCommand,
 } from './http.js';
+export {
+  createActiveHomeMembershipsReader,
+  LIST_ACTIVE_HOME_MEMBERSHIPS_SQL,
+  type ActiveHomeMembershipsQueryable,
+  type ActiveHomeMembershipsReader,
+} from './list-active-home-memberships-reader.js';
+export {
+  decideMembershipListActive,
+  isMembershipListActiveCapableRole,
+  MEMBERSHIP_LIST_ACTIVE_CAPABLE_ROLES,
+  type MembershipListActiveDenial,
+} from './list-active-policy.js';
 export {
   insertActiveMembership,
   INSERT_ACTIVE_MEMBERSHIP_SQL,

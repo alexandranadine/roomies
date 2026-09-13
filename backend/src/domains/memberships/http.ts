@@ -7,6 +7,14 @@ import {
   type ActiveHomeActorResolver,
   type MembershipRole,
 } from '../../platform/authz/index.js';
+import {
+  toActiveHomeMembershipsDto,
+  type ActiveHomeMembershipsDto,
+} from './active-home-membership-dto.js';
+import type {
+  ActiveHomeMembershipListItem,
+  ListActiveHomeMembershipsInput,
+} from './active-home-membership-list.js';
 import type { ChangeMembershipRoleInput } from './change-role.js';
 import type { LeaveMembershipInput } from './leave.js';
 import type { RemoveMembershipInput } from './remove.js';
@@ -39,12 +47,17 @@ export type RemoveMembershipCommand = (
   input: RemoveMembershipInput,
 ) => Promise<unknown>;
 
+export type ListActiveHomeMembershipsCommand = (
+  input: ListActiveHomeMembershipsInput,
+) => Promise<readonly ActiveHomeMembershipListItem[]>;
+
 export type CreateMembershipsRouterOptions = {
   principalResolver: Pick<PrincipalResolver, 'requirePrincipal'>;
   activeHomeActorResolver: Pick<ActiveHomeActorResolver, 'resolve'>;
   changeMembershipRole: ChangeMembershipRoleCommand;
   leaveMembership: LeaveMembershipCommand;
   removeMembership: RemoveMembershipCommand;
+  listActiveHomeMemberships?: ListActiveHomeMembershipsCommand;
 };
 
 function parseChangeRoleBody(body: unknown): MembershipRole {
@@ -70,7 +83,7 @@ function parseRemoveBody(body: unknown): void {
 }
 
 /**
- * Membership mutation routes. Mount at `/homes` on the v1 router.
+ * Membership routes. Mount at `/homes` on the v1 router.
  */
 export function createMembershipsRouter(
   options: CreateMembershipsRouterOptions,
@@ -82,6 +95,25 @@ export function createMembershipsRouter(
     '/:homeId',
     createRequireHomeContext(options.activeHomeActorResolver),
   );
+
+  if (options.listActiveHomeMemberships !== undefined) {
+    const listActiveHomeMemberships = options.listActiveHomeMemberships;
+    router.get('/:homeId/memberships', (req, res, next) => {
+      void (async () => {
+        const actor = getActiveHomeActor(res);
+        const homeId = parsePathUuid(req.params['homeId']);
+        const memberships = await listActiveHomeMemberships({
+          actor,
+          homeId,
+        });
+        const dto: ActiveHomeMembershipsDto = toActiveHomeMembershipsDto({
+          currentMembershipId: actor.membershipId,
+          memberships,
+        });
+        res.status(200).json(dto);
+      })().catch(next);
+    });
+  }
 
   router.patch('/:homeId/memberships/:membershipId/role', (req, res, next) => {
     void (async () => {

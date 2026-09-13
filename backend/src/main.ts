@@ -7,6 +7,7 @@ import { createAcceptInvitationFromPool } from './application/invitations/accept
 import { createPreviewInvitationFromPool } from './application/invitations/preview-invitation.js';
 import { createLeaveMembershipFromPool } from './application/home-administration/leave-membership.js';
 import { createRemoveMembershipFromPool } from './application/home-administration/remove-membership.js';
+import { createListActiveHomeMembershipsFromPool } from './application/memberships/list-active-home-memberships.js';
 import { createCreateMaintenanceEntryFromPool } from './application/maintenance/create-maintenance-entry.js';
 import { createListHomeMaintenanceFromPool } from './application/maintenance/list-home-maintenance.js';
 import { createReadMaintenanceEntryFromPool } from './application/maintenance/read-maintenance-entry.js';
@@ -97,6 +98,9 @@ function createWebHttpRuntime(
       ),
       leaveMembership: createLeaveMembershipFromPool(databasePool.pool),
       removeMembership: createRemoveMembershipFromPool(databasePool.pool),
+      listActiveHomeMemberships: createListActiveHomeMembershipsFromPool(
+        databasePool.pool,
+      ),
       invitations: {
         createInvitation: createCreateInvitationFromPool(databasePool.pool),
         revokeInvitation: createRevokeInvitationFromPool(databasePool.pool),
