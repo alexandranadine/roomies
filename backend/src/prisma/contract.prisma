@@ -46,6 +46,18 @@ enum SupplyClaimReleaseReason {
   ENTRY_CANCELED
 }
 
+enum MaintenanceVisibility {
+  @@type("pg/text@1")
+  HOUSEHOLD
+  PRIVATE
+}
+
+enum MaintenanceStatus {
+  @@type("pg/text@1")
+  OPEN
+  RESOLVED
+}
+
 model User {
   id          Uuid                 @id @default(uuid(7))
   createdAt   temporal.createdAt() @map("created_at")
@@ -67,8 +79,10 @@ model Home {
   invitations      Invitation[]
   taskInstances    TaskInstance[]
   taskDefinitions  TaskDefinition[]
-  supplyEntries    SupplyEntry[]
-  supplyClaims     SupplyClaim[]
+  supplyEntries         SupplyEntry[]
+  supplyClaims          SupplyClaim[]
+  maintenanceEntries    MaintenanceEntry[]
+  maintenanceAudiences  MaintenanceAudience[]
 
   @@map("homes")
 }
@@ -88,8 +102,11 @@ model Membership {
   assignedTaskInstances    TaskInstance[]    @relation("TaskInstanceAssignedMembership")
   assignedTaskDefinitions  TaskDefinition[]  @relation("TaskDefinitionAssignedMembership")
   createdTaskDefinitions   TaskDefinition[]  @relation("TaskDefinitionCreatorMembership")
-  createdSupplyEntries     SupplyEntry[]      @relation("SupplyEntryCreatorMembership")
-  supplyClaims             SupplyClaim[]      @relation("SupplyClaimClaimantMembership")
+  createdSupplyEntries          SupplyEntry[]           @relation("SupplyEntryCreatorMembership")
+  supplyClaims                  SupplyClaim[]           @relation("SupplyClaimClaimantMembership")
+  createdMaintenanceEntries     MaintenanceEntry[]      @relation("MaintenanceEntryCreatorMembership")
+  resolvedMaintenanceEntries    MaintenanceEntry[]      @relation("MaintenanceEntryResolverMembership")
+  maintenanceAudiences          MaintenanceAudience[]   @relation("MaintenanceAudienceMembership")
 
   // At most one active tenure per (home, user). Ended rows may coexist so
   // leave-and-rejoin creates a new Membership id rather than reopening one.
@@ -442,4 +459,69 @@ model SupplyClaim {
   @@index([homeId, supplyEntryId, claimedAt, id], name: "supply_claims_entry_history_idx")
   @@index([homeId, claimantMembershipId, id], where: "(released_at IS NULL)", name: "supply_claims_home_active_claimant_idx")
   @@map("supply_claims")
+}
+
+// Maintenance persistence. PRIVATE audience cardinality/creator inclusion and
+// HOUSEHOLD zero-audience are cross-row transactional invariants for the
+// later create-command slice: insert entry then the complete audience set in
+// one transaction. No trigger, RLS, search index, or Maintenance outbox
+// events are part of this contract. Canonical visibility never includes a
+// creator exception or Admin/role branch.
+model MaintenanceEntry {
+  id                     Uuid                   @id @default(uuid(7))
+  homeId                 Uuid                   @map("home_id")
+  createdByMembershipId  Uuid                   @map("created_by_membership_id")
+  visibility             MaintenanceVisibility
+  title                  String
+  details                String?
+  status                 MaintenanceStatus      @default(OPEN)
+  resolvedByMembershipId Uuid?                  @map("resolved_by_membership_id")
+  resolvedAt             Timestamptz?           @map("resolved_at")
+  createdAt              temporal.createdAt()   @map("created_at")
+  updatedAt              temporal.updatedAt()   @map("updated_at")
+
+  home Home @relation(fields: [homeId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "maintenance_entries_home_id_fkey")
+  createdByMembership Membership @relation("MaintenanceEntryCreatorMembership", fields: [homeId, createdByMembershipId], references: [homeId, id], onDelete: Restrict, onUpdate: Restrict, map: "maintenance_entries_creator_home_membership_fkey")
+  resolvedByMembership Membership? @relation("MaintenanceEntryResolverMembership", fields: [homeId, resolvedByMembershipId], references: [homeId, id], onDelete: Restrict, onUpdate: Restrict, map: "maintenance_entries_resolver_home_membership_fkey")
+  audiences MaintenanceAudience[]
+
+  @@check(
+    expression: "(((status = 'OPEN'::text) AND (resolved_by_membership_id IS NULL) AND (resolved_at IS NULL)) OR ((status = 'RESOLVED'::text) AND (resolved_by_membership_id IS NOT NULL) AND (resolved_at IS NOT NULL)))",
+    map: "maintenance_entries_lifecycle_check"
+  )
+  @@check(
+    expression: "(updated_at >= created_at)",
+    map: "maintenance_entries_updated_time_check"
+  )
+  @@check(
+    expression: "((resolved_at IS NULL) OR ((resolved_at >= created_at) AND (resolved_at <= updated_at)))",
+    map: "maintenance_entries_resolved_time_check"
+  )
+  @@check(
+    expression: "((char_length(title) >= 1) AND (char_length(title) <= 120) AND (title = btrim(title)))",
+    map: "maintenance_entries_title_canonical_check"
+  )
+  @@check(
+    expression: "((details IS NULL) OR ((char_length(details) >= 1) AND (char_length(details) <= 4000) AND (details = btrim(details))))",
+    map: "maintenance_entries_details_canonical_check"
+  )
+  @@index([homeId, id], unique: true, name: "maintenance_entries_home_id_id_key")
+  @@index([homeId, updatedAt, id], where: "(status = 'OPEN')", name: "maintenance_entries_home_open_idx")
+  @@index([homeId, updatedAt, id], where: "(status = 'RESOLVED')", name: "maintenance_entries_home_resolved_idx")
+  @@map("maintenance_entries")
+}
+
+model MaintenanceAudience {
+  homeId              Uuid        @map("home_id")
+  maintenanceEntryId  Uuid        @map("maintenance_entry_id")
+  membershipId        Uuid        @map("membership_id")
+  createdAt           Timestamptz @map("created_at")
+
+  home Home @relation(fields: [homeId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "maintenance_audiences_home_id_fkey")
+  maintenanceEntry MaintenanceEntry @relation(fields: [homeId, maintenanceEntryId], references: [homeId, id], onDelete: Restrict, onUpdate: Restrict, map: "maintenance_audiences_entry_home_fkey")
+  membership Membership @relation("MaintenanceAudienceMembership", fields: [homeId, membershipId], references: [homeId, id], onDelete: Restrict, onUpdate: Restrict, map: "maintenance_audiences_home_membership_fkey")
+
+  @@id([homeId, maintenanceEntryId, membershipId], map: "maintenance_audiences_pkey")
+  @@index([homeId, membershipId, maintenanceEntryId], name: "maintenance_audiences_home_membership_entry_idx")
+  @@map("maintenance_audiences")
 }

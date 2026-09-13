@@ -1,0 +1,722 @@
+[
+  {
+    "id": "table.maintenance_audiences",
+    "label": "Create table \"maintenance_audiences\"",
+    "summary": "Creates table \"maintenance_audiences\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "maintenance_audiences"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"maintenance_audiences\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"maintenance_audiences\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"maintenance_audiences\"",
+        "sql": "CREATE TABLE \"public\".\"maintenance_audiences\" (\n  \"created_at\" timestamptz NOT NULL,\n  \"home_id\" uuid NOT NULL,\n  \"maintenance_entry_id\" uuid NOT NULL,\n  \"membership_id\" uuid NOT NULL,\n  CONSTRAINT \"maintenance_audiences_pkey\" PRIMARY KEY (\"home_id\", \"maintenance_entry_id\", \"membership_id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"maintenance_audiences\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"maintenance_audiences\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.maintenance_entries",
+    "label": "Create table \"maintenance_entries\"",
+    "summary": "Creates table \"maintenance_entries\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "maintenance_entries"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"maintenance_entries\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"maintenance_entries\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"maintenance_entries\"",
+        "sql": "CREATE TABLE \"public\".\"maintenance_entries\" (\n  \"created_at\" timestamptz DEFAULT (now()) NOT NULL,\n  \"created_by_membership_id\" uuid NOT NULL,\n  \"details\" text,\n  \"home_id\" uuid NOT NULL,\n  \"id\" uuid NOT NULL,\n  \"resolved_at\" timestamptz,\n  \"resolved_by_membership_id\" uuid,\n  \"status\" text DEFAULT 'OPEN' NOT NULL,\n  \"title\" text NOT NULL,\n  \"updated_at\" timestamptz NOT NULL,\n  \"visibility\" text NOT NULL,\n  PRIMARY KEY (\"id\"),\n  CONSTRAINT \"maintenance_entries_details_canonical_check\" CHECK (((details IS NULL) OR ((char_length(details) >= 1) AND (char_length(details) <= 4000) AND (details = btrim(details))))),\n  CONSTRAINT \"maintenance_entries_lifecycle_check\" CHECK ((((status = 'OPEN'::text) AND (resolved_by_membership_id IS NULL) AND (resolved_at IS NULL)) OR ((status = 'RESOLVED'::text) AND (resolved_by_membership_id IS NOT NULL) AND (resolved_at IS NOT NULL)))),\n  CONSTRAINT \"maintenance_entries_resolved_time_check\" CHECK (((resolved_at IS NULL) OR ((resolved_at >= created_at) AND (resolved_at <= updated_at)))),\n  CONSTRAINT \"maintenance_entries_status_check_2a206a64\" CHECK (\"status\" IN ('OPEN', 'RESOLVED')),\n  CONSTRAINT \"maintenance_entries_title_canonical_check\" CHECK (((char_length(title) >= 1) AND (char_length(title) <= 120) AND (title = btrim(title)))),\n  CONSTRAINT \"maintenance_entries_updated_time_check\" CHECK ((updated_at >= created_at)),\n  CONSTRAINT \"maintenance_entries_visibility_check_b1f71ccd\" CHECK (\"visibility\" IN ('HOUSEHOLD', 'PRIVATE'))\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"maintenance_entries\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"maintenance_entries\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.maintenance_audiences.maintenance_audiences_home_id_idx_f881d5c1",
+    "label": "Create index \"maintenance_audiences_home_id_idx_f881d5c1\" on \"maintenance_audiences\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "maintenance_audiences_home_id_idx_f881d5c1",
+        "table": "maintenance_audiences"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"maintenance_audiences_home_id_idx_f881d5c1\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"maintenance_audiences_home_id_idx_f881d5c1\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"maintenance_audiences_home_id_idx_f881d5c1\"",
+        "sql": "CREATE INDEX \"maintenance_audiences_home_id_idx_f881d5c1\" ON \"public\".\"maintenance_audiences\" (\"home_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"maintenance_audiences_home_id_idx_f881d5c1\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"maintenance_audiences_home_id_idx_f881d5c1\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.maintenance_audiences.maintenance_audiences_home_id_maintenance_entry_id_idx_07136f46",
+    "label": "Create index \"maintenance_audiences_home_id_maintenance_entry_id_idx_07136f46\" on \"maintenance_audiences\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "maintenance_audiences_home_id_maintenance_entry_id_idx_07136f46",
+        "table": "maintenance_audiences"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"maintenance_audiences_home_id_maintenance_entry_id_idx_07136f46\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"maintenance_audiences_home_id_maintenance_entry_id_idx_07136f46\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"maintenance_audiences_home_id_maintenance_entry_id_idx_07136f46\"",
+        "sql": "CREATE INDEX \"maintenance_audiences_home_id_maintenance_entry_id_idx_07136f46\" ON \"public\".\"maintenance_audiences\" (\"home_id\", \"maintenance_entry_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"maintenance_audiences_home_id_maintenance_entry_id_idx_07136f46\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"maintenance_audiences_home_id_maintenance_entry_id_idx_07136f46\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.maintenance_audiences.maintenance_audiences_home_id_membership_id_idx_3d66ba27",
+    "label": "Create index \"maintenance_audiences_home_id_membership_id_idx_3d66ba27\" on \"maintenance_audiences\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "maintenance_audiences_home_id_membership_id_idx_3d66ba27",
+        "table": "maintenance_audiences"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"maintenance_audiences_home_id_membership_id_idx_3d66ba27\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"maintenance_audiences_home_id_membership_id_idx_3d66ba27\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"maintenance_audiences_home_id_membership_id_idx_3d66ba27\"",
+        "sql": "CREATE INDEX \"maintenance_audiences_home_id_membership_id_idx_3d66ba27\" ON \"public\".\"maintenance_audiences\" (\"home_id\", \"membership_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"maintenance_audiences_home_id_membership_id_idx_3d66ba27\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"maintenance_audiences_home_id_membership_id_idx_3d66ba27\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.maintenance_audiences.maintenance_audiences_home_membership_entry_idx_478378c9",
+    "label": "Create index \"maintenance_audiences_home_membership_entry_idx_478378c9\" on \"maintenance_audiences\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "maintenance_audiences_home_membership_entry_idx_478378c9",
+        "table": "maintenance_audiences"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"maintenance_audiences_home_membership_entry_idx_478378c9\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"maintenance_audiences_home_membership_entry_idx_478378c9\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"maintenance_audiences_home_membership_entry_idx_478378c9\"",
+        "sql": "CREATE INDEX \"maintenance_audiences_home_membership_entry_idx_478378c9\" ON \"public\".\"maintenance_audiences\" (\"home_id\", \"membership_id\", \"maintenance_entry_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"maintenance_audiences_home_membership_entry_idx_478378c9\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"maintenance_audiences_home_membership_entry_idx_478378c9\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.maintenance_entries.maintenance_entries_home_id_created_by_membership_id_i_889ed7bc",
+    "label": "Create index \"maintenance_entries_home_id_created_by_membership_id_i_889ed7bc\" on \"maintenance_entries\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "maintenance_entries_home_id_created_by_membership_id_i_889ed7bc",
+        "table": "maintenance_entries"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"maintenance_entries_home_id_created_by_membership_id_i_889ed7bc\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"maintenance_entries_home_id_created_by_membership_id_i_889ed7bc\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"maintenance_entries_home_id_created_by_membership_id_i_889ed7bc\"",
+        "sql": "CREATE INDEX \"maintenance_entries_home_id_created_by_membership_id_i_889ed7bc\" ON \"public\".\"maintenance_entries\" (\"home_id\", \"created_by_membership_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"maintenance_entries_home_id_created_by_membership_id_i_889ed7bc\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"maintenance_entries_home_id_created_by_membership_id_i_889ed7bc\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.maintenance_entries.maintenance_entries_home_id_id_key_2f2cccd8",
+    "label": "Create index \"maintenance_entries_home_id_id_key_2f2cccd8\" on \"maintenance_entries\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "maintenance_entries_home_id_id_key_2f2cccd8",
+        "table": "maintenance_entries"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"maintenance_entries_home_id_id_key_2f2cccd8\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"maintenance_entries_home_id_id_key_2f2cccd8\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"maintenance_entries_home_id_id_key_2f2cccd8\"",
+        "sql": "CREATE UNIQUE INDEX \"maintenance_entries_home_id_id_key_2f2cccd8\" ON \"public\".\"maintenance_entries\" (\"home_id\", \"id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"maintenance_entries_home_id_id_key_2f2cccd8\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"maintenance_entries_home_id_id_key_2f2cccd8\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.maintenance_entries.maintenance_entries_home_id_idx_f881d5c1",
+    "label": "Create index \"maintenance_entries_home_id_idx_f881d5c1\" on \"maintenance_entries\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "maintenance_entries_home_id_idx_f881d5c1",
+        "table": "maintenance_entries"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"maintenance_entries_home_id_idx_f881d5c1\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"maintenance_entries_home_id_idx_f881d5c1\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"maintenance_entries_home_id_idx_f881d5c1\"",
+        "sql": "CREATE INDEX \"maintenance_entries_home_id_idx_f881d5c1\" ON \"public\".\"maintenance_entries\" (\"home_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"maintenance_entries_home_id_idx_f881d5c1\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"maintenance_entries_home_id_idx_f881d5c1\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.maintenance_entries.maintenance_entries_home_id_resolved_by_membership_id__4c1f3348",
+    "label": "Create index \"maintenance_entries_home_id_resolved_by_membership_id__4c1f3348\" on \"maintenance_entries\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "maintenance_entries_home_id_resolved_by_membership_id__4c1f3348",
+        "table": "maintenance_entries"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"maintenance_entries_home_id_resolved_by_membership_id__4c1f3348\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"maintenance_entries_home_id_resolved_by_membership_id__4c1f3348\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"maintenance_entries_home_id_resolved_by_membership_id__4c1f3348\"",
+        "sql": "CREATE INDEX \"maintenance_entries_home_id_resolved_by_membership_id__4c1f3348\" ON \"public\".\"maintenance_entries\" (\"home_id\", \"resolved_by_membership_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"maintenance_entries_home_id_resolved_by_membership_id__4c1f3348\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"maintenance_entries_home_id_resolved_by_membership_id__4c1f3348\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.maintenance_entries.maintenance_entries_home_open_idx_9084003b",
+    "label": "Create index \"maintenance_entries_home_open_idx_9084003b\" on \"maintenance_entries\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "maintenance_entries_home_open_idx_9084003b",
+        "table": "maintenance_entries"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"maintenance_entries_home_open_idx_9084003b\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"maintenance_entries_home_open_idx_9084003b\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"maintenance_entries_home_open_idx_9084003b\"",
+        "sql": "CREATE INDEX \"maintenance_entries_home_open_idx_9084003b\" ON \"public\".\"maintenance_entries\" (\"home_id\", \"updated_at\", \"id\") WHERE ((status = 'OPEN'))",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"maintenance_entries_home_open_idx_9084003b\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"maintenance_entries_home_open_idx_9084003b\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.maintenance_entries.maintenance_entries_home_resolved_idx_af0912c3",
+    "label": "Create index \"maintenance_entries_home_resolved_idx_af0912c3\" on \"maintenance_entries\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "maintenance_entries_home_resolved_idx_af0912c3",
+        "table": "maintenance_entries"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"maintenance_entries_home_resolved_idx_af0912c3\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"maintenance_entries_home_resolved_idx_af0912c3\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"maintenance_entries_home_resolved_idx_af0912c3\"",
+        "sql": "CREATE INDEX \"maintenance_entries_home_resolved_idx_af0912c3\" ON \"public\".\"maintenance_entries\" (\"home_id\", \"updated_at\", \"id\") WHERE ((status = 'RESOLVED'))",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"maintenance_entries_home_resolved_idx_af0912c3\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"maintenance_entries_home_resolved_idx_af0912c3\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.maintenance_audiences.maintenance_audiences_home_id_fkey",
+    "label": "Add foreign key \"maintenance_audiences_home_id_fkey\" on \"maintenance_audiences\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "maintenance_audiences_home_id_fkey",
+        "table": "maintenance_audiences"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"maintenance_audiences_home_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "maintenance_audiences_home_id_fkey",
+          "public",
+          "\"public\".\"maintenance_audiences\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"maintenance_audiences_home_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"maintenance_audiences\"\nADD CONSTRAINT \"maintenance_audiences_home_id_fkey\"\nFOREIGN KEY (\"home_id\")\nREFERENCES \"public\".\"homes\" (\"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"maintenance_audiences_home_id_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "maintenance_audiences_home_id_fkey",
+          "public",
+          "\"public\".\"maintenance_audiences\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.maintenance_audiences.maintenance_audiences_entry_home_fkey",
+    "label": "Add foreign key \"maintenance_audiences_entry_home_fkey\" on \"maintenance_audiences\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "maintenance_audiences_entry_home_fkey",
+        "table": "maintenance_audiences"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"maintenance_audiences_entry_home_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "maintenance_audiences_entry_home_fkey",
+          "public",
+          "\"public\".\"maintenance_audiences\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"maintenance_audiences_entry_home_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"maintenance_audiences\"\nADD CONSTRAINT \"maintenance_audiences_entry_home_fkey\"\nFOREIGN KEY (\"home_id\", \"maintenance_entry_id\")\nREFERENCES \"public\".\"maintenance_entries\" (\"home_id\", \"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"maintenance_audiences_entry_home_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "maintenance_audiences_entry_home_fkey",
+          "public",
+          "\"public\".\"maintenance_audiences\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.maintenance_audiences.maintenance_audiences_home_membership_fkey",
+    "label": "Add foreign key \"maintenance_audiences_home_membership_fkey\" on \"maintenance_audiences\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "maintenance_audiences_home_membership_fkey",
+        "table": "maintenance_audiences"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"maintenance_audiences_home_membership_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "maintenance_audiences_home_membership_fkey",
+          "public",
+          "\"public\".\"maintenance_audiences\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"maintenance_audiences_home_membership_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"maintenance_audiences\"\nADD CONSTRAINT \"maintenance_audiences_home_membership_fkey\"\nFOREIGN KEY (\"home_id\", \"membership_id\")\nREFERENCES \"public\".\"memberships\" (\"home_id\", \"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"maintenance_audiences_home_membership_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "maintenance_audiences_home_membership_fkey",
+          "public",
+          "\"public\".\"maintenance_audiences\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.maintenance_entries.maintenance_entries_home_id_fkey",
+    "label": "Add foreign key \"maintenance_entries_home_id_fkey\" on \"maintenance_entries\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "maintenance_entries_home_id_fkey",
+        "table": "maintenance_entries"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"maintenance_entries_home_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "maintenance_entries_home_id_fkey",
+          "public",
+          "\"public\".\"maintenance_entries\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"maintenance_entries_home_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"maintenance_entries\"\nADD CONSTRAINT \"maintenance_entries_home_id_fkey\"\nFOREIGN KEY (\"home_id\")\nREFERENCES \"public\".\"homes\" (\"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"maintenance_entries_home_id_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "maintenance_entries_home_id_fkey",
+          "public",
+          "\"public\".\"maintenance_entries\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.maintenance_entries.maintenance_entries_creator_home_membership_fkey",
+    "label": "Add foreign key \"maintenance_entries_creator_home_membership_fkey\" on \"maintenance_entries\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "maintenance_entries_creator_home_membership_fkey",
+        "table": "maintenance_entries"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"maintenance_entries_creator_home_membership_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "maintenance_entries_creator_home_membership_fkey",
+          "public",
+          "\"public\".\"maintenance_entries\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"maintenance_entries_creator_home_membership_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"maintenance_entries\"\nADD CONSTRAINT \"maintenance_entries_creator_home_membership_fkey\"\nFOREIGN KEY (\"home_id\", \"created_by_membership_id\")\nREFERENCES \"public\".\"memberships\" (\"home_id\", \"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"maintenance_entries_creator_home_membership_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "maintenance_entries_creator_home_membership_fkey",
+          "public",
+          "\"public\".\"maintenance_entries\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.maintenance_entries.maintenance_entries_resolver_home_membership_fkey",
+    "label": "Add foreign key \"maintenance_entries_resolver_home_membership_fkey\" on \"maintenance_entries\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "maintenance_entries_resolver_home_membership_fkey",
+        "table": "maintenance_entries"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"maintenance_entries_resolver_home_membership_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "maintenance_entries_resolver_home_membership_fkey",
+          "public",
+          "\"public\".\"maintenance_entries\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"maintenance_entries_resolver_home_membership_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"maintenance_entries\"\nADD CONSTRAINT \"maintenance_entries_resolver_home_membership_fkey\"\nFOREIGN KEY (\"home_id\", \"resolved_by_membership_id\")\nREFERENCES \"public\".\"memberships\" (\"home_id\", \"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"maintenance_entries_resolver_home_membership_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "maintenance_entries_resolver_home_membership_fkey",
+          "public",
+          "\"public\".\"maintenance_entries\""
+        ]
+      }
+    ]
+  }
+]

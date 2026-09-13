@@ -28,6 +28,14 @@
       "model": "Invitation",
       "namespace": "public"
     },
+    "maintenance_audiences": {
+      "model": "MaintenanceAudience",
+      "namespace": "public"
+    },
+    "maintenance_entries": {
+      "model": "MaintenanceEntry",
+      "namespace": "public"
+    },
     "memberships": {
       "model": "Membership",
       "namespace": "public"
@@ -61,6 +69,32 @@
     "namespaces": {
       "public": {
         "enum": {
+          "MaintenanceStatus": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "OPEN",
+                "value": "OPEN"
+              },
+              {
+                "name": "RESOLVED",
+                "value": "RESOLVED"
+              }
+            ]
+          },
+          "MaintenanceVisibility": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "HOUSEHOLD",
+                "value": "HOUSEHOLD"
+              },
+              {
+                "name": "PRIVATE",
+                "value": "PRIVATE"
+              }
+            ]
+          },
           "MembershipRole": {
             "codecId": "pg/text@1",
             "members": [
@@ -680,6 +714,36 @@
                   "namespace": "public"
                 }
               },
+              "maintenanceAudiences": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "homeId"
+                  ]
+                },
+                "to": {
+                  "model": "MaintenanceAudience",
+                  "namespace": "public"
+                }
+              },
+              "maintenanceEntries": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "homeId"
+                  ]
+                },
+                "to": {
+                  "model": "MaintenanceEntry",
+                  "namespace": "public"
+                }
+              },
               "memberships": {
                 "cardinality": "1:N",
                 "on": {
@@ -952,6 +1016,307 @@
               "table": "invitations"
             }
           },
+          "MaintenanceAudience": {
+            "fields": {
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "homeId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "maintenanceEntryId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "membershipId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "home": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "homeId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Home",
+                  "namespace": "public"
+                }
+              },
+              "maintenanceEntry": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "maintenanceEntryId"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "MaintenanceEntry",
+                  "namespace": "public"
+                }
+              },
+              "membership": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "membershipId"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Membership",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "homeId": {
+                  "column": "home_id"
+                },
+                "maintenanceEntryId": {
+                  "column": "maintenance_entry_id"
+                },
+                "membershipId": {
+                  "column": "membership_id"
+                }
+              },
+              "namespaceId": "public",
+              "table": "maintenance_audiences"
+            }
+          },
+          "MaintenanceEntry": {
+            "fields": {
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdByMembershipId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "details": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "homeId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "resolvedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "resolvedByMembershipId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "status": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "MaintenanceStatus",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "title": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "visibility": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "MaintenanceVisibility",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              }
+            },
+            "relations": {
+              "audiences": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "id"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "maintenanceEntryId"
+                  ]
+                },
+                "to": {
+                  "model": "MaintenanceAudience",
+                  "namespace": "public"
+                }
+              },
+              "createdByMembership": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "createdByMembershipId"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Membership",
+                  "namespace": "public"
+                }
+              },
+              "home": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "homeId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Home",
+                  "namespace": "public"
+                }
+              },
+              "resolvedByMembership": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "resolvedByMembershipId"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Membership",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "createdByMembershipId": {
+                  "column": "created_by_membership_id"
+                },
+                "details": {
+                  "column": "details"
+                },
+                "homeId": {
+                  "column": "home_id"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "resolvedAt": {
+                  "column": "resolved_at"
+                },
+                "resolvedByMembershipId": {
+                  "column": "resolved_by_membership_id"
+                },
+                "status": {
+                  "column": "status"
+                },
+                "title": {
+                  "column": "title"
+                },
+                "updatedAt": {
+                  "column": "updated_at"
+                },
+                "visibility": {
+                  "column": "visibility"
+                }
+              },
+              "namespaceId": "public",
+              "table": "maintenance_entries"
+            }
+          },
           "Membership": {
             "fields": {
               "endedAt": {
@@ -1072,6 +1437,23 @@
                   "namespace": "public"
                 }
               },
+              "createdMaintenanceEntries": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "id"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "createdByMembershipId"
+                  ]
+                },
+                "to": {
+                  "model": "MaintenanceEntry",
+                  "namespace": "public"
+                }
+              },
               "createdSupplyEntries": {
                 "cardinality": "1:N",
                 "on": {
@@ -1118,6 +1500,40 @@
                 },
                 "to": {
                   "model": "Home",
+                  "namespace": "public"
+                }
+              },
+              "maintenanceAudiences": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "id"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "membershipId"
+                  ]
+                },
+                "to": {
+                  "model": "MaintenanceAudience",
+                  "namespace": "public"
+                }
+              },
+              "resolvedMaintenanceEntries": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "id"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "resolvedByMembershipId"
+                  ]
+                },
+                "to": {
+                  "model": "MaintenanceEntry",
                   "namespace": "public"
                 }
               },
@@ -2795,6 +3211,379 @@
               },
               "uniques": []
             },
+            "maintenance_audiences": {
+              "columns": {
+                "created_at": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "home_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "maintenance_entry_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "membership_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "name": "maintenance_audiences_home_id_fkey",
+                  "onDelete": "restrict",
+                  "onUpdate": "restrict",
+                  "source": {
+                    "columns": [
+                      "home_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "maintenance_audiences"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "homes"
+                  }
+                },
+                {
+                  "name": "maintenance_audiences_entry_home_fkey",
+                  "onDelete": "restrict",
+                  "onUpdate": "restrict",
+                  "source": {
+                    "columns": [
+                      "home_id",
+                      "maintenance_entry_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "maintenance_audiences"
+                  },
+                  "target": {
+                    "columns": [
+                      "home_id",
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "maintenance_entries"
+                  }
+                },
+                {
+                  "name": "maintenance_audiences_home_membership_fkey",
+                  "onDelete": "restrict",
+                  "onUpdate": "restrict",
+                  "source": {
+                    "columns": [
+                      "home_id",
+                      "membership_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "maintenance_audiences"
+                  },
+                  "target": {
+                    "columns": [
+                      "home_id",
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "memberships"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "home_id"
+                  ],
+                  "name": "maintenance_audiences_home_id_idx_f881d5c1",
+                  "prefix": "maintenance_audiences_home_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "maintenance_entry_id"
+                  ],
+                  "name": "maintenance_audiences_home_id_maintenance_entry_id_idx_07136f46",
+                  "prefix": "maintenance_audiences_home_id_maintenance_entry_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "membership_id"
+                  ],
+                  "name": "maintenance_audiences_home_id_membership_id_idx_3d66ba27",
+                  "prefix": "maintenance_audiences_home_id_membership_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "membership_id",
+                    "maintenance_entry_id"
+                  ],
+                  "name": "maintenance_audiences_home_membership_entry_idx_478378c9",
+                  "prefix": "maintenance_audiences_home_membership_entry_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "home_id",
+                  "maintenance_entry_id",
+                  "membership_id"
+                ],
+                "name": "maintenance_audiences_pkey"
+              },
+              "uniques": []
+            },
+            "maintenance_entries": {
+              "checks": [
+                {
+                  "expression": "((details IS NULL) OR ((char_length(details) >= 1) AND (char_length(details) <= 4000) AND (details = btrim(details))))",
+                  "name": "maintenance_entries_details_canonical_check"
+                },
+                {
+                  "expression": "(((status = 'OPEN'::text) AND (resolved_by_membership_id IS NULL) AND (resolved_at IS NULL)) OR ((status = 'RESOLVED'::text) AND (resolved_by_membership_id IS NOT NULL) AND (resolved_at IS NOT NULL)))",
+                  "name": "maintenance_entries_lifecycle_check"
+                },
+                {
+                  "expression": "((resolved_at IS NULL) OR ((resolved_at >= created_at) AND (resolved_at <= updated_at)))",
+                  "name": "maintenance_entries_resolved_time_check"
+                },
+                {
+                  "expression": "\"status\" IN ('OPEN', 'RESOLVED')",
+                  "name": "maintenance_entries_status_check_2a206a64",
+                  "prefix": "maintenance_entries_status_check"
+                },
+                {
+                  "expression": "((char_length(title) >= 1) AND (char_length(title) <= 120) AND (title = btrim(title)))",
+                  "name": "maintenance_entries_title_canonical_check"
+                },
+                {
+                  "expression": "(updated_at >= created_at)",
+                  "name": "maintenance_entries_updated_time_check"
+                },
+                {
+                  "expression": "\"visibility\" IN ('HOUSEHOLD', 'PRIVATE')",
+                  "name": "maintenance_entries_visibility_check_b1f71ccd",
+                  "prefix": "maintenance_entries_visibility_check"
+                }
+              ],
+              "columns": {
+                "created_at": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "created_by_membership_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "details": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "home_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "resolved_at": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "resolved_by_membership_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": true
+                },
+                "status": {
+                  "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": "OPEN"
+                  },
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "MaintenanceStatus",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "title": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "updated_at": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "visibility": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "MaintenanceVisibility",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                }
+              },
+              "foreignKeys": [
+                {
+                  "name": "maintenance_entries_home_id_fkey",
+                  "onDelete": "restrict",
+                  "onUpdate": "restrict",
+                  "source": {
+                    "columns": [
+                      "home_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "maintenance_entries"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "homes"
+                  }
+                },
+                {
+                  "name": "maintenance_entries_creator_home_membership_fkey",
+                  "onDelete": "restrict",
+                  "onUpdate": "restrict",
+                  "source": {
+                    "columns": [
+                      "home_id",
+                      "created_by_membership_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "maintenance_entries"
+                  },
+                  "target": {
+                    "columns": [
+                      "home_id",
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "memberships"
+                  }
+                },
+                {
+                  "name": "maintenance_entries_resolver_home_membership_fkey",
+                  "onDelete": "restrict",
+                  "onUpdate": "restrict",
+                  "source": {
+                    "columns": [
+                      "home_id",
+                      "resolved_by_membership_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "maintenance_entries"
+                  },
+                  "target": {
+                    "columns": [
+                      "home_id",
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "memberships"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "home_id",
+                    "created_by_membership_id"
+                  ],
+                  "name": "maintenance_entries_home_id_created_by_membership_id_i_889ed7bc",
+                  "prefix": "maintenance_entries_home_id_created_by_membership_id_i",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "id"
+                  ],
+                  "name": "maintenance_entries_home_id_id_key_2f2cccd8",
+                  "prefix": "maintenance_entries_home_id_id_key",
+                  "unique": true
+                },
+                {
+                  "columns": [
+                    "home_id"
+                  ],
+                  "name": "maintenance_entries_home_id_idx_f881d5c1",
+                  "prefix": "maintenance_entries_home_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "resolved_by_membership_id"
+                  ],
+                  "name": "maintenance_entries_home_id_resolved_by_membership_id__4c1f3348",
+                  "prefix": "maintenance_entries_home_id_resolved_by_membership_id_",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "updated_at",
+                    "id"
+                  ],
+                  "name": "maintenance_entries_home_open_idx_9084003b",
+                  "prefix": "maintenance_entries_home_open_idx",
+                  "unique": false,
+                  "where": "(status = 'OPEN')"
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "updated_at",
+                    "id"
+                  ],
+                  "name": "maintenance_entries_home_resolved_idx_af0912c3",
+                  "prefix": "maintenance_entries_home_resolved_idx",
+                  "unique": false,
+                  "where": "(status = 'RESOLVED')"
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            },
             "memberships": {
               "checks": [
                 {
@@ -3988,6 +4777,20 @@
             }
           },
           "valueSet": {
+            "MaintenanceStatus": {
+              "kind": "valueSet",
+              "values": [
+                "OPEN",
+                "RESOLVED"
+              ]
+            },
+            "MaintenanceVisibility": {
+              "kind": "valueSet",
+              "values": [
+                "HOUSEHOLD",
+                "PRIVATE"
+              ]
+            },
             "MembershipRole": {
               "kind": "valueSet",
               "values": [
@@ -4040,10 +4843,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "69b3be9ba4dff5e0aa89204a26c569bd9f59e0f750ef27f1fe7c1da04f6b5d3a"
+    "storageHash": "29198392131d455122e9c05441c5036decaffe594b242677f6f461b9651846b9"
   },
   "execution": {
-    "executionHash": "29fda7262a70996de2a7e088b74a9dd79fb97615d9be79cf32aad49beceeafff",
+    "executionHash": "2c332e06e2d1dacc348760680e2355d43a1fa70f9f24d43a5c60b1a0a6b47b53",
     "mutations": {
       "defaults": [
         {
@@ -4070,6 +4873,32 @@
             "column": "updated_at",
             "namespace": "public",
             "table": "homes"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv7",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "public",
+            "table": "maintenance_entries"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "instantNow",
+            "kind": "generator"
+          },
+          "onUpdate": {
+            "id": "instantNow",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "updated_at",
+            "namespace": "public",
+            "table": "maintenance_entries"
           }
         },
         {
