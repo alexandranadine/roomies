@@ -30,9 +30,11 @@ void describe('maintenance domain boundary', () => {
       assert.doesNotMatch(source, /home-administration/, relative);
       assert.doesNotMatch(source, /platform\/runtime/, relative);
       assert.doesNotMatch(source, /outbox/, relative);
-      assert.doesNotMatch(source, /from ['"]express['"]/, relative);
       assert.doesNotMatch(source, /better-auth/, relative);
       assert.doesNotMatch(source, /user_id/, relative);
+      if (!relative.endsWith('/http.ts')) {
+        assert.doesNotMatch(source, /from ['"]express['"]/, relative);
+      }
     }
   });
 
@@ -119,14 +121,26 @@ void describe('maintenance domain boundary', () => {
     assert.doesNotMatch(actions, /audience/);
   });
 
-  void it('does not create HTTP, application, or cache surfaces in this slice', async () => {
-    const names = (await readdir(maintenanceDir)).filter((name) =>
-      name.endsWith('.ts'),
-    );
-    assert.equal(names.includes('http.ts'), false);
-    const index = await readFile(path.join(maintenanceDir, 'index.ts'), 'utf8');
-    assert.doesNotMatch(index, /createMaintenanceRouter/);
-    assert.doesNotMatch(index, /from ['"]express['"]/);
-    assert.doesNotMatch(index, /application\/maintenance/);
+  void it('keeps Maintenance HTTP adapter-only on the existing Home authz path', async () => {
+    const source = await readFile(path.join(maintenanceDir, 'http.ts'), 'utf8');
+    assert.match(source, /router\.post\('\/:homeId\/maintenance'/);
+    assert.match(source, /createRequireHomeContext/);
+    assert.match(source, /createRequireAuth/);
+    assert.match(source, /setPrivateNoStoreHeaders/);
+    assert.match(source, /discriminatedUnion\('visibility'/);
+    assert.match(source, /\.strict\(\)/);
+    assert.match(source, /toMaintenanceDetailDto/);
+    assert.doesNotMatch(source, /lockHomeAndExactMemberships/);
+    assert.doesNotMatch(source, /findActiveExactMembershipIdsInHome/);
+    assert.doesNotMatch(source, /FROM\s+maintenance_entries/i);
+    assert.doesNotMatch(source, /FROM\s+memberships/i);
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+    assert.doesNotMatch(source, /better-auth/);
+    assert.doesNotMatch(source, /maintenance\.created/);
+    assert.doesNotMatch(source, /outbox/);
+    assert.doesNotMatch(source, /router\.get/i);
+    assert.doesNotMatch(source, /router\.patch/i);
+    assert.doesNotMatch(source, /router\.delete/i);
+    assert.doesNotMatch(source, /audienceMembershipIds.*res\.json/);
   });
 });

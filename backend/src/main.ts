@@ -7,6 +7,7 @@ import { createAcceptInvitationFromPool } from './application/invitations/accept
 import { createPreviewInvitationFromPool } from './application/invitations/preview-invitation.js';
 import { createLeaveMembershipFromPool } from './application/home-administration/leave-membership.js';
 import { createRemoveMembershipFromPool } from './application/home-administration/remove-membership.js';
+import { createCreateMaintenanceEntryFromPool } from './application/maintenance/create-maintenance-entry.js';
 import { createCancelSupplyEntryFromPool } from './application/supplies/cancel-supply-entry.js';
 import { createClaimSupplyEntryFromPool } from './application/supplies/claim-supply-entry.js';
 import { createCreateSupplyEntryFromPool } from './application/supplies/create-supply-entry.js';
@@ -122,6 +123,11 @@ function createWebHttpRuntime(
           databasePool.pool,
         ),
         cancelSupplyEntry: createCancelSupplyEntryFromPool(databasePool.pool),
+      },
+      maintenance: {
+        createMaintenanceEntry: createCreateMaintenanceEntryFromPool(
+          databasePool.pool,
+        ),
       },
     }),
   });

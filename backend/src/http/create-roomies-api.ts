@@ -16,6 +16,10 @@ import {
   type RemoveMembershipCommand,
 } from '../domains/memberships/http.js';
 import {
+  createMaintenanceRouter,
+  type CreateMaintenanceEntryCommand,
+} from '../domains/maintenance/http.js';
+import {
   createSuppliesRouter,
   type CancelSupplyEntryCommand,
   type ClaimSupplyEntryCommand,
@@ -82,6 +86,9 @@ export type CreateRoomiesApiRouterOptions = {
     releaseSupplyClaim: ReleaseSupplyClaimCommand;
     markSupplyEntryObtained: MarkSupplyEntryObtainedCommand;
     cancelSupplyEntry: CancelSupplyEntryCommand;
+  };
+  maintenance?: {
+    createMaintenanceEntry: CreateMaintenanceEntryCommand;
   };
 };
 
@@ -162,6 +169,16 @@ export function createRoomiesApiRouter(
         releaseSupplyClaim: options.supplies.releaseSupplyClaim,
         markSupplyEntryObtained: options.supplies.markSupplyEntryObtained,
         cancelSupplyEntry: options.supplies.cancelSupplyEntry,
+      }),
+    );
+  }
+  if (options.maintenance !== undefined) {
+    router.use(
+      '/homes',
+      createMaintenanceRouter({
+        principalResolver: options.principalResolver,
+        activeHomeActorResolver: options.activeHomeActorResolver,
+        createMaintenanceEntry: options.maintenance.createMaintenanceEntry,
       }),
     );
   }
