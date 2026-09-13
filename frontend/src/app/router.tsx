@@ -1,7 +1,10 @@
 import { createBrowserRouter, type RouteObject } from 'react-router';
 import { HomeDiscoveryPage } from '../homes/home-discovery-page.js';
+import { HomeOverviewPage } from '../homes/home-overview-page.js';
 import { HomeShellPage } from '../homes/home-shell-page.js';
 import { InvitationLandingPage } from '../invitations/invitation-landing-page.js';
+import { MaintenanceDetailPage } from '../maintenance/maintenance-detail-page.js';
+import { MaintenanceListPage } from '../maintenance/maintenance-list-page.js';
 import { AppShell } from './app-shell.js';
 import { NotFoundPage } from './not-found-page.js';
 import { RequireAuth } from './require-auth.js';
@@ -57,6 +60,20 @@ export function buildAppChildRoutes(includeDevRoutes: boolean): RouteObject[] {
           <HomeShellPage />
         </RequireAuth>
       ),
+      children: [
+        {
+          index: true,
+          element: <HomeOverviewPage />,
+        },
+        {
+          path: 'maintenance',
+          element: <MaintenanceListPage />,
+        },
+        {
+          path: 'maintenance/:maintenanceEntryId',
+          element: <MaintenanceDetailPage />,
+        },
+      ],
     },
     {
       path: 'invitations/:invitationId',

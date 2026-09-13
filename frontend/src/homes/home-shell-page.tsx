@@ -1,11 +1,13 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, Outlet, useParams } from 'react-router';
 import { DocumentTitle } from '../components/document-title.js';
 import { Spinner } from '../components/ui/index.js';
 import { ApiError } from '../platform/api/index.js';
 import { clearPrivateHomeQueryState } from './clear-private-home-queries.js';
 import { getHomeContext } from './home-context-api.js';
+import type { HomeShellOutletContext } from './home-overview-page.js';
+import { HomePrimaryNav } from './home-primary-nav.js';
 import { currentUserQueryKey, homeContextQueryKey } from './home-query-keys.js';
 
 const HOME_ID_PATTERN =
@@ -85,21 +87,21 @@ export function HomeShellPage() {
     );
   }
 
+  const outletContext: HomeShellOutletContext = { home };
+
   return (
-    <DocumentTitle title={`${home.name} · Roomies`}>
-      <div className="flex flex-col gap-4">
-        <p>
-          <Link
-            to="/"
-            className="text-sm font-medium text-brand underline-offset-4 hover:text-brand-hover hover:underline focus-visible:rounded-sm"
-          >
-            Your Homes
-          </Link>
-        </p>
-        <h1 className="text-2xl font-semibold tracking-tight text-text-primary sm:text-3xl">
-          {home.name}
-        </h1>
-      </div>
-    </DocumentTitle>
+    <div className="flex flex-col gap-4">
+      <p>
+        <Link
+          to="/"
+          className="text-sm font-medium text-brand underline-offset-4 hover:text-brand-hover hover:underline focus-visible:rounded-sm"
+        >
+          Your Homes
+        </Link>
+      </p>
+      <p className="text-sm font-medium text-text-secondary">{home.name}</p>
+      <HomePrimaryNav homeId={home.id} />
+      <Outlet context={outletContext} />
+    </div>
   );
 }
