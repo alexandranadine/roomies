@@ -111,15 +111,19 @@ void describe('homes domain boundary', () => {
     }
   });
 
-  void it('keeps the explicit archive route adapter-only', async () => {
+  void it('keeps Home mutation routes adapter-only', async () => {
     const source = await readFile(path.join(homesDir, 'http.ts'), 'utf8');
     const mutations = source.match(/router\.(post|patch|put|delete)\s*\(/g);
-    assert.equal(mutations?.length, 1);
+    assert.equal(mutations?.length, 2);
+    assert.match(source, /router\.post\('\/'/);
     assert.match(source, /router\.post\('\/:homeId\/archive-final-member'/);
     assert.doesNotMatch(source, /lockHomeStructure/);
     assert.doesNotMatch(source, /FOR UPDATE/i);
     assert.doesNotMatch(source, /leave|removeMember/i);
     assert.doesNotMatch(source, /activeMemberships|actor\.role/);
+    assert.doesNotMatch(source, /INSERT INTO/i);
+    assert.doesNotMatch(source, /application\/homes/);
+    assert.doesNotMatch(source, /owner|primaryAdmin|createdByUserId/i);
   });
 
   void it('does not query Membership tables from HTTP', async () => {
@@ -133,6 +137,20 @@ void describe('homes domain boundary', () => {
       assert.doesNotMatch(source, /FROM\s+homes/i);
       assert.doesNotMatch(source, /from ['"]pg['"]/);
     }
+  });
+
+  void it('keeps Home insert free of Membership writes, Owner fields, and events', async () => {
+    const source = await readFile(
+      path.join(homesDir, 'insert-home.ts'),
+      'utf8',
+    );
+    assert.match(source, /INSERT INTO homes/);
+    assert.doesNotMatch(source, /memberships/i);
+    assert.doesNotMatch(source, /outbox/i);
+    assert.doesNotMatch(source, /owner|primaryAdmin|createdByUserId|founder/i);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+    assert.doesNotMatch(source, /Date\.now/);
   });
 
   void it('does not put Home policy inside platform/auth', async () => {

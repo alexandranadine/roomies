@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   createHomesRouter,
   type ArchiveFinalMemberCommand,
+  type CreateHomeCommand,
 } from '../domains/homes/http.js';
 import type { HomeReader } from '../domains/homes/index.js';
 import {
@@ -32,6 +33,7 @@ export type CreateRoomiesApiRouterOptions = {
   activeHomeActorResolver: Pick<ActiveHomeActorResolver, 'resolve'>;
   homeReader: Pick<HomeReader, 'findActiveHomeById'>;
   archiveFinalMemberHome: ArchiveFinalMemberCommand;
+  createHome?: CreateHomeCommand;
   changeMembershipRole: ChangeMembershipRoleCommand;
   leaveMembership: LeaveMembershipCommand;
   removeMembership: RemoveMembershipCommand;

@@ -121,6 +121,24 @@ void describe('memberships domain boundary', () => {
     }
   });
 
+  void it('keeps active Membership insert an ordinary tenure write', async () => {
+    const source = await readFile(
+      path.join(membershipsDir, 'insert-active-membership.ts'),
+      'utf8',
+    );
+    assert.match(source, /INSERT INTO memberships/);
+    assert.match(source, /ended_at/);
+    assert.match(source, /NULL/);
+    assert.doesNotMatch(source, /founder|owner|primaryAdmin|createdBy/i);
+    assert.doesNotMatch(source, /outbox/i);
+    assert.doesNotMatch(source, /home\.created/i);
+    assert.doesNotMatch(source, /membership\.started/i);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+    assert.doesNotMatch(source, /homes\/insert-home/);
+    assert.doesNotMatch(source, /Date\.now/);
+  });
+
   void it('owns the exact active Membership ending UPDATE', async () => {
     const source = await readFile(
       path.join(membershipsDir, 'update-active-membership-ended-at.ts'),

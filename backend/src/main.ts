@@ -1,3 +1,4 @@
+import { createCreateHomeFromPool } from './application/homes/create-home.js';
 import { createChangeMembershipRoleFromPool } from './application/home-administration/change-membership-role.js';
 import { createArchiveFinalMemberHomeFromPool } from './application/home-administration/archive-final-member-home.js';
 import { createCreateInvitationFromPool } from './application/home-administration/create-invitation.js';
@@ -56,6 +57,7 @@ function main(): void {
       principalResolver,
       activeHomeActorResolver,
       homeReader,
+      createHome: createCreateHomeFromPool(databasePool.pool),
       archiveFinalMemberHome: createArchiveFinalMemberHomeFromPool(
         databasePool.pool,
       ),

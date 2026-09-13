@@ -31,6 +31,11 @@ export {
   type LeaveMembershipCommand,
   type RemoveMembershipCommand,
 } from './http.js';
+export {
+  insertActiveMembership,
+  INSERT_ACTIVE_MEMBERSHIP_SQL,
+  type NewActiveMembership,
+} from './insert-active-membership.js';
 export type { LeaveMembershipInput } from './leave.js';
 export {
   decideMembershipLeave,

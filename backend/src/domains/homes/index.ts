@@ -5,15 +5,29 @@ export {
   createHomeArchiveWriter,
   type HomeArchiveWriter,
 } from './archive-home.js';
+export {
+  createdHomeDtoSchema,
+  toCreatedHomeDto,
+  type CreatedHomeDto,
+} from './created-home-dto.js';
 export { FinalMemberRequiredError } from './errors.js';
 export { getHome } from './get-home.js';
 export type { Home } from './home.js';
 export { homeDtoSchema, toHomeDto, type HomeDto } from './home-dto.js';
 export {
+  HOME_NAME_MAX_LENGTH,
+  InvalidHomeNameError,
+  normalizeHomeName,
+} from './home-name.js';
+export {
   createHomesRouter,
   type ArchiveFinalMemberCommand,
+  type CreateHomeCommand,
+  type CreateHomeCommandInput,
+  type CreateHomeCommandResult,
   type CreateHomesRouterOptions,
 } from './http.js';
+export { insertHome, INSERT_HOME_SQL, type NewHome } from './insert-home.js';
 export {
   lockActiveHomeStructureForEntry,
   lockHomeStructure,
