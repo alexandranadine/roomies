@@ -7,6 +7,8 @@ import { StructuralIntegrityError } from './structure-errors.js';
 import {
   LOCK_EXACT_MEMBERSHIP_FOR_UPDATE_SQL,
   lockHomeAndExactMemberships,
+  TRY_LOCK_HOME_FOR_UPDATE_SQL,
+  tryLockHomeAndExactMemberships,
   uniqueSortedMembershipIds,
 } from './lock-home-and-exact-memberships.js';
 import { LOCK_HOME_FOR_UPDATE_SQL } from './lock-home-structure.js';
@@ -89,6 +91,42 @@ void describe('lockHomeAndExactMemberships', () => {
       /FOR NO KEY UPDATE/,
     );
     assert.match(LOCK_EXACT_MEMBERSHIP_FOR_UPDATE_SQL, /WHERE id = \$1/);
+    assert.match(TRY_LOCK_HOME_FOR_UPDATE_SQL, /FOR UPDATE SKIP LOCKED/);
+  });
+
+  void it('returns null without Membership locks when Home is unavailable', async () => {
+    const { tx, queries } = txWith({ home: [] });
+    const locked = await tryLockHomeAndExactMemberships(tx, {
+      homeId: HOME_A,
+      membershipIds: [MEMBERSHIP_LOW],
+    });
+    assert.equal(locked, null);
+    assert.equal(queries[0]?.text, TRY_LOCK_HOME_FOR_UPDATE_SQL);
+    assert.equal(
+      queries.some((query) => query.text.includes('FROM memberships')),
+      false,
+    );
+  });
+
+  void it('uses the non-blocking Home lock before exact Membership locks', async () => {
+    const { tx, queries } = txWith({
+      memberships: {
+        [MEMBERSHIP_LOW]: {
+          id: MEMBERSHIP_LOW,
+          user_id: USER_A,
+          home_id: HOME_A,
+          role: 'ROOMMATE',
+          ended_at: null,
+        },
+      },
+    });
+    const locked = await tryLockHomeAndExactMemberships(tx, {
+      homeId: HOME_A,
+      membershipIds: [MEMBERSHIP_LOW],
+    });
+    assert.ok(locked);
+    assert.equal(queries[0]?.text, TRY_LOCK_HOME_FOR_UPDATE_SQL);
+    assert.equal(queries[1]?.text, LOCK_EXACT_MEMBERSHIP_FOR_UPDATE_SQL);
   });
 
   void it('sorts and deduplicates Membership ids before locking', () => {

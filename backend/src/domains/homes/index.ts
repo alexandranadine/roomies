@@ -47,10 +47,13 @@ export {
 export { insertHome, INSERT_HOME_SQL, type NewHome } from './insert-home.js';
 export {
   lockHomeAndExactMemberships,
+  tryLockHomeAndExactMemberships,
   uniqueSortedMembershipIds,
   LOCK_EXACT_MEMBERSHIP_FOR_UPDATE_SQL,
+  TRY_LOCK_HOME_FOR_UPDATE_SQL,
   type ExactLockedMembership,
   type LockedHomeAndExactMemberships,
+  type TryLockHomeAndExactMemberships,
 } from './lock-home-and-exact-memberships.js';
 export {
   lockActiveHomeStructureForEntry,

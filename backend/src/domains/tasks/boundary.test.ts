@@ -61,6 +61,10 @@ void describe('tasks domain boundary', () => {
     assert.match(source, /listDefinitionsByHome/);
     assert.match(source, /lockDefinitionByHomeAndId/);
     assert.match(source, /deactivateActiveDefinition/);
+    assert.match(source, /findNextDueDefinitionCandidate/);
+    assert.match(source, /lockDueDefinitionByHomeAndId/);
+    assert.match(source, /insertRecurringOccurrence/);
+    assert.match(source, /advanceDefinitionCursor/);
     assert.match(source, /next_occurrence_date::text/);
     assert.match(source, /next_occurrence_date IS NOT NULL/);
     assert.match(source, /next_occurrence_at IS NOT NULL/);
@@ -71,6 +75,15 @@ void describe('tasks domain boundary', () => {
     assert.match(source, /'COMPLETED'/);
     assert.match(source, /NULLS LAST/);
     assert.match(source, /FOR UPDATE/i);
+    assert.match(source, /FOR UPDATE SKIP LOCKED/i);
+    assert.match(
+      source,
+      /next_occurrence_at <= \$1::timestamptz[\s\S]*next_occurrence_at ASC,[\s\S]*next_occurrence_date ASC,[\s\S]*td\.id ASC/,
+    );
+    assert.match(
+      source,
+      /ON CONFLICT \(task_definition_id, scheduled_for\)[\s\S]*DO NOTHING/,
+    );
     assert.match(source, /completed_at IS NULL/);
     assert.match(source, /UNASSIGN_OPEN_TASK_INSTANCES_FOR_MEMBERSHIP_SQL/);
     assert.match(source, /UNASSIGN_ACTIVE_TASK_DEFINITIONS_FOR_MEMBERSHIP_SQL/);

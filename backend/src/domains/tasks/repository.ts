@@ -28,6 +28,22 @@ created_at,
 updated_at
 `;
 
+const TASK_DEFINITION_COLUMNS = `
+id,
+home_id,
+title,
+recurrence_frequency,
+recurrence_weekday,
+recurrence_day_of_month,
+assigned_membership_id,
+creator_membership_id,
+next_occurrence_date::text AS next_occurrence_date,
+next_occurrence_at,
+deactivated_at,
+created_at,
+updated_at
+`;
+
 export const INSERT_MANUAL_TASK_INSTANCE_SQL = `
 INSERT INTO task_instances (
   id,
@@ -56,6 +72,96 @@ VALUES (
   $6::timestamptz
 )
 RETURNING ${TASK_INSTANCE_COLUMNS}
+`;
+
+export const FIND_NEXT_DUE_TASK_DEFINITION_CANDIDATE_SQL = `
+SELECT
+  td.id,
+  td.home_id,
+  td.assigned_membership_id
+FROM task_definitions AS td
+INNER JOIN homes AS h
+  ON h.id = td.home_id
+ AND h.archived_at IS NULL
+WHERE td.deactivated_at IS NULL
+  AND td.next_occurrence_date IS NOT NULL
+  AND td.next_occurrence_at IS NOT NULL
+  AND td.next_occurrence_at <= $1::timestamptz
+  AND NOT (td.id = ANY($2::uuid[]))
+ORDER BY
+  td.next_occurrence_at ASC,
+  td.next_occurrence_date ASC,
+  td.id ASC
+LIMIT 1
+`;
+
+export const LOCK_DUE_TASK_DEFINITION_BY_HOME_AND_ID_SQL = `
+SELECT ${TASK_DEFINITION_COLUMNS}
+FROM task_definitions
+WHERE home_id = $1::uuid
+  AND id = $2::uuid
+  AND deactivated_at IS NULL
+  AND next_occurrence_date IS NOT NULL
+  AND next_occurrence_at IS NOT NULL
+  AND next_occurrence_at <= $3::timestamptz
+LIMIT 2
+FOR UPDATE SKIP LOCKED
+`;
+
+export const INSERT_RECURRING_TASK_INSTANCE_SQL = `
+INSERT INTO task_instances (
+  id,
+  home_id,
+  source,
+  status,
+  title,
+  scheduled_for,
+  assigned_membership_id,
+  task_definition_id,
+  completed_at,
+  created_at,
+  updated_at
+)
+VALUES (
+  $1::uuid,
+  $2::uuid,
+  'RECURRING',
+  'OPEN',
+  $3,
+  $4::date,
+  $5::uuid,
+  $6::uuid,
+  NULL,
+  $7::timestamptz,
+  $7::timestamptz
+)
+ON CONFLICT (task_definition_id, scheduled_for)
+  WHERE task_definition_id IS NOT NULL
+DO NOTHING
+RETURNING id
+`;
+
+export const FIND_RECURRING_TASK_OCCURRENCE_SQL = `
+SELECT id
+FROM task_instances
+WHERE task_definition_id = $1::uuid
+  AND scheduled_for = $2::date
+  AND source = 'RECURRING'
+LIMIT 2
+`;
+
+export const ADVANCE_TASK_DEFINITION_CURSOR_SQL = `
+UPDATE task_definitions
+SET
+  next_occurrence_date = $3::date,
+  next_occurrence_at = $4::timestamptz,
+  updated_at = $5::timestamptz
+WHERE home_id = $1::uuid
+  AND id = $2::uuid
+  AND deactivated_at IS NULL
+  AND next_occurrence_date IS NOT NULL
+  AND next_occurrence_at IS NOT NULL
+RETURNING ${TASK_DEFINITION_COLUMNS}
 `;
 
 export const FIND_TASK_INSTANCE_BY_HOME_AND_ID_SQL = `
@@ -127,22 +233,6 @@ SET
 WHERE home_id = $1::uuid
   AND assigned_membership_id = $2::uuid
   AND deactivated_at IS NULL
-`;
-
-const TASK_DEFINITION_COLUMNS = `
-id,
-home_id,
-title,
-recurrence_frequency,
-recurrence_weekday,
-recurrence_day_of_month,
-assigned_membership_id,
-creator_membership_id,
-next_occurrence_date::text AS next_occurrence_date,
-next_occurrence_at,
-deactivated_at,
-created_at,
-updated_at
 `;
 
 export const INSERT_TASK_DEFINITION_SQL = `
@@ -255,6 +345,32 @@ export type DeactivateActiveTaskDefinition = Readonly<{
   deactivatedAt: Date;
 }>;
 
+export type DueTaskDefinitionCandidate = Readonly<{
+  id: string;
+  homeId: string;
+  assignedMembershipId: string | null;
+}>;
+
+export type NewRecurringTaskOccurrence = Readonly<{
+  id: string;
+  homeId: string;
+  taskDefinitionId: string;
+  title: string;
+  scheduledFor: DateString;
+  assignedMembershipId: string | null;
+  createdAt: Date;
+}>;
+
+export type AdvanceTaskDefinitionCursor = Readonly<{
+  homeId: string;
+  taskDefinitionId: string;
+  nextOccurrenceDate: DateString;
+  nextOccurrenceAt: Temporal.Instant;
+  updatedAt: Date;
+}>;
+
+export type RecurringOccurrenceInsertResult = 'generated' | 'reconciled';
+
 export type TaskRepository = Readonly<{
   insertManual(
     tx: TransactionContext,
@@ -293,6 +409,24 @@ export type TaskRepository = Readonly<{
     tx: TransactionContext,
     input: DeactivateActiveTaskDefinition,
   ): Promise<TaskDefinition | null>;
+  findNextDueDefinitionCandidate(
+    workerNow: Date,
+    excludedDefinitionIds: readonly string[],
+  ): Promise<DueTaskDefinitionCandidate | null>;
+  lockDueDefinitionByHomeAndId(
+    tx: TransactionContext,
+    homeId: string,
+    taskDefinitionId: string,
+    workerNow: Date,
+  ): Promise<TaskDefinition | null>;
+  insertRecurringOccurrence(
+    tx: TransactionContext,
+    occurrence: NewRecurringTaskOccurrence,
+  ): Promise<RecurringOccurrenceInsertResult>;
+  advanceDefinitionCursor(
+    tx: TransactionContext,
+    input: AdvanceTaskDefinitionCursor,
+  ): Promise<TaskDefinition>;
 }>;
 
 type TaskInstanceRow = {
@@ -414,6 +548,16 @@ type TaskDefinitionRow = {
   updated_at: unknown;
 };
 
+type DueTaskDefinitionCandidateRow = {
+  id: unknown;
+  home_id: unknown;
+  assigned_membership_id: unknown;
+};
+
+type IdRow = {
+  id: unknown;
+};
+
 function parseOptionalInteger(value: unknown): number | null {
   if (value === null) {
     return null;
@@ -507,6 +651,19 @@ function oneDefinitionRow(
     throw new TaskPersistenceError();
   }
   return parseTaskDefinitionRow(rows[0], homeId);
+}
+
+function parseDueCandidate(
+  row: DueTaskDefinitionCandidateRow,
+): DueTaskDefinitionCandidate {
+  if (!isUuid(row.id) || !isUuid(row.home_id)) {
+    throw new TaskPersistenceError();
+  }
+  return Object.freeze({
+    id: row.id,
+    homeId: row.home_id,
+    assignedMembershipId: parseOptionalUuid(row.assigned_membership_id),
+  });
 }
 
 export function createTaskRepository(pool: Pool): TaskRepository {
@@ -723,6 +880,108 @@ export function createTaskRepository(pool: Pool): TaskRepository {
       }
       if (rows.length === 0) {
         return null;
+      }
+      return oneDefinitionRow(rows, input.homeId);
+    },
+
+    async findNextDueDefinitionCandidate(workerNow, excludedDefinitionIds) {
+      let rows: DueTaskDefinitionCandidateRow[];
+      try {
+        rows = (
+          await pool.query<DueTaskDefinitionCandidateRow>(
+            FIND_NEXT_DUE_TASK_DEFINITION_CANDIDATE_SQL,
+            [workerNow, excludedDefinitionIds],
+          )
+        ).rows;
+      } catch {
+        throw new TaskPersistenceError();
+      }
+      if (rows.length === 0) {
+        return null;
+      }
+      if (rows.length !== 1 || rows[0] === undefined) {
+        throw new TaskPersistenceError();
+      }
+      return parseDueCandidate(rows[0]);
+    },
+
+    async lockDueDefinitionByHomeAndId(
+      tx,
+      homeId,
+      taskDefinitionId,
+      workerNow,
+    ) {
+      let rows: TaskDefinitionRow[];
+      try {
+        rows = (
+          await tx.query<TaskDefinitionRow>(
+            LOCK_DUE_TASK_DEFINITION_BY_HOME_AND_ID_SQL,
+            [homeId, taskDefinitionId, workerNow],
+          )
+        ).rows;
+      } catch {
+        throw new TaskPersistenceError();
+      }
+      if (rows.length === 0) {
+        return null;
+      }
+      return oneDefinitionRow(rows, homeId);
+    },
+
+    async insertRecurringOccurrence(tx, occurrence) {
+      try {
+        const inserted = await tx.query<IdRow>(
+          INSERT_RECURRING_TASK_INSTANCE_SQL,
+          [
+            occurrence.id,
+            occurrence.homeId,
+            occurrence.title,
+            occurrence.scheduledFor,
+            occurrence.assignedMembershipId,
+            occurrence.taskDefinitionId,
+            occurrence.createdAt,
+          ],
+        );
+        if (inserted.rows.length === 1 && isUuid(inserted.rows[0]?.id)) {
+          return 'generated';
+        }
+        if (inserted.rows.length !== 0) {
+          throw new TaskPersistenceError();
+        }
+
+        const existing = await tx.query<IdRow>(
+          FIND_RECURRING_TASK_OCCURRENCE_SQL,
+          [occurrence.taskDefinitionId, occurrence.scheduledFor],
+        );
+        if (existing.rows.length !== 1 || !isUuid(existing.rows[0]?.id)) {
+          throw new TaskPersistenceError();
+        }
+        return 'reconciled';
+      } catch (error) {
+        if (error instanceof TaskPersistenceError) {
+          throw error;
+        }
+        throw new TaskPersistenceError();
+      }
+    },
+
+    async advanceDefinitionCursor(tx, input) {
+      let rows: TaskDefinitionRow[];
+      try {
+        rows = (
+          await tx.query<TaskDefinitionRow>(
+            ADVANCE_TASK_DEFINITION_CURSOR_SQL,
+            [
+              input.homeId,
+              input.taskDefinitionId,
+              input.nextOccurrenceDate,
+              input.nextOccurrenceAt.toString(),
+              input.updatedAt,
+            ],
+          )
+        ).rows;
+      } catch {
+        throw new TaskPersistenceError();
       }
       return oneDefinitionRow(rows, input.homeId);
     },

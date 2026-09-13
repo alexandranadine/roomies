@@ -8,6 +8,13 @@ import type { TransactionContext } from '../../platform/persistence/transaction.
 import { LOCK_HOME_FOR_UPDATE_SQL } from './lock-home-structure.js';
 import { StructuralIntegrityError } from './structure-errors.js';
 
+export const TRY_LOCK_HOME_FOR_UPDATE_SQL = `
+SELECT id, archived_at, timezone
+FROM homes
+WHERE id = $1
+FOR UPDATE SKIP LOCKED
+`;
+
 /**
  * Exact Home + exact Membership lock seam for content mutations.
  *
@@ -48,6 +55,14 @@ export type LockedHomeAndExactMemberships = Readonly<{
   }>;
   memberships: readonly ExactLockedMembership[];
 }>;
+
+export type TryLockHomeAndExactMemberships = (
+  tx: TransactionContext,
+  input: {
+    homeId: string;
+    membershipIds: readonly string[];
+  },
+) => Promise<LockedHomeAndExactMemberships | null>;
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -113,18 +128,18 @@ function parseLockedMembership(row: MembershipLockRow): ExactLockedMembership {
  * Lock the exact Home, refuse an archived Home, then lock the exact
  * Membership rows in deterministic id order.
  */
-export async function lockHomeAndExactMemberships(
+async function lockHomeAndExactMembershipsUsing(
   tx: TransactionContext,
   input: {
     homeId: string;
     membershipIds: readonly string[];
   },
-): Promise<LockedHomeAndExactMemberships> {
+  homeLockSql: string,
+  unavailableReturnsNull: boolean,
+): Promise<LockedHomeAndExactMemberships | null> {
   let homeRows: HomeLockRow[];
   try {
-    const result = await tx.query<HomeLockRow>(LOCK_HOME_FOR_UPDATE_SQL, [
-      input.homeId,
-    ]);
+    const result = await tx.query<HomeLockRow>(homeLockSql, [input.homeId]);
     homeRows = result.rows;
   } catch {
     throw new TransactionInfrastructureError();
@@ -136,6 +151,9 @@ export async function lockHomeAndExactMemberships(
     throw new StructuralIntegrityError();
   }
   if (homeRows.length === 0 || homeRow === undefined) {
+    if (unavailableReturnsNull) {
+      return null;
+    }
     throw new ConcealedNotFoundError();
   }
 
@@ -151,6 +169,9 @@ export async function lockHomeAndExactMemberships(
   }
 
   if (homeRow.archived_at !== null) {
+    if (unavailableReturnsNull) {
+      return null;
+    }
     throw new ConcealedNotFoundError();
   }
 
@@ -189,4 +210,43 @@ export async function lockHomeAndExactMemberships(
     }),
     memberships: Object.freeze(memberships),
   });
+}
+
+export async function lockHomeAndExactMemberships(
+  tx: TransactionContext,
+  input: {
+    homeId: string;
+    membershipIds: readonly string[];
+  },
+): Promise<LockedHomeAndExactMemberships> {
+  const locked = await lockHomeAndExactMembershipsUsing(
+    tx,
+    input,
+    LOCK_HOME_FOR_UPDATE_SQL,
+    false,
+  );
+  if (locked === null) {
+    throw new ConcealedNotFoundError();
+  }
+  return locked;
+}
+
+/**
+ * Trusted-system non-blocking structural entry seam.
+ * Preserves Home → exact Membership lock order while allowing recurrence
+ * workers to skip a Home already owned by another canonical mutation.
+ */
+export async function tryLockHomeAndExactMemberships(
+  tx: TransactionContext,
+  input: {
+    homeId: string;
+    membershipIds: readonly string[];
+  },
+): Promise<LockedHomeAndExactMemberships | null> {
+  return lockHomeAndExactMembershipsUsing(
+    tx,
+    input,
+    TRY_LOCK_HOME_FOR_UPDATE_SQL,
+    true,
+  );
 }

@@ -184,6 +184,38 @@ void describe('tasks application boundary', () => {
     assert.doesNotMatch(source, /FOR UPDATE/i);
   });
 
+  void it('processes recurrence as a bounded trusted system operation', async () => {
+    const source = await readFile(
+      path.join(dir, 'process-due-recurring-tasks.ts'),
+      'utf8',
+    );
+    assert.match(source, /computeNextRecurrenceCursor/);
+    assert.match(source, /previousOccurrenceDate: occurrenceDate/);
+    assert.match(source, /tryLockHomeAndExactMemberships/);
+    assert.match(source, /lockDueDefinitionByHomeAndId/);
+    assert.match(source, /insertRecurringOccurrence/);
+    assert.match(source, /advanceDefinitionCursor/);
+    assert.match(
+      source,
+      /DEFAULT_MAX_RECURRING_DEFINITIONS_PER_INVOCATION = 25/,
+    );
+    assert.match(
+      source,
+      /DEFAULT_MAX_OCCURRENCES_PER_RECURRING_DEFINITION = 100/,
+    );
+    assert.match(source, /deps\.clock\.now\(\)/);
+    assert.match(source, /deps\.ids\.next\(\)/);
+    assert.doesNotMatch(source, /\bactor\b/);
+    assert.doesNotMatch(source, /decideTask/);
+    assert.doesNotMatch(source, /ADMIN/);
+    assert.doesNotMatch(source, /outbox/);
+    assert.doesNotMatch(source, /setInterval|setTimeout|sleep/);
+    assert.doesNotMatch(source, /previousOccurrenceAt/);
+    assert.doesNotMatch(source, /Date\.now|new Date\(/);
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+  });
+
   void it('does not import repository internals or Express', async () => {
     const files = await walkProduction(dir);
     for (const file of files) {
