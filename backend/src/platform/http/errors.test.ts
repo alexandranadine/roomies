@@ -24,6 +24,7 @@ import {
 } from '../../domains/memberships/errors.js';
 import {
   InvalidMaintenanceRequestError,
+  MaintenanceNotOpenError,
   MaintenancePersistenceError,
 } from '../../domains/maintenance/errors.js';
 import {
@@ -175,6 +176,16 @@ void describe('HTTP known-error mappings', () => {
     const body = res.json() as ApiErrorBody;
     assert.equal(body.error.code, 'SUPPLY_NOT_OPEN');
     assert.equal(body.error.message, 'Supply is not open');
+  });
+
+  void it('maps MaintenanceNotOpenError to 409 MAINTENANCE_NOT_OPEN', async () => {
+    const res = await appRequest(appThatThrows(new MaintenanceNotOpenError()), {
+      path: '/throw',
+    });
+    assert.equal(res.status, 409);
+    const body = res.json() as ApiErrorBody;
+    assert.equal(body.error.code, 'MAINTENANCE_NOT_OPEN');
+    assert.equal(body.error.message, 'Maintenance is not open');
   });
 
   void it('maps SupplyClaimNotActiveError to 409 SUPPLY_CLAIM_NOT_ACTIVE', async () => {

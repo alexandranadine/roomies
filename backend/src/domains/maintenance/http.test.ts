@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import type { CreateMaintenanceEntryInput } from '../../application/maintenance/create-maintenance-entry.js';
 import type { ListHomeMaintenanceInput } from '../../application/maintenance/list-home-maintenance.js';
 import type { ReadMaintenanceEntryInput } from '../../application/maintenance/read-maintenance-entry.js';
+import type { ResolveMaintenanceEntryInput } from '../../application/maintenance/resolve-maintenance-entry.js';
 import { createRoomiesApiRouter } from '../../http/create-roomies-api.js';
 import { UnauthenticatedError } from '../../platform/auth/errors.js';
 import type { PrincipalResolver } from '../../platform/auth/principal.js';
@@ -18,6 +19,7 @@ import {
 } from '../../platform/http/assert-no-forbidden-leak.js';
 import { createApp } from '../../platform/http/create-app.js';
 import type { ApiErrorBody } from '../../platform/http/errors.js';
+import { MaintenanceNotOpenError } from './errors.js';
 import { MAINTENANCE_DETAILS_MAX_LENGTH } from './maintenance-details.js';
 import {
   maintenanceDetailDtoSchema,
@@ -118,15 +120,20 @@ function buildApp(
     readMaintenanceEntry?: (
       input: ReadMaintenanceEntryInput,
     ) => Promise<MaintenanceDetailProjection>;
+    resolveMaintenanceEntry?: (
+      input: ResolveMaintenanceEntryInput,
+    ) => Promise<MaintenanceDetailProjection>;
   } = {},
 ) {
   const createCalls: CreateMaintenanceEntryInput[] = [];
   const listCalls: ListHomeMaintenanceInput[] = [];
   const readCalls: ReadMaintenanceEntryInput[] = [];
+  const resolveCalls: ResolveMaintenanceEntryInput[] = [];
   return {
     createCalls,
     listCalls,
     readCalls,
+    resolveCalls,
     app: createApp({
       config: { trustedOrigins: [TRUSTED_ORIGIN], trustProxyHops: 0 },
       readiness: { checkReady: () => Promise.resolve(true) },
@@ -176,6 +183,19 @@ function buildApp(
               return options.readMaintenanceEntry(input);
             }
             return projection({ id: input.maintenanceEntryId });
+          },
+          resolveMaintenanceEntry: async (input) => {
+            resolveCalls.push(input);
+            if (options.resolveMaintenanceEntry) {
+              return options.resolveMaintenanceEntry(input);
+            }
+            return projection({
+              id: input.maintenanceEntryId,
+              status: 'RESOLVED',
+              resolvedByMembershipId: input.actor.membershipId,
+              resolvedAt: CREATED,
+              updatedAt: CREATED,
+            });
           },
         },
       }),
@@ -783,5 +803,221 @@ void describe('GET /api/v1/homes/:homeId/maintenance/:maintenanceEntryId', () =>
     const res = await getDetail(app, ENTRY_ID);
     assert.equal(res.status, 401);
     assert.deepEqual(readCalls, []);
+  });
+});
+
+function resolvePath(
+  homeId: string = HOME_ID,
+  maintenanceEntryId: string = ENTRY_ID,
+): string {
+  return `/api/v1/homes/${homeId}/maintenance/${maintenanceEntryId}/resolve`;
+}
+
+function postResolve(
+  app: ReturnType<typeof buildApp>['app'],
+  body: unknown,
+  options: {
+    homeId?: string;
+    maintenanceEntryId?: string;
+    origin?: string | null;
+    cookie?: string;
+    includeContentType?: boolean;
+  } = {},
+) {
+  const headers: Record<string, string> = {};
+  if (options.includeContentType !== false) {
+    headers['content-type'] = 'application/json';
+  }
+  if (options.origin !== null) {
+    headers.Origin = options.origin ?? TRUSTED_ORIGIN;
+  }
+  if (options.cookie !== undefined) {
+    headers.Cookie = options.cookie;
+  }
+  return appRequest(app, {
+    method: 'POST',
+    path: resolvePath(options.homeId, options.maintenanceEntryId),
+    headers,
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+}
+
+void describe('POST /api/v1/homes/:homeId/maintenance/:maintenanceEntryId/resolve', () => {
+  void it('returns 200 with the exact MaintenanceDetailDto and private/no-store', async () => {
+    const { app, resolveCalls } = buildApp();
+    const res = await postResolve(app, {});
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('cache-control'), 'private, no-store');
+    const body = maintenanceDetailDtoSchema.parse(res.json());
+    assert.deepEqual(Object.keys(body), dtoKeys);
+    assert.equal(body.status, 'RESOLVED');
+    assert.equal(body.resolvedByMembershipId, MEMBERSHIP_ID);
+    assert.equal(body.resolvedAt, CREATED.toISOString());
+    assert.equal(body.updatedAt, CREATED.toISOString());
+    assert.equal('homeId' in (res.json() as object), false);
+    assert.equal('audienceMembershipIds' in (res.json() as object), false);
+    assert.equal('role' in (res.json() as object), false);
+    assert.deepEqual(resolveCalls, [
+      {
+        actor: actor(),
+        homeId: HOME_ID,
+        maintenanceEntryId: ENTRY_ID,
+      },
+    ]);
+  });
+
+  void it('accepts a trusted Origin and a strict empty body', async () => {
+    const { app, resolveCalls } = buildApp();
+    const res = await postResolve(app, {}, { origin: TRUSTED_ORIGIN });
+    assert.equal(res.status, 200);
+    assert.equal(resolveCalls.length, 1);
+  });
+
+  void it('accepts an absent body without invoking extra fields', async () => {
+    const { app, resolveCalls } = buildApp();
+    const res = await postResolve(app, undefined, {
+      includeContentType: false,
+    });
+    assert.equal(res.status, 200);
+    assert.equal(resolveCalls.length, 1);
+  });
+
+  void it('rejects unknown keys and malformed bodies without invoking the command', async () => {
+    const { app, resolveCalls } = buildApp();
+    for (const body of [
+      null,
+      [],
+      'resolve',
+      1,
+      true,
+      { extra: 1 },
+      { resolvedAt: CREATED.toISOString() },
+      { resolver: MEMBERSHIP_ID },
+      { status: 'RESOLVED' },
+      { note: 'done' },
+    ]) {
+      const res = await postResolve(app, body);
+      assert.equal(res.status, 400);
+      assert.equal((res.json() as ApiErrorBody).error.code, 'INVALID_REQUEST');
+    }
+    assert.deepEqual(resolveCalls, []);
+  });
+
+  void it('rejects malformed path UUIDs before invoking resolve', async () => {
+    const { app, resolveCalls } = buildApp();
+    const res = await postResolve(
+      app,
+      {},
+      { maintenanceEntryId: 'not-a-uuid' },
+    );
+    assert.equal(res.status, 400);
+    assert.equal((res.json() as ApiErrorBody).error.code, 'INVALID_PATH_INPUT');
+    assert.deepEqual(resolveCalls, []);
+  });
+
+  void it('rejects a hostile Origin without invoking the command', async () => {
+    const { app, resolveCalls } = buildApp();
+    const res = await postResolve(app, {}, { origin: HOSTILE_ORIGIN });
+    assert.equal(res.status, 403);
+    assert.equal((res.json() as ApiErrorBody).error.code, 'FORBIDDEN');
+    assert.deepEqual(resolveCalls, []);
+    assert.equal(res.text.includes(HOSTILE_ORIGIN), false);
+  });
+
+  void it('rejects a missing mutation Origin without invoking the command', async () => {
+    const { app, resolveCalls } = buildApp();
+    const res = await postResolve(app, {}, { origin: null });
+    assert.equal(res.status, 403);
+    assert.equal((res.json() as ApiErrorBody).error.code, 'FORBIDDEN');
+    assert.deepEqual(resolveCalls, []);
+  });
+
+  void it('maps invisible PRIVATE to the same concealed 404 as missing', async () => {
+    const invisible = buildApp({
+      resolveMaintenanceEntry: () =>
+        Promise.reject(new ConcealedNotFoundError()),
+    });
+    const missing = buildApp({
+      resolveMaintenanceEntry: () =>
+        Promise.reject(new ConcealedNotFoundError()),
+    });
+    const invisibleRes = await postResolve(invisible.app, {});
+    const missingRes = await postResolve(
+      missing.app,
+      {},
+      {
+        maintenanceEntryId: FOREIGN_ID,
+      },
+    );
+    assert.equal(invisibleRes.status, 404);
+    assert.equal(missingRes.status, 404);
+    const invisibleError = (invisibleRes.json() as ApiErrorBody).error;
+    const missingError = (missingRes.json() as ApiErrorBody).error;
+    assert.equal(invisibleError.code, 'NOT_FOUND');
+    assert.equal(invisibleError.message, 'Not found');
+    assert.deepEqual(
+      { code: invisibleError.code, message: invisibleError.message },
+      { code: missingError.code, message: missingError.message },
+    );
+    assertNoForbiddenLeak({
+      context: 'invisible maintenance resolve HTTP',
+      text: `${invisibleRes.text}\n${missingRes.text}`,
+      forbidden: [...leakSentinels, 'PRIVATE', 'visibility', 'audience'],
+    });
+  });
+
+  void it('maps a visible already-RESOLVED entry to 409 MAINTENANCE_NOT_OPEN', async () => {
+    const { app, resolveCalls } = buildApp({
+      resolveMaintenanceEntry: () =>
+        Promise.reject(new MaintenanceNotOpenError()),
+    });
+    const res = await postResolve(app, {});
+    assert.equal(res.status, 409);
+    assert.equal(
+      (res.json() as ApiErrorBody).error.code,
+      'MAINTENANCE_NOT_OPEN',
+    );
+    assert.equal(
+      (res.json() as ApiErrorBody).error.message,
+      'Maintenance is not open',
+    );
+    assert.equal(resolveCalls.length, 1);
+    assertNoForbiddenLeak({
+      context: 'resolved maintenance conflict HTTP',
+      text: res.text,
+      forbidden: leakSentinels,
+    });
+  });
+
+  void it('returns 401 for unauthenticated resolve requests', async () => {
+    const { app, resolveCalls } = buildApp({
+      requirePrincipal: () => Promise.reject(new UnauthenticatedError()),
+    });
+    const res = await postResolve(app, {});
+    assert.equal(res.status, 401);
+    assert.deepEqual(resolveCalls, []);
+  });
+
+  void it('does not expose audience on ADMIN or PRIVATE success', async () => {
+    const { app } = buildApp({
+      resolve: ({ homeId }) => Promise.resolve({ ...actor('ADMIN'), homeId }),
+      resolveMaintenanceEntry: () =>
+        Promise.resolve(
+          projection({
+            status: 'RESOLVED',
+            visibility: 'PRIVATE',
+            resolvedByMembershipId: MEMBERSHIP_ID,
+            resolvedAt: CREATED,
+            updatedAt: CREATED,
+          }),
+        ),
+    });
+    const res = await postResolve(app, {});
+    assert.equal(res.status, 200);
+    const body = maintenanceDetailDtoSchema.parse(res.json());
+    assert.equal(body.visibility, 'PRIVATE');
+    assert.equal('audienceMembershipIds' in (res.json() as object), false);
+    assert.equal('userId' in (res.json() as object), false);
+    assert.equal('role' in (res.json() as object), false);
   });
 });

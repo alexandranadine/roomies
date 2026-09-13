@@ -138,6 +138,12 @@ void describe('maintenance domain boundary', () => {
     assert.match(source, /toMaintenanceListPageDto/);
     assert.match(source, /listHomeMaintenance/);
     assert.match(source, /readMaintenanceEntry/);
+    assert.match(source, /resolveMaintenanceEntry/);
+    assert.match(
+      source,
+      /router\.post\(\s*'\/:homeId\/maintenance\/:maintenanceEntryId\/resolve'/,
+    );
+    assert.match(source, /emptyMaintenanceMutationBodySchema/);
     assert.doesNotMatch(source, /lockHomeAndExactMemberships/);
     assert.doesNotMatch(source, /findActiveExactMembershipIdsInHome/);
     assert.doesNotMatch(source, /FROM\s+maintenance_entries/i);
@@ -145,13 +151,13 @@ void describe('maintenance domain boundary', () => {
     assert.doesNotMatch(source, /from ['"]pg['"]/);
     assert.doesNotMatch(source, /better-auth/);
     assert.doesNotMatch(source, /maintenance\.created/);
+    assert.doesNotMatch(source, /maintenance\.resolved/);
     assert.doesNotMatch(source, /outbox/);
     assert.doesNotMatch(source, /from ['"]\.\/repository/);
     assert.doesNotMatch(source, /decodeMaintenanceListCursor/);
     assert.doesNotMatch(source, /bindMaintenanceListCursor/);
     assert.doesNotMatch(source, /router\.patch/i);
     assert.doesNotMatch(source, /router\.delete/i);
-    assert.doesNotMatch(source, /\/resolve/);
     assert.doesNotMatch(source, /audienceMembershipIds.*res\.json/);
   });
 });

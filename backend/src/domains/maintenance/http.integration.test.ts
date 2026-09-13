@@ -5,6 +5,7 @@ import type { Pool } from 'pg';
 import { createCreateMaintenanceEntryFromPool } from '../../application/maintenance/create-maintenance-entry.js';
 import { createListHomeMaintenanceFromPool } from '../../application/maintenance/list-home-maintenance.js';
 import { createReadMaintenanceEntryFromPool } from '../../application/maintenance/read-maintenance-entry.js';
+import { createResolveMaintenanceEntryFromPool } from '../../application/maintenance/resolve-maintenance-entry.js';
 import { createHomeRepository } from '../homes/index.js';
 import { createRoomiesApiRouter } from '../../http/create-roomies-api.js';
 import { createActiveHomeActorResolver } from '../memberships/index.js';
@@ -251,6 +252,9 @@ void describe('Maintenance HTTP PostgreSQL', () => {
                 database.pool,
               ),
               readMaintenanceEntry: createReadMaintenanceEntryFromPool(
+                database.pool,
+              ),
+              resolveMaintenanceEntry: createResolveMaintenanceEntryFromPool(
                 database.pool,
               ),
             },
@@ -783,6 +787,9 @@ void describe('Maintenance HTTP PostgreSQL', () => {
                 database.pool,
               ),
               readMaintenanceEntry: createReadMaintenanceEntryFromPool(
+                database.pool,
+              ),
+              resolveMaintenanceEntry: createResolveMaintenanceEntryFromPool(
                 database.pool,
               ),
             },
@@ -1498,6 +1505,524 @@ void describe('Maintenance HTTP PostgreSQL', () => {
               'Private A',
               'Private B',
               page1Body.nextCursor ?? 'next-cursor-missing',
+            ],
+          });
+        });
+      } finally {
+        console.error = originalError;
+        if (homeIds.length > 0) {
+          await database.pool.query(
+            'DELETE FROM maintenance_audiences WHERE home_id = ANY($1)',
+            [homeIds],
+          );
+          await database.pool.query(
+            'DELETE FROM maintenance_entries WHERE home_id = ANY($1)',
+            [homeIds],
+          );
+          await database.pool.query(
+            'DELETE FROM memberships WHERE home_id = ANY($1)',
+            [homeIds],
+          );
+          await database.pool.query('DELETE FROM homes WHERE id = ANY($1)', [
+            homeIds,
+          ]);
+        }
+        for (const id of identityIds) {
+          await database.pool.query(
+            'DELETE FROM auth_sessions WHERE user_id = $1',
+            [id],
+          );
+          await database.pool.query(
+            'DELETE FROM auth_accounts WHERE user_id = $1',
+            [id],
+          );
+          await database.pool.query(
+            'DELETE FROM auth_identities WHERE id = $1',
+            [id],
+          );
+          await database.pool.query('DELETE FROM users WHERE id = $1', [id]);
+        }
+        await db.close();
+        await database.close();
+      }
+    },
+  );
+
+  void it(
+    'covers resolve Origin, empty body, privacy, 409, and concealed 404',
+    { skip: skipWithoutDatabase, timeout: 60_000 },
+    async () => {
+      const databaseUrl = resolveSafeDedicatedTestDatabaseUrl();
+      const config = authConfig(databaseUrl);
+      const database = createDatabasePool(config);
+      const db = createDb(database.pool);
+      const auth = createAuthRuntime(database.pool, config);
+      const principalResolver = createPrincipalResolver({
+        auth,
+        hasCanonicalUser: createCanonicalUserLookup(database.pool),
+      });
+      const identityIds: string[] = [];
+      const homeIds: string[] = [];
+      const logs: string[] = [];
+      const originalError = console.error;
+      console.error = (...args: unknown[]) => {
+        logs.push(args.map((value) => JSON.stringify(value)).join(' '));
+      };
+
+      try {
+        await db.connect();
+        const app = createApp({
+          config,
+          readiness: createDbReadiness(db),
+          auth,
+          roomiesApi: createRoomiesApiRouter({
+            principalResolver,
+            activeHomeActorResolver: createActiveHomeActorResolver(
+              database.pool,
+            ),
+            homeReader: createHomeRepository(database.pool),
+            archiveFinalMemberHome: () => Promise.resolve(),
+            changeMembershipRole: () =>
+              Promise.reject(new Error('role change must not run')),
+            leaveMembership: () =>
+              Promise.reject(new Error('leave must not run')),
+            removeMembership: () =>
+              Promise.reject(new Error('remove must not run')),
+            maintenance: {
+              createMaintenanceEntry: createCreateMaintenanceEntryFromPool(
+                database.pool,
+              ),
+              listHomeMaintenance: createListHomeMaintenanceFromPool(
+                database.pool,
+              ),
+              readMaintenanceEntry: createReadMaintenanceEntryFromPool(
+                database.pool,
+              ),
+              resolveMaintenanceEntry: createResolveMaintenanceEntryFromPool(
+                database.pool,
+              ),
+            },
+          }),
+        });
+
+        await withAppServer(app, async (request) => {
+          async function signUp(name: string) {
+            const email = `m54-${name}-${randomUUID()}@example.test`;
+            const signup = await request({
+              method: 'POST',
+              path: '/api/auth/sign-up/email',
+              headers: {
+                Origin: TRUSTED_ORIGIN,
+                'content-type': 'application/json',
+              },
+              body: JSON.stringify({ name, email, password: PASSWORD }),
+            });
+            assert.ok(signup.status >= 200 && signup.status < 300);
+            const id = (signup.json() as { user?: { id?: string } }).user?.id;
+            assert.ok(id);
+            identityIds.push(id);
+            const cookie = findSessionSetCookie(signup.headers);
+            assert.ok(cookie);
+            return { id, cookie: sessionCookieHeader(cookie) };
+          }
+
+          function resolvePath(homeId: string, entryId: string): string {
+            return `/api/v1/homes/${homeId}/maintenance/${entryId}/resolve`;
+          }
+
+          async function createHousehold(
+            cookie: string,
+            homeId: string,
+            title: string,
+          ) {
+            const created = await request({
+              method: 'POST',
+              path: `/api/v1/homes/${homeId}/maintenance`,
+              headers: {
+                Origin: TRUSTED_ORIGIN,
+                Cookie: cookie,
+                'content-type': 'application/json',
+              },
+              body: JSON.stringify({ visibility: 'HOUSEHOLD', title }),
+            });
+            assert.equal(created.status, 201);
+            return maintenanceDetailDtoSchema.parse(created.json());
+          }
+
+          async function createPrivate(
+            cookie: string,
+            homeId: string,
+            title: string,
+          ) {
+            const created = await request({
+              method: 'POST',
+              path: `/api/v1/homes/${homeId}/maintenance`,
+              headers: {
+                Origin: TRUSTED_ORIGIN,
+                Cookie: cookie,
+                'content-type': 'application/json',
+              },
+              body: JSON.stringify({
+                visibility: 'PRIVATE',
+                title,
+                audienceMembershipIds: [],
+              }),
+            });
+            assert.equal(created.status, 201);
+            return maintenanceDetailDtoSchema.parse(created.json());
+          }
+
+          const alex = await signUp('alex');
+          const jamie = await signUp('jamie');
+          const taylor = await signUp('taylor');
+          const other = await signUp('other');
+
+          const homeA = createUuidV7();
+          const homeB = createUuidV7();
+          homeIds.push(homeA, homeB);
+          const alexMembership = createUuidV7();
+          const jamieMembership = createUuidV7();
+          const taylorMembership = createUuidV7();
+          const otherMembership = createUuidV7();
+
+          await insertHome(database.pool, { id: homeA, name: 'Resolve A' });
+          await insertHome(database.pool, { id: homeB, name: 'Resolve B' });
+          await insertMembership(database.pool, {
+            id: alexMembership,
+            homeId: homeA,
+            userId: alex.id,
+            role: 'ROOMMATE',
+          });
+          await insertMembership(database.pool, {
+            id: jamieMembership,
+            homeId: homeA,
+            userId: jamie.id,
+            role: 'ROOMMATE',
+          });
+          await insertMembership(database.pool, {
+            id: taylorMembership,
+            homeId: homeA,
+            userId: taylor.id,
+            role: 'ADMIN',
+          });
+          await insertMembership(database.pool, {
+            id: otherMembership,
+            homeId: homeB,
+            userId: other.id,
+            role: 'ADMIN',
+          });
+
+          const household = await createHousehold(
+            alex.cookie,
+            homeA,
+            'Household resolve',
+          );
+          const householdConflict = await createHousehold(
+            alex.cookie,
+            homeA,
+            'Already resolved',
+          );
+          const privateAlex = await createPrivate(
+            alex.cookie,
+            homeA,
+            'Alex private',
+          );
+          const privateAlexHidden = await createPrivate(
+            alex.cookie,
+            homeA,
+            'Alex hidden',
+          );
+          const privateJamie = await createPrivate(
+            jamie.cookie,
+            homeA,
+            'Jamie private',
+          );
+          const privateJamieHidden = await createPrivate(
+            jamie.cookie,
+            homeA,
+            'Jamie hidden',
+          );
+          const foreign = await createHousehold(
+            other.cookie,
+            homeB,
+            'Foreign household',
+          );
+
+          const resolved = await request({
+            method: 'POST',
+            path: resolvePath(homeA, household.id),
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: alex.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          });
+          assert.equal(resolved.status, 200);
+          assert.equal(
+            resolved.headers.get('cache-control'),
+            'private, no-store',
+          );
+          const resolvedBody = maintenanceDetailDtoSchema.parse(
+            resolved.json(),
+          );
+          assert.deepEqual(Object.keys(resolvedBody), dtoKeys);
+          assert.equal(resolvedBody.status, 'RESOLVED');
+          assert.equal(resolvedBody.resolvedByMembershipId, alexMembership);
+          assert.notEqual(resolvedBody.resolvedAt, null);
+          assert.equal(resolvedBody.updatedAt, resolvedBody.resolvedAt);
+          assert.equal('homeId' in (resolved.json() as object), false);
+          assert.equal(
+            'audienceMembershipIds' in (resolved.json() as object),
+            false,
+          );
+
+          const hostile = await request({
+            method: 'POST',
+            path: resolvePath(homeA, householdConflict.id),
+            headers: {
+              Origin: HOSTILE_ORIGIN,
+              Cookie: alex.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          });
+          assert.equal(hostile.status, 403);
+          assert.equal(
+            (hostile.json() as ApiErrorBody).error.code,
+            'FORBIDDEN',
+          );
+
+          const missingOrigin = await request({
+            method: 'POST',
+            path: resolvePath(homeA, householdConflict.id),
+            headers: {
+              Cookie: alex.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          });
+          assert.equal(missingOrigin.status, 403);
+
+          const unknownKey = await request({
+            method: 'POST',
+            path: resolvePath(homeA, householdConflict.id),
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: alex.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({ note: 'done' }),
+          });
+          assert.equal(unknownKey.status, 400);
+          assert.equal(
+            (unknownKey.json() as ApiErrorBody).error.code,
+            'INVALID_REQUEST',
+          );
+
+          const alexPrivate = await request({
+            method: 'POST',
+            path: resolvePath(homeA, privateAlex.id),
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: alex.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          });
+          assert.equal(alexPrivate.status, 200);
+          assert.equal(
+            maintenanceDetailDtoSchema.parse(alexPrivate.json()).visibility,
+            'PRIVATE',
+          );
+          assert.equal(
+            'audienceMembershipIds' in (alexPrivate.json() as object),
+            false,
+          );
+
+          const alexSeesJamie = await request({
+            method: 'POST',
+            path: resolvePath(homeA, privateJamieHidden.id),
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: alex.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          });
+          assert.deepEqual(errorShape(alexSeesJamie), {
+            status: 404,
+            code: 'NOT_FOUND',
+            message: 'Not found',
+          });
+
+          const jamiePrivate = await request({
+            method: 'POST',
+            path: resolvePath(homeA, privateJamie.id),
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: jamie.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          });
+          assert.equal(jamiePrivate.status, 200);
+
+          const jamieSeesAlex = await request({
+            method: 'POST',
+            path: resolvePath(homeA, privateAlexHidden.id),
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: jamie.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          });
+          assert.deepEqual(
+            errorShape(jamieSeesAlex),
+            errorShape(alexSeesJamie),
+          );
+
+          const taylorHousehold = await createHousehold(
+            taylor.cookie,
+            homeA,
+            'Taylor household',
+          );
+          const taylorOk = await request({
+            method: 'POST',
+            path: resolvePath(homeA, taylorHousehold.id),
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: taylor.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          });
+          assert.equal(taylorOk.status, 200);
+          assert.equal(
+            maintenanceDetailDtoSchema.parse(taylorOk.json())
+              .resolvedByMembershipId,
+            taylorMembership,
+          );
+
+          const taylorPrivateA = await request({
+            method: 'POST',
+            path: resolvePath(homeA, privateAlexHidden.id),
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: taylor.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          });
+          const taylorPrivateB = await request({
+            method: 'POST',
+            path: resolvePath(homeA, privateJamieHidden.id),
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: taylor.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          });
+          assert.deepEqual(
+            errorShape(taylorPrivateA),
+            errorShape(alexSeesJamie),
+          );
+          assert.deepEqual(
+            errorShape(taylorPrivateB),
+            errorShape(alexSeesJamie),
+          );
+
+          const firstConflict = await request({
+            method: 'POST',
+            path: resolvePath(homeA, householdConflict.id),
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: alex.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          });
+          assert.equal(firstConflict.status, 200);
+          const secondConflict = await request({
+            method: 'POST',
+            path: resolvePath(homeA, householdConflict.id),
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: jamie.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          });
+          assert.equal(secondConflict.status, 409);
+          assert.equal(
+            (secondConflict.json() as ApiErrorBody).error.code,
+            'MAINTENANCE_NOT_OPEN',
+          );
+          assert.equal(
+            (secondConflict.json() as ApiErrorBody).error.message,
+            'Maintenance is not open',
+          );
+
+          const missing = await request({
+            method: 'POST',
+            path: resolvePath(homeA, createUuidV7()),
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: alex.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          });
+          const viaHomeA = await request({
+            method: 'POST',
+            path: resolvePath(homeA, foreign.id),
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: alex.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          });
+          const viaHomeB = await request({
+            method: 'POST',
+            path: resolvePath(homeB, foreign.id),
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: alex.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          });
+          assert.deepEqual(errorShape(missing), {
+            status: 404,
+            code: 'NOT_FOUND',
+            message: 'Not found',
+          });
+          assert.deepEqual(errorShape(viaHomeA), errorShape(missing));
+          assert.deepEqual(errorShape(viaHomeB), errorShape(missing));
+          assert.notEqual(errorShape(secondConflict).status, 404);
+
+          const foreignStillOpen = await request({
+            method: 'GET',
+            path: `/api/v1/homes/${homeB}/maintenance/${foreign.id}`,
+            headers: { Cookie: other.cookie },
+          });
+          assert.equal(foreignStillOpen.status, 200);
+          assert.equal(
+            maintenanceDetailDtoSchema.parse(foreignStillOpen.json()).status,
+            'OPEN',
+          );
+
+          assertNoForbiddenLeak({
+            context: 'maintenance resolve HTTP',
+            text: `${alexSeesJamie.text}\n${taylorPrivateA.text}\n${missing.text}\n${logs.join('\n')}`,
+            forbidden: [
+              ...leakSentinels,
+              'Alex hidden',
+              'Jamie hidden',
+              'audience',
             ],
           });
         });

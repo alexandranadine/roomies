@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { CreateMaintenanceEntryInput } from '../../application/maintenance/create-maintenance-entry.js';
 import type { ListHomeMaintenanceInput } from '../../application/maintenance/list-home-maintenance.js';
 import type { ReadMaintenanceEntryInput } from '../../application/maintenance/read-maintenance-entry.js';
+import type { ResolveMaintenanceEntryInput } from '../../application/maintenance/resolve-maintenance-entry.js';
 import type { PrincipalResolver } from '../../platform/auth/principal.js';
 import {
   InvalidRequestError,
@@ -59,6 +60,8 @@ const createMaintenanceBodySchema = z.discriminatedUnion('visibility', [
   createMaintenancePrivateBodySchema,
 ]);
 
+const emptyMaintenanceMutationBodySchema = z.object({}).strict();
+
 export type CreateMaintenanceEntryCommand = (
   input: CreateMaintenanceEntryInput,
 ) => Promise<MaintenanceDetailProjection>;
@@ -75,13 +78,28 @@ export type ReadMaintenanceEntryCommand = (
   input: ReadMaintenanceEntryInput,
 ) => Promise<MaintenanceDetailProjection>;
 
+export type ResolveMaintenanceEntryCommand = (
+  input: ResolveMaintenanceEntryInput,
+) => Promise<MaintenanceDetailProjection>;
+
 export type CreateMaintenanceRouterOptions = {
   principalResolver: Pick<PrincipalResolver, 'requirePrincipal'>;
   activeHomeActorResolver: Pick<ActiveHomeActorResolver, 'resolve'>;
   createMaintenanceEntry: CreateMaintenanceEntryCommand;
   listHomeMaintenance: ListHomeMaintenanceCommand;
   readMaintenanceEntry: ReadMaintenanceEntryCommand;
+  resolveMaintenanceEntry: ResolveMaintenanceEntryCommand;
 };
+
+function parseEmptyMaintenanceMutationBody(body: unknown): void {
+  if (body === undefined) {
+    return;
+  }
+  const parsed = emptyMaintenanceMutationBodySchema.safeParse(body);
+  if (!parsed.success) {
+    throw new InvalidRequestError();
+  }
+}
 
 function parseCreateMaintenanceBody(body: unknown): {
   visibility: 'HOUSEHOLD' | 'PRIVATE';
@@ -242,6 +260,26 @@ export function createMaintenanceRouter(
       res.status(200).json(toMaintenanceDetailDto(entry));
     })().catch(next);
   });
+
+  router.post(
+    '/:homeId/maintenance/:maintenanceEntryId/resolve',
+    (req, res, next) => {
+      void (async () => {
+        const actor = getActiveHomeActor(res);
+        const homeId = parsePathUuid(req.params['homeId']);
+        const maintenanceEntryId = parsePathUuid(
+          req.params['maintenanceEntryId'],
+        );
+        parseEmptyMaintenanceMutationBody(req.body);
+        const resolved = await options.resolveMaintenanceEntry({
+          actor,
+          homeId,
+          maintenanceEntryId,
+        });
+        res.status(200).json(toMaintenanceDetailDto(resolved));
+      })().catch(next);
+    },
+  );
 
   return router;
 }

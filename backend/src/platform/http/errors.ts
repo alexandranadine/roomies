@@ -26,6 +26,7 @@ import {
 } from '../../domains/memberships/errors.js';
 import {
   InvalidMaintenanceRequestError,
+  MaintenanceNotOpenError,
   MaintenancePersistenceError,
 } from '../../domains/maintenance/errors.js';
 import {
@@ -271,6 +272,17 @@ export function errorHandler(
 
   if (err instanceof SupplyNotOpenError) {
     sendApiError(res, 409, 'SUPPLY_NOT_OPEN', 'Supply is not open', requestId);
+    return;
+  }
+
+  if (err instanceof MaintenanceNotOpenError) {
+    sendApiError(
+      res,
+      409,
+      'MAINTENANCE_NOT_OPEN',
+      'Maintenance is not open',
+      requestId,
+    );
     return;
   }
 

@@ -83,10 +83,9 @@ void describe('maintenance application boundary', () => {
     }
   });
 
-  void it('does not create HTTP, resolve, or frontend surfaces in this slice', async () => {
+  void it('does not create HTTP or frontend surfaces from application commands', async () => {
     const names = (await readdir(dir)).filter((name) => name.endsWith('.ts'));
     assert.equal(names.includes('http.ts'), false);
-    assert.equal(names.includes('resolve-maintenance-entry.ts'), false);
     const source = await readFile(
       path.join(dir, 'create-maintenance-entry.ts'),
       'utf8',
@@ -96,6 +95,55 @@ void describe('maintenance application boundary', () => {
     assert.doesNotMatch(source, /maintenance\.list/);
     assert.doesNotMatch(source, /maintenance\.read/);
     assert.doesNotMatch(source, /maintenance\.resolve/);
+    assert.doesNotMatch(source, /lockVisibleForResolve/);
+    assert.doesNotMatch(source, /resolveOpenEntry/);
+  });
+
+  void it('resolves through visible lock, OPEN check, and conditional write', async () => {
+    const source = await readFile(
+      path.join(dir, 'resolve-maintenance-entry.ts'),
+      'utf8',
+    );
+    assert.match(source, /decideMaintenanceResolve/);
+    assert.match(source, /lockHomeAndExactMemberships/);
+    assert.match(source, /lockVisibleForResolve/);
+    assert.match(source, /resolveOpenEntry/);
+    assert.match(source, /runInReadCommittedTransaction/);
+    assert.match(source, /resolverMembershipId: actor\.membershipId/);
+    assert.match(source, /entry\.status !== 'OPEN'/);
+    assert.match(source, /MaintenanceNotOpenError/);
+    assert.match(source, /MaintenancePersistenceError/);
+    assert.match(source, /ConcealedNotFoundError/);
+    assert.match(
+      source,
+      /membershipIds: Object\.freeze\(\[input\.actor\.membershipId\]\)/,
+    );
+    assert.match(source, /userId/);
+    assert.doesNotMatch(source, /findVisibleByHomeAndId/);
+    assert.doesNotMatch(source, /listVisibleByHome/);
+    assert.doesNotMatch(source, /insertEntryWithAudience/);
+    assert.doesNotMatch(source, /findActiveExactMembershipIdsInHome/);
+    assert.doesNotMatch(source, /decideHomeRead/);
+    assert.doesNotMatch(source, /memberships\/repository/);
+    assert.doesNotMatch(source, /homes\/repository/);
+    assert.doesNotMatch(source, /lockHomeStructure/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+    assert.doesNotMatch(source, /Date\.now/);
+    assert.doesNotMatch(source, /new Date\(/);
+    assert.doesNotMatch(source, /outbox/);
+    assert.doesNotMatch(source, /maintenance\.resolved/);
+    assert.doesNotMatch(source, /maintenance\.resolve_private/);
+    assert.doesNotMatch(source, /maintenance\.resolve_admin/);
+    assert.doesNotMatch(source, /isHomeAdmin/);
+    assert.doesNotMatch(source, /user_id/);
+    assert.doesNotMatch(source, /audienceMembershipIds/);
+    assert.doesNotMatch(source, /filter\(/);
+    assert.doesNotMatch(source, /reopen/i);
+    assert.doesNotMatch(source, /SERIALIZABLE/);
+    assert.doesNotMatch(source, /pg_advisory/i);
+    assert.doesNotMatch(source, /router\./);
+    assert.doesNotMatch(source, /createMaintenanceRouter/);
   });
 
   void it('lists and reads through public repository visibility without app filtering', async () => {

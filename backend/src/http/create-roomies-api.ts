@@ -20,6 +20,7 @@ import {
   type CreateMaintenanceEntryCommand,
   type ListHomeMaintenanceCommand,
   type ReadMaintenanceEntryCommand,
+  type ResolveMaintenanceEntryCommand,
 } from '../domains/maintenance/http.js';
 import {
   createSuppliesRouter,
@@ -93,6 +94,7 @@ export type CreateRoomiesApiRouterOptions = {
     createMaintenanceEntry: CreateMaintenanceEntryCommand;
     listHomeMaintenance: ListHomeMaintenanceCommand;
     readMaintenanceEntry: ReadMaintenanceEntryCommand;
+    resolveMaintenanceEntry: ResolveMaintenanceEntryCommand;
   };
 };
 
@@ -185,6 +187,7 @@ export function createRoomiesApiRouter(
         createMaintenanceEntry: options.maintenance.createMaintenanceEntry,
         listHomeMaintenance: options.maintenance.listHomeMaintenance,
         readMaintenanceEntry: options.maintenance.readMaintenanceEntry,
+        resolveMaintenanceEntry: options.maintenance.resolveMaintenanceEntry,
       }),
     );
   }
