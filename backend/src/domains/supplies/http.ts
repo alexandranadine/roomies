@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import type { CancelSupplyEntryInput } from '../../application/supplies/cancel-supply-entry.js';
 import type { ClaimSupplyEntryInput } from '../../application/supplies/claim-supply-entry.js';
 import type { CreateSupplyEntryInput } from '../../application/supplies/create-supply-entry.js';
 import type { ListHomeSuppliesInput } from '../../application/supplies/list-home-supplies.js';
+import type { MarkSupplyEntryObtainedInput } from '../../application/supplies/mark-supply-entry-obtained.js';
 import type { ReleaseSupplyClaimInput } from '../../application/supplies/release-supply-claim.js';
 import type { PrincipalResolver } from '../../platform/auth/principal.js';
 import {
@@ -52,6 +54,14 @@ export type ReleaseSupplyClaimCommand = (
   input: ReleaseSupplyClaimInput,
 ) => Promise<void>;
 
+export type MarkSupplyEntryObtainedCommand = (
+  input: MarkSupplyEntryObtainedInput,
+) => Promise<SupplyEntry>;
+
+export type CancelSupplyEntryCommand = (
+  input: CancelSupplyEntryInput,
+) => Promise<SupplyEntry>;
+
 export type CreateSuppliesRouterOptions = {
   principalResolver: Pick<PrincipalResolver, 'requirePrincipal'>;
   activeHomeActorResolver: Pick<ActiveHomeActorResolver, 'resolve'>;
@@ -59,6 +69,8 @@ export type CreateSuppliesRouterOptions = {
   listHomeSupplies: ListHomeSuppliesCommand;
   claimSupplyEntry: ClaimSupplyEntryCommand;
   releaseSupplyClaim: ReleaseSupplyClaimCommand;
+  markSupplyEntryObtained: MarkSupplyEntryObtainedCommand;
+  cancelSupplyEntry: CancelSupplyEntryCommand;
 };
 
 function parseCreateSupplyEntryBody(body: unknown): { title: string } {
@@ -176,6 +188,36 @@ export function createSuppliesRouter(
       })().catch(next);
     },
   );
+
+  router.post('/:homeId/supplies/:supplyEntryId/obtain', (req, res, next) => {
+    void (async () => {
+      const actor = getActiveHomeActor(res);
+      const homeId = parsePathUuid(req.params['homeId']);
+      const supplyEntryId = parsePathUuid(req.params['supplyEntryId']);
+      parseEmptySupplyMutationBody(req.body);
+      const updated = await options.markSupplyEntryObtained({
+        actor,
+        homeId,
+        supplyEntryId,
+      });
+      res.status(200).json(toSupplyEntryDto(updated));
+    })().catch(next);
+  });
+
+  router.post('/:homeId/supplies/:supplyEntryId/cancel', (req, res, next) => {
+    void (async () => {
+      const actor = getActiveHomeActor(res);
+      const homeId = parsePathUuid(req.params['homeId']);
+      const supplyEntryId = parsePathUuid(req.params['supplyEntryId']);
+      parseEmptySupplyMutationBody(req.body);
+      const updated = await options.cancelSupplyEntry({
+        actor,
+        homeId,
+        supplyEntryId,
+      });
+      res.status(200).json(toSupplyEntryDto(updated));
+    })().catch(next);
+  });
 
   return router;
 }

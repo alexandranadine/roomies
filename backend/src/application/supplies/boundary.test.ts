@@ -191,4 +191,60 @@ void describe('supplies application boundary', () => {
     assert.doesNotMatch(source, /pg_advisory/i);
     assert.doesNotMatch(source, /Idempotency-Key/);
   });
+
+  void it('marks obtained through ordinary policy without claim ownership', async () => {
+    const source = await readFile(
+      path.join(dir, 'mark-supply-entry-obtained.ts'),
+      'utf8',
+    );
+    assert.match(source, /decideSupplyMarkObtained/);
+    assert.match(source, /lockHomeAndExactMemberships/);
+    assert.match(source, /lockSupplyEntryByHomeAndId/);
+    assert.match(source, /lockActiveClaimByEntry/);
+    assert.match(source, /releaseActiveClaimForEntryTerminalization/);
+    assert.match(source, /terminalizeSupplyEntryAsObtained/);
+    assert.match(source, /runInReadCommittedTransaction/);
+    assert.match(source, /reason: 'ENTRY_OBTAINED'/);
+    assert.doesNotMatch(source, /decideSupplyReleaseClaim/);
+    assert.doesNotMatch(source, /isHomeAdmin/);
+    assert.doesNotMatch(source, /memberships\/repository/);
+    assert.doesNotMatch(source, /homes\/repository/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+    assert.doesNotMatch(source, /Date\.now/);
+    assert.doesNotMatch(source, /new Date\(/);
+    assert.doesNotMatch(source, /outbox/);
+    assert.doesNotMatch(source, /supply\.obtained/);
+    assert.doesNotMatch(source, /SERIALIZABLE/);
+    assert.doesNotMatch(source, /pg_advisory/i);
+    assert.doesNotMatch(source, /Idempotency-Key/);
+  });
+
+  void it('cancels through ordinary policy without claim ownership', async () => {
+    const source = await readFile(
+      path.join(dir, 'cancel-supply-entry.ts'),
+      'utf8',
+    );
+    assert.match(source, /decideSupplyCancel/);
+    assert.match(source, /lockHomeAndExactMemberships/);
+    assert.match(source, /lockSupplyEntryByHomeAndId/);
+    assert.match(source, /lockActiveClaimByEntry/);
+    assert.match(source, /releaseActiveClaimForEntryTerminalization/);
+    assert.match(source, /terminalizeSupplyEntryAsCanceled/);
+    assert.match(source, /runInReadCommittedTransaction/);
+    assert.match(source, /reason: 'ENTRY_CANCELED'/);
+    assert.doesNotMatch(source, /decideSupplyReleaseClaim/);
+    assert.doesNotMatch(source, /isHomeAdmin/);
+    assert.doesNotMatch(source, /memberships\/repository/);
+    assert.doesNotMatch(source, /homes\/repository/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+    assert.doesNotMatch(source, /Date\.now/);
+    assert.doesNotMatch(source, /new Date\(/);
+    assert.doesNotMatch(source, /outbox/);
+    assert.doesNotMatch(source, /supply\.canceled/);
+    assert.doesNotMatch(source, /SERIALIZABLE/);
+    assert.doesNotMatch(source, /pg_advisory/i);
+    assert.doesNotMatch(source, /Idempotency-Key/);
+  });
 });

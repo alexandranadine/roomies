@@ -202,6 +202,55 @@ RETURNING ${SUPPLY_CLAIM_COLUMNS}
 `;
 
 /**
+ * Terminalization release for an optional active SupplyClaim. Exact claim,
+ * Home, and entry only. Never predicates on claimant Membership and never
+ * rewrites a historical release reason.
+ */
+export const RELEASE_ACTIVE_CLAIM_FOR_ENTRY_TERMINALIZATION_SQL = `
+UPDATE supply_claims
+SET
+  released_at = $4::timestamptz,
+  release_reason = $5,
+  updated_at = $4::timestamptz
+WHERE id = $1::uuid
+  AND home_id = $2::uuid
+  AND supply_entry_id = $3::uuid
+  AND released_at IS NULL
+  AND release_reason IS NULL
+RETURNING ${SUPPLY_CLAIM_COLUMNS}
+`;
+
+export const TERMINALIZE_SUPPLY_ENTRY_AS_OBTAINED_SQL = `
+UPDATE supply_entries
+SET
+  status = 'OBTAINED',
+  obtained_at = $3::timestamptz,
+  canceled_at = NULL,
+  updated_at = $3::timestamptz
+WHERE id = $1::uuid
+  AND home_id = $2::uuid
+  AND status = 'OPEN'
+  AND obtained_at IS NULL
+  AND canceled_at IS NULL
+RETURNING ${SUPPLY_ENTRY_COLUMNS}
+`;
+
+export const TERMINALIZE_SUPPLY_ENTRY_AS_CANCELED_SQL = `
+UPDATE supply_entries
+SET
+  status = 'CANCELED',
+  canceled_at = $3::timestamptz,
+  obtained_at = NULL,
+  updated_at = $3::timestamptz
+WHERE id = $1::uuid
+  AND home_id = $2::uuid
+  AND status = 'OPEN'
+  AND obtained_at IS NULL
+  AND canceled_at IS NULL
+RETURNING ${SUPPLY_ENTRY_COLUMNS}
+`;
+
+/**
  * Membership-ending cleanup for active SupplyClaims. Exact Home + exact
  * Membership tenure only. Already-released rows stay historical. Never
  * rewrites claimant_membership_id or SupplyEntry status.
@@ -255,6 +304,31 @@ export type ReleaseActiveClaimOwnedByMembership = Readonly<{
   releasedAt: Date;
 }>;
 
+export type SupplyTerminalClaimReleaseReason = Extract<
+  SupplyClaimReleaseReason,
+  'ENTRY_OBTAINED' | 'ENTRY_CANCELED'
+>;
+
+export type ReleaseActiveClaimForEntryTerminalization = Readonly<{
+  claimId: string;
+  homeId: string;
+  supplyEntryId: string;
+  releasedAt: Date;
+  reason: SupplyTerminalClaimReleaseReason;
+}>;
+
+export type TerminalizeSupplyEntryAsObtained = Readonly<{
+  supplyEntryId: string;
+  homeId: string;
+  obtainedAt: Date;
+}>;
+
+export type TerminalizeSupplyEntryAsCanceled = Readonly<{
+  supplyEntryId: string;
+  homeId: string;
+  canceledAt: Date;
+}>;
+
 export type SupplyRepository = Readonly<{
   insertSupplyEntry(
     tx: TransactionContext,
@@ -294,6 +368,18 @@ export type SupplyRepository = Readonly<{
     tx: TransactionContext,
     input: ReleaseActiveClaimOwnedByMembership,
   ): Promise<SupplyClaim | null>;
+  releaseActiveClaimForEntryTerminalization(
+    tx: TransactionContext,
+    input: ReleaseActiveClaimForEntryTerminalization,
+  ): Promise<SupplyClaim | null>;
+  terminalizeSupplyEntryAsObtained(
+    tx: TransactionContext,
+    input: TerminalizeSupplyEntryAsObtained,
+  ): Promise<SupplyEntry | null>;
+  terminalizeSupplyEntryAsCanceled(
+    tx: TransactionContext,
+    input: TerminalizeSupplyEntryAsCanceled,
+  ): Promise<SupplyEntry | null>;
   releaseActiveClaimsForMembership(
     tx: TransactionContext,
     input: ReleaseMembershipClaims,
@@ -671,6 +757,75 @@ export function createSupplyRepository(pool: Pool): SupplyRepository {
           throw new SupplyPersistenceError();
         }
         return oneSupplyClaim(result.rows, input.homeId);
+      } catch (error) {
+        if (error instanceof SupplyPersistenceError) {
+          throw error;
+        }
+        throw new SupplyPersistenceError();
+      }
+    },
+
+    async releaseActiveClaimForEntryTerminalization(tx, input) {
+      if (
+        input.reason !== 'ENTRY_OBTAINED' &&
+        input.reason !== 'ENTRY_CANCELED'
+      ) {
+        throw new SupplyPersistenceError();
+      }
+      try {
+        const result = await tx.query<SupplyClaimRow>(
+          RELEASE_ACTIVE_CLAIM_FOR_ENTRY_TERMINALIZATION_SQL,
+          [
+            input.claimId,
+            input.homeId,
+            input.supplyEntryId,
+            input.releasedAt,
+            input.reason,
+          ],
+        );
+        if (result.rows.length === 0) {
+          return null;
+        }
+        if (result.rows.length !== 1) {
+          throw new SupplyPersistenceError();
+        }
+        return oneSupplyClaim(result.rows, input.homeId);
+      } catch (error) {
+        if (error instanceof SupplyPersistenceError) {
+          throw error;
+        }
+        throw new SupplyPersistenceError();
+      }
+    },
+
+    async terminalizeSupplyEntryAsObtained(tx, input) {
+      try {
+        const result = await tx.query<SupplyEntryRow>(
+          TERMINALIZE_SUPPLY_ENTRY_AS_OBTAINED_SQL,
+          [input.supplyEntryId, input.homeId, input.obtainedAt],
+        );
+        if (result.rows.length === 0) {
+          return null;
+        }
+        return oneSupplyEntry(result.rows, input.homeId);
+      } catch (error) {
+        if (error instanceof SupplyPersistenceError) {
+          throw error;
+        }
+        throw new SupplyPersistenceError();
+      }
+    },
+
+    async terminalizeSupplyEntryAsCanceled(tx, input) {
+      try {
+        const result = await tx.query<SupplyEntryRow>(
+          TERMINALIZE_SUPPLY_ENTRY_AS_CANCELED_SQL,
+          [input.supplyEntryId, input.homeId, input.canceledAt],
+        );
+        if (result.rows.length === 0) {
+          return null;
+        }
+        return oneSupplyEntry(result.rows, input.homeId);
       } catch (error) {
         if (error instanceof SupplyPersistenceError) {
           throw error;

@@ -7,9 +7,11 @@ import { createAcceptInvitationFromPool } from './application/invitations/accept
 import { createPreviewInvitationFromPool } from './application/invitations/preview-invitation.js';
 import { createLeaveMembershipFromPool } from './application/home-administration/leave-membership.js';
 import { createRemoveMembershipFromPool } from './application/home-administration/remove-membership.js';
+import { createCancelSupplyEntryFromPool } from './application/supplies/cancel-supply-entry.js';
 import { createClaimSupplyEntryFromPool } from './application/supplies/claim-supply-entry.js';
 import { createCreateSupplyEntryFromPool } from './application/supplies/create-supply-entry.js';
 import { createListHomeSuppliesFromPool } from './application/supplies/list-home-supplies.js';
+import { createMarkSupplyEntryObtainedFromPool } from './application/supplies/mark-supply-entry-obtained.js';
 import { createReleaseSupplyClaimFromPool } from './application/supplies/release-supply-claim.js';
 import { createCompleteTaskFromPool } from './application/tasks/complete-task.js';
 import { createCreateManualTaskFromPool } from './application/tasks/create-manual-task.js';
@@ -116,6 +118,10 @@ function createWebHttpRuntime(
         listHomeSupplies: createListHomeSuppliesFromPool(databasePool.pool),
         claimSupplyEntry: createClaimSupplyEntryFromPool(databasePool.pool),
         releaseSupplyClaim: createReleaseSupplyClaimFromPool(databasePool.pool),
+        markSupplyEntryObtained: createMarkSupplyEntryObtainedFromPool(
+          databasePool.pool,
+        ),
+        cancelSupplyEntry: createCancelSupplyEntryFromPool(databasePool.pool),
       },
     }),
   });

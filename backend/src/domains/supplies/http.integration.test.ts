@@ -2,9 +2,11 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { describe, it } from 'node:test';
 import type { Pool } from 'pg';
+import { createCancelSupplyEntryFromPool } from '../../application/supplies/cancel-supply-entry.js';
 import { createClaimSupplyEntryFromPool } from '../../application/supplies/claim-supply-entry.js';
 import { createCreateSupplyEntryFromPool } from '../../application/supplies/create-supply-entry.js';
 import { createListHomeSuppliesFromPool } from '../../application/supplies/list-home-supplies.js';
+import { createMarkSupplyEntryObtainedFromPool } from '../../application/supplies/mark-supply-entry-obtained.js';
 import { createReleaseSupplyClaimFromPool } from '../../application/supplies/release-supply-claim.js';
 import { createHomeRepository } from '../homes/index.js';
 import { createRoomiesApiRouter } from '../../http/create-roomies-api.js';
@@ -173,6 +175,10 @@ void describe('Supply HTTP PostgreSQL', () => {
               releaseSupplyClaim: createReleaseSupplyClaimFromPool(
                 database.pool,
               ),
+              markSupplyEntryObtained: createMarkSupplyEntryObtainedFromPool(
+                database.pool,
+              ),
+              cancelSupplyEntry: createCancelSupplyEntryFromPool(database.pool),
             },
           }),
         });
@@ -562,6 +568,175 @@ void describe('Supply HTTP PostgreSQL', () => {
             body: JSON.stringify({ claimantMembershipId: membershipB }),
           });
           assert.equal(extraClaimBody.status, 400);
+
+          const obtained = await request({
+            method: 'POST',
+            path: `/api/v1/homes/${homeA}/supplies/${createdBody.id}/obtain`,
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: roommate.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          });
+          assert.equal(obtained.status, 200);
+          assert.equal(
+            obtained.headers.get('cache-control'),
+            'private, no-store',
+          );
+          const obtainedBody = supplyEntryDtoSchema.parse(obtained.json());
+          assert.deepEqual(Object.keys(obtainedBody), dtoKeys);
+          assert.equal(obtainedBody.status, 'OBTAINED');
+          assert.ok(obtainedBody.obtainedAt);
+          assert.equal(obtainedBody.canceledAt, null);
+          assert.equal(obtainedBody.activeClaim, null);
+          assert.equal(obtainedBody.updatedAt, obtainedBody.obtainedAt);
+          assert.equal('homeId' in (obtained.json() as object), false);
+
+          const listedObtained = await request({
+            method: 'GET',
+            path: `/api/v1/homes/${homeA}/supplies`,
+            headers: { Cookie: roommate.cookie },
+          });
+          const listedObtainedBody = listedObtained.json() as SupplyEntryDto[];
+          assert.equal(
+            listedObtainedBody.find((row) => row.id === createdBody.id)
+              ?.activeClaim,
+            null,
+          );
+
+          const repeatObtain = await request({
+            method: 'POST',
+            path: `/api/v1/homes/${homeA}/supplies/${createdBody.id}/obtain`,
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: roommate.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          });
+          assert.equal(repeatObtain.status, 409);
+          assert.equal(
+            (repeatObtain.json() as ApiErrorBody).error.code,
+            'SUPPLY_NOT_OPEN',
+          );
+
+          const cancelTarget = await request({
+            method: 'POST',
+            path: `/api/v1/homes/${homeA}/supplies`,
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: roommate.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({ title: 'Cancel me' }),
+          });
+          assert.equal(cancelTarget.status, 201);
+          const cancelTargetBody = supplyEntryDtoSchema.parse(
+            cancelTarget.json(),
+          );
+          const canceled = await request({
+            method: 'POST',
+            path: `/api/v1/homes/${homeA}/supplies/${cancelTargetBody.id}/cancel`,
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: roommate.cookie,
+            },
+          });
+          assert.equal(canceled.status, 200);
+          const canceledBody = supplyEntryDtoSchema.parse(canceled.json());
+          assert.equal(canceledBody.status, 'CANCELED');
+          assert.ok(canceledBody.canceledAt);
+          assert.equal(canceledBody.obtainedAt, null);
+          assert.equal(canceledBody.activeClaim, null);
+          assert.equal(canceledBody.updatedAt, canceledBody.canceledAt);
+
+          const opposite = await request({
+            method: 'POST',
+            path: `/api/v1/homes/${homeA}/supplies/${cancelTargetBody.id}/obtain`,
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: roommate.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          });
+          assert.equal(opposite.status, 409);
+          assert.equal(
+            (opposite.json() as ApiErrorBody).error.code,
+            'SUPPLY_NOT_OPEN',
+          );
+
+          const hostileObtain = await request({
+            method: 'POST',
+            path: `/api/v1/homes/${homeA}/supplies/${createdBody.id}/obtain`,
+            headers: {
+              Origin: HOSTILE_ORIGIN,
+              Cookie: roommate.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          });
+          assert.equal(hostileObtain.status, 403);
+
+          const missingAuthObtain = await request({
+            method: 'POST',
+            path: `/api/v1/homes/${homeA}/supplies/${createdBody.id}/cancel`,
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          });
+          assert.equal(missingAuthObtain.status, 401);
+
+          const extraObtainBody = await request({
+            method: 'POST',
+            path: `/api/v1/homes/${homeA}/supplies/${createdBody.id}/obtain`,
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: roommate.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({ status: 'OBTAINED' }),
+          });
+          assert.equal(extraObtainBody.status, 400);
+
+          const unknownObtain = await request({
+            method: 'POST',
+            path: `/api/v1/homes/${homeA}/supplies/${createUuidV7()}/obtain`,
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: roommate.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          });
+          assert.equal(unknownObtain.status, 404);
+
+          const foreignObtain = await request({
+            method: 'POST',
+            path: `/api/v1/homes/${homeA}/supplies/${createUuidV7()}/cancel`,
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: roommate.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          });
+          assert.equal(foreignObtain.status, 404);
+
+          const endedObtain = await request({
+            method: 'POST',
+            path: `/api/v1/homes/${homeA}/supplies/${createdBody.id}/obtain`,
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: ended.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          });
+          assert.equal(endedObtain.status, 404);
 
           assertNoForbiddenLeak({
             context: 'supply HTTP logs',

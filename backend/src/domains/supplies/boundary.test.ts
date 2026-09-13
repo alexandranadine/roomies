@@ -50,6 +50,9 @@ void describe('supplies domain boundary', () => {
       'listSupplyEntriesByHome',
       'listSupplyEntriesByHomeAndStatus',
       'releaseActiveClaimsForMembership',
+      'releaseActiveClaimForEntryTerminalization',
+      'terminalizeSupplyEntryAsObtained',
+      'terminalizeSupplyEntryAsCanceled',
     ]) {
       assert.match(source, new RegExp(primitive));
     }
@@ -70,6 +73,9 @@ void describe('supplies domain boundary', () => {
     assert.match(source, /LOCK_SUPPLY_ENTRY_BY_HOME_AND_ID_SQL/);
     assert.match(source, /LOCK_ACTIVE_CLAIM_BY_ENTRY_SQL/);
     assert.match(source, /RELEASE_ACTIVE_CLAIM_OWNED_BY_MEMBERSHIP_SQL/);
+    assert.match(source, /RELEASE_ACTIVE_CLAIM_FOR_ENTRY_TERMINALIZATION_SQL/);
+    assert.match(source, /TERMINALIZE_SUPPLY_ENTRY_AS_OBTAINED_SQL/);
+    assert.match(source, /TERMINALIZE_SUPPLY_ENTRY_AS_CANCELED_SQL/);
     assert.doesNotMatch(source, /DELETE /i);
     assert.doesNotMatch(source, /claimed_by_membership_id/);
     assert.doesNotMatch(source, /quantity|price|reimbursement/i);
@@ -95,6 +101,8 @@ void describe('supplies domain boundary', () => {
       'list-policy.ts',
       'claim-policy.ts',
       'release-policy.ts',
+      'obtain-policy.ts',
+      'cancel-policy.ts',
       'actions.ts',
     ]) {
       const source = await readFile(path.join(suppliesDir, name), 'utf8');
@@ -113,8 +121,10 @@ void describe('supplies domain boundary', () => {
     assert.match(actions, /supply\.list/);
     assert.match(actions, /supply\.claim/);
     assert.match(actions, /supply\.release_claim/);
-    assert.doesNotMatch(actions, /supply\.obtain/);
-    assert.doesNotMatch(actions, /supply\.cancel/);
+    assert.match(actions, /supply\.mark_obtained/);
+    assert.match(actions, /supply\.cancel/);
+    assert.doesNotMatch(actions, /supply\.reopen/);
+    assert.doesNotMatch(actions, /supply\.delete/);
   });
 
   void it('keeps Supply HTTP adapter-only on the existing Home authz path', async () => {
@@ -129,6 +139,14 @@ void describe('supplies domain boundary', () => {
       source,
       /router\.post\(\s*'\/:homeId\/supplies\/:supplyEntryId\/release-claim'/,
     );
+    assert.match(
+      source,
+      /router\.post\(\s*'\/:homeId\/supplies\/:supplyEntryId\/obtain'/,
+    );
+    assert.match(
+      source,
+      /router\.post\(\s*'\/:homeId\/supplies\/:supplyEntryId\/cancel'/,
+    );
     assert.match(source, /createRequireHomeContext/);
     assert.match(source, /createRequireAuth/);
     assert.match(source, /setPrivateNoStoreHeaders/);
@@ -141,9 +159,8 @@ void describe('supplies domain boundary', () => {
     assert.doesNotMatch(source, /supply\.created/);
     assert.doesNotMatch(source, /outbox/);
     assert.doesNotMatch(source, /router\.delete/i);
-    assert.doesNotMatch(source, /\/obtain/);
-    assert.doesNotMatch(source, /\/cancel/);
     assert.doesNotMatch(source, /router\.patch/i);
+    assert.doesNotMatch(source, /res\.status\(204\)\.json/);
     assert.doesNotMatch(source, /claimedBy|canClaim/);
   });
 });

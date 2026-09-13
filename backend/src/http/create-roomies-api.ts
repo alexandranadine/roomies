@@ -17,9 +17,11 @@ import {
 } from '../domains/memberships/http.js';
 import {
   createSuppliesRouter,
+  type CancelSupplyEntryCommand,
   type ClaimSupplyEntryCommand,
   type CreateSupplyEntryCommand,
   type ListHomeSuppliesCommand,
+  type MarkSupplyEntryObtainedCommand,
   type ReleaseSupplyClaimCommand,
 } from '../domains/supplies/http.js';
 import {
@@ -78,6 +80,8 @@ export type CreateRoomiesApiRouterOptions = {
     listHomeSupplies: ListHomeSuppliesCommand;
     claimSupplyEntry: ClaimSupplyEntryCommand;
     releaseSupplyClaim: ReleaseSupplyClaimCommand;
+    markSupplyEntryObtained: MarkSupplyEntryObtainedCommand;
+    cancelSupplyEntry: CancelSupplyEntryCommand;
   };
 };
 
@@ -156,6 +160,8 @@ export function createRoomiesApiRouter(
         listHomeSupplies: options.supplies.listHomeSupplies,
         claimSupplyEntry: options.supplies.claimSupplyEntry,
         releaseSupplyClaim: options.supplies.releaseSupplyClaim,
+        markSupplyEntryObtained: options.supplies.markSupplyEntryObtained,
+        cancelSupplyEntry: options.supplies.cancelSupplyEntry,
       }),
     );
   }
