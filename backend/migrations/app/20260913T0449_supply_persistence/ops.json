@@ -1,0 +1,719 @@
+[
+  {
+    "id": "table.supply_claims",
+    "label": "Create table \"supply_claims\"",
+    "summary": "Creates table \"supply_claims\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "supply_claims"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"supply_claims\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"supply_claims\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"supply_claims\"",
+        "sql": "CREATE TABLE \"public\".\"supply_claims\" (\n  \"claimant_membership_id\" uuid NOT NULL,\n  \"claimed_at\" timestamptz NOT NULL,\n  \"created_at\" timestamptz DEFAULT (now()) NOT NULL,\n  \"home_id\" uuid NOT NULL,\n  \"id\" uuid NOT NULL,\n  \"release_reason\" text,\n  \"released_at\" timestamptz,\n  \"supply_entry_id\" uuid NOT NULL,\n  \"updated_at\" timestamptz NOT NULL,\n  PRIMARY KEY (\"id\"),\n  CONSTRAINT \"supply_claims_release_completeness_check\" CHECK (((released_at IS NULL) = (release_reason IS NULL))),\n  CONSTRAINT \"supply_claims_release_reason_check_d17b2d97\" CHECK (\"release_reason\" IN ('CLAIMANT_RELEASED', 'MEMBERSHIP_ENDED', 'ENTRY_OBTAINED', 'ENTRY_CANCELED')),\n  CONSTRAINT \"supply_claims_released_time_check\" CHECK (((released_at IS NULL) OR ((released_at >= claimed_at) AND (released_at >= created_at))))\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"supply_claims\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"supply_claims\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.supply_entries",
+    "label": "Create table \"supply_entries\"",
+    "summary": "Creates table \"supply_entries\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "supply_entries"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"supply_entries\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"supply_entries\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"supply_entries\"",
+        "sql": "CREATE TABLE \"public\".\"supply_entries\" (\n  \"canceled_at\" timestamptz,\n  \"created_at\" timestamptz DEFAULT (now()) NOT NULL,\n  \"created_by_membership_id\" uuid NOT NULL,\n  \"home_id\" uuid NOT NULL,\n  \"id\" uuid NOT NULL,\n  \"obtained_at\" timestamptz,\n  \"status\" text DEFAULT 'OPEN' NOT NULL,\n  \"title\" text NOT NULL,\n  \"updated_at\" timestamptz NOT NULL,\n  PRIMARY KEY (\"id\"),\n  CONSTRAINT \"supply_entries_lifecycle_check\" CHECK ((((status = 'OPEN'::text) AND (obtained_at IS NULL) AND (canceled_at IS NULL)) OR ((status = 'OBTAINED'::text) AND (obtained_at IS NOT NULL) AND (canceled_at IS NULL)) OR ((status = 'CANCELED'::text) AND (obtained_at IS NULL) AND (canceled_at IS NOT NULL)))),\n  CONSTRAINT \"supply_entries_status_check_cbe78413\" CHECK (\"status\" IN ('OPEN', 'OBTAINED', 'CANCELED')),\n  CONSTRAINT \"supply_entries_terminal_time_check\" CHECK ((((obtained_at IS NULL) OR (obtained_at >= created_at)) AND ((canceled_at IS NULL) OR (canceled_at >= created_at))))\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"supply_entries\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"supply_entries\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.supply_claims.supply_claims_entry_history_idx_8c80cae3",
+    "label": "Create index \"supply_claims_entry_history_idx_8c80cae3\" on \"supply_claims\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "supply_claims_entry_history_idx_8c80cae3",
+        "table": "supply_claims"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"supply_claims_entry_history_idx_8c80cae3\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"supply_claims_entry_history_idx_8c80cae3\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"supply_claims_entry_history_idx_8c80cae3\"",
+        "sql": "CREATE INDEX \"supply_claims_entry_history_idx_8c80cae3\" ON \"public\".\"supply_claims\" (\"home_id\", \"supply_entry_id\", \"claimed_at\", \"id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"supply_claims_entry_history_idx_8c80cae3\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"supply_claims_entry_history_idx_8c80cae3\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.supply_claims.supply_claims_home_active_claimant_idx_2b0b42e6",
+    "label": "Create index \"supply_claims_home_active_claimant_idx_2b0b42e6\" on \"supply_claims\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "supply_claims_home_active_claimant_idx_2b0b42e6",
+        "table": "supply_claims"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"supply_claims_home_active_claimant_idx_2b0b42e6\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"supply_claims_home_active_claimant_idx_2b0b42e6\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"supply_claims_home_active_claimant_idx_2b0b42e6\"",
+        "sql": "CREATE INDEX \"supply_claims_home_active_claimant_idx_2b0b42e6\" ON \"public\".\"supply_claims\" (\"home_id\", \"claimant_membership_id\", \"id\") WHERE ((released_at IS NULL))",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"supply_claims_home_active_claimant_idx_2b0b42e6\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"supply_claims_home_active_claimant_idx_2b0b42e6\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.supply_claims.supply_claims_home_id_claimant_membership_id_idx_023e58f6",
+    "label": "Create index \"supply_claims_home_id_claimant_membership_id_idx_023e58f6\" on \"supply_claims\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "supply_claims_home_id_claimant_membership_id_idx_023e58f6",
+        "table": "supply_claims"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"supply_claims_home_id_claimant_membership_id_idx_023e58f6\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"supply_claims_home_id_claimant_membership_id_idx_023e58f6\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"supply_claims_home_id_claimant_membership_id_idx_023e58f6\"",
+        "sql": "CREATE INDEX \"supply_claims_home_id_claimant_membership_id_idx_023e58f6\" ON \"public\".\"supply_claims\" (\"home_id\", \"claimant_membership_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"supply_claims_home_id_claimant_membership_id_idx_023e58f6\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"supply_claims_home_id_claimant_membership_id_idx_023e58f6\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.supply_claims.supply_claims_home_id_idx_f881d5c1",
+    "label": "Create index \"supply_claims_home_id_idx_f881d5c1\" on \"supply_claims\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "supply_claims_home_id_idx_f881d5c1",
+        "table": "supply_claims"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"supply_claims_home_id_idx_f881d5c1\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"supply_claims_home_id_idx_f881d5c1\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"supply_claims_home_id_idx_f881d5c1\"",
+        "sql": "CREATE INDEX \"supply_claims_home_id_idx_f881d5c1\" ON \"public\".\"supply_claims\" (\"home_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"supply_claims_home_id_idx_f881d5c1\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"supply_claims_home_id_idx_f881d5c1\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.supply_claims.supply_claims_home_id_supply_entry_id_idx_98811f6a",
+    "label": "Create index \"supply_claims_home_id_supply_entry_id_idx_98811f6a\" on \"supply_claims\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "supply_claims_home_id_supply_entry_id_idx_98811f6a",
+        "table": "supply_claims"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"supply_claims_home_id_supply_entry_id_idx_98811f6a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"supply_claims_home_id_supply_entry_id_idx_98811f6a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"supply_claims_home_id_supply_entry_id_idx_98811f6a\"",
+        "sql": "CREATE INDEX \"supply_claims_home_id_supply_entry_id_idx_98811f6a\" ON \"public\".\"supply_claims\" (\"home_id\", \"supply_entry_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"supply_claims_home_id_supply_entry_id_idx_98811f6a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"supply_claims_home_id_supply_entry_id_idx_98811f6a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.supply_claims.supply_claims_one_active_per_entry_1e26d778",
+    "label": "Create index \"supply_claims_one_active_per_entry_1e26d778\" on \"supply_claims\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "supply_claims_one_active_per_entry_1e26d778",
+        "table": "supply_claims"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"supply_claims_one_active_per_entry_1e26d778\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"supply_claims_one_active_per_entry_1e26d778\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"supply_claims_one_active_per_entry_1e26d778\"",
+        "sql": "CREATE UNIQUE INDEX \"supply_claims_one_active_per_entry_1e26d778\" ON \"public\".\"supply_claims\" (\"supply_entry_id\") WHERE ((released_at IS NULL))",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"supply_claims_one_active_per_entry_1e26d778\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"supply_claims_one_active_per_entry_1e26d778\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.supply_entries.supply_entries_home_history_idx_60894047",
+    "label": "Create index \"supply_entries_home_history_idx_60894047\" on \"supply_entries\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "supply_entries_home_history_idx_60894047",
+        "table": "supply_entries"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"supply_entries_home_history_idx_60894047\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"supply_entries_home_history_idx_60894047\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"supply_entries_home_history_idx_60894047\"",
+        "sql": "CREATE INDEX \"supply_entries_home_history_idx_60894047\" ON \"public\".\"supply_entries\" (\"home_id\", \"updated_at\", \"id\") WHERE ((status IN ('OBTAINED', 'CANCELED')))",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"supply_entries_home_history_idx_60894047\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"supply_entries_home_history_idx_60894047\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.supply_entries.supply_entries_home_id_created_by_membership_id_idx_889ed7bc",
+    "label": "Create index \"supply_entries_home_id_created_by_membership_id_idx_889ed7bc\" on \"supply_entries\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "supply_entries_home_id_created_by_membership_id_idx_889ed7bc",
+        "table": "supply_entries"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"supply_entries_home_id_created_by_membership_id_idx_889ed7bc\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"supply_entries_home_id_created_by_membership_id_idx_889ed7bc\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"supply_entries_home_id_created_by_membership_id_idx_889ed7bc\"",
+        "sql": "CREATE INDEX \"supply_entries_home_id_created_by_membership_id_idx_889ed7bc\" ON \"public\".\"supply_entries\" (\"home_id\", \"created_by_membership_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"supply_entries_home_id_created_by_membership_id_idx_889ed7bc\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"supply_entries_home_id_created_by_membership_id_idx_889ed7bc\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.supply_entries.supply_entries_home_id_id_key_2f2cccd8",
+    "label": "Create index \"supply_entries_home_id_id_key_2f2cccd8\" on \"supply_entries\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "supply_entries_home_id_id_key_2f2cccd8",
+        "table": "supply_entries"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"supply_entries_home_id_id_key_2f2cccd8\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"supply_entries_home_id_id_key_2f2cccd8\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"supply_entries_home_id_id_key_2f2cccd8\"",
+        "sql": "CREATE UNIQUE INDEX \"supply_entries_home_id_id_key_2f2cccd8\" ON \"public\".\"supply_entries\" (\"home_id\", \"id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"supply_entries_home_id_id_key_2f2cccd8\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"supply_entries_home_id_id_key_2f2cccd8\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.supply_entries.supply_entries_home_id_idx_f881d5c1",
+    "label": "Create index \"supply_entries_home_id_idx_f881d5c1\" on \"supply_entries\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "supply_entries_home_id_idx_f881d5c1",
+        "table": "supply_entries"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"supply_entries_home_id_idx_f881d5c1\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"supply_entries_home_id_idx_f881d5c1\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"supply_entries_home_id_idx_f881d5c1\"",
+        "sql": "CREATE INDEX \"supply_entries_home_id_idx_f881d5c1\" ON \"public\".\"supply_entries\" (\"home_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"supply_entries_home_id_idx_f881d5c1\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"supply_entries_home_id_idx_f881d5c1\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.supply_entries.supply_entries_home_open_idx_9cfca592",
+    "label": "Create index \"supply_entries_home_open_idx_9cfca592\" on \"supply_entries\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "supply_entries_home_open_idx_9cfca592",
+        "table": "supply_entries"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"supply_entries_home_open_idx_9cfca592\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"supply_entries_home_open_idx_9cfca592\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"supply_entries_home_open_idx_9cfca592\"",
+        "sql": "CREATE INDEX \"supply_entries_home_open_idx_9cfca592\" ON \"public\".\"supply_entries\" (\"home_id\", \"created_at\", \"id\") WHERE ((status = 'OPEN'))",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"supply_entries_home_open_idx_9cfca592\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"supply_entries_home_open_idx_9cfca592\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.supply_claims.supply_claims_home_id_fkey",
+    "label": "Add foreign key \"supply_claims_home_id_fkey\" on \"supply_claims\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "supply_claims_home_id_fkey",
+        "table": "supply_claims"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"supply_claims_home_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "supply_claims_home_id_fkey",
+          "public",
+          "\"public\".\"supply_claims\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"supply_claims_home_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"supply_claims\"\nADD CONSTRAINT \"supply_claims_home_id_fkey\"\nFOREIGN KEY (\"home_id\")\nREFERENCES \"public\".\"homes\" (\"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"supply_claims_home_id_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "supply_claims_home_id_fkey",
+          "public",
+          "\"public\".\"supply_claims\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.supply_claims.supply_claims_entry_home_fkey",
+    "label": "Add foreign key \"supply_claims_entry_home_fkey\" on \"supply_claims\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "supply_claims_entry_home_fkey",
+        "table": "supply_claims"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"supply_claims_entry_home_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "supply_claims_entry_home_fkey",
+          "public",
+          "\"public\".\"supply_claims\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"supply_claims_entry_home_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"supply_claims\"\nADD CONSTRAINT \"supply_claims_entry_home_fkey\"\nFOREIGN KEY (\"home_id\", \"supply_entry_id\")\nREFERENCES \"public\".\"supply_entries\" (\"home_id\", \"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"supply_claims_entry_home_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "supply_claims_entry_home_fkey",
+          "public",
+          "\"public\".\"supply_claims\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.supply_claims.supply_claims_claimant_home_membership_fkey",
+    "label": "Add foreign key \"supply_claims_claimant_home_membership_fkey\" on \"supply_claims\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "supply_claims_claimant_home_membership_fkey",
+        "table": "supply_claims"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"supply_claims_claimant_home_membership_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "supply_claims_claimant_home_membership_fkey",
+          "public",
+          "\"public\".\"supply_claims\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"supply_claims_claimant_home_membership_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"supply_claims\"\nADD CONSTRAINT \"supply_claims_claimant_home_membership_fkey\"\nFOREIGN KEY (\"home_id\", \"claimant_membership_id\")\nREFERENCES \"public\".\"memberships\" (\"home_id\", \"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"supply_claims_claimant_home_membership_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "supply_claims_claimant_home_membership_fkey",
+          "public",
+          "\"public\".\"supply_claims\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.supply_entries.supply_entries_home_id_fkey",
+    "label": "Add foreign key \"supply_entries_home_id_fkey\" on \"supply_entries\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "supply_entries_home_id_fkey",
+        "table": "supply_entries"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"supply_entries_home_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "supply_entries_home_id_fkey",
+          "public",
+          "\"public\".\"supply_entries\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"supply_entries_home_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"supply_entries\"\nADD CONSTRAINT \"supply_entries_home_id_fkey\"\nFOREIGN KEY (\"home_id\")\nREFERENCES \"public\".\"homes\" (\"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"supply_entries_home_id_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "supply_entries_home_id_fkey",
+          "public",
+          "\"public\".\"supply_entries\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.supply_entries.supply_entries_creator_home_membership_fkey",
+    "label": "Add foreign key \"supply_entries_creator_home_membership_fkey\" on \"supply_entries\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "supply_entries_creator_home_membership_fkey",
+        "table": "supply_entries"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"supply_entries_creator_home_membership_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "supply_entries_creator_home_membership_fkey",
+          "public",
+          "\"public\".\"supply_entries\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"supply_entries_creator_home_membership_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"supply_entries\"\nADD CONSTRAINT \"supply_entries_creator_home_membership_fkey\"\nFOREIGN KEY (\"home_id\", \"created_by_membership_id\")\nREFERENCES \"public\".\"memberships\" (\"home_id\", \"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"supply_entries_creator_home_membership_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "supply_entries_creator_home_membership_fkey",
+          "public",
+          "\"public\".\"supply_entries\""
+        ]
+      }
+    ]
+  }
+]

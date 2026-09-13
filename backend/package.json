@@ -15,7 +15,8 @@
     "db:migrate": "prisma db migrate",
     "db:verify": "prisma db verify",
     "db:test:migrate": "tsx scripts/verify-fresh-migrations.ts",
-    "db:test:auth-persistence": "tsx scripts/verify-auth-persistence.ts"
+    "db:test:auth-persistence": "tsx scripts/verify-auth-persistence.ts",
+    "db:test:supply-persistence": "tsx scripts/verify-supply-schema.ts"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

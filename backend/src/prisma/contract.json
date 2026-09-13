@@ -36,6 +36,14 @@
       "model": "OutboxEvent",
       "namespace": "public"
     },
+    "supply_claims": {
+      "model": "SupplyClaim",
+      "namespace": "public"
+    },
+    "supply_entries": {
+      "model": "SupplyEntry",
+      "namespace": "public"
+    },
     "task_definitions": {
       "model": "TaskDefinition",
       "namespace": "public"
@@ -63,6 +71,44 @@
               {
                 "name": "ADMIN",
                 "value": "ADMIN"
+              }
+            ]
+          },
+          "SupplyClaimReleaseReason": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "CLAIMANT_RELEASED",
+                "value": "CLAIMANT_RELEASED"
+              },
+              {
+                "name": "MEMBERSHIP_ENDED",
+                "value": "MEMBERSHIP_ENDED"
+              },
+              {
+                "name": "ENTRY_OBTAINED",
+                "value": "ENTRY_OBTAINED"
+              },
+              {
+                "name": "ENTRY_CANCELED",
+                "value": "ENTRY_CANCELED"
+              }
+            ]
+          },
+          "SupplyEntryStatus": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "OPEN",
+                "value": "OPEN"
+              },
+              {
+                "name": "OBTAINED",
+                "value": "OBTAINED"
+              },
+              {
+                "name": "CANCELED",
+                "value": "CANCELED"
               }
             ]
           },
@@ -649,6 +695,36 @@
                   "namespace": "public"
                 }
               },
+              "supplyClaims": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "homeId"
+                  ]
+                },
+                "to": {
+                  "model": "SupplyClaim",
+                  "namespace": "public"
+                }
+              },
+              "supplyEntries": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "homeId"
+                  ]
+                },
+                "to": {
+                  "model": "SupplyEntry",
+                  "namespace": "public"
+                }
+              },
               "taskDefinitions": {
                 "cardinality": "1:N",
                 "on": {
@@ -996,6 +1072,23 @@
                   "namespace": "public"
                 }
               },
+              "createdSupplyEntries": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "id"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "createdByMembershipId"
+                  ]
+                },
+                "to": {
+                  "model": "SupplyEntry",
+                  "namespace": "public"
+                }
+              },
               "createdTaskDefinitions": {
                 "cardinality": "1:N",
                 "on": {
@@ -1025,6 +1118,23 @@
                 },
                 "to": {
                   "model": "Home",
+                  "namespace": "public"
+                }
+              },
+              "supplyClaims": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "id"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "claimantMembershipId"
+                  ]
+                },
+                "to": {
+                  "model": "SupplyClaim",
                   "namespace": "public"
                 }
               },
@@ -1234,6 +1344,320 @@
               },
               "namespaceId": "public",
               "table": "outbox_events"
+            }
+          },
+          "SupplyClaim": {
+            "fields": {
+              "claimantMembershipId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "claimedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "homeId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "releaseReason": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "SupplyClaimReleaseReason",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "releasedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "supplyEntryId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "claimantMembership": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "claimantMembershipId"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Membership",
+                  "namespace": "public"
+                }
+              },
+              "home": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "homeId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Home",
+                  "namespace": "public"
+                }
+              },
+              "supplyEntry": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "supplyEntryId"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "SupplyEntry",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "claimantMembershipId": {
+                  "column": "claimant_membership_id"
+                },
+                "claimedAt": {
+                  "column": "claimed_at"
+                },
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "homeId": {
+                  "column": "home_id"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "releaseReason": {
+                  "column": "release_reason"
+                },
+                "releasedAt": {
+                  "column": "released_at"
+                },
+                "supplyEntryId": {
+                  "column": "supply_entry_id"
+                },
+                "updatedAt": {
+                  "column": "updated_at"
+                }
+              },
+              "namespaceId": "public",
+              "table": "supply_claims"
+            }
+          },
+          "SupplyEntry": {
+            "fields": {
+              "canceledAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdByMembershipId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "homeId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "obtainedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "status": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "SupplyEntryStatus",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "title": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "claims": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "id"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "supplyEntryId"
+                  ]
+                },
+                "to": {
+                  "model": "SupplyClaim",
+                  "namespace": "public"
+                }
+              },
+              "createdByMembership": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "createdByMembershipId"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Membership",
+                  "namespace": "public"
+                }
+              },
+              "home": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "homeId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Home",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "canceledAt": {
+                  "column": "canceled_at"
+                },
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "createdByMembershipId": {
+                  "column": "created_by_membership_id"
+                },
+                "homeId": {
+                  "column": "home_id"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "obtainedAt": {
+                  "column": "obtained_at"
+                },
+                "status": {
+                  "column": "status"
+                },
+                "title": {
+                  "column": "title"
+                },
+                "updatedAt": {
+                  "column": "updated_at"
+                }
+              },
+              "namespaceId": "public",
+              "table": "supply_entries"
             }
           },
           "TaskDefinition": {
@@ -2673,6 +3097,384 @@
               },
               "uniques": []
             },
+            "supply_claims": {
+              "checks": [
+                {
+                  "expression": "((released_at IS NULL) = (release_reason IS NULL))",
+                  "name": "supply_claims_release_completeness_check"
+                },
+                {
+                  "expression": "\"release_reason\" IN ('CLAIMANT_RELEASED', 'MEMBERSHIP_ENDED', 'ENTRY_OBTAINED', 'ENTRY_CANCELED')",
+                  "name": "supply_claims_release_reason_check_d17b2d97",
+                  "prefix": "supply_claims_release_reason_check"
+                },
+                {
+                  "expression": "((released_at IS NULL) OR ((released_at >= claimed_at) AND (released_at >= created_at)))",
+                  "name": "supply_claims_released_time_check"
+                }
+              ],
+              "columns": {
+                "claimant_membership_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "claimed_at": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "created_at": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "home_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "release_reason": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "SupplyClaimReleaseReason",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "released_at": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "supply_entry_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "updated_at": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "name": "supply_claims_home_id_fkey",
+                  "onDelete": "restrict",
+                  "onUpdate": "restrict",
+                  "source": {
+                    "columns": [
+                      "home_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "supply_claims"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "homes"
+                  }
+                },
+                {
+                  "name": "supply_claims_entry_home_fkey",
+                  "onDelete": "restrict",
+                  "onUpdate": "restrict",
+                  "source": {
+                    "columns": [
+                      "home_id",
+                      "supply_entry_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "supply_claims"
+                  },
+                  "target": {
+                    "columns": [
+                      "home_id",
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "supply_entries"
+                  }
+                },
+                {
+                  "name": "supply_claims_claimant_home_membership_fkey",
+                  "onDelete": "restrict",
+                  "onUpdate": "restrict",
+                  "source": {
+                    "columns": [
+                      "home_id",
+                      "claimant_membership_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "supply_claims"
+                  },
+                  "target": {
+                    "columns": [
+                      "home_id",
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "memberships"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "home_id",
+                    "supply_entry_id",
+                    "claimed_at",
+                    "id"
+                  ],
+                  "name": "supply_claims_entry_history_idx_8c80cae3",
+                  "prefix": "supply_claims_entry_history_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "claimant_membership_id",
+                    "id"
+                  ],
+                  "name": "supply_claims_home_active_claimant_idx_2b0b42e6",
+                  "prefix": "supply_claims_home_active_claimant_idx",
+                  "unique": false,
+                  "where": "(released_at IS NULL)"
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "claimant_membership_id"
+                  ],
+                  "name": "supply_claims_home_id_claimant_membership_id_idx_023e58f6",
+                  "prefix": "supply_claims_home_id_claimant_membership_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "home_id"
+                  ],
+                  "name": "supply_claims_home_id_idx_f881d5c1",
+                  "prefix": "supply_claims_home_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "supply_entry_id"
+                  ],
+                  "name": "supply_claims_home_id_supply_entry_id_idx_98811f6a",
+                  "prefix": "supply_claims_home_id_supply_entry_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "supply_entry_id"
+                  ],
+                  "name": "supply_claims_one_active_per_entry_1e26d778",
+                  "prefix": "supply_claims_one_active_per_entry",
+                  "unique": true,
+                  "where": "(released_at IS NULL)"
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            },
+            "supply_entries": {
+              "checks": [
+                {
+                  "expression": "(((status = 'OPEN'::text) AND (obtained_at IS NULL) AND (canceled_at IS NULL)) OR ((status = 'OBTAINED'::text) AND (obtained_at IS NOT NULL) AND (canceled_at IS NULL)) OR ((status = 'CANCELED'::text) AND (obtained_at IS NULL) AND (canceled_at IS NOT NULL)))",
+                  "name": "supply_entries_lifecycle_check"
+                },
+                {
+                  "expression": "\"status\" IN ('OPEN', 'OBTAINED', 'CANCELED')",
+                  "name": "supply_entries_status_check_cbe78413",
+                  "prefix": "supply_entries_status_check"
+                },
+                {
+                  "expression": "(((obtained_at IS NULL) OR (obtained_at >= created_at)) AND ((canceled_at IS NULL) OR (canceled_at >= created_at)))",
+                  "name": "supply_entries_terminal_time_check"
+                }
+              ],
+              "columns": {
+                "canceled_at": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "created_at": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "created_by_membership_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "home_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "obtained_at": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "status": {
+                  "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": "OPEN"
+                  },
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "SupplyEntryStatus",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "title": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "updated_at": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "name": "supply_entries_home_id_fkey",
+                  "onDelete": "restrict",
+                  "onUpdate": "restrict",
+                  "source": {
+                    "columns": [
+                      "home_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "supply_entries"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "homes"
+                  }
+                },
+                {
+                  "name": "supply_entries_creator_home_membership_fkey",
+                  "onDelete": "restrict",
+                  "onUpdate": "restrict",
+                  "source": {
+                    "columns": [
+                      "home_id",
+                      "created_by_membership_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "supply_entries"
+                  },
+                  "target": {
+                    "columns": [
+                      "home_id",
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "memberships"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "home_id",
+                    "updated_at",
+                    "id"
+                  ],
+                  "name": "supply_entries_home_history_idx_60894047",
+                  "prefix": "supply_entries_home_history_idx",
+                  "unique": false,
+                  "where": "(status IN ('OBTAINED', 'CANCELED'))"
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "created_by_membership_id"
+                  ],
+                  "name": "supply_entries_home_id_created_by_membership_id_idx_889ed7bc",
+                  "prefix": "supply_entries_home_id_created_by_membership_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "id"
+                  ],
+                  "name": "supply_entries_home_id_id_key_2f2cccd8",
+                  "prefix": "supply_entries_home_id_id_key",
+                  "unique": true
+                },
+                {
+                  "columns": [
+                    "home_id"
+                  ],
+                  "name": "supply_entries_home_id_idx_f881d5c1",
+                  "prefix": "supply_entries_home_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "created_at",
+                    "id"
+                  ],
+                  "name": "supply_entries_home_open_idx_9cfca592",
+                  "prefix": "supply_entries_home_open_idx",
+                  "unique": false,
+                  "where": "(status = 'OPEN')"
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            },
             "task_definitions": {
               "checks": [
                 {
@@ -3193,6 +3995,23 @@
                 "ADMIN"
               ]
             },
+            "SupplyClaimReleaseReason": {
+              "kind": "valueSet",
+              "values": [
+                "CLAIMANT_RELEASED",
+                "MEMBERSHIP_ENDED",
+                "ENTRY_OBTAINED",
+                "ENTRY_CANCELED"
+              ]
+            },
+            "SupplyEntryStatus": {
+              "kind": "valueSet",
+              "values": [
+                "OPEN",
+                "OBTAINED",
+                "CANCELED"
+              ]
+            },
             "TaskRecurrenceFrequency": {
               "kind": "valueSet",
               "values": [
@@ -3221,10 +4040,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "af531590032cdd8c8c3fd02ba04f1c6a81eb78a7874402afd20497d3dca980c5"
+    "storageHash": "69b3be9ba4dff5e0aa89204a26c569bd9f59e0f750ef27f1fe7c1da04f6b5d3a"
   },
   "execution": {
-    "executionHash": "2c32da5aa443bc1c55f740849de1e5958905b617fc075f2a59fdf5eb3493b181",
+    "executionHash": "29fda7262a70996de2a7e088b74a9dd79fb97615d9be79cf32aad49beceeafff",
     "mutations": {
       "defaults": [
         {
@@ -3262,6 +4081,58 @@
             "column": "id",
             "namespace": "public",
             "table": "memberships"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv7",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "public",
+            "table": "supply_claims"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "instantNow",
+            "kind": "generator"
+          },
+          "onUpdate": {
+            "id": "instantNow",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "updated_at",
+            "namespace": "public",
+            "table": "supply_claims"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv7",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "public",
+            "table": "supply_entries"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "instantNow",
+            "kind": "generator"
+          },
+          "onUpdate": {
+            "id": "instantNow",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "updated_at",
+            "namespace": "public",
+            "table": "supply_entries"
           }
         },
         {

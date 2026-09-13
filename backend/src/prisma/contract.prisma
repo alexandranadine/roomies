@@ -31,6 +31,21 @@ enum TaskRecurrenceFrequency {
   MONTHLY
 }
 
+enum SupplyEntryStatus {
+  @@type("pg/text@1")
+  OPEN
+  OBTAINED
+  CANCELED
+}
+
+enum SupplyClaimReleaseReason {
+  @@type("pg/text@1")
+  CLAIMANT_RELEASED
+  MEMBERSHIP_ENDED
+  ENTRY_OBTAINED
+  ENTRY_CANCELED
+}
+
 model User {
   id          Uuid                 @id @default(uuid(7))
   createdAt   temporal.createdAt() @map("created_at")
@@ -52,6 +67,8 @@ model Home {
   invitations      Invitation[]
   taskInstances    TaskInstance[]
   taskDefinitions  TaskDefinition[]
+  supplyEntries    SupplyEntry[]
+  supplyClaims     SupplyClaim[]
 
   @@map("homes")
 }
@@ -71,6 +88,8 @@ model Membership {
   assignedTaskInstances    TaskInstance[]    @relation("TaskInstanceAssignedMembership")
   assignedTaskDefinitions  TaskDefinition[]  @relation("TaskDefinitionAssignedMembership")
   createdTaskDefinitions   TaskDefinition[]  @relation("TaskDefinitionCreatorMembership")
+  createdSupplyEntries     SupplyEntry[]      @relation("SupplyEntryCreatorMembership")
+  supplyClaims             SupplyClaim[]      @relation("SupplyClaimClaimantMembership")
 
   // At most one active tenure per (home, user). Ended rows may coexist so
   // leave-and-rejoin creates a new Membership id rather than reopening one.
@@ -360,4 +379,67 @@ model TaskInstance {
   @@index([homeId, assignedMembershipId, id], where: "((status = 'OPEN') AND (assigned_membership_id IS NOT NULL))", name: "task_instances_home_open_assignee_idx")
   @@index([taskDefinitionId, scheduledFor], unique: true, where: "(task_definition_id IS NOT NULL)", name: "task_instances_definition_occurrence_uidx")
   @@map("task_instances")
+}
+
+// Supply persistence. Claim-on-OPEN and terminal-entry/active-claim coordination
+// are cross-row transactional invariants for later application slices:
+// lock SupplyEntry, validate/transition, lock/release its active claim, commit.
+// No trigger and no Supply outbox events are part of this contract.
+model SupplyEntry {
+  id                      Uuid              @id @default(uuid(7))
+  homeId                  Uuid              @map("home_id")
+  title                   String
+  status                  SupplyEntryStatus @default(OPEN)
+  createdByMembershipId   Uuid              @map("created_by_membership_id")
+  obtainedAt              Timestamptz?      @map("obtained_at")
+  canceledAt              Timestamptz?      @map("canceled_at")
+  createdAt               temporal.createdAt() @map("created_at")
+  updatedAt               temporal.updatedAt() @map("updated_at")
+
+  home Home @relation(fields: [homeId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "supply_entries_home_id_fkey")
+  createdByMembership Membership @relation("SupplyEntryCreatorMembership", fields: [homeId, createdByMembershipId], references: [homeId, id], onDelete: Restrict, onUpdate: Restrict, map: "supply_entries_creator_home_membership_fkey")
+  claims SupplyClaim[]
+
+  @@check(
+    expression: "(((status = 'OPEN'::text) AND (obtained_at IS NULL) AND (canceled_at IS NULL)) OR ((status = 'OBTAINED'::text) AND (obtained_at IS NOT NULL) AND (canceled_at IS NULL)) OR ((status = 'CANCELED'::text) AND (obtained_at IS NULL) AND (canceled_at IS NOT NULL)))",
+    map: "supply_entries_lifecycle_check"
+  )
+  @@check(
+    expression: "(((obtained_at IS NULL) OR (obtained_at >= created_at)) AND ((canceled_at IS NULL) OR (canceled_at >= created_at)))",
+    map: "supply_entries_terminal_time_check"
+  )
+  @@index([homeId, id], unique: true, name: "supply_entries_home_id_id_key")
+  @@index([homeId, createdAt, id], where: "(status = 'OPEN')", name: "supply_entries_home_open_idx")
+  // PostgreSQL can scan this ascending btree backward for DESC history order.
+  @@index([homeId, updatedAt, id], where: "(status IN ('OBTAINED', 'CANCELED'))", name: "supply_entries_home_history_idx")
+  @@map("supply_entries")
+}
+
+model SupplyClaim {
+  id                      Uuid                      @id @default(uuid(7))
+  homeId                  Uuid                      @map("home_id")
+  supplyEntryId           Uuid                      @map("supply_entry_id")
+  claimantMembershipId    Uuid                      @map("claimant_membership_id")
+  claimedAt               Timestamptz               @map("claimed_at")
+  releasedAt              Timestamptz?              @map("released_at")
+  releaseReason           SupplyClaimReleaseReason? @map("release_reason")
+  createdAt               temporal.createdAt()      @map("created_at")
+  updatedAt               temporal.updatedAt()      @map("updated_at")
+
+  home Home @relation(fields: [homeId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "supply_claims_home_id_fkey")
+  supplyEntry SupplyEntry @relation(fields: [homeId, supplyEntryId], references: [homeId, id], onDelete: Restrict, onUpdate: Restrict, map: "supply_claims_entry_home_fkey")
+  claimantMembership Membership @relation("SupplyClaimClaimantMembership", fields: [homeId, claimantMembershipId], references: [homeId, id], onDelete: Restrict, onUpdate: Restrict, map: "supply_claims_claimant_home_membership_fkey")
+
+  @@check(
+    expression: "((released_at IS NULL) = (release_reason IS NULL))",
+    map: "supply_claims_release_completeness_check"
+  )
+  @@check(
+    expression: "((released_at IS NULL) OR ((released_at >= claimed_at) AND (released_at >= created_at)))",
+    map: "supply_claims_released_time_check"
+  )
+  @@index([supplyEntryId], unique: true, where: "(released_at IS NULL)", name: "supply_claims_one_active_per_entry")
+  @@index([homeId, supplyEntryId, claimedAt, id], name: "supply_claims_entry_history_idx")
+  @@index([homeId, claimantMembershipId, id], where: "(released_at IS NULL)", name: "supply_claims_home_active_claimant_idx")
+  @@map("supply_claims")
 }
