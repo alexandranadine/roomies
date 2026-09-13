@@ -295,6 +295,7 @@ model TaskDefinition {
   recurrenceFrequency    TaskRecurrenceFrequency   @map("recurrence_frequency")
   recurrenceWeekday      Int?                      @map("recurrence_weekday")
   recurrenceDayOfMonth   Int?                      @map("recurrence_day_of_month")
+  nextOccurrenceDate     DateString?               @map("next_occurrence_date")
   nextOccurrenceAt       Timestamptz?              @map("next_occurrence_at")
   deactivatedAt          Timestamptz?              @map("deactivated_at")
   createdAt              temporal.createdAt()      @map("created_at")
@@ -310,7 +311,7 @@ model TaskDefinition {
     map: "task_definitions_recurrence_config_check"
   )
   @@check(
-    expression: "((deactivated_at IS NULL) = (next_occurrence_at IS NOT NULL))",
+    expression: "(((deactivated_at IS NULL) AND (next_occurrence_date IS NOT NULL) AND (next_occurrence_at IS NOT NULL)) OR ((deactivated_at IS NOT NULL) AND (next_occurrence_date IS NULL) AND (next_occurrence_at IS NULL)))",
     map: "task_definitions_scheduling_lifecycle_check"
   )
   @@check(

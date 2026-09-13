@@ -1287,6 +1287,13 @@
                   "kind": "scalar"
                 }
               },
+              "nextOccurrenceDate": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/date-string@1",
+                  "kind": "scalar"
+                }
+              },
               "recurrenceDayOfMonth": {
                 "nullable": true,
                 "type": {
@@ -1419,6 +1426,9 @@
                 },
                 "nextOccurrenceAt": {
                   "column": "next_occurrence_at"
+                },
+                "nextOccurrenceDate": {
+                  "column": "next_occurrence_date"
                 },
                 "recurrenceDayOfMonth": {
                   "column": "recurrence_day_of_month"
@@ -2679,7 +2689,7 @@
                   "prefix": "task_definitions_recurrence_frequency_check"
                 },
                 {
-                  "expression": "((deactivated_at IS NULL) = (next_occurrence_at IS NOT NULL))",
+                  "expression": "(((deactivated_at IS NULL) AND (next_occurrence_date IS NOT NULL) AND (next_occurrence_at IS NOT NULL)) OR ((deactivated_at IS NOT NULL) AND (next_occurrence_date IS NULL) AND (next_occurrence_at IS NULL)))",
                   "name": "task_definitions_scheduling_lifecycle_check"
                 }
               ],
@@ -2721,6 +2731,11 @@
                 "next_occurrence_at": {
                   "codecId": "pg/timestamptz-temporal@1",
                   "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "next_occurrence_date": {
+                  "codecId": "pg/date-string@1",
+                  "nativeType": "date",
                   "nullable": true
                 },
                 "recurrence_day_of_month": {
@@ -3206,7 +3221,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "64d43d201edd6675c3b3665ec0c764020e54aff2ff974646026e0eeaedbdb534"
+    "storageHash": "af531590032cdd8c8c3fd02ba04f1c6a81eb78a7874402afd20497d3dca980c5"
   },
   "execution": {
     "executionHash": "2c32da5aa443bc1c55f740849de1e5958905b617fc075f2a59fdf5eb3493b181",

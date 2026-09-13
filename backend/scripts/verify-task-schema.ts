@@ -11,14 +11,16 @@ import {
 /**
  * Recurrence timing is stored, not computed, by this migration.
  *
- * next_occurrence_at is timestamptz. Runtime meaning (later worker):
- * for next recurrence calendar date D, D 00:00:00 in Home.timezone is
+ * next_occurrence_date is the authoritative logical Home-local DATE.
+ * next_occurrence_at is the resolved timestamptz. Runtime meaning (later worker):
+ * for next_occurrence_date D, D 00:00:00 in Home.timezone is
  * resolved with Temporal-compatible "compatible" disambiguation:
  * - normal local time → sole instant
  * - nonexistent local time → shift forward by the timezone gap
  * - ambiguous local time → earlier instant/offset
- * Timezone changes later preserve the logical next recurrence date and
- * re-resolve it. There is no time-of-day column.
+ * Timezone changes later preserve next_occurrence_date and re-resolve
+ * next_occurrence_at. Neither cursor field is universally derivable from the
+ * other. There is no time-of-day column.
  *
  * ISO weekday numbering on task_definitions.recurrence_weekday:
  * 1=Monday … 7=Sunday.
@@ -246,6 +248,7 @@ async function verifyCatalog(client: PoolClient): Promise<void> {
       'home_id',
       'id',
       'next_occurrence_at',
+      'next_occurrence_date',
       'recurrence_day_of_month',
       'recurrence_frequency',
       'recurrence_weekday',
@@ -284,6 +287,19 @@ async function verifyCatalog(client: PoolClient): Promise<void> {
     'timestamptz',
   );
   assert.equal(definitionColumns.get('next_occurrence_at')?.is_nullable, 'YES');
+  assert.equal(
+    definitionColumns.get('next_occurrence_date')?.data_type,
+    'date',
+  );
+  assert.equal(definitionColumns.get('next_occurrence_date')?.udt_name, 'date');
+  assert.equal(
+    definitionColumns.get('next_occurrence_date')?.is_nullable,
+    'YES',
+  );
+  assert.equal(
+    definitionColumns.get('next_occurrence_date')?.column_default,
+    null,
+  );
   assert.equal(
     definitionColumns.get('deactivated_at')?.udt_name,
     'timestamptz',
@@ -339,7 +355,7 @@ async function verifyCatalog(client: PoolClient): Promise<void> {
   assert.match(
     definitionConstraints.get('task_definitions_scheduling_lifecycle_check')
       ?.definition ?? '',
-    /\(deactivated_at IS NULL\) = \(next_occurrence_at IS NOT NULL\)/,
+    /deactivated_at IS NULL.*next_occurrence_date IS NOT NULL.*next_occurrence_at IS NOT NULL.*deactivated_at IS NOT NULL.*next_occurrence_date IS NULL.*next_occurrence_at IS NULL/s,
   );
   assert.match(
     definitionConstraints.get('task_definitions_deactivated_time_check')
@@ -468,11 +484,11 @@ const INSERT_DEFINITION_SQL = `
   INSERT INTO task_definitions (
     id, home_id, title, assigned_membership_id, creator_membership_id,
     recurrence_frequency, recurrence_weekday, recurrence_day_of_month,
-    next_occurrence_at, deactivated_at, created_at, updated_at
+    next_occurrence_at, next_occurrence_date, deactivated_at, created_at, updated_at
   ) VALUES (
     $1::uuid, $2::uuid, $3, $4::uuid, $5::uuid,
     $6, $7::int, $8::int,
-    $9::timestamptz, $10::timestamptz, $11::timestamptz, $12::timestamptz
+    $9::timestamptz, $13::date, $10::timestamptz, $11::timestamptz, $12::timestamptz
   )
 `;
 
@@ -486,6 +502,7 @@ type Fixture = {
   assigned: string;
   ended: string;
   otherMembership: string;
+  orphanMembership: string;
 };
 
 type InstanceInput = {
@@ -511,6 +528,7 @@ type DefinitionInput = {
   frequency: string;
   weekday?: number | null;
   dayOfMonth?: number | null;
+  nextOccurrenceDate?: string | null;
   nextOccurrenceAt?: Date | null;
   deactivatedAt?: Date | null;
   createdAt?: Date;
@@ -518,7 +536,12 @@ type DefinitionInput = {
 };
 
 const CREATED = new Date('2026-09-12T18:00:00.000Z');
+const NEXT_DATE = '2026-09-13';
 const NEXT = new Date('2026-09-13T07:00:00.000Z');
+const WEEKLY_NEXT_DATE = '2026-09-14';
+const WEEKLY_NEXT = new Date('2026-09-14T07:00:00.000Z');
+const MONTHLY_NEXT_DATE = '2026-09-15';
+const MONTHLY_NEXT = new Date('2026-09-15T07:00:00.000Z');
 const COMPLETED = new Date('2026-09-12T20:00:00.000Z');
 const DEACTIVATED = new Date('2026-09-12T21:00:00.000Z');
 
@@ -545,6 +568,14 @@ async function insertDefinition(
   client: PoolClient,
   input: DefinitionInput,
 ): Promise<void> {
+  const defaultCursor =
+    input.frequency === 'WEEKLY'
+      ? { occurrenceDate: WEEKLY_NEXT_DATE, occurrenceAt: WEEKLY_NEXT }
+      : input.frequency === 'MONTHLY'
+        ? { occurrenceDate: MONTHLY_NEXT_DATE, occurrenceAt: MONTHLY_NEXT }
+        : { occurrenceDate: NEXT_DATE, occurrenceAt: NEXT };
+  const isDeactivated =
+    input.deactivatedAt !== undefined && input.deactivatedAt !== null;
   await client.query(INSERT_DEFINITION_SQL, [
     input.id,
     input.homeId,
@@ -554,10 +585,19 @@ async function insertDefinition(
     input.frequency,
     input.weekday ?? null,
     input.dayOfMonth ?? null,
-    input.nextOccurrenceAt === undefined ? NEXT : input.nextOccurrenceAt,
+    input.nextOccurrenceAt === undefined
+      ? isDeactivated
+        ? null
+        : defaultCursor.occurrenceAt
+      : input.nextOccurrenceAt,
     input.deactivatedAt ?? null,
     input.createdAt ?? CREATED,
     input.updatedAt ?? CREATED,
+    input.nextOccurrenceDate === undefined
+      ? isDeactivated
+        ? null
+        : defaultCursor.occurrenceDate
+      : input.nextOccurrenceDate,
   ]);
 }
 
@@ -574,6 +614,7 @@ async function createFixture(
   const assigned = `60000000-0000-4000-8000-0000000000${suffix}`;
   const ended = `65000000-0000-4000-8000-0000000000${suffix}`;
   const otherMembership = `70000000-0000-4000-8000-0000000000${suffix}`;
+  const orphanMembership = `71000000-0000-4000-8000-0000000000${suffix}`;
   await client.query(
     `INSERT INTO users (id, updated_at) VALUES ($1, now()), ($2, now())`,
     [userA, userB],
@@ -590,8 +631,20 @@ async function createFixture(
      VALUES ($1, $2, $3, 'ADMIN', NULL),
             ($4, $2, $5, 'ROOMMATE', NULL),
             ($6, $2, $5, 'ROOMMATE', TIMESTAMPTZ '2026-09-01T00:00:00Z'),
-            ($7, $8, $5, 'ADMIN', NULL)`,
-    [creator, home, userA, assigned, userB, ended, otherMembership, otherHome],
+            ($7, $8, $5, 'ADMIN', NULL),
+            ($9, $10, $3, 'ADMIN', NULL)`,
+    [
+      creator,
+      home,
+      userA,
+      assigned,
+      userB,
+      ended,
+      otherMembership,
+      otherHome,
+      orphanMembership,
+      orphanHome,
+    ],
   );
   return {
     userA,
@@ -603,6 +656,7 @@ async function createFixture(
     assigned,
     ended,
     otherMembership,
+    orphanMembership,
   };
 }
 
@@ -689,6 +743,114 @@ async function verifyBehavior(client: PoolClient): Promise<void> {
       nextOccurrenceAt: null,
       deactivatedAt: DEACTIVATED,
     });
+
+    const lifecycleUpdate = `
+      UPDATE task_definitions
+      SET next_occurrence_date = $2::date,
+          next_occurrence_at = $3::timestamptz,
+          deactivated_at = $4::timestamptz
+      WHERE id = $1::uuid
+    `;
+    const invalidLifecycleStates: ReadonlyArray<
+      readonly [string, string | null, Date | null, Date | null]
+    > = [
+      ['active_null_null', null, null, null],
+      ['active_date_null', NEXT_DATE, null, null],
+      ['active_null_instant', null, NEXT, null],
+      ['deactivated_date_instant', NEXT_DATE, NEXT, DEACTIVATED],
+      ['deactivated_date_null', NEXT_DATE, null, DEACTIVATED],
+      ['deactivated_null_instant', null, NEXT, DEACTIVATED],
+    ];
+    for (const [
+      name,
+      occurrenceDate,
+      occurrenceAt,
+      deactivatedAt,
+    ] of invalidLifecycleStates) {
+      await expectSqlFailure(
+        client,
+        name,
+        lifecycleUpdate,
+        [dailyId, occurrenceDate, occurrenceAt, deactivatedAt],
+        CHECK_VIOLATION,
+      );
+    }
+
+    await client.query(
+      `UPDATE task_definitions
+       SET deactivated_at = $2,
+           next_occurrence_date = NULL,
+           next_occurrence_at = NULL,
+           updated_at = $2
+       WHERE id = $1`,
+      [monthlyId, DEACTIVATED],
+    );
+    const deactivatedCursor = await client.query<{
+      deactivated_at: Date | null;
+      next_occurrence_date: string | null;
+      next_occurrence_at: Date | null;
+      updated_at: Date;
+    }>(
+      `SELECT deactivated_at,
+              next_occurrence_date::text AS next_occurrence_date,
+              next_occurrence_at,
+              updated_at
+       FROM task_definitions WHERE id = $1`,
+      [monthlyId],
+    );
+    assert.equal(deactivatedCursor.rows[0]?.next_occurrence_date, null);
+    assert.equal(deactivatedCursor.rows[0]?.next_occurrence_at, null);
+    assert.equal(
+      deactivatedCursor.rows[0]?.deactivated_at?.getTime(),
+      DEACTIVATED.getTime(),
+    );
+    assert.equal(
+      deactivatedCursor.rows[0]?.updated_at.getTime(),
+      DEACTIVATED.getTime(),
+    );
+
+    const apiaDefinitionId = nextId();
+    await client.query(
+      `UPDATE homes SET timezone = 'Pacific/Apia' WHERE id = $1`,
+      [fixture.orphanHome],
+    );
+    await insertDefinition(client, {
+      id: apiaDefinitionId,
+      homeId: fixture.orphanHome,
+      title: 'Apia skipped date',
+      creatorMembershipId: fixture.orphanMembership,
+      frequency: 'DAILY',
+      nextOccurrenceDate: '2011-12-30',
+      nextOccurrenceAt: new Date('2011-12-30T10:00:00.000Z'),
+    });
+    const apiaCursor = await client.query<{
+      occurrence_date: string;
+      resolved_local_date: string;
+    }>(
+      `SELECT next_occurrence_date::text AS occurrence_date,
+              to_char(
+                next_occurrence_at AT TIME ZONE 'Pacific/Apia',
+                'YYYY-MM-DD'
+              ) AS resolved_local_date
+       FROM task_definitions WHERE id = $1`,
+      [apiaDefinitionId],
+    );
+    assert.equal(apiaCursor.rows[0]?.occurrence_date, '2011-12-30');
+    assert.equal(apiaCursor.rows[0]?.resolved_local_date, '2011-12-31');
+    const apiaInstances = await client.query<{ count: string }>(
+      `SELECT count(*)::text AS count
+       FROM task_instances WHERE task_definition_id = $1`,
+      [apiaDefinitionId],
+    );
+    assert.equal(apiaInstances.rows[0]?.count, '0');
+    const taskOutbox = await client.query<{ count: string }>(
+      `SELECT count(*)::text AS count
+       FROM outbox_events
+       WHERE home_id = ANY($1::uuid[]) AND event_type LIKE 'task.%'`,
+      [[fixture.home, fixture.otherHome, fixture.orphanHome]],
+    );
+    assert.equal(taskOutbox.rows[0]?.count, '0');
+
     await insertInstance(client, {
       id: nextId(),
       homeId: fixture.home,
@@ -754,6 +916,7 @@ async function verifyBehavior(client: PoolClient): Promise<void> {
         null,
         CREATED,
         CREATED,
+        NEXT_DATE,
       ],
       FOREIGN_KEY_VIOLATION,
     );
@@ -774,6 +937,7 @@ async function verifyBehavior(client: PoolClient): Promise<void> {
         null,
         CREATED,
         CREATED,
+        NEXT_DATE,
       ],
       FOREIGN_KEY_VIOLATION,
     );
@@ -784,6 +948,7 @@ async function verifyBehavior(client: PoolClient): Promise<void> {
       title: 'Other daily',
       creatorMembershipId: fixture.otherMembership,
       frequency: 'DAILY',
+      nextOccurrenceAt: new Date('2026-09-13T00:00:00.000Z'),
     });
     await expectSqlFailure(
       client,
@@ -1035,6 +1200,7 @@ async function verifyBehavior(client: PoolClient): Promise<void> {
           override.deactivatedAt ?? null,
           CREATED,
           CREATED,
+          override.nextOccurrenceAt === null ? null : NEXT_DATE,
         ],
         CHECK_VIOLATION,
       );
@@ -1176,10 +1342,10 @@ async function verifyConcurrentOccurrence(pool: Pool): Promise<void> {
         'DELETE FROM task_definitions WHERE home_id IN ($1, $2, $3)',
         [fixture.home, fixture.otherHome, fixture.orphanHome],
       );
-      await setup.query('DELETE FROM memberships WHERE home_id IN ($1, $2)', [
-        fixture.home,
-        fixture.otherHome,
-      ]);
+      await setup.query(
+        'DELETE FROM memberships WHERE home_id IN ($1, $2, $3)',
+        [fixture.home, fixture.otherHome, fixture.orphanHome],
+      );
       await setup.query('DELETE FROM homes WHERE id IN ($1, $2, $3)', [
         fixture.home,
         fixture.otherHome,

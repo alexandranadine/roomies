@@ -1,0 +1,128 @@
+[
+  {
+    "id": "column.public.task_definitions.next_occurrence_date",
+    "label": "Add column \"next_occurrence_date\" to \"task_definitions\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "next_occurrence_date",
+        "table": "task_definitions"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"next_occurrence_date\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "task_definitions",
+          "next_occurrence_date"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"next_occurrence_date\"",
+        "sql": "ALTER TABLE \"public\".\"task_definitions\" ADD COLUMN \"next_occurrence_date\" date"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"next_occurrence_date\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "task_definitions",
+          "next_occurrence_date"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dropCheckConstraint.task_definitions.task_definitions_scheduling_lifecycle_check",
+    "label": "Drop check constraint \"task_definitions_scheduling_lifecycle_check\" on \"task_definitions\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "checkConstraint",
+        "name": "task_definitions_scheduling_lifecycle_check",
+        "table": "task_definitions"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"task_definitions_scheduling_lifecycle_check\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "task_definitions_scheduling_lifecycle_check",
+          "public",
+          "\"public\".\"task_definitions\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop check constraint \"task_definitions_scheduling_lifecycle_check\"",
+        "sql": "ALTER TABLE \"public\".\"task_definitions\" DROP CONSTRAINT \"task_definitions_scheduling_lifecycle_check\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"task_definitions_scheduling_lifecycle_check\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "task_definitions_scheduling_lifecycle_check",
+          "public",
+          "\"public\".\"task_definitions\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "checkConstraint.task_definitions.task_definitions_scheduling_lifecycle_check",
+    "label": "Add check constraint \"task_definitions_scheduling_lifecycle_check\" on \"task_definitions\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "checkConstraint",
+        "name": "task_definitions_scheduling_lifecycle_check",
+        "table": "task_definitions"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"task_definitions_scheduling_lifecycle_check\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "task_definitions_scheduling_lifecycle_check",
+          "public",
+          "\"public\".\"task_definitions\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add check constraint \"task_definitions_scheduling_lifecycle_check\"",
+        "sql": "ALTER TABLE \"public\".\"task_definitions\" ADD CONSTRAINT \"task_definitions_scheduling_lifecycle_check\" CHECK ((((deactivated_at IS NULL) AND (next_occurrence_date IS NOT NULL) AND (next_occurrence_at IS NOT NULL)) OR ((deactivated_at IS NOT NULL) AND (next_occurrence_date IS NULL) AND (next_occurrence_at IS NULL))))"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"task_definitions_scheduling_lifecycle_check\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "task_definitions_scheduling_lifecycle_check",
+          "public",
+          "\"public\".\"task_definitions\""
+        ]
+      }
+    ]
+  }
+]

@@ -20,6 +20,7 @@ export {
 export {
   HOME_LOCAL_DATE_PATTERN,
   parseHomeLocalDate,
+  type DateString,
 } from './home-local-date.js';
 export {
   decideTaskList,
@@ -66,3 +67,13 @@ export {
   type TaskListDto,
 } from './task-dto.js';
 export { normalizeTaskTitle } from './task-title.js';
+export {
+  computeInitialRecurrenceCursor,
+  computeNextRecurrenceCursor,
+  resolveLocalMidnight,
+  TASK_RECURRENCE_FREQUENCIES,
+  type ComputeInitialRecurrenceCursorInput,
+  type ComputeNextRecurrenceCursorInput,
+  type RecurrenceCursor,
+  type TaskRecurrenceFrequency,
+} from './recurrence-cursor.js';

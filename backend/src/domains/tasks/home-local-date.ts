@@ -1,5 +1,15 @@
 import { InvalidHomeLocalDateError } from './errors.js';
 
+declare const DATE_STRING_BRAND: unique symbol;
+
+/**
+ * A validated PostgreSQL DATE value in exact YYYY-MM-DD form.
+ * It is a logical calendar date, never a JavaScript Date or an instant.
+ */
+export type DateString = string & {
+  readonly [DATE_STRING_BRAND]: 'DateString';
+};
+
 /**
  * Home-local calendar DATE as YYYY-MM-DD. Not an instant. Do not construct
  * a JS Date or convert through a timezone.
@@ -23,7 +33,7 @@ function daysInMonth(year: number, month: number): number {
  * Accepts only a real Gregorian calendar day in exact YYYY-MM-DD form.
  * Returns the same string unchanged for persistence as DATE.
  */
-export function parseHomeLocalDate(raw: string): string {
+export function parseHomeLocalDate(raw: string): DateString {
   const match = HOME_LOCAL_DATE_PATTERN.exec(raw);
   if (match === null || match[1] === undefined || match[2] === undefined) {
     throw new InvalidHomeLocalDateError();
@@ -47,5 +57,5 @@ export function parseHomeLocalDate(raw: string): string {
     throw new InvalidHomeLocalDateError();
   }
 
-  return raw;
+  return raw as DateString;
 }

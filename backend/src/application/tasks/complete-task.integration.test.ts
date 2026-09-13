@@ -492,8 +492,8 @@ void describe('Task completion PostgreSQL', () => {
         await database.pool.query(
           `INSERT INTO task_definitions (
              id, home_id, title, creator_membership_id, recurrence_frequency,
-             next_occurrence_at, created_at, updated_at
-           ) VALUES ($1, $2, 'Definition stays put', $3, 'DAILY', $4, $5, $5)`,
+             next_occurrence_date, next_occurrence_at, created_at, updated_at
+           ) VALUES ($1, $2, 'Definition stays put', $3, 'DAILY', DATE '2026-09-16', $4, $5, $5)`,
           [definitionId, homeA, membershipA, nextOccurrenceAt, CREATED],
         );
         await database.pool.query(

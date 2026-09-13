@@ -342,9 +342,15 @@ void describe('manual Tasks PostgreSQL', () => {
         await database.pool.query(
           `INSERT INTO task_definitions (
              id, home_id, title, creator_membership_id, recurrence_frequency,
-             next_occurrence_at, created_at, updated_at
-           ) VALUES ($1, $2, 'Definition title should not render', $3, 'DAILY', $4, $4, $4)`,
-          [definitionId, homeA, membershipA, OCCURRED],
+             next_occurrence_date, next_occurrence_at, created_at, updated_at
+           ) VALUES ($1, $2, 'Definition title should not render', $3, 'DAILY', DATE '2026-09-13', $4, $5, $5)`,
+          [
+            definitionId,
+            homeA,
+            membershipA,
+            new Date('2026-09-13T00:00:00.000Z'),
+            OCCURRED,
+          ],
         );
         await database.pool.query(
           `INSERT INTO task_instances (

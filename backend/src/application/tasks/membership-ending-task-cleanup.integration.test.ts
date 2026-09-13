@@ -142,10 +142,10 @@ async function insertDefinition(
     `INSERT INTO task_definitions (
        id, home_id, title, assigned_membership_id, creator_membership_id,
        recurrence_frequency, recurrence_weekday, recurrence_day_of_month,
-       next_occurrence_at, deactivated_at, created_at, updated_at
+       next_occurrence_date, next_occurrence_at, deactivated_at, created_at, updated_at
      ) VALUES (
        $1::uuid, $2::uuid, $3, $4::uuid, $5::uuid, $6, $7, $8,
-       $9::timestamptz, $10::timestamptz, $11::timestamptz, $11::timestamptz
+       $9::date, $10::timestamptz, $11::timestamptz, $12::timestamptz, $12::timestamptz
      )`,
     [
       input.id,
@@ -156,6 +156,7 @@ async function insertDefinition(
       input.frequency,
       weekday,
       dayOfMonth,
+      deactivatedAt === null ? '2026-03-16' : null,
       deactivatedAt === null ? NEXT_AT : null,
       deactivatedAt,
       CREATED_AT,
@@ -269,16 +270,22 @@ async function definitionRow(
 ): Promise<{
   assignedMembershipId: string | null;
   creatorMembershipId: string;
+  nextOccurrenceDate: string | null;
+  nextOccurrenceAt: Date | null;
   deactivatedAt: Date | null;
   updatedAt: Date;
 }> {
   const result = await pool.query<{
     assigned_membership_id: string | null;
     creator_membership_id: string;
+    next_occurrence_date: string | null;
+    next_occurrence_at: Date | null;
     deactivated_at: Date | null;
     updated_at: Date;
   }>(
-    `SELECT assigned_membership_id, creator_membership_id, deactivated_at, updated_at
+    `SELECT assigned_membership_id, creator_membership_id,
+            next_occurrence_date::text AS next_occurrence_date,
+            next_occurrence_at, deactivated_at, updated_at
      FROM task_definitions WHERE id = $1`,
     [definitionId],
   );
@@ -287,6 +294,8 @@ async function definitionRow(
   return {
     assignedMembershipId: row.assigned_membership_id,
     creatorMembershipId: row.creator_membership_id,
+    nextOccurrenceDate: row.next_occurrence_date,
+    nextOccurrenceAt: row.next_occurrence_at,
     deactivatedAt: row.deactivated_at,
     updatedAt: row.updated_at,
   };
@@ -507,9 +516,13 @@ void describe('Membership-ending Task cleanup PostgreSQL', () => {
         assert.equal(monthly.assignedMembershipId, null);
         assert.equal(daily.updatedAt.getTime(), ENDED_AT.getTime());
         assert.equal(daily.creatorMembershipId, adminMembership);
+        assert.equal(daily.nextOccurrenceDate, '2026-03-16');
+        assert.equal(daily.nextOccurrenceAt?.getTime(), NEXT_AT.getTime());
 
         const inactive = await definitionRow(database.pool, inactiveId);
         assert.equal(inactive.assignedMembershipId, leavingMembership);
+        assert.equal(inactive.nextOccurrenceDate, null);
+        assert.equal(inactive.nextOccurrenceAt, null);
         assert.ok(inactive.deactivatedAt);
 
         const creatorOnly = await definitionRow(database.pool, creatorOnlyId);

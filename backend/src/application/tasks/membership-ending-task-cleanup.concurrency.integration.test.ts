@@ -305,10 +305,11 @@ async function insertDefinition(
     `INSERT INTO task_definitions (
        id, home_id, title, assigned_membership_id, creator_membership_id,
        recurrence_frequency, recurrence_weekday, recurrence_day_of_month,
-       next_occurrence_at, deactivated_at, created_at, updated_at
+       next_occurrence_date, next_occurrence_at, deactivated_at, created_at, updated_at
      ) VALUES (
        $1::uuid, $2::uuid, $3, $4::uuid, $5::uuid, 'DAILY', NULL, NULL,
-       $6::timestamptz, NULL, $6::timestamptz, $6::timestamptz
+       DATE '2026-09-13', TIMESTAMPTZ '2026-09-13T00:00:00Z',
+       NULL, $6::timestamptz, $6::timestamptz
      )`,
     [
       input.id,
