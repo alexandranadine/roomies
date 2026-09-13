@@ -7,6 +7,7 @@ import { TransactionInfrastructureError } from '../../platform/persistence/error
 import type { TransactionContext } from '../../platform/persistence/transaction.js';
 import type {
   LockedActiveMembership,
+  LockedHomeEntryStructure,
   LockedHomeStructure,
 } from './locked-home-structure.js';
 import { StructuralIntegrityError } from './structure-errors.js';
@@ -53,6 +54,12 @@ type MembershipLockRow = {
 
 function isUuid(value: unknown): value is string {
   return typeof value === 'string' && UUID_PATTERN.test(value);
+}
+
+function isDateOrNull(value: unknown): value is Date | null {
+  return (
+    value === null || (value instanceof Date && !Number.isNaN(value.valueOf()))
+  );
 }
 
 function logStructuralFailure(kind: 'home' | 'rows' | 'invariant'): void {
@@ -117,17 +124,14 @@ function findExactLockedActor(
 }
 
 /**
- * Lock Home then active Memberships, revalidate the exact actor tenure from
- * transaction-current rows, and refuse existing zero-admin corruption.
- * Input actor.role is ignored; the locked actor uses the DB role.
+ * Lock the active Home then its complete active Membership set. This is the
+ * public structural entry seam for invitation acceptance, where no Membership
+ * actor exists yet.
  */
-export async function lockHomeStructure(
+export async function lockActiveHomeStructureForEntry(
   tx: TransactionContext,
-  input: {
-    homeId: string;
-    actor: Pick<ActiveHomeActor, 'userId' | 'membershipId' | 'homeId' | 'role'>;
-  },
-): Promise<LockedHomeStructure> {
+  input: { homeId: string },
+): Promise<LockedHomeEntryStructure> {
   let homeRows: HomeLockRow[];
   try {
     const result = await tx.query<HomeLockRow>(LOCK_HOME_FOR_UPDATE_SQL, [
@@ -143,15 +147,15 @@ export async function lockHomeStructure(
     logStructuralFailure('home');
     throw new StructuralIntegrityError();
   }
-  if (
-    homeRows.length === 0 ||
-    homeRow === undefined ||
-    homeRow.archived_at !== null
-  ) {
+  if (homeRows.length === 0 || homeRow === undefined) {
     throw new ConcealedNotFoundError();
   }
 
-  if (!isUuid(homeRow.id) || homeRow.id !== input.homeId) {
+  if (
+    !isUuid(homeRow.id) ||
+    homeRow.id !== input.homeId ||
+    !isDateOrNull(homeRow.archived_at)
+  ) {
     logStructuralFailure('home');
     throw new StructuralIntegrityError();
   }
@@ -172,13 +176,8 @@ export async function lockHomeStructure(
   );
   assertUniqueActiveSet(activeMemberships);
 
-  const lockedMembership = findExactLockedActor(activeMemberships, input);
-  if (lockedMembership === undefined) {
-    throw new ConcealedNotFoundError();
-  }
-
   const invariant = evaluateHomeStructureInvariant({
-    archived: false,
+    archived: homeRow.archived_at !== null,
     activeMemberships,
   });
   if (!invariant.ok) {
@@ -187,13 +186,45 @@ export async function lockHomeStructure(
   }
 
   return Object.freeze({
-    home: Object.freeze({ id: homeRow.id }),
+    home: Object.freeze({
+      id: homeRow.id,
+      archived: homeRow.archived_at !== null,
+    }),
+    activeMemberships: Object.freeze(activeMemberships),
+  });
+}
+
+/**
+ * Lock Home then active Memberships, revalidate the exact actor tenure from
+ * transaction-current rows, and refuse existing zero-admin corruption.
+ * Input actor.role is ignored; the locked actor uses the DB role.
+ */
+export async function lockHomeStructure(
+  tx: TransactionContext,
+  input: {
+    homeId: string;
+    actor: Pick<ActiveHomeActor, 'userId' | 'membershipId' | 'homeId' | 'role'>;
+  },
+): Promise<LockedHomeStructure> {
+  const locked = await lockActiveHomeStructureForEntry(tx, input);
+  if (locked.home.archived) {
+    throw new ConcealedNotFoundError();
+  }
+  const lockedMembership = findExactLockedActor(
+    locked.activeMemberships,
+    input,
+  );
+  if (lockedMembership === undefined) {
+    throw new ConcealedNotFoundError();
+  }
+
+  return Object.freeze({
+    ...locked,
     actor: Object.freeze({
       userId: lockedMembership.userId,
       membershipId: lockedMembership.id,
       homeId: lockedMembership.homeId,
       role: lockedMembership.role,
     }),
-    activeMemberships: Object.freeze(activeMemberships),
   });
 }

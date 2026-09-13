@@ -67,6 +67,19 @@ WHERE id = $1::uuid
 FOR UPDATE
 `;
 
+export const ACCEPT_LOCKED_INVITATION_SQL = `
+UPDATE invitations
+SET accepted_at = $1::timestamptz,
+    accepted_membership_id = $2::uuid
+WHERE id = $3::uuid
+  AND home_id = $4::uuid
+  AND accepted_at IS NULL
+  AND accepted_membership_id IS NULL
+  AND revoked_at IS NULL
+  AND revocation_cause IS NULL
+  AND expires_at > $1::timestamptz
+`;
+
 export const FIND_EFFECTIVE_PENDING_INVITATION_SQL = `
 SELECT ${INVITATION_COLUMNS}
 FROM invitations
@@ -215,6 +228,15 @@ export type InvitationRepository = Readonly<{
     tx: TransactionContext,
     input: { homeId: string; invitationId: string },
   ): Promise<Invitation | null>;
+  acceptLocked(
+    tx: TransactionContext,
+    input: {
+      invitationId: string;
+      homeId: string;
+      membershipId: string;
+      acceptedAt: Date;
+    },
+  ): Promise<number>;
   findEffectivePending(
     tx: TransactionContext,
     input: { homeId: string; invitedEmail: NormalizedEmail; at: Date },
@@ -304,6 +326,20 @@ export function createInvitationRepository(pool: Pool): InvitationRepository {
         throw new InvitationPersistenceError();
       }
       return parseInvitationRow(rows[0], input.homeId);
+    },
+
+    async acceptLocked(tx, input) {
+      try {
+        const result = await tx.query(ACCEPT_LOCKED_INVITATION_SQL, [
+          input.acceptedAt,
+          input.membershipId,
+          input.invitationId,
+          input.homeId,
+        ]);
+        return result.rowCount ?? 0;
+      } catch {
+        throw new InvitationPersistenceError();
+      }
     },
 
     async findEffectivePending(tx, input) {

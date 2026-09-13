@@ -1,4 +1,5 @@
 import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { resetApiClientForTests } from '../platform/api/index.js';
 import { renderApp } from '../test/render.js';
@@ -28,12 +29,22 @@ function previewBody() {
 }
 
 function stubPreview(status: number, body: unknown) {
-  const fetchMock = vi.fn().mockResolvedValue(
-    new Response(JSON.stringify(body), {
-      status,
-      headers: { 'Content-Type': 'application/json' },
-    }),
-  );
+  const fetchMock = vi.fn().mockImplementation((url: string) => {
+    if (url.includes('/api/auth/get-session')) {
+      return Promise.resolve(
+        new Response('null', {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+    }
+    return Promise.resolve(
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+  });
   vi.stubGlobal('fetch', fetchMock);
   return fetchMock;
 }
@@ -69,7 +80,7 @@ describe('invitation landing page', () => {
     ).toBeInTheDocument();
     expect(screen.getByText(new RegExp(EMAIL))).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Join Home' })).toBeDisabled();
-    expect(screen.getByText(/isn’t available yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/sign in to roomies/i)).toBeInTheDocument();
     expect(document.body.innerHTML).not.toContain(SECRET);
     expect(document.querySelector('img')).toBeNull();
     expect(document.body.innerHTML).not.toMatch(/r2|photo|cloudflare/i);
@@ -83,8 +94,12 @@ describe('invitation landing page', () => {
     expect(keys).toContainEqual(invitationPreviewQueryKey(INVITATION_ID));
     expect(JSON.stringify(keys)).not.toContain(SECRET);
 
-    expect(fetchMock).toHaveBeenCalledOnce();
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const previewCall = fetchMock.mock.calls.find(([url]) =>
+      String(url).includes('/preview'),
+    ) as [string, RequestInit] | undefined;
+    expect(previewCall).toBeDefined();
+    if (previewCall === undefined) throw new Error('missing preview request');
+    const [url, init] = previewCall;
     expect(url).toContain(`/api/v1/invitations/${INVITATION_ID}/preview`);
     expect(url).not.toContain(SECRET);
     expect(new Headers(init.headers).get('Authorization')).toBe(
@@ -177,7 +192,12 @@ describe('invitation landing page', () => {
       name: `You’re invited to ${HOME_NAME}`,
     });
 
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const previewCall = fetchMock.mock.calls.find(([url]) =>
+      String(url).includes('/preview'),
+    ) as [string, RequestInit] | undefined;
+    expect(previewCall).toBeDefined();
+    if (previewCall === undefined) throw new Error('missing preview request');
+    const [, init] = previewCall;
     const headers = new Headers(init.headers);
     expect(headers.get('Cookie')).toBeNull();
     expect(headers.has('Authorization')).toBe(true);
@@ -196,5 +216,113 @@ describe('invitation landing page', () => {
       expect(localStorage.length).toBe(0);
       expect(sessionStorage.length).toBe(0);
     });
+  });
+
+  it('lets a signed-in matching verified user accept without persisting the secret', async () => {
+    window.history.replaceState(
+      null,
+      '',
+      `/invitations/${INVITATION_ID}#secret=${SECRET}`,
+    );
+    captureInvitationFragment();
+    const homeId = previewBody().invitation.home.id;
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/auth/get-session')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              user: {
+                id: '11111111-1111-4111-8111-111111111111',
+                email: EMAIL,
+                emailVerified: true,
+              },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        );
+      }
+      if (url.includes('/accept')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              membershipId: '018f1e2c-7e3a-7000-8000-1234567890ac',
+              homeId,
+            }),
+            { status: 201, headers: { 'Content-Type': 'application/json' } },
+          ),
+        );
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify(previewBody()), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { queryClient, router } = renderApp(`/invitations/${INVITATION_ID}`);
+    const join = await screen.findByRole('button', { name: 'Join Home' });
+    expect(join).toBeEnabled();
+    await userEvent.click(join);
+
+    await waitFor(() => {
+      expect(window.location.href).not.toContain(SECRET);
+      expect(localStorage.length).toBe(0);
+      expect(sessionStorage.length).toBe(0);
+    });
+    const acceptCall = fetchMock.mock.calls.find(([url]) =>
+      String(url).includes('/accept'),
+    ) as [string, RequestInit] | undefined;
+    expect(acceptCall).toBeDefined();
+    if (acceptCall === undefined) throw new Error('missing acceptance request');
+    const [acceptUrl, acceptInit] = acceptCall;
+    expect(acceptUrl).not.toContain(SECRET);
+    expect(new Headers(acceptInit.headers).get('Authorization')).toBe(
+      `Invitation ${SECRET}`,
+    );
+    expect(acceptInit.body).toBe('{}');
+    expect(
+      queryClient.getQueryData(invitationPreviewQueryKey(INVITATION_ID)),
+    ).toBeUndefined();
+    expect(router.state.location.pathname).toBe(`/homes/${homeId}`);
+    expect(document.body.innerHTML).not.toContain(SECRET);
+  });
+
+  it('does not attempt acceptance for wrong or unverified session email', async () => {
+    for (const user of [
+      { email: 'other@example.com', emailVerified: true },
+      { email: EMAIL, emailVerified: false },
+    ]) {
+      resetCapturedInvitationSecretForTests();
+      captureInvitationFragment(
+        {
+          pathname: `/invitations/${INVITATION_ID}`,
+          search: '',
+          hash: `#secret=${SECRET}`,
+        },
+        window.history,
+      );
+      const fetchMock = vi.fn().mockImplementation((url: string) => {
+        const value = url.includes('/api/auth/get-session')
+          ? { user: { id: 'user-id', ...user } }
+          : previewBody();
+        return Promise.resolve(
+          new Response(JSON.stringify(value), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        );
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      const rendered = renderApp(`/invitations/${INVITATION_ID}`);
+      expect(
+        await screen.findByRole('button', { name: 'Join Home' }),
+      ).toBeDisabled();
+      expect(
+        fetchMock.mock.calls.some(([url]) => String(url).includes('/accept')),
+      ).toBe(false);
+      rendered.unmount();
+    }
   });
 });

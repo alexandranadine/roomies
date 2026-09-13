@@ -5,13 +5,24 @@ export {
 export { MEMBERSHIP_ACTION, type MembershipAction } from './actions.js';
 export type { ChangeMembershipRoleInput } from './change-role.js';
 export {
+  ActiveMembershipConflictError,
+  findLatestEndedMembershipTenure,
+  insertInvitationMembership,
+  MembershipAcceptancePersistenceError,
+  type NewInvitationMembership,
+  type PriorMembershipTenure,
+} from './invitation-acceptance-store.js';
+export {
   LastAdminRequiredError,
   LastRoommateRequiresArchiveError,
 } from './errors.js';
 export {
+  createMembershipStartedV1Event,
   isMembershipEndedCause,
   MEMBERSHIP_ENDED_CAUSES,
+  MEMBERSHIP_STARTED_V1,
   type MembershipEndedCause,
+  type MembershipStartedV1Payload,
 } from './events.js';
 export {
   createMembershipsRouter,

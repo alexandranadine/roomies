@@ -14,6 +14,10 @@ import { createCurrentUserRouter } from '../domains/users/http.js';
 import type { PrincipalResolver } from '../platform/auth/principal.js';
 import type { ActiveHomeActorResolver } from '../platform/authz/index.js';
 import {
+  createInvitationAcceptanceRouter,
+  type AcceptInvitationCommand,
+} from './invitation-acceptance.js';
+import {
   createInvitationPreviewRouter,
   type PreviewInvitationCommand,
 } from './invitation-preview.js';
@@ -35,6 +39,7 @@ export type CreateRoomiesApiRouterOptions = {
     frontendOrigin: string;
   };
   previewInvitation?: PreviewInvitationCommand;
+  acceptInvitation?: AcceptInvitationCommand;
 };
 
 /**
@@ -64,6 +69,15 @@ export function createRoomiesApiRouter(
       '/invitations',
       createInvitationPreviewRouter({
         previewInvitation: options.previewInvitation,
+      }),
+    );
+  }
+  if (options.acceptInvitation !== undefined) {
+    router.use(
+      '/invitations',
+      createInvitationAcceptanceRouter({
+        principalResolver: options.principalResolver,
+        acceptInvitation: options.acceptInvitation,
       }),
     );
   }

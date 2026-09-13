@@ -40,6 +40,7 @@ export function renderApp(
 
   return {
     queryClient,
+    router,
     ...render(<RouterProvider router={router} />, { wrapper: Wrapper }),
   };
 }

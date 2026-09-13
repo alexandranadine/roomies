@@ -12,6 +12,11 @@ export {
   type CanonicalIdentityQuery,
 } from './canonical-identity-by-email.js';
 export {
+  findCurrentCanonicalIdentityByUser,
+  type CurrentCanonicalIdentity,
+  type CurrentCanonicalIdentityQuery,
+} from './canonical-identity-by-user.js';
+export {
   createCanonicalUserLookup,
   createPrincipalResolver,
   type AuthenticatedPrincipal,

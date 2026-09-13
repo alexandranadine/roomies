@@ -4,6 +4,11 @@ export type LockedHome = Readonly<{
   id: string;
 }>;
 
+export type LockedEntryHome = LockedHome &
+  Readonly<{
+    archived: boolean;
+  }>;
+
 export type LockedActiveMembership = Readonly<{
   id: string;
   userId: string;
@@ -16,6 +21,11 @@ export type LockedHomeActor = Readonly<{
   membershipId: string;
   homeId: string;
   role: MembershipRole;
+}>;
+
+export type LockedHomeEntryStructure = Readonly<{
+  home: LockedEntryHome;
+  activeMemberships: readonly LockedActiveMembership[];
 }>;
 
 /**

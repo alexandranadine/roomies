@@ -16,6 +16,8 @@ import { FinalMemberRequiredError } from '../../domains/homes/errors.js';
 import {
   AlreadyHomeMemberError,
   InvitationAlreadyPendingError,
+  InvitationEmailMismatchError,
+  InvitationEmailNotVerifiedError,
   InvitationNotAvailableError,
 } from '../../domains/invitations/errors.js';
 import {
@@ -189,6 +191,28 @@ export function errorHandler(
       404,
       'INVITATION_NOT_AVAILABLE',
       'Invitation is not available',
+      requestId,
+    );
+    return;
+  }
+
+  if (err instanceof InvitationEmailMismatchError) {
+    sendApiError(
+      res,
+      409,
+      'EMAIL_MISMATCH',
+      'Current verified email does not match this invitation',
+      requestId,
+    );
+    return;
+  }
+
+  if (err instanceof InvitationEmailNotVerifiedError) {
+    sendApiError(
+      res,
+      409,
+      'EMAIL_NOT_VERIFIED',
+      'Current email must be verified',
       requestId,
     );
     return;

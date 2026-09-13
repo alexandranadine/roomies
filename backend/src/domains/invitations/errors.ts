@@ -50,3 +50,21 @@ export class InvitationNotAvailableError extends Error {
     super('Invitation is not available');
   }
 }
+
+export class InvitationEmailMismatchError extends Error {
+  override readonly name = 'InvitationEmailMismatchError';
+  readonly code = 'EMAIL_MISMATCH';
+
+  constructor() {
+    super('Current verified email does not match the invitation recipient');
+  }
+}
+
+export class InvitationEmailNotVerifiedError extends Error {
+  override readonly name = 'InvitationEmailNotVerifiedError';
+  readonly code = 'EMAIL_NOT_VERIFIED';
+
+  constructor() {
+    super('Current email is not verified');
+  }
+}

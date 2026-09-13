@@ -75,6 +75,11 @@ export function getCapturedInvitationSecret(): string | null {
   return capturedSecret;
 }
 
+/** Remove the bearer from memory immediately after terminal acceptance. */
+export function clearCapturedInvitationSecret(): void {
+  capturedSecret = null;
+}
+
 /** Test isolation only. Production invitation flow never persists or restores. */
 export function resetCapturedInvitationSecretForTests(): void {
   capturedSecret = null;

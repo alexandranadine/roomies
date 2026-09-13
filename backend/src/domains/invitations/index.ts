@@ -9,6 +9,8 @@ export {
 } from './bearer.js';
 export {
   AlreadyHomeMemberError,
+  InvitationEmailMismatchError,
+  InvitationEmailNotVerifiedError,
   InvitationAlreadyPendingError,
   InvitationNotAvailableError,
   InvitationPersistenceError,

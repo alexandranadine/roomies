@@ -1,11 +1,23 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
-import { useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router';
 import { DocumentTitle } from '../components/document-title.js';
 import { Alert, Button, Card, Spinner } from '../components/ui/index.js';
 import { ApiError } from '../platform/api/index.js';
 import { shouldRetryQuery } from '../platform/query/query-client.js';
-import { getCapturedInvitationSecret } from './capture-invitation-fragment.js';
+import {
+  acceptInvitation,
+  currentUserHomesQueryKey,
+  homeListQueryKey,
+} from './accept-api.js';
+import {
+  getInvitationAuthSession,
+  invitationAuthSessionQueryKey,
+} from './auth-session-api.js';
+import {
+  clearCapturedInvitationSecret,
+  getCapturedInvitationSecret,
+} from './capture-invitation-fragment.js';
 import { invitationPreviewQueryKey, previewInvitation } from './preview-api.js';
 
 const INVITATION_ID_PATTERN =
@@ -33,6 +45,8 @@ function isUnavailableError(error: unknown): boolean {
 
 export function InvitationLandingPage() {
   const { invitationId = '' } = useParams();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const secret = getCapturedInvitationSecret();
   const validInvitationId = INVITATION_ID_PATTERN.test(invitationId);
   const canPreview = secret !== null && validInvitationId;
@@ -49,6 +63,34 @@ export function InvitationLandingPage() {
     staleTime: 0,
     gcTime: 0,
     retry: shouldRetryQuery,
+  });
+  const sessionQuery = useQuery({
+    queryKey: invitationAuthSessionQueryKey,
+    queryFn: ({ signal }) => getInvitationAuthSession(signal),
+    retry: false,
+  });
+  const acceptance = useMutation({
+    mutationFn: () => {
+      if (secret === null) {
+        throw new Error('Invitation secret is not available in memory');
+      }
+      return acceptInvitation({ invitationId, secret });
+    },
+    retry: false,
+    onSuccess: async (result) => {
+      clearCapturedInvitationSecret();
+      queryClient.removeQueries({
+        queryKey: invitationPreviewQueryKey(invitationId),
+        exact: true,
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: homeListQueryKey }),
+        queryClient.invalidateQueries({ queryKey: currentUserHomesQueryKey }),
+      ]);
+      void navigate(`/homes/${encodeURIComponent(result.homeId)}`, {
+        replace: true,
+      });
+    },
   });
 
   if (secret === null) {
@@ -124,6 +166,13 @@ export function InvitationLandingPage() {
   }
 
   const invitation = query.data.invitation;
+  const session = sessionQuery.data;
+  const signedIn = session !== null && session !== undefined;
+  const sessionEmail = session?.user.email.trim().toLowerCase();
+  const matchingEmail =
+    signedIn && session.user.emailVerified && sessionEmail === invitation.email;
+  const acceptanceError =
+    acceptance.error instanceof ApiError ? acceptance.error.code : undefined;
 
   return (
     <InvitationPageFrame title={`${invitation.home.name} invitation · Roomies`}>
@@ -138,10 +187,76 @@ export function InvitationLandingPage() {
           Expires {formatExpiration(invitation.expiresAt)}.
         </p>
         <div className="flex flex-col gap-2">
-          <Button disabled>Join Home</Button>
-          <p className="text-sm text-text-secondary">
-            Joining this Home isn’t available yet.
-          </p>
+          {sessionQuery.isPending ? (
+            <p className="flex items-center gap-2 text-sm text-text-secondary">
+              <Spinner label="Checking sign-in status" />
+            </p>
+          ) : null}
+          {!sessionQuery.isPending && !signedIn ? (
+            <>
+              <Button disabled>Join Home</Button>
+              <p className="text-sm text-text-secondary">
+                Sign in to Roomies, then reopen the original invitation link.
+                The invitation secret is intentionally not saved across a page
+                reload.
+              </p>
+            </>
+          ) : null}
+          {signedIn && !session.user.emailVerified ? (
+            <>
+              <Button disabled>Join Home</Button>
+              <Alert variant="warning" title="Verify your email first">
+                Verify your current Roomies email, then reopen this invitation
+                link.
+              </Alert>
+            </>
+          ) : null}
+          {signedIn &&
+          session.user.emailVerified &&
+          sessionEmail !== invitation.email ? (
+            <>
+              <Button disabled>Join Home</Button>
+              <Alert variant="warning" title="Use the invited account">
+                Sign in with the verified Roomies account that received this
+                invitation.
+              </Alert>
+            </>
+          ) : null}
+          {matchingEmail ? (
+            <Button
+              loading={acceptance.isPending}
+              onClick={() => acceptance.mutate()}
+            >
+              Join Home
+            </Button>
+          ) : null}
+          {acceptanceError === 'EMAIL_NOT_VERIFIED' ? (
+            <Alert variant="warning" title="Verify your email first">
+              Verify your current Roomies email, then reopen this invitation
+              link.
+            </Alert>
+          ) : null}
+          {acceptanceError === 'EMAIL_MISMATCH' ? (
+            <Alert variant="warning" title="Use the invited account">
+              Sign in with the verified Roomies account that received this
+              invitation.
+            </Alert>
+          ) : null}
+          {acceptanceError === 'ALREADY_HOME_MEMBER' ? (
+            <Alert variant="warning" title="Already a Home member">
+              Your current Roomies account already belongs to this Home.
+            </Alert>
+          ) : null}
+          {acceptanceError === 'INVITATION_NOT_AVAILABLE' ? (
+            <Alert variant="warning" title="This invitation isn’t available">
+              Ask a Home Admin for a new invitation if you still need access.
+            </Alert>
+          ) : null}
+          {acceptance.isError && acceptanceError === undefined ? (
+            <Alert variant="danger" title="Couldn’t join this Home">
+              Something went wrong. Try again in a moment.
+            </Alert>
+          ) : null}
         </div>
       </Card>
     </InvitationPageFrame>

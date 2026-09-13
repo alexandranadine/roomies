@@ -14,11 +14,15 @@ export {
   type ArchiveFinalMemberCommand,
   type CreateHomesRouterOptions,
 } from './http.js';
-export { lockHomeStructure } from './lock-home-structure.js';
+export {
+  lockActiveHomeStructureForEntry,
+  lockHomeStructure,
+} from './lock-home-structure.js';
 export type {
   LockedActiveMembership,
   LockedHome,
   LockedHomeActor,
+  LockedHomeEntryStructure,
   LockedHomeStructure,
 } from './locked-home-structure.js';
 export {
