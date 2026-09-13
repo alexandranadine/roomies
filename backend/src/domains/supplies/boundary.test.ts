@@ -45,9 +45,13 @@ void describe('supplies domain boundary', () => {
       'findActiveClaimByEntry',
       'listClaimsForEntry',
       'listOpenEntriesByHome',
+      'releaseActiveClaimsForMembership',
     ]) {
       assert.match(source, new RegExp(primitive));
     }
+    assert.match(source, /RELEASE_ACTIVE_CLAIMS_FOR_MEMBERSHIP_SQL/);
+    assert.match(source, /claimant_membership_id = \$2::uuid/);
+    assert.match(source, /release_reason = 'MEMBERSHIP_ENDED'/);
     assert.match(source, /home_id = \$1::uuid/);
     assert.match(source, /released_at IS NULL/);
     assert.match(source, /ORDER BY claimed_at ASC, id ASC/);

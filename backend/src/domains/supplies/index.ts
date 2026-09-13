@@ -6,8 +6,10 @@ export {
   INSERT_SUPPLY_ENTRY_SQL,
   LIST_CLAIMS_FOR_ENTRY_SQL,
   LIST_OPEN_ENTRIES_BY_HOME_SQL,
+  RELEASE_ACTIVE_CLAIMS_FOR_MEMBERSHIP_SQL,
   type NewSupplyClaim,
   type NewSupplyEntry,
+  type ReleaseMembershipClaims,
   type SupplyRepository,
 } from './repository.js';
 export {

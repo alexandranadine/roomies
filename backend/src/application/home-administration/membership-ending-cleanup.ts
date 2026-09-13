@@ -26,7 +26,7 @@ export type MembershipEndingTaskCleanup = {
 
 /**
  * Public Supply-module port for synchronous membership-ending consequences.
- * M4 Supplies will replace the temporary no-op adapter that implements this.
+ * Supplies implements this via createMembershipEndingSupplyCleanup.
  */
 export type MembershipEndingSupplyCleanup = {
   handleMembershipEnded(

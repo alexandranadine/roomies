@@ -226,6 +226,7 @@ void describe('tasks application boundary', () => {
       const rel = file.replaceAll('\\', '/');
       assert.doesNotMatch(source, /memberships\/repository/, rel);
       assert.doesNotMatch(source, /homes\/repository/, rel);
+      assert.doesNotMatch(source, /supplies\/repository/, rel);
       assert.doesNotMatch(source, /from ['"]express['"]/, rel);
       assert.doesNotMatch(source, /better-auth/, rel);
       assert.doesNotMatch(source, /from ['"]pg['"]/, rel);
@@ -261,9 +262,14 @@ void describe('tasks application boundary', () => {
     assert.doesNotMatch(cleanup, /lockHomeAndExactMemberships/);
     assert.match(composition, /createEndMembershipWithinHomeStructureFromPool/);
     assert.match(composition, /createMembershipEndingTaskCleanupFromPool/);
+    assert.match(composition, /createMembershipEndingSupplyCleanupFromPool/);
     assert.doesNotMatch(
       composition,
       /createTemporaryNoOpMembershipEndingTaskCleanup/,
+    );
+    assert.doesNotMatch(
+      composition,
+      /createTemporaryNoOpMembershipEndingSupplyCleanup/,
     );
     assert.doesNotMatch(composition, /tasks\/repository/);
     assert.doesNotMatch(composition, /FROM\s+task_instances/i);

@@ -17,8 +17,8 @@ import {
   skipUnlessDedicatedTestDatabase,
 } from '../../platform/persistence/test-database.js';
 import { runInReadCommittedTransaction } from '../../platform/persistence/transaction.js';
+import { createMembershipEndingSupplyCleanupFromPool } from '../supplies/membership-ending-supply-cleanup.js';
 import { createMembershipEndingTaskCleanupFromPool } from './membership-ending-task-cleanup.js';
-import { createTemporaryNoOpMembershipEndingSupplyCleanup } from '../home-administration/temporary-noop-membership-ending-supply-cleanup.js';
 
 const skipWithoutDatabase = skipUnlessDedicatedTestDatabase();
 const ENDED_AT = new Date('2026-03-15T12:34:56.789Z');
@@ -230,7 +230,7 @@ function leaveCommand(pool: Pool) {
     clock: { now: () => ENDED_AT },
     endMembership: createEndMembershipWithinHomeStructure({
       taskCleanup: createMembershipEndingTaskCleanupFromPool(pool),
-      supplyCleanup: createTemporaryNoOpMembershipEndingSupplyCleanup(),
+      supplyCleanup: createMembershipEndingSupplyCleanupFromPool(pool),
       membershipEnding: createMembershipEndingWriter(),
       outbox: createOutboxWriter(),
       ids: { next: nextEventId },

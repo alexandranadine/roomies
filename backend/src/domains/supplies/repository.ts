@@ -114,6 +114,22 @@ WHERE home_id = $1::uuid
 ORDER BY created_at ASC, id ASC
 `;
 
+/**
+ * Membership-ending cleanup for active SupplyClaims. Exact Home + exact
+ * Membership tenure only. Already-released rows stay historical. Never
+ * rewrites claimant_membership_id or SupplyEntry status.
+ */
+export const RELEASE_ACTIVE_CLAIMS_FOR_MEMBERSHIP_SQL = `
+UPDATE supply_claims
+SET
+  released_at = $3::timestamptz,
+  release_reason = 'MEMBERSHIP_ENDED',
+  updated_at = $3::timestamptz
+WHERE home_id = $1::uuid
+  AND claimant_membership_id = $2::uuid
+  AND released_at IS NULL
+`;
+
 export type NewSupplyEntry = Readonly<{
   id: string;
   homeId: string;
@@ -138,6 +154,12 @@ export type NewSupplyClaim = Readonly<{
   updatedAt: Date;
 }>;
 
+export type ReleaseMembershipClaims = Readonly<{
+  homeId: string;
+  membershipId: string;
+  releasedAt: Date;
+}>;
+
 export type SupplyRepository = Readonly<{
   insertSupplyEntry(
     tx: TransactionContext,
@@ -156,6 +178,10 @@ export type SupplyRepository = Readonly<{
     supplyEntryId: string,
   ): Promise<readonly SupplyClaim[]>;
   listOpenEntriesByHome(homeId: string): Promise<readonly SupplyEntry[]>;
+  releaseActiveClaimsForMembership(
+    tx: TransactionContext,
+    input: ReleaseMembershipClaims,
+  ): Promise<number>;
 }>;
 
 type SupplyEntryRow = {
@@ -388,6 +414,21 @@ export function createSupplyRepository(pool: Pool): SupplyRepository {
         return Object.freeze(
           result.rows.map((row) => parseSupplyEntryRow(row, homeId)),
         );
+      } catch (error) {
+        if (error instanceof SupplyPersistenceError) {
+          throw error;
+        }
+        throw new SupplyPersistenceError();
+      }
+    },
+
+    async releaseActiveClaimsForMembership(tx, input) {
+      try {
+        const result = await tx.query(
+          RELEASE_ACTIVE_CLAIMS_FOR_MEMBERSHIP_SQL,
+          [input.homeId, input.membershipId, input.releasedAt],
+        );
+        return result.rowCount ?? 0;
       } catch (error) {
         if (error instanceof SupplyPersistenceError) {
           throw error;

@@ -70,14 +70,21 @@ void describe('home-administration application boundary', () => {
     assert.match(source, /handleMembershipEnded/);
     assert.match(source, /createMembershipEndedV1Event/);
     assert.match(source, /createMembershipEndingTaskCleanupFromPool/);
-    assert.match(source, /createTemporaryNoOpMembershipEndingSupplyCleanup/);
+    assert.match(source, /createMembershipEndingSupplyCleanupFromPool/);
     assert.doesNotMatch(
       source,
       /createTemporaryNoOpMembershipEndingTaskCleanup/,
     );
+    assert.doesNotMatch(
+      source,
+      /createTemporaryNoOpMembershipEndingSupplyCleanup/,
+    );
     assert.doesNotMatch(source, /tasks\/repository/);
+    assert.doesNotMatch(source, /supplies\/repository/);
     assert.doesNotMatch(source, /FROM\s+task_instances/i);
     assert.doesNotMatch(source, /FROM\s+task_definitions/i);
+    assert.doesNotMatch(source, /FROM\s+supply_claims/i);
+    assert.doesNotMatch(source, /UPDATE\s+supply_claims/i);
   });
 
   void it('orchestrates voluntary leave through the locked structure and ending seam', async () => {
@@ -188,23 +195,31 @@ void describe('home-administration application boundary', () => {
     );
   });
 
-  void it('makes Task cleanup public-seam-only and Supply no-op replacement obligatory', async () => {
+  void it('makes Task and Supply cleanup public-seam-only', async () => {
     const composition = await readFile(
       path.join(dir, 'end-membership-within-home-structure.ts'),
       'utf8',
     );
     assert.match(composition, /createEndMembershipWithinHomeStructureFromPool/);
     assert.match(composition, /createMembershipEndingTaskCleanupFromPool/);
-    assert.match(composition, /MUST be replaced when M4 Supplies/);
+    assert.match(composition, /createMembershipEndingSupplyCleanupFromPool/);
     assert.doesNotMatch(composition, /taskCleanup\?:/);
     assert.doesNotMatch(composition, /supplyCleanup\?:/);
     assert.doesNotMatch(
       composition,
       /createTemporaryNoOpMembershipEndingTaskCleanup/,
     );
+    assert.doesNotMatch(
+      composition,
+      /createTemporaryNoOpMembershipEndingSupplyCleanup/,
+    );
+    assert.doesNotMatch(composition, /MUST be replaced when M4 Supplies/);
     assert.doesNotMatch(composition, /tasks\/repository/);
+    assert.doesNotMatch(composition, /supplies\/repository/);
     assert.doesNotMatch(composition, /FROM\s+task_instances/i);
     assert.doesNotMatch(composition, /FROM\s+task_definitions/i);
+    assert.doesNotMatch(composition, /FROM\s+supply_claims/i);
+    assert.doesNotMatch(composition, /UPDATE\s+supply_claims/i);
 
     const files = await walkProduction(dir);
     for (const file of files) {
@@ -213,6 +228,7 @@ void describe('home-administration application boundary', () => {
       assert.doesNotMatch(source, /memberships\/repository/, rel);
       assert.doesNotMatch(source, /homes\/repository/, rel);
       assert.doesNotMatch(source, /tasks\/repository/, rel);
+      assert.doesNotMatch(source, /supplies\/repository/, rel);
       assert.doesNotMatch(source, /from ['"]express['"]/, rel);
       assert.doesNotMatch(source, /better-auth/, rel);
       assert.doesNotMatch(source, /from ['"]pg['"]/, rel);

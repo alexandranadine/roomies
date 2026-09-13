@@ -16,12 +16,12 @@ import type {
   TransactionContext,
   TransactionPool,
 } from '../../platform/persistence/transaction.js';
+import { createMembershipEndingSupplyCleanupFromPool } from '../supplies/membership-ending-supply-cleanup.js';
 import { createMembershipEndingTaskCleanupFromPool } from '../tasks/membership-ending-task-cleanup.js';
 import type {
   MembershipEndingSupplyCleanup,
   MembershipEndingTaskCleanup,
 } from './membership-ending-cleanup.js';
-import { createTemporaryNoOpMembershipEndingSupplyCleanup } from './temporary-noop-membership-ending-supply-cleanup.js';
 
 /**
  * Exact active Membership tenure to end. The caller already locked Home then
@@ -128,17 +128,16 @@ export function createEndMembershipWithinHomeStructure(
 }
 
 /**
- * Production composition for leave/remove. Injects the Tasks-owned
- * Membership-ending cleanup and the temporary no-op Supply adapter. The
- * Supply adapter MUST be replaced when M4 Supplies ships. Does not begin
- * a transaction; callers own the outer structural transaction.
+ * Production composition for leave/remove. Injects the Tasks-owned and
+ * Supplies-owned Membership-ending cleanups. Does not begin a transaction;
+ * callers own the outer structural transaction.
  */
 export function createEndMembershipWithinHomeStructureFromPool(
   pool: TransactionPool,
 ): EndMembershipWithinHomeStructure {
   return createEndMembershipWithinHomeStructure({
     taskCleanup: createMembershipEndingTaskCleanupFromPool(pool),
-    supplyCleanup: createTemporaryNoOpMembershipEndingSupplyCleanup(),
+    supplyCleanup: createMembershipEndingSupplyCleanupFromPool(pool),
     membershipEnding: createMembershipEndingWriter(),
     outbox: outboxWriter,
     ids: systemUuidV7,
@@ -150,7 +149,7 @@ export function createApplyMembershipEndingWithinHomeStructureFromPool(
 ): ApplyMembershipEndingWithinHomeStructure {
   return createApplyMembershipEndingWithinHomeStructure({
     taskCleanup: createMembershipEndingTaskCleanupFromPool(pool),
-    supplyCleanup: createTemporaryNoOpMembershipEndingSupplyCleanup(),
+    supplyCleanup: createMembershipEndingSupplyCleanupFromPool(pool),
     membershipEnding: createMembershipEndingWriter(),
   });
 }
