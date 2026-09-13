@@ -25,6 +25,10 @@ import {
   LastRoommateRequiresArchiveError,
 } from '../../domains/memberships/errors.js';
 import {
+  InvalidMaintenanceRequestError,
+  MaintenancePersistenceError,
+} from '../../domains/maintenance/errors.js';
+import {
   SupplyAlreadyClaimedError,
   SupplyClaimNotActiveError,
   SupplyNotOpenError,
@@ -147,7 +151,10 @@ export function errorHandler(
     return;
   }
 
-  if (err instanceof InvalidRequestError) {
+  if (
+    err instanceof InvalidRequestError ||
+    err instanceof InvalidMaintenanceRequestError
+  ) {
     sendApiError(res, 400, 'INVALID_REQUEST', 'Invalid request', requestId);
     return;
   }
@@ -304,6 +311,7 @@ export function errorHandler(
     err instanceof StructuralIntegrityError ||
     err instanceof TaskPersistenceError ||
     err instanceof SupplyPersistenceError ||
+    err instanceof MaintenancePersistenceError ||
     err instanceof TransactionInfrastructureError ||
     err instanceof AuthInfrastructureError
   ) {

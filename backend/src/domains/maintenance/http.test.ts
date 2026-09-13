@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { CreateMaintenanceEntryInput } from '../../application/maintenance/create-maintenance-entry.js';
+import type { ListHomeMaintenanceInput } from '../../application/maintenance/list-home-maintenance.js';
+import type { ReadMaintenanceEntryInput } from '../../application/maintenance/read-maintenance-entry.js';
 import { createRoomiesApiRouter } from '../../http/create-roomies-api.js';
 import { UnauthenticatedError } from '../../platform/auth/errors.js';
 import type { PrincipalResolver } from '../../platform/auth/principal.js';
 import type { ActiveHomeActor } from '../../platform/authz/context.js';
-import { ConcealedNotFoundError } from '../../platform/authz/errors.js';
+import {
+  ConcealedNotFoundError,
+  InvalidRequestError,
+} from '../../platform/authz/errors.js';
 import { appRequest } from '../../platform/http/app-request.test-helper.js';
 import {
   assertNoForbiddenLeak,
@@ -16,9 +21,13 @@ import type { ApiErrorBody } from '../../platform/http/errors.js';
 import { MAINTENANCE_DETAILS_MAX_LENGTH } from './maintenance-details.js';
 import {
   maintenanceDetailDtoSchema,
+  maintenanceListPageDtoSchema,
   type MaintenanceDetailDto,
 } from './maintenance-entry-dto.js';
-import type { MaintenanceDetailProjection } from './maintenance.js';
+import type {
+  MaintenanceDetailProjection,
+  MaintenanceListItemProjection,
+} from './maintenance.js';
 import { MAINTENANCE_TITLE_MAX_LENGTH } from './maintenance-title.js';
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
@@ -59,6 +68,31 @@ function projection(
   };
 }
 
+function listItem(
+  overrides: Partial<MaintenanceListItemProjection> = {},
+): MaintenanceListItemProjection {
+  return {
+    id: ENTRY_ID,
+    title: 'Leaky faucet',
+    status: 'OPEN',
+    visibility: 'HOUSEHOLD',
+    createdByMembershipId: MEMBERSHIP_ID,
+    resolvedByMembershipId: null,
+    resolvedAt: null,
+    createdAt: CREATED,
+    updatedAt: CREATED,
+    ...overrides,
+  };
+}
+
+function emptyPage(): {
+  items: readonly MaintenanceListItemProjection[];
+  hasMore: boolean;
+  nextCursor: string | null;
+} {
+  return { items: [], hasMore: false, nextCursor: null };
+}
+
 function unusedHomeReader() {
   return {
     findActiveHomeById: () =>
@@ -76,11 +110,23 @@ function buildApp(
     createMaintenanceEntry?: (
       input: CreateMaintenanceEntryInput,
     ) => Promise<MaintenanceDetailProjection>;
+    listHomeMaintenance?: (input: ListHomeMaintenanceInput) => Promise<{
+      items: readonly MaintenanceListItemProjection[];
+      hasMore: boolean;
+      nextCursor: string | null;
+    }>;
+    readMaintenanceEntry?: (
+      input: ReadMaintenanceEntryInput,
+    ) => Promise<MaintenanceDetailProjection>;
   } = {},
 ) {
   const createCalls: CreateMaintenanceEntryInput[] = [];
+  const listCalls: ListHomeMaintenanceInput[] = [];
+  const readCalls: ReadMaintenanceEntryInput[] = [];
   return {
     createCalls,
+    listCalls,
+    readCalls,
     app: createApp({
       config: { trustedOrigins: [TRUSTED_ORIGIN], trustProxyHops: 0 },
       readiness: { checkReady: () => Promise.resolve(true) },
@@ -116,6 +162,20 @@ function buildApp(
               visibility:
                 input.visibility === 'PRIVATE' ? 'PRIVATE' : 'HOUSEHOLD',
             });
+          },
+          listHomeMaintenance: async (input) => {
+            listCalls.push(input);
+            if (options.listHomeMaintenance) {
+              return options.listHomeMaintenance(input);
+            }
+            return emptyPage();
+          },
+          readMaintenanceEntry: async (input) => {
+            readCalls.push(input);
+            if (options.readMaintenanceEntry) {
+              return options.readMaintenanceEntry(input);
+            }
+            return projection({ id: input.maintenanceEntryId });
           },
         },
       }),
@@ -432,5 +492,296 @@ void describe('POST /api/v1/homes/:homeId/maintenance', () => {
       text: JSON.stringify(responses),
       forbidden: leakSentinels,
     });
+  });
+});
+
+const listDtoKeys = [
+  'id',
+  'title',
+  'status',
+  'visibility',
+  'createdByMembershipId',
+  'resolvedByMembershipId',
+  'resolvedAt',
+  'createdAt',
+  'updatedAt',
+];
+
+function getList(
+  app: ReturnType<typeof buildApp>['app'],
+  options: {
+    homeId?: string;
+    query?: string;
+    origin?: string;
+    cookie?: string;
+  } = {},
+) {
+  const headers: Record<string, string> = {};
+  if (options.origin !== undefined) {
+    headers.Origin = options.origin;
+  }
+  if (options.cookie !== undefined) {
+    headers.Cookie = options.cookie;
+  }
+  const suffix = options.query === undefined ? '' : `?${options.query}`;
+  return appRequest(app, {
+    method: 'GET',
+    path: `${maintenancePath(options.homeId)}${suffix}`,
+    headers,
+  });
+}
+
+function getDetail(
+  app: ReturnType<typeof buildApp>['app'],
+  maintenanceEntryId: string,
+  options: { homeId?: string; origin?: string } = {},
+) {
+  const headers: Record<string, string> = {};
+  if (options.origin !== undefined) {
+    headers.Origin = options.origin;
+  }
+  return appRequest(app, {
+    method: 'GET',
+    path: `${maintenancePath(options.homeId)}/${maintenanceEntryId}`,
+    headers,
+  });
+}
+
+void describe('GET /api/v1/homes/:homeId/maintenance', () => {
+  void it('returns 200 with the exact list page DTO and private/no-store headers', async () => {
+    const { app, listCalls } = buildApp({
+      listHomeMaintenance: () =>
+        Promise.resolve({
+          items: [
+            listItem(),
+            listItem({
+              id: '018f1e2c-7e3a-7000-8000-1234567890ac',
+              title: 'Resolved leak',
+              status: 'RESOLVED',
+              resolvedByMembershipId: MEMBERSHIP_ID,
+              resolvedAt: CREATED,
+            }),
+          ],
+          hasMore: true,
+          nextCursor: 'opaque-cursor',
+        }),
+    });
+    const res = await getList(app);
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('cache-control'), 'private, no-store');
+    const body = maintenanceListPageDtoSchema.parse(res.json());
+    assert.deepEqual(Object.keys(body), ['items', 'hasMore', 'nextCursor']);
+    assert.equal(body.items.length, 2);
+    assert.deepEqual(Object.keys(body.items[0] ?? {}), listDtoKeys);
+    assert.equal('details' in (body.items[0] ?? {}), false);
+    assert.equal('homeId' in (body.items[0] ?? {}), false);
+    assert.equal('audienceMembershipIds' in (body.items[0] ?? {}), false);
+    assert.equal(body.hasMore, true);
+    assert.equal(body.nextCursor, 'opaque-cursor');
+    assert.deepEqual(listCalls[0], {
+      actor: actor(),
+      homeId: HOME_ID,
+      limit: 25,
+    });
+  });
+
+  void it('returns 200 with a valid empty page', async () => {
+    const { app } = buildApp({
+      listHomeMaintenance: () => Promise.resolve(emptyPage()),
+    });
+    const res = await getList(app);
+    assert.equal(res.status, 200);
+    const body = maintenanceListPageDtoSchema.parse(res.json());
+    assert.deepEqual(body, {
+      items: [],
+      hasMore: false,
+      nextCursor: null,
+    });
+  });
+
+  void it('does not require a mutation Origin', async () => {
+    const { app, listCalls } = buildApp();
+    const missing = await getList(app);
+    assert.equal(missing.status, 200);
+    const hostile = await getList(app, { origin: HOSTILE_ORIGIN });
+    assert.equal(hostile.status, 200);
+    assert.equal(listCalls.length, 2);
+  });
+
+  void it('passes status and limit through and defaults limit to 25', async () => {
+    const { app, listCalls } = buildApp();
+    const open = await getList(app, { query: 'status=OPEN&limit=10' });
+    assert.equal(open.status, 200);
+    assert.equal(listCalls[0]?.status, 'OPEN');
+    assert.equal(listCalls[0]?.limit, 10);
+    const resolved = await getList(app, { query: 'status=RESOLVED' });
+    assert.equal(resolved.status, 200);
+    assert.equal(listCalls[1]?.status, 'RESOLVED');
+    assert.equal(listCalls[1]?.limit, 25);
+  });
+
+  void it('passes an opaque cursor without decoding it', async () => {
+    const { app, listCalls } = buildApp();
+    const res = await getList(app, { query: 'cursor=opaque-token' });
+    assert.equal(res.status, 200);
+    assert.equal(listCalls[0]?.cursor, 'opaque-token');
+  });
+
+  void it('rejects invalid status, limit, and empty cursor', async () => {
+    const { app, listCalls } = buildApp();
+    for (const query of [
+      'status=CLOSED',
+      'status=ALL',
+      'status=PENDING',
+      'status=open',
+      'status=',
+      'status=OPEN&status=RESOLVED',
+      'limit=0',
+      'limit=-1',
+      'limit=101',
+      'limit=1.5',
+      'limit=25.0',
+      'limit=abc',
+      'limit=',
+      'limit=01',
+      'cursor=',
+    ]) {
+      const res = await getList(app, { query });
+      assert.equal(res.status, 400);
+      assert.equal((res.json() as ApiErrorBody).error.code, 'INVALID_REQUEST');
+    }
+    assert.deepEqual(listCalls, []);
+  });
+
+  void it('maps malformed cursor failures to 400 without exposing cursor contents', async () => {
+    const { app, listCalls } = buildApp({
+      listHomeMaintenance: (input) => {
+        if (input.cursor === '%%%') {
+          return Promise.reject(new InvalidRequestError());
+        }
+        return Promise.resolve(emptyPage());
+      },
+    });
+    const res = await getList(app, {
+      query: `cursor=${encodeURIComponent('%%%')}`,
+    });
+    assert.equal(res.status, 400);
+    assert.equal((res.json() as ApiErrorBody).error.code, 'INVALID_REQUEST');
+    assert.equal((res.json() as ApiErrorBody).error.message, 'Invalid request');
+    assert.equal(listCalls[0]?.cursor, '%%%');
+    assert.equal(res.text.includes('%%%'), false);
+  });
+
+  void it('maps stale-scope concealment to 404, distinct from a valid empty page', async () => {
+    const stale = buildApp({
+      listHomeMaintenance: () => Promise.reject(new ConcealedNotFoundError()),
+    });
+    const staleRes = await getList(stale.app);
+    assert.equal(staleRes.status, 404);
+    assert.equal((staleRes.json() as ApiErrorBody).error.code, 'NOT_FOUND');
+    assert.equal((staleRes.json() as ApiErrorBody).error.message, 'Not found');
+    assert.equal(stale.listCalls.length, 1);
+
+    const empty = buildApp({
+      listHomeMaintenance: () => Promise.resolve(emptyPage()),
+    });
+    const emptyRes = await getList(empty.app);
+    assert.equal(emptyRes.status, 200);
+    assert.deepEqual(emptyRes.json(), {
+      items: [],
+      hasMore: false,
+      nextCursor: null,
+    });
+  });
+
+  void it('returns 401 for unauthenticated list requests', async () => {
+    const { app, listCalls } = buildApp({
+      requirePrincipal: () => Promise.reject(new UnauthenticatedError()),
+    });
+    const res = await getList(app);
+    assert.equal(res.status, 401);
+    assert.deepEqual(listCalls, []);
+  });
+
+  void it('conceals an inaccessible Home without invoking list', async () => {
+    const { app, listCalls } = buildApp({
+      resolve: () => Promise.resolve(null),
+    });
+    const res = await getList(app, { homeId: OTHER_HOME_ID });
+    assert.equal(res.status, 404);
+    assert.deepEqual(listCalls, []);
+  });
+});
+
+void describe('GET /api/v1/homes/:homeId/maintenance/:maintenanceEntryId', () => {
+  void it('returns 200 with the exact detail DTO including details', async () => {
+    const { app, readCalls } = buildApp({
+      readMaintenanceEntry: () =>
+        Promise.resolve(projection({ details: 'Kitchen sink' })),
+    });
+    const res = await getDetail(app, ENTRY_ID);
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('cache-control'), 'private, no-store');
+    const body = maintenanceDetailDtoSchema.parse(res.json());
+    assert.deepEqual(Object.keys(body), dtoKeys);
+    assert.equal(body.details, 'Kitchen sink');
+    assert.equal('homeId' in (res.json() as object), false);
+    assert.equal('audienceMembershipIds' in (res.json() as object), false);
+    assert.deepEqual(readCalls[0], {
+      actor: actor(),
+      homeId: HOME_ID,
+      maintenanceEntryId: ENTRY_ID,
+    });
+  });
+
+  void it('does not require a mutation Origin', async () => {
+    const { app, readCalls } = buildApp();
+    const missing = await getDetail(app, ENTRY_ID);
+    assert.equal(missing.status, 200);
+    const hostile = await getDetail(app, ENTRY_ID, { origin: HOSTILE_ORIGIN });
+    assert.equal(hostile.status, 200);
+    assert.equal(readCalls.length, 2);
+  });
+
+  void it('rejects malformed IDs before invoking read', async () => {
+    const { app, readCalls } = buildApp();
+    const res = await getDetail(app, 'not-a-uuid');
+    assert.equal(res.status, 400);
+    assert.equal((res.json() as ApiErrorBody).error.code, 'INVALID_PATH_INPUT');
+    assert.deepEqual(readCalls, []);
+  });
+
+  void it('maps concealed unknown, foreign, invisible, archived, and stale reads to the same 404', async () => {
+    const shapes: Array<{ code: string; message: string }> = [];
+    for (let index = 0; index < 5; index += 1) {
+      const { app } = buildApp({
+        readMaintenanceEntry: () =>
+          Promise.reject(new ConcealedNotFoundError()),
+      });
+      const res = await getDetail(app, ENTRY_ID);
+      assert.equal(res.status, 404);
+      const error = (res.json() as ApiErrorBody).error;
+      assert.equal(error.code, 'NOT_FOUND');
+      assert.equal(error.message, 'Not found');
+      shapes.push({ code: error.code, message: error.message });
+      assertNoForbiddenLeak({
+        context: 'concealed maintenance read HTTP',
+        text: res.text,
+        forbidden: [...leakSentinels, ENTRY_ID, 'PRIVATE', 'visibility'],
+      });
+    }
+    assert.deepEqual(shapes[0], shapes[1]);
+    assert.deepEqual(shapes[1], shapes[2]);
+    assert.deepEqual(shapes[2], shapes[3]);
+    assert.deepEqual(shapes[3], shapes[4]);
+  });
+
+  void it('returns 401 for unauthenticated detail requests', async () => {
+    const { app, readCalls } = buildApp({
+      requirePrincipal: () => Promise.reject(new UnauthenticatedError()),
+    });
+    const res = await getDetail(app, ENTRY_ID);
+    assert.equal(res.status, 401);
+    assert.deepEqual(readCalls, []);
   });
 });

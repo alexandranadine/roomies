@@ -67,3 +67,15 @@ export function toMaintenanceDetailDto(
     details: entry.details,
   });
 }
+
+export function toMaintenanceListPageDto(page: {
+  items: readonly MaintenanceListItemProjection[];
+  hasMore: boolean;
+  nextCursor: string | null;
+}): MaintenanceListPageDto {
+  return maintenanceListPageDtoSchema.parse({
+    items: page.items.map(toMaintenanceListItemDto),
+    hasMore: page.hasMore,
+    nextCursor: page.nextCursor,
+  });
+}

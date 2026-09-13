@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { describe, it } from 'node:test';
 import type { Pool } from 'pg';
 import { createCreateMaintenanceEntryFromPool } from '../../application/maintenance/create-maintenance-entry.js';
+import { createListHomeMaintenanceFromPool } from '../../application/maintenance/list-home-maintenance.js';
+import { createReadMaintenanceEntryFromPool } from '../../application/maintenance/read-maintenance-entry.js';
 import { createHomeRepository } from '../homes/index.js';
 import { createRoomiesApiRouter } from '../../http/create-roomies-api.js';
 import { createActiveHomeActorResolver } from '../memberships/index.js';
@@ -27,10 +29,22 @@ import {
   resolveSafeDedicatedTestDatabaseUrl,
   skipUnlessDedicatedTestDatabase,
 } from '../../platform/persistence/test-database.js';
+import { runInReadCommittedTransaction } from '../../platform/persistence/transaction.js';
 import { createDb } from '../../prisma/db.js';
-import { maintenanceDetailDtoSchema } from './maintenance-entry-dto.js';
+import {
+  encodeMaintenanceListCursor,
+  MAINTENANCE_LIST_QUERY_FINGERPRINT,
+} from './cursor.js';
+import {
+  maintenanceDetailDtoSchema,
+  maintenanceListPageDtoSchema,
+} from './maintenance-entry-dto.js';
 import { MAINTENANCE_DETAILS_MAX_LENGTH } from './maintenance-details.js';
 import { MAINTENANCE_TITLE_MAX_LENGTH } from './maintenance-title.js';
+import {
+  createMaintenanceRepository,
+  type NewMaintenanceEntry,
+} from './repository.js';
 
 const TEST_SECRET = 'roomies_test_secret_32_chars_minimum_value';
 const TRUSTED_ORIGIN = 'http://127.0.0.1:5173';
@@ -131,6 +145,52 @@ const leakSentinels = [
   'stack',
 ];
 
+const listDtoKeys = [
+  'id',
+  'title',
+  'status',
+  'visibility',
+  'createdByMembershipId',
+  'resolvedByMembershipId',
+  'resolvedAt',
+  'createdAt',
+  'updatedAt',
+];
+
+const CREATED = new Date('2026-09-13T12:00:00.000Z');
+
+function entryInput(
+  id: string,
+  homeId: string,
+  createdByMembershipId: string,
+  visibility: 'HOUSEHOLD' | 'PRIVATE',
+  title: string,
+  updatedAt = CREATED,
+): NewMaintenanceEntry {
+  return {
+    id,
+    homeId,
+    createdByMembershipId,
+    visibility,
+    title,
+    details: `${title} details`,
+    status: 'OPEN',
+    resolvedByMembershipId: null,
+    resolvedAt: null,
+    createdAt: CREATED,
+    updatedAt,
+  };
+}
+
+function errorShape(res: { status: number; json: () => unknown }): {
+  status: number;
+  code: string;
+  message: string;
+} {
+  const error = (res.json() as ApiErrorBody).error;
+  return { status: res.status, code: error.code, message: error.message };
+}
+
 void describe('Maintenance HTTP PostgreSQL', () => {
   void it(
     'uses only a dedicated safe TEST_DATABASE_URL',
@@ -185,6 +245,12 @@ void describe('Maintenance HTTP PostgreSQL', () => {
               Promise.reject(new Error('remove must not run')),
             maintenance: {
               createMaintenanceEntry: createCreateMaintenanceEntryFromPool(
+                database.pool,
+              ),
+              listHomeMaintenance: createListHomeMaintenanceFromPool(
+                database.pool,
+              ),
+              readMaintenanceEntry: createReadMaintenanceEntryFromPool(
                 database.pool,
               ),
             },
@@ -627,6 +693,813 @@ void describe('Maintenance HTTP PostgreSQL', () => {
           const successTitles = [householdBody.title, creatorOnlyBody.title];
           assert.ok(successTitles.includes('Leaky faucet'));
           assert.ok(successTitles.includes('Creator only'));
+        });
+      } finally {
+        console.error = originalError;
+        if (homeIds.length > 0) {
+          await database.pool.query(
+            'DELETE FROM maintenance_audiences WHERE home_id = ANY($1)',
+            [homeIds],
+          );
+          await database.pool.query(
+            'DELETE FROM maintenance_entries WHERE home_id = ANY($1)',
+            [homeIds],
+          );
+          await database.pool.query(
+            'DELETE FROM memberships WHERE home_id = ANY($1)',
+            [homeIds],
+          );
+          await database.pool.query('DELETE FROM homes WHERE id = ANY($1)', [
+            homeIds,
+          ]);
+        }
+        for (const id of identityIds) {
+          await database.pool.query(
+            'DELETE FROM auth_sessions WHERE user_id = $1',
+            [id],
+          );
+          await database.pool.query(
+            'DELETE FROM auth_accounts WHERE user_id = $1',
+            [id],
+          );
+          await database.pool.query(
+            'DELETE FROM auth_identities WHERE id = $1',
+            [id],
+          );
+          await database.pool.query('DELETE FROM users WHERE id = $1', [id]);
+        }
+        await db.close();
+        await database.close();
+      }
+    },
+  );
+
+  void it(
+    'enforces visible list/detail privacy, pagination, cursors, tenure, archive, and cross-Home through HTTP',
+    { skip: skipWithoutDatabase, timeout: 90_000 },
+    async () => {
+      const databaseUrl = resolveSafeDedicatedTestDatabaseUrl();
+      const config = authConfig(databaseUrl);
+      const database = createDatabasePool(config);
+      const db = createDb(database.pool);
+      const auth = createAuthRuntime(database.pool, config);
+      const principalResolver = createPrincipalResolver({
+        auth,
+        hasCanonicalUser: createCanonicalUserLookup(database.pool),
+      });
+      const identityIds: string[] = [];
+      const homeIds: string[] = [];
+      const logs: string[] = [];
+      const originalError = console.error;
+      console.error = (...args: unknown[]) => {
+        logs.push(args.map((value) => JSON.stringify(value)).join(' '));
+      };
+      const repository = createMaintenanceRepository(database.pool);
+
+      try {
+        await db.connect();
+        const app = createApp({
+          config,
+          readiness: createDbReadiness(db),
+          auth,
+          roomiesApi: createRoomiesApiRouter({
+            principalResolver,
+            activeHomeActorResolver: createActiveHomeActorResolver(
+              database.pool,
+            ),
+            homeReader: createHomeRepository(database.pool),
+            archiveFinalMemberHome: () => Promise.resolve(),
+            changeMembershipRole: () =>
+              Promise.reject(new Error('role change must not run')),
+            leaveMembership: () =>
+              Promise.reject(new Error('leave must not run')),
+            removeMembership: () =>
+              Promise.reject(new Error('remove must not run')),
+            maintenance: {
+              createMaintenanceEntry: createCreateMaintenanceEntryFromPool(
+                database.pool,
+              ),
+              listHomeMaintenance: createListHomeMaintenanceFromPool(
+                database.pool,
+              ),
+              readMaintenanceEntry: createReadMaintenanceEntryFromPool(
+                database.pool,
+              ),
+            },
+          }),
+        });
+
+        await withAppServer(app, async (request) => {
+          async function signUp(name: string) {
+            const email = `m53-${name}-${randomUUID()}@example.test`;
+            const signup = await request({
+              method: 'POST',
+              path: '/api/auth/sign-up/email',
+              headers: {
+                Origin: TRUSTED_ORIGIN,
+                'content-type': 'application/json',
+              },
+              body: JSON.stringify({ name, email, password: PASSWORD }),
+            });
+            assert.ok(signup.status >= 200 && signup.status < 300);
+            const id = (signup.json() as { user?: { id?: string } }).user?.id;
+            assert.ok(id);
+            identityIds.push(id);
+            const cookie = findSessionSetCookie(signup.headers);
+            assert.ok(cookie);
+            return { id, cookie: sessionCookieHeader(cookie) };
+          }
+
+          async function insertEntry(
+            entry: NewMaintenanceEntry,
+            audienceMembershipIds: readonly string[],
+          ) {
+            await runInReadCommittedTransaction(database.pool, async (tx) => {
+              await repository.insertEntryWithAudience(tx, {
+                entry,
+                audienceMembershipIds,
+              });
+            });
+          }
+
+          function listPath(targetHomeId: string, query = ''): string {
+            return `/api/v1/homes/${targetHomeId}/maintenance${query}`;
+          }
+
+          function detailPath(targetHomeId: string, entryId: string): string {
+            return `/api/v1/homes/${targetHomeId}/maintenance/${entryId}`;
+          }
+
+          const alex = await signUp('alex');
+          const jamie = await signUp('jamie');
+          const taylor = await signUp('taylor');
+          const foreign = await signUp('foreign');
+          const tenureUser = await signUp('tenure');
+
+          const homeId = createUuidV7();
+          const pageHomeId = createUuidV7();
+          const foreignHomeId = createUuidV7();
+          const tenureHomeId = createUuidV7();
+          const archivedHomeId = createUuidV7();
+          homeIds.push(
+            homeId,
+            pageHomeId,
+            foreignHomeId,
+            tenureHomeId,
+            archivedHomeId,
+          );
+
+          const alexMembership = createUuidV7();
+          const jamieMembership = createUuidV7();
+          const taylorMembership = createUuidV7();
+          const pageAlex = createUuidV7();
+          const pageJamie = createUuidV7();
+          const foreignMembership = createUuidV7();
+          const tenureA = createUuidV7();
+          const tenureB = createUuidV7();
+          const archivedMembership = createUuidV7();
+          const privateA = createUuidV7();
+          const privateB = createUuidV7();
+          const householdH = createUuidV7();
+          const foreignEntry = createUuidV7();
+          const tenurePrivate = createUuidV7();
+          const tenureHousehold = createUuidV7();
+          const archivedEntry = createUuidV7();
+          const v1 = createUuidV7();
+          const v2 = createUuidV7();
+          const v3 = createUuidV7();
+          const v4 = createUuidV7();
+          const v5 = createUuidV7();
+          const hidden1 = createUuidV7();
+          const hidden2 = createUuidV7();
+          const hidden3 = createUuidV7();
+
+          await insertHome(database.pool, { id: homeId, name: 'Sentinel' });
+          await insertHome(database.pool, { id: pageHomeId, name: 'Pages' });
+          await insertHome(database.pool, {
+            id: foreignHomeId,
+            name: 'Foreign',
+          });
+          await insertHome(database.pool, { id: tenureHomeId, name: 'Tenure' });
+          await insertHome(database.pool, {
+            id: archivedHomeId,
+            name: 'Archived',
+          });
+          await insertMembership(database.pool, {
+            id: alexMembership,
+            homeId,
+            userId: alex.id,
+            role: 'ROOMMATE',
+          });
+          await insertMembership(database.pool, {
+            id: jamieMembership,
+            homeId,
+            userId: jamie.id,
+            role: 'ROOMMATE',
+          });
+          await insertMembership(database.pool, {
+            id: taylorMembership,
+            homeId,
+            userId: taylor.id,
+            role: 'ADMIN',
+          });
+          await insertMembership(database.pool, {
+            id: pageAlex,
+            homeId: pageHomeId,
+            userId: alex.id,
+            role: 'ROOMMATE',
+          });
+          await insertMembership(database.pool, {
+            id: pageJamie,
+            homeId: pageHomeId,
+            userId: jamie.id,
+            role: 'ROOMMATE',
+          });
+          await insertMembership(database.pool, {
+            id: foreignMembership,
+            homeId: foreignHomeId,
+            userId: foreign.id,
+            role: 'ADMIN',
+          });
+          await insertMembership(database.pool, {
+            id: tenureA,
+            homeId: tenureHomeId,
+            userId: tenureUser.id,
+            role: 'ROOMMATE',
+          });
+          await insertMembership(database.pool, {
+            id: archivedMembership,
+            homeId: archivedHomeId,
+            userId: tenureUser.id,
+            role: 'ROOMMATE',
+          });
+
+          await insertEntry(
+            entryInput(
+              privateA,
+              homeId,
+              alexMembership,
+              'PRIVATE',
+              'Private A',
+              new Date('2026-09-13T12:20:00.000Z'),
+            ),
+            [alexMembership],
+          );
+          await insertEntry(
+            entryInput(
+              privateB,
+              homeId,
+              jamieMembership,
+              'PRIVATE',
+              'Private B',
+              new Date('2026-09-13T12:10:00.000Z'),
+            ),
+            [jamieMembership],
+          );
+          await insertEntry(
+            entryInput(
+              householdH,
+              homeId,
+              taylorMembership,
+              'HOUSEHOLD',
+              'Household H',
+              new Date('2026-09-13T12:30:00.000Z'),
+            ),
+            [],
+          );
+          await insertEntry(
+            entryInput(
+              foreignEntry,
+              foreignHomeId,
+              foreignMembership,
+              'HOUSEHOLD',
+              'Foreign household',
+            ),
+            [],
+          );
+
+          const alexList = await request({
+            method: 'GET',
+            path: listPath(homeId),
+            headers: { Cookie: alex.cookie },
+          });
+          assert.equal(alexList.status, 200);
+          assert.equal(
+            alexList.headers.get('cache-control'),
+            'private, no-store',
+          );
+          const alexPage = maintenanceListPageDtoSchema.parse(alexList.json());
+          assert.deepEqual(
+            alexPage.items.map((item) => item.id),
+            [householdH, privateA],
+          );
+          assert.equal(
+            alexPage.items.some((item) => item.id === privateB),
+            false,
+          );
+          assert.equal('details' in (alexPage.items[0] ?? {}), false);
+          assert.deepEqual(Object.keys(alexPage.items[0] ?? {}), listDtoKeys);
+
+          const jamieList = await request({
+            method: 'GET',
+            path: listPath(homeId),
+            headers: { Cookie: jamie.cookie },
+          });
+          const jamiePage = maintenanceListPageDtoSchema.parse(
+            jamieList.json(),
+          );
+          assert.deepEqual(
+            jamiePage.items.map((item) => item.id),
+            [householdH, privateB],
+          );
+          assert.equal(
+            jamiePage.items.some((item) => item.id === privateA),
+            false,
+          );
+
+          const taylorList = await request({
+            method: 'GET',
+            path: listPath(homeId),
+            headers: { Cookie: taylor.cookie },
+          });
+          const taylorPage = maintenanceListPageDtoSchema.parse(
+            taylorList.json(),
+          );
+          assert.deepEqual(
+            taylorPage.items.map((item) => item.id),
+            [householdH],
+          );
+          assert.equal(
+            taylorPage.items.some((item) => item.id === privateA),
+            false,
+          );
+          assert.equal(
+            taylorPage.items.some((item) => item.id === privateB),
+            false,
+          );
+
+          const alexA = await request({
+            method: 'GET',
+            path: detailPath(homeId, privateA),
+            headers: { Cookie: alex.cookie },
+          });
+          assert.equal(alexA.status, 200);
+          const alexABody = maintenanceDetailDtoSchema.parse(alexA.json());
+          assert.equal(alexABody.details, 'Private A details');
+          assert.equal(alexA.headers.get('cache-control'), 'private, no-store');
+
+          const alexB = await request({
+            method: 'GET',
+            path: detailPath(homeId, privateB),
+            headers: { Cookie: alex.cookie },
+          });
+          const jamieB = await request({
+            method: 'GET',
+            path: detailPath(homeId, privateB),
+            headers: { Cookie: jamie.cookie },
+          });
+          const jamieA = await request({
+            method: 'GET',
+            path: detailPath(homeId, privateA),
+            headers: { Cookie: jamie.cookie },
+          });
+          const taylorH = await request({
+            method: 'GET',
+            path: detailPath(homeId, householdH),
+            headers: { Cookie: taylor.cookie },
+          });
+          const taylorA = await request({
+            method: 'GET',
+            path: detailPath(homeId, privateA),
+            headers: { Cookie: taylor.cookie },
+          });
+          const taylorB = await request({
+            method: 'GET',
+            path: detailPath(homeId, privateB),
+            headers: { Cookie: taylor.cookie },
+          });
+          assert.equal(jamieB.status, 200);
+          assert.equal(taylorH.status, 200);
+          const concealed = [alexB, jamieA, taylorA, taylorB].map(errorShape);
+          for (const shape of concealed) {
+            assert.deepEqual(shape, {
+              status: 404,
+              code: 'NOT_FOUND',
+              message: 'Not found',
+            });
+          }
+          assert.deepEqual(concealed[0], concealed[1]);
+
+          const t50 = new Date('2026-09-13T13:50:00.000Z');
+          const t45 = new Date('2026-09-13T13:45:00.000Z');
+          const t40 = new Date('2026-09-13T13:40:00.000Z');
+          const t35 = new Date('2026-09-13T13:35:00.000Z');
+          const t30 = new Date('2026-09-13T13:30:00.000Z');
+          const t25 = new Date('2026-09-13T13:25:00.000Z');
+          const t20 = new Date('2026-09-13T13:20:00.000Z');
+          const t10 = new Date('2026-09-13T13:10:00.000Z');
+          await insertEntry(
+            entryInput(v1, pageHomeId, pageAlex, 'HOUSEHOLD', 'V1', t50),
+            [],
+          );
+          await insertEntry(
+            entryInput(hidden1, pageHomeId, pageJamie, 'PRIVATE', 'H1', t45),
+            [pageJamie],
+          );
+          await insertEntry(
+            entryInput(v2, pageHomeId, pageAlex, 'HOUSEHOLD', 'V2', t40),
+            [],
+          );
+          await insertEntry(
+            entryInput(hidden2, pageHomeId, pageJamie, 'PRIVATE', 'H2', t35),
+            [pageJamie],
+          );
+          await insertEntry(
+            entryInput(v3, pageHomeId, pageAlex, 'HOUSEHOLD', 'V3', t30),
+            [],
+          );
+          await insertEntry(
+            entryInput(hidden3, pageHomeId, pageJamie, 'PRIVATE', 'H3', t25),
+            [pageJamie],
+          );
+          await insertEntry(
+            entryInput(v4, pageHomeId, pageAlex, 'PRIVATE', 'V4', t20),
+            [pageAlex],
+          );
+          await insertEntry(
+            entryInput(v5, pageHomeId, pageAlex, 'HOUSEHOLD', 'V5', t10),
+            [],
+          );
+
+          const visibleOrder = [v1, v2, v3, v4, v5];
+          const page1 = await request({
+            method: 'GET',
+            path: listPath(pageHomeId, '?limit=2'),
+            headers: { Cookie: alex.cookie },
+          });
+          const page1Body = maintenanceListPageDtoSchema.parse(page1.json());
+          assert.deepEqual(
+            page1Body.items.map((item) => item.id),
+            [v1, v2],
+          );
+          assert.equal(page1Body.hasMore, true);
+          assert.equal(typeof page1Body.nextCursor, 'string');
+          assert.equal(
+            page1Body.items.some((item) =>
+              [hidden1, hidden2, hidden3].includes(item.id),
+            ),
+            false,
+          );
+
+          const page2 = await request({
+            method: 'GET',
+            path: listPath(
+              pageHomeId,
+              `?limit=2&cursor=${encodeURIComponent(page1Body.nextCursor ?? '')}`,
+            ),
+            headers: { Cookie: alex.cookie },
+          });
+          const page2Body = maintenanceListPageDtoSchema.parse(page2.json());
+          assert.deepEqual(
+            page2Body.items.map((item) => item.id),
+            [v3, v4],
+          );
+          assert.equal(page2Body.hasMore, true);
+
+          const page3 = await request({
+            method: 'GET',
+            path: listPath(
+              pageHomeId,
+              `?limit=2&cursor=${encodeURIComponent(page2Body.nextCursor ?? '')}`,
+            ),
+            headers: { Cookie: alex.cookie },
+          });
+          const page3Body = maintenanceListPageDtoSchema.parse(page3.json());
+          assert.deepEqual(
+            page3Body.items.map((item) => item.id),
+            [v5],
+          );
+          assert.equal(page3Body.hasMore, false);
+          assert.equal(page3Body.nextCursor, null);
+
+          const pagedIds = [
+            ...page1Body.items,
+            ...page2Body.items,
+            ...page3Body.items,
+          ].map((item) => item.id);
+          assert.deepEqual(pagedIds, visibleOrder);
+          assert.equal(new Set(pagedIds).size, 5);
+
+          const continued = await request({
+            method: 'GET',
+            path: listPath(
+              pageHomeId,
+              `?limit=2&cursor=${encodeURIComponent(page1Body.nextCursor ?? '')}`,
+            ),
+            headers: { Cookie: alex.cookie },
+          });
+          assert.equal(continued.status, 200);
+          assert.deepEqual(
+            maintenanceListPageDtoSchema
+              .parse(continued.json())
+              .items.map((item) => item.id),
+            [v3, v4],
+          );
+
+          const malformed = await request({
+            method: 'GET',
+            path: listPath(pageHomeId, `?cursor=${encodeURIComponent('%%%')}`),
+            headers: { Cookie: alex.cookie },
+          });
+          assert.deepEqual(errorShape(malformed), {
+            status: 400,
+            code: 'INVALID_REQUEST',
+            message: 'Invalid request',
+          });
+          assert.equal(malformed.text.includes('%%%'), false);
+
+          const homeMismatchCursor = encodeMaintenanceListCursor({
+            v: 1,
+            statusRank: 0,
+            updatedAt: t50.toISOString(),
+            id: v1,
+            homeId: foreignHomeId,
+            actorMembershipId: pageAlex,
+            statusFilter: null,
+            queryFingerprint: MAINTENANCE_LIST_QUERY_FINGERPRINT,
+          });
+          const homeMismatch = await request({
+            method: 'GET',
+            path: listPath(
+              pageHomeId,
+              `?cursor=${encodeURIComponent(homeMismatchCursor)}`,
+            ),
+            headers: { Cookie: alex.cookie },
+          });
+          assert.deepEqual(errorShape(homeMismatch), {
+            status: 400,
+            code: 'INVALID_REQUEST',
+            message: 'Invalid request',
+          });
+
+          const actorMismatch = await request({
+            method: 'GET',
+            path: listPath(
+              pageHomeId,
+              `?cursor=${encodeURIComponent(page1Body.nextCursor ?? '')}`,
+            ),
+            headers: { Cookie: jamie.cookie },
+          });
+          assert.deepEqual(errorShape(actorMismatch), {
+            status: 400,
+            code: 'INVALID_REQUEST',
+            message: 'Invalid request',
+          });
+
+          const statusMismatch = await request({
+            method: 'GET',
+            path: listPath(
+              pageHomeId,
+              `?status=OPEN&cursor=${encodeURIComponent(page1Body.nextCursor ?? '')}`,
+            ),
+            headers: { Cookie: alex.cookie },
+          });
+          assert.deepEqual(errorShape(statusMismatch), {
+            status: 400,
+            code: 'INVALID_REQUEST',
+            message: 'Invalid request',
+          });
+
+          await insertEntry(
+            entryInput(
+              tenurePrivate,
+              tenureHomeId,
+              tenureA,
+              'PRIVATE',
+              'Tenure private',
+            ),
+            [tenureA],
+          );
+          await insertEntry(
+            entryInput(
+              tenureHousehold,
+              tenureHomeId,
+              tenureA,
+              'HOUSEHOLD',
+              'Tenure household',
+            ),
+            [],
+          );
+          const tenureListBefore = await request({
+            method: 'GET',
+            path: listPath(tenureHomeId, '?limit=1'),
+            headers: { Cookie: tenureUser.cookie },
+          });
+          const tenurePageBefore = maintenanceListPageDtoSchema.parse(
+            tenureListBefore.json(),
+          );
+          assert.equal(tenureListBefore.status, 200);
+          const oldCursor = tenurePageBefore.nextCursor;
+          assert.equal(typeof oldCursor, 'string');
+          const tenureDetailBefore = await request({
+            method: 'GET',
+            path: detailPath(tenureHomeId, tenurePrivate),
+            headers: { Cookie: tenureUser.cookie },
+          });
+          assert.equal(tenureDetailBefore.status, 200);
+
+          await database.pool.query(
+            'UPDATE memberships SET ended_at = NOW() WHERE id = $1',
+            [tenureA],
+          );
+          const endedActorList = await request({
+            method: 'GET',
+            path: listPath(tenureHomeId),
+            headers: { Cookie: tenureUser.cookie },
+          });
+          const endedActorDetail = await request({
+            method: 'GET',
+            path: detailPath(tenureHomeId, tenurePrivate),
+            headers: { Cookie: tenureUser.cookie },
+          });
+          assert.deepEqual(errorShape(endedActorList), {
+            status: 404,
+            code: 'NOT_FOUND',
+            message: 'Not found',
+          });
+          assert.deepEqual(
+            errorShape(endedActorDetail),
+            errorShape(endedActorList),
+          );
+          await insertMembership(database.pool, {
+            id: tenureB,
+            homeId: tenureHomeId,
+            userId: tenureUser.id,
+            role: 'ROOMMATE',
+          });
+
+          const tenureDetailAfter = await request({
+            method: 'GET',
+            path: detailPath(tenureHomeId, tenurePrivate),
+            headers: { Cookie: tenureUser.cookie },
+          });
+          assert.deepEqual(errorShape(tenureDetailAfter), {
+            status: 404,
+            code: 'NOT_FOUND',
+            message: 'Not found',
+          });
+          const tenureListAfter = await request({
+            method: 'GET',
+            path: listPath(tenureHomeId),
+            headers: { Cookie: tenureUser.cookie },
+          });
+          const tenurePageAfter = maintenanceListPageDtoSchema.parse(
+            tenureListAfter.json(),
+          );
+          assert.deepEqual(
+            tenurePageAfter.items.map((item) => item.id),
+            [tenureHousehold],
+          );
+          const reusedCursor = await request({
+            method: 'GET',
+            path: listPath(
+              tenureHomeId,
+              `?limit=1&cursor=${encodeURIComponent(oldCursor ?? '')}`,
+            ),
+            headers: { Cookie: tenureUser.cookie },
+          });
+          assert.deepEqual(errorShape(reusedCursor), {
+            status: 400,
+            code: 'INVALID_REQUEST',
+            message: 'Invalid request',
+          });
+
+          await insertEntry(
+            entryInput(
+              archivedEntry,
+              archivedHomeId,
+              archivedMembership,
+              'HOUSEHOLD',
+              'Archived household',
+            ),
+            [],
+          );
+          await database.pool.query(
+            'UPDATE homes SET archived_at = NOW() WHERE id = $1',
+            [archivedHomeId],
+          );
+          const archivedList = await request({
+            method: 'GET',
+            path: listPath(archivedHomeId),
+            headers: { Cookie: tenureUser.cookie },
+          });
+          const archivedDetail = await request({
+            method: 'GET',
+            path: detailPath(archivedHomeId, archivedEntry),
+            headers: { Cookie: tenureUser.cookie },
+          });
+          assert.deepEqual(errorShape(archivedList), {
+            status: 404,
+            code: 'NOT_FOUND',
+            message: 'Not found',
+          });
+          assert.deepEqual(
+            errorShape(archivedDetail),
+            errorShape(archivedList),
+          );
+          assert.equal(await entryCount(database.pool, archivedHomeId), 1);
+
+          const crossThroughA = await request({
+            method: 'GET',
+            path: detailPath(homeId, foreignEntry),
+            headers: { Cookie: alex.cookie },
+          });
+          const crossThroughB = await request({
+            method: 'GET',
+            path: detailPath(foreignHomeId, foreignEntry),
+            headers: { Cookie: alex.cookie },
+          });
+          const randomId = createUuidV7();
+          const randomMissing = await request({
+            method: 'GET',
+            path: detailPath(homeId, randomId),
+            headers: { Cookie: alex.cookie },
+          });
+          assert.deepEqual(errorShape(crossThroughA), {
+            status: 404,
+            code: 'NOT_FOUND',
+            message: 'Not found',
+          });
+          assert.deepEqual(
+            errorShape(crossThroughB),
+            errorShape(crossThroughA),
+          );
+          assert.deepEqual(
+            errorShape(randomMissing),
+            errorShape(crossThroughA),
+          );
+          const sentinelListAgain = await request({
+            method: 'GET',
+            path: listPath(homeId),
+            headers: { Cookie: alex.cookie },
+          });
+          assert.equal(
+            maintenanceListPageDtoSchema
+              .parse(sentinelListAgain.json())
+              .items.some((item) => item.id === foreignEntry),
+            false,
+          );
+
+          const emptyHomeId = createUuidV7();
+          homeIds.push(emptyHomeId);
+          const emptyMembership = createUuidV7();
+          await insertHome(database.pool, { id: emptyHomeId, name: 'Empty' });
+          await insertMembership(database.pool, {
+            id: emptyMembership,
+            homeId: emptyHomeId,
+            userId: alex.id,
+            role: 'ROOMMATE',
+          });
+          const validEmpty = await request({
+            method: 'GET',
+            path: listPath(emptyHomeId),
+            headers: { Cookie: alex.cookie },
+          });
+          assert.equal(validEmpty.status, 200);
+          assert.deepEqual(validEmpty.json(), {
+            items: [],
+            hasMore: false,
+            nextCursor: null,
+          });
+
+          const staleList = await request({
+            method: 'GET',
+            path: listPath(homeId),
+            headers: { Cookie: tenureUser.cookie },
+          });
+          const staleDetail = await request({
+            method: 'GET',
+            path: detailPath(homeId, householdH),
+            headers: { Cookie: tenureUser.cookie },
+          });
+          assert.deepEqual(errorShape(staleList), {
+            status: 404,
+            code: 'NOT_FOUND',
+            message: 'Not found',
+          });
+          assert.deepEqual(errorShape(staleDetail), errorShape(staleList));
+          assert.deepEqual(errorShape(staleDetail), errorShape(alexB));
+
+          assertNoForbiddenLeak({
+            context: 'maintenance read/list HTTP logs',
+            text: logs.join('\n'),
+            forbidden: [
+              ...leakSentinels,
+              'Private A',
+              'Private B',
+              page1Body.nextCursor ?? 'next-cursor-missing',
+            ],
+          });
         });
       } finally {
         console.error = originalError;

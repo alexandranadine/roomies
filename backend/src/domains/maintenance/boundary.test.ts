@@ -124,12 +124,20 @@ void describe('maintenance domain boundary', () => {
   void it('keeps Maintenance HTTP adapter-only on the existing Home authz path', async () => {
     const source = await readFile(path.join(maintenanceDir, 'http.ts'), 'utf8');
     assert.match(source, /router\.post\('\/:homeId\/maintenance'/);
+    assert.match(source, /router\.get\('\/:homeId\/maintenance'/);
+    assert.match(
+      source,
+      /router\.get\('\/:homeId\/maintenance\/:maintenanceEntryId'/,
+    );
     assert.match(source, /createRequireHomeContext/);
     assert.match(source, /createRequireAuth/);
     assert.match(source, /setPrivateNoStoreHeaders/);
     assert.match(source, /discriminatedUnion\('visibility'/);
     assert.match(source, /\.strict\(\)/);
     assert.match(source, /toMaintenanceDetailDto/);
+    assert.match(source, /toMaintenanceListPageDto/);
+    assert.match(source, /listHomeMaintenance/);
+    assert.match(source, /readMaintenanceEntry/);
     assert.doesNotMatch(source, /lockHomeAndExactMemberships/);
     assert.doesNotMatch(source, /findActiveExactMembershipIdsInHome/);
     assert.doesNotMatch(source, /FROM\s+maintenance_entries/i);
@@ -138,9 +146,12 @@ void describe('maintenance domain boundary', () => {
     assert.doesNotMatch(source, /better-auth/);
     assert.doesNotMatch(source, /maintenance\.created/);
     assert.doesNotMatch(source, /outbox/);
-    assert.doesNotMatch(source, /router\.get/i);
+    assert.doesNotMatch(source, /from ['"]\.\/repository/);
+    assert.doesNotMatch(source, /decodeMaintenanceListCursor/);
+    assert.doesNotMatch(source, /bindMaintenanceListCursor/);
     assert.doesNotMatch(source, /router\.patch/i);
     assert.doesNotMatch(source, /router\.delete/i);
+    assert.doesNotMatch(source, /\/resolve/);
     assert.doesNotMatch(source, /audienceMembershipIds.*res\.json/);
   });
 });

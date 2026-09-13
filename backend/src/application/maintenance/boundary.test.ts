@@ -83,10 +83,9 @@ void describe('maintenance application boundary', () => {
     }
   });
 
-  void it('does not create HTTP, list, resolve, or frontend surfaces in this slice', async () => {
+  void it('does not create HTTP, resolve, or frontend surfaces in this slice', async () => {
     const names = (await readdir(dir)).filter((name) => name.endsWith('.ts'));
     assert.equal(names.includes('http.ts'), false);
-    assert.equal(names.includes('list-home-maintenance.ts'), false);
     assert.equal(names.includes('resolve-maintenance-entry.ts'), false);
     const source = await readFile(
       path.join(dir, 'create-maintenance-entry.ts'),
@@ -97,5 +96,44 @@ void describe('maintenance application boundary', () => {
     assert.doesNotMatch(source, /maintenance\.list/);
     assert.doesNotMatch(source, /maintenance\.read/);
     assert.doesNotMatch(source, /maintenance\.resolve/);
+  });
+
+  void it('lists and reads through public repository visibility without app filtering', async () => {
+    const list = await readFile(
+      path.join(dir, 'list-home-maintenance.ts'),
+      'utf8',
+    );
+    const read = await readFile(
+      path.join(dir, 'read-maintenance-entry.ts'),
+      'utf8',
+    );
+    assert.match(list, /decideMaintenanceList/);
+    assert.match(list, /listVisibleByHome/);
+    assert.match(list, /actorMembershipId: input\.actor\.membershipId/);
+    assert.match(list, /MAINTENANCE_LIST_DEFAULT_LIMIT/);
+    assert.match(list, /page === null/);
+    assert.match(list, /ConcealedNotFoundError/);
+    assert.doesNotMatch(list, /filter\(/);
+    assert.doesNotMatch(list, /sort\(/);
+    assert.doesNotMatch(list, /decodeMaintenanceListCursor/);
+    assert.doesNotMatch(list, /bindMaintenanceListCursor/);
+    assert.doesNotMatch(list, /userId/);
+    assert.doesNotMatch(list, /isHomeAdmin/);
+    assert.doesNotMatch(list, /lockHomeAndExactMemberships/);
+    assert.doesNotMatch(list, /FOR UPDATE/i);
+    assert.doesNotMatch(list, /from ['"]express['"]/);
+    assert.doesNotMatch(list, /from ['"]pg['"]/);
+    assert.doesNotMatch(list, /outbox/);
+    assert.match(read, /decideMaintenanceRead/);
+    assert.match(read, /findVisibleByHomeAndId/);
+    assert.match(read, /input\.actor\.membershipId/);
+    assert.match(read, /ConcealedNotFoundError/);
+    assert.doesNotMatch(read, /lockVisibleForResolve/);
+    assert.doesNotMatch(read, /userId/);
+    assert.doesNotMatch(read, /isHomeAdmin/);
+    assert.doesNotMatch(read, /from ['"]express['"]/);
+    assert.doesNotMatch(read, /from ['"]pg['"]/);
+    assert.doesNotMatch(read, /outbox/);
+    assert.doesNotMatch(read, /maintenance\.read_private/);
   });
 });

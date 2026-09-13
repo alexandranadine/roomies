@@ -29,7 +29,7 @@ import { createMembershipEndingSupplyCleanupFromPool } from './membership-ending
 import { createReleaseSupplyClaimFromPool } from './release-supply-claim.js';
 
 const skipWithoutDatabase = skipUnlessDedicatedTestDatabase();
-const OCCURRED = new Date('2026-09-13T20:00:00.000Z');
+const OCCURRED = new Date('2026-12-31T20:00:00.000Z');
 const PRIOR = new Date('2026-09-13T17:00:00.000Z');
 
 function testConfig(databaseUrl: string): AppConfig {

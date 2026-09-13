@@ -8,6 +8,8 @@ import { createPreviewInvitationFromPool } from './application/invitations/previ
 import { createLeaveMembershipFromPool } from './application/home-administration/leave-membership.js';
 import { createRemoveMembershipFromPool } from './application/home-administration/remove-membership.js';
 import { createCreateMaintenanceEntryFromPool } from './application/maintenance/create-maintenance-entry.js';
+import { createListHomeMaintenanceFromPool } from './application/maintenance/list-home-maintenance.js';
+import { createReadMaintenanceEntryFromPool } from './application/maintenance/read-maintenance-entry.js';
 import { createCancelSupplyEntryFromPool } from './application/supplies/cancel-supply-entry.js';
 import { createClaimSupplyEntryFromPool } from './application/supplies/claim-supply-entry.js';
 import { createCreateSupplyEntryFromPool } from './application/supplies/create-supply-entry.js';
@@ -126,6 +128,12 @@ function createWebHttpRuntime(
       },
       maintenance: {
         createMaintenanceEntry: createCreateMaintenanceEntryFromPool(
+          databasePool.pool,
+        ),
+        listHomeMaintenance: createListHomeMaintenanceFromPool(
+          databasePool.pool,
+        ),
+        readMaintenanceEntry: createReadMaintenanceEntryFromPool(
           databasePool.pool,
         ),
       },

@@ -4,6 +4,7 @@ import type { MaintenanceDetailProjection } from './maintenance.js';
 import {
   toMaintenanceDetailDto,
   toMaintenanceListItemDto,
+  toMaintenanceListPageDto,
 } from './maintenance-entry-dto.js';
 
 const CREATED = new Date('2026-09-13T12:00:00.000Z');
@@ -97,5 +98,17 @@ void describe('Maintenance projections', () => {
     assert.equal(serialized.includes('hiddenCount'), false);
     assert.equal(serialized.includes('canResolve'), false);
     assert.equal(serialized.includes('"role"'), false);
+  });
+
+  void it('whitelists the list page without details or hidden counts', () => {
+    const dto = toMaintenanceListPageDto({
+      items: [detail()],
+      hasMore: true,
+      nextCursor: 'opaque-cursor',
+    });
+    assert.deepEqual(Object.keys(dto), ['items', 'hasMore', 'nextCursor']);
+    assert.equal('details' in dto.items[0]!, false);
+    assert.equal(dto.hasMore, true);
+    assert.equal(dto.nextCursor, 'opaque-cursor');
   });
 });

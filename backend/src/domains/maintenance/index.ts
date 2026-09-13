@@ -57,6 +57,7 @@ export {
   maintenanceListPageDtoSchema,
   toMaintenanceDetailDto,
   toMaintenanceListItemDto,
+  toMaintenanceListPageDto,
   type MaintenanceDetailDto,
   type MaintenanceListItemDto,
   type MaintenanceListPageDto,
