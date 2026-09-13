@@ -16,6 +16,11 @@ import {
   type RemoveMembershipCommand,
 } from '../domains/memberships/http.js';
 import {
+  createSuppliesRouter,
+  type CreateSupplyEntryCommand,
+  type ListHomeSuppliesCommand,
+} from '../domains/supplies/http.js';
+import {
   createTasksRouter,
   type CompleteTaskCommand,
   type CreateManualTaskCommand,
@@ -65,6 +70,10 @@ export type CreateRoomiesApiRouterOptions = {
     createRecurringTaskDefinition: CreateRecurringTaskDefinitionCommand;
     listHomeTaskDefinitions: ListHomeTaskDefinitionsCommand;
     deactivateTaskDefinition: DeactivateTaskDefinitionCommand;
+  };
+  supplies?: {
+    createSupplyEntry: CreateSupplyEntryCommand;
+    listHomeSupplies: ListHomeSuppliesCommand;
   };
 };
 
@@ -130,6 +139,17 @@ export function createRoomiesApiRouter(
           options.tasks.createRecurringTaskDefinition,
         listHomeTaskDefinitions: options.tasks.listHomeTaskDefinitions,
         deactivateTaskDefinition: options.tasks.deactivateTaskDefinition,
+      }),
+    );
+  }
+  if (options.supplies !== undefined) {
+    router.use(
+      '/homes',
+      createSuppliesRouter({
+        principalResolver: options.principalResolver,
+        activeHomeActorResolver: options.activeHomeActorResolver,
+        createSupplyEntry: options.supplies.createSupplyEntry,
+        listHomeSupplies: options.supplies.listHomeSupplies,
       }),
     );
   }

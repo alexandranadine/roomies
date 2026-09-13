@@ -7,6 +7,8 @@ import { createAcceptInvitationFromPool } from './application/invitations/accept
 import { createPreviewInvitationFromPool } from './application/invitations/preview-invitation.js';
 import { createLeaveMembershipFromPool } from './application/home-administration/leave-membership.js';
 import { createRemoveMembershipFromPool } from './application/home-administration/remove-membership.js';
+import { createCreateSupplyEntryFromPool } from './application/supplies/create-supply-entry.js';
+import { createListHomeSuppliesFromPool } from './application/supplies/list-home-supplies.js';
 import { createCompleteTaskFromPool } from './application/tasks/complete-task.js';
 import { createCreateManualTaskFromPool } from './application/tasks/create-manual-task.js';
 import { createCreateRecurringTaskDefinitionFromPool } from './application/tasks/create-recurring-task-definition.js';
@@ -106,6 +108,10 @@ function createWebHttpRuntime(
         deactivateTaskDefinition: createDeactivateTaskDefinitionFromPool(
           databasePool.pool,
         ),
+      },
+      supplies: {
+        createSupplyEntry: createCreateSupplyEntryFromPool(databasePool.pool),
+        listHomeSupplies: createListHomeSuppliesFromPool(databasePool.pool),
       },
     }),
   });

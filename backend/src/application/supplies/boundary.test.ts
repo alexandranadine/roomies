@@ -78,4 +78,62 @@ void describe('supplies application boundary', () => {
       assert.doesNotMatch(source, /from ['"]pg['"]/, rel);
     }
   });
+
+  void it('creates SupplyEntries without repository internals or outbox', async () => {
+    const source = await readFile(
+      path.join(dir, 'create-supply-entry.ts'),
+      'utf8',
+    );
+    assert.match(source, /decideSupplyCreate/);
+    assert.match(source, /lockHomeAndExactMemberships/);
+    assert.match(source, /insertSupplyEntry/);
+    assert.match(source, /runInReadCommittedTransaction/);
+    assert.match(source, /normalizeSupplyTitle/);
+    assert.match(source, /createdByMembershipId: actor\.membershipId/);
+    assert.match(source, /status: 'OPEN'/);
+    assert.match(source, /obtainedAt: null/);
+    assert.match(source, /canceledAt: null/);
+    assert.match(source, /userId/);
+    assert.doesNotMatch(source, /decideHomeRead/);
+    assert.doesNotMatch(source, /findActiveHomeMembership/);
+    assert.doesNotMatch(source, /memberships\/repository/);
+    assert.doesNotMatch(source, /homes\/repository/);
+    assert.doesNotMatch(source, /home-repository/);
+    assert.doesNotMatch(source, /active-home-actor-lookup/);
+    assert.doesNotMatch(source, /lockHomeStructure/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /better-auth/);
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+    assert.doesNotMatch(source, /Date\.now/);
+    assert.doesNotMatch(source, /new Date\(/);
+    assert.doesNotMatch(source, /outbox/);
+    assert.doesNotMatch(source, /supply\.created/);
+    assert.doesNotMatch(source, /insertSupplyClaim/);
+    assert.doesNotMatch(source, /SERIALIZABLE/);
+    assert.doesNotMatch(source, /pg_advisory/i);
+    assert.doesNotMatch(source, /user_id/);
+  });
+
+  void it('lists Home Supplies through the public repository without claim joins', async () => {
+    const source = await readFile(
+      path.join(dir, 'list-home-supplies.ts'),
+      'utf8',
+    );
+    assert.match(source, /decideSupplyList/);
+    assert.match(source, /listSupplyEntriesByHome/);
+    assert.match(source, /listOpenEntriesByHome/);
+    assert.match(source, /listSupplyEntriesByHomeAndStatus/);
+    assert.doesNotMatch(source, /decideHomeRead/);
+    assert.doesNotMatch(source, /memberships\/repository/);
+    assert.doesNotMatch(source, /homes\/repository/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /better-auth/);
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+    assert.doesNotMatch(source, /outbox/);
+    assert.doesNotMatch(source, /lockHomeStructure/);
+    assert.doesNotMatch(source, /lockHomeAndExactMemberships/);
+    assert.doesNotMatch(source, /FOR UPDATE/i);
+    assert.doesNotMatch(source, /supply_claims/);
+    assert.doesNotMatch(source, /activeClaim|claimedBy|canClaim/);
+  });
 });

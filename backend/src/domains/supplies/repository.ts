@@ -114,6 +114,31 @@ WHERE home_id = $1::uuid
 ORDER BY created_at ASC, id ASC
 `;
 
+export const LIST_SUPPLY_ENTRIES_BY_HOME_SQL = `
+SELECT ${SUPPLY_ENTRY_COLUMNS}
+FROM supply_entries
+WHERE home_id = $1::uuid
+ORDER BY
+  CASE WHEN status = 'OPEN' THEN 0 ELSE 1 END ASC,
+  CASE WHEN status = 'OPEN' THEN created_at END ASC,
+  CASE WHEN status = 'OPEN' THEN id END ASC,
+  CASE WHEN status <> 'OPEN' THEN updated_at END DESC,
+  CASE WHEN status <> 'OPEN' THEN status END ASC,
+  CASE WHEN status <> 'OPEN' THEN id END DESC
+`;
+
+export const LIST_SUPPLY_ENTRIES_BY_HOME_AND_STATUS_SQL = `
+SELECT ${SUPPLY_ENTRY_COLUMNS}
+FROM supply_entries
+WHERE home_id = $1::uuid
+  AND status = $2
+ORDER BY
+  CASE WHEN status = 'OPEN' THEN created_at END ASC,
+  CASE WHEN status = 'OPEN' THEN id END ASC,
+  CASE WHEN status <> 'OPEN' THEN updated_at END DESC,
+  CASE WHEN status <> 'OPEN' THEN id END DESC
+`;
+
 /**
  * Membership-ending cleanup for active SupplyClaims. Exact Home + exact
  * Membership tenure only. Already-released rows stay historical. Never
@@ -178,6 +203,11 @@ export type SupplyRepository = Readonly<{
     supplyEntryId: string,
   ): Promise<readonly SupplyClaim[]>;
   listOpenEntriesByHome(homeId: string): Promise<readonly SupplyEntry[]>;
+  listSupplyEntriesByHome(homeId: string): Promise<readonly SupplyEntry[]>;
+  listSupplyEntriesByHomeAndStatus(
+    homeId: string,
+    status: SupplyEntryStatus,
+  ): Promise<readonly SupplyEntry[]>;
   releaseActiveClaimsForMembership(
     tx: TransactionContext,
     input: ReleaseMembershipClaims,
@@ -410,6 +440,40 @@ export function createSupplyRepository(pool: Pool): SupplyRepository {
         const result = await pool.query<SupplyEntryRow>(
           LIST_OPEN_ENTRIES_BY_HOME_SQL,
           [homeId],
+        );
+        return Object.freeze(
+          result.rows.map((row) => parseSupplyEntryRow(row, homeId)),
+        );
+      } catch (error) {
+        if (error instanceof SupplyPersistenceError) {
+          throw error;
+        }
+        throw new SupplyPersistenceError();
+      }
+    },
+
+    async listSupplyEntriesByHome(homeId) {
+      try {
+        const result = await pool.query<SupplyEntryRow>(
+          LIST_SUPPLY_ENTRIES_BY_HOME_SQL,
+          [homeId],
+        );
+        return Object.freeze(
+          result.rows.map((row) => parseSupplyEntryRow(row, homeId)),
+        );
+      } catch (error) {
+        if (error instanceof SupplyPersistenceError) {
+          throw error;
+        }
+        throw new SupplyPersistenceError();
+      }
+    },
+
+    async listSupplyEntriesByHomeAndStatus(homeId, status) {
+      try {
+        const result = await pool.query<SupplyEntryRow>(
+          LIST_SUPPLY_ENTRIES_BY_HOME_AND_STATUS_SQL,
+          [homeId, status],
         );
         return Object.freeze(
           result.rows.map((row) => parseSupplyEntryRow(row, homeId)),
