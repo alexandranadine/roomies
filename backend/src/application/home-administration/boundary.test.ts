@@ -202,4 +202,30 @@ void describe('home-administration application boundary', () => {
     assert.doesNotMatch(source, /SERIALIZABLE/);
     assert.doesNotMatch(source, /pg_advisory/i);
   });
+
+  void it('orchestrates invitation revocation without outbox, HTTP, or Date.now', async () => {
+    const source = await readFile(
+      path.join(dir, 'revoke-invitation.ts'),
+      'utf8',
+    );
+    assert.match(source, /lockHomeStructure/);
+    assert.match(source, /decideInvitationRevoke/);
+    assert.match(source, /lockById/);
+    assert.match(source, /revokeLocked/);
+    assert.match(source, /projectInvitationLifecycle/);
+    assert.match(source, /ADMIN_REVOKED/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /better-auth/);
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+    assert.doesNotMatch(source, /Date\.now/);
+    assert.doesNotMatch(source, /outbox/);
+    assert.doesNotMatch(source, /invitation\.revoked/);
+    assert.doesNotMatch(source, /membership\.started/);
+    assert.doesNotMatch(source, /Authorization: Invitation/);
+    assert.doesNotMatch(source, /tokenHash|rawSecret|inviteUrl/);
+    assert.doesNotMatch(source, /SERIALIZABLE/);
+    assert.doesNotMatch(source, /pg_advisory/i);
+    assert.doesNotMatch(source, /memberships\/repository/);
+    assert.doesNotMatch(source, /homes\/repository/);
+  });
 });

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import type { CreateInvitationInput } from '../application/home-administration/create-invitation.js';
+import type { RevokeInvitationInput } from '../application/home-administration/revoke-invitation.js';
 import {
   InvalidNormalizedEmailError,
   normalizeEmail,
@@ -24,6 +25,8 @@ const createInvitationBodySchema = z
     email: z.string(),
   })
   .strict();
+
+const revokeInvitationBodySchema = z.object({}).strict();
 
 export const createdInvitationDtoSchema = z
   .object({
@@ -51,12 +54,26 @@ export type CreateInvitationCommand = (
   rawSecret: string;
 }>;
 
+export type RevokeInvitationCommand = (
+  input: RevokeInvitationInput,
+) => Promise<void>;
+
 export type CreateInvitationsRouterOptions = {
   principalResolver: Pick<PrincipalResolver, 'requirePrincipal'>;
   activeHomeActorResolver: Pick<ActiveHomeActorResolver, 'resolve'>;
   createInvitation: CreateInvitationCommand;
+  revokeInvitation: RevokeInvitationCommand;
   frontendOrigin: string;
 };
+
+function parseRevokeInvitationBody(body: unknown): void {
+  if (body === undefined) {
+    return;
+  }
+  if (!revokeInvitationBodySchema.safeParse(body).success) {
+    throw new InvalidRequestError();
+  }
+}
 
 function parseCreateInvitationBody(body: unknown): string {
   const parsed = createInvitationBodySchema.safeParse(body);
@@ -136,6 +153,21 @@ export function createInvitationsRouter(
           rawSecret: created.rawSecret,
         }),
       );
+    })().catch(next);
+  });
+
+  router.post('/:homeId/invitations/:invitationId/revoke', (req, res, next) => {
+    void (async () => {
+      const actor = getActiveHomeActor(res);
+      const homeId = parsePathUuid(req.params['homeId']);
+      const invitationId = parsePathUuid(req.params['invitationId']);
+      parseRevokeInvitationBody(req.body);
+      await options.revokeInvitation({
+        actor,
+        homeId,
+        invitationId,
+      });
+      res.status(204).end();
     })().catch(next);
   });
 

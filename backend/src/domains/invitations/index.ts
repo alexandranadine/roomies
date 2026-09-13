@@ -4,6 +4,10 @@ export {
   type InvitationCreateDenial,
 } from './create-policy.js';
 export {
+  decideInvitationRevoke,
+  type InvitationRevokeDenial,
+} from './revoke-policy.js';
+export {
   InvalidInvitationAuthorizationError,
   parseInvitationAuthorization,
 } from './bearer.js';

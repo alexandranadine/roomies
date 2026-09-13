@@ -1,14 +1,10 @@
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { describe, it } from 'node:test';
 import type { Pool } from 'pg';
 import { createCreateInvitationFromPool } from '../application/home-administration/create-invitation.js';
 import { createRevokeInvitationFromPool } from '../application/home-administration/revoke-invitation.js';
 import { createHomeRepository } from '../domains/homes/index.js';
-import {
-  decodeInvitationSecret,
-  hashInvitationSecretBytes,
-} from '../domains/invitations/secret.js';
 import { createActiveHomeActorResolver } from '../domains/memberships/index.js';
 import {
   createCanonicalUserLookup,
@@ -33,7 +29,6 @@ import {
 } from '../platform/persistence/test-database.js';
 import { createDb } from '../prisma/db.js';
 import { createRoomiesApiRouter } from './create-roomies-api.js';
-import { createdInvitationDtoSchema } from './invitations.js';
 
 const TEST_SECRET = 'roomies_test_secret_32_chars_minimum_value';
 const TRUSTED_ORIGIN = 'http://127.0.0.1:5173';
@@ -68,12 +63,12 @@ function sessionCookieHeader(setCookie: string): string {
 
 async function insertHome(
   pool: Pool,
-  input: { id: string; name: string; archived?: boolean },
+  input: { id: string; name: string },
 ): Promise<void> {
   await pool.query(
-    `INSERT INTO homes (id, name, timezone, archived_at, updated_at)
-     VALUES ($1, $2, 'UTC', $3, NOW())`,
-    [input.id, input.name, input.archived === true ? new Date() : null],
+    `INSERT INTO homes (id, name, timezone, updated_at)
+     VALUES ($1, $2, 'UTC', NOW())`,
+    [input.id, input.name],
   );
 }
 
@@ -84,23 +79,56 @@ async function insertMembership(
     homeId: string;
     userId: string;
     role: 'ROOMMATE' | 'ADMIN';
-    ended?: boolean;
   },
 ): Promise<void> {
   await pool.query(
-    `INSERT INTO memberships (id, home_id, user_id, role, ended_at)
-     VALUES ($1, $2, $3, $4, $5)`,
+    `INSERT INTO memberships (id, home_id, user_id, role)
+     VALUES ($1, $2, $3, $4)`,
+    [input.id, input.homeId, input.userId, input.role],
+  );
+}
+
+async function insertInvitationRow(
+  pool: Pool,
+  input: {
+    id: string;
+    homeId: string;
+    email: string;
+    createdByMembershipId: string;
+    createdAt: Date;
+    expiresAt: Date;
+    acceptedAt?: Date;
+    acceptedMembershipId?: string;
+    revokedAt?: Date;
+  },
+): Promise<void> {
+  await pool.query(
+    `INSERT INTO invitations (
+       id, home_id, invited_email, token_hash, created_by_membership_id,
+       created_at, expires_at, accepted_at, accepted_membership_id,
+       revoked_at, revocation_cause
+     ) VALUES (
+       $1::uuid, $2::uuid, $3::text, $4::bytea, $5::uuid,
+       $6::timestamptz, $7::timestamptz, $8::timestamptz, $9::uuid,
+       $10::timestamptz, $11::text
+     )`,
     [
       input.id,
       input.homeId,
-      input.userId,
-      input.role,
-      input.ended === true ? new Date() : null,
+      normalizeEmail(input.email),
+      Buffer.from(randomBytes(32)),
+      input.createdByMembershipId,
+      input.createdAt,
+      input.expiresAt,
+      input.acceptedAt ?? null,
+      input.acceptedMembershipId ?? null,
+      input.revokedAt ?? null,
+      input.revokedAt === undefined ? null : 'ADMIN_REVOKED',
     ],
   );
 }
 
-void describe('POST invitation HTTP PostgreSQL', () => {
+void describe('POST invitation revoke HTTP PostgreSQL', () => {
   void it(
     'uses only a dedicated safe TEST_DATABASE_URL',
     { skip: skipWithoutDatabase },
@@ -113,7 +141,7 @@ void describe('POST invitation HTTP PostgreSQL', () => {
   );
 
   void it(
-    'covers Admin success, concealment, conflicts, and validation',
+    'covers Admin 204, Roommate 403, unavailable, origin, and privacy',
     { skip: skipWithoutDatabase, timeout: 60_000 },
     async () => {
       const databaseUrl = resolveSafeDedicatedTestDatabaseUrl();
@@ -162,7 +190,7 @@ void describe('POST invitation HTTP PostgreSQL', () => {
 
         await withAppServer(app, async (request) => {
           async function signUp(name: string) {
-            const email = `m22c-${name}-${randomUUID()}@example.test`;
+            const email = `m22f-${name}-${randomUUID()}@example.test`;
             const signup = await request({
               method: 'POST',
               path: '/api/auth/sign-up/email',
@@ -181,44 +209,53 @@ void describe('POST invitation HTTP PostgreSQL', () => {
             return { id, email, cookie: sessionCookieHeader(cookie) };
           }
 
-          async function invite(input: {
-            cookie: string;
+          async function revoke(input: {
+            cookie?: string;
             homeId: string;
-            email: string;
+            invitationId: string;
             origin?: string;
             rawBody?: string;
+            omitBody?: boolean;
           }) {
+            const headers: Record<string, string> = {
+              'content-type': 'application/json',
+            };
+            if (input.origin !== undefined) {
+              headers.Origin = input.origin;
+            } else if (input.origin !== null) {
+              headers.Origin = TRUSTED_ORIGIN;
+            }
+            if (input.cookie !== undefined) {
+              headers.Cookie = input.cookie;
+            }
+            if (input.origin === '') {
+              delete headers.Origin;
+            }
             return request({
               method: 'POST',
-              path: `/api/v1/homes/${input.homeId}/invitations`,
-              headers: {
-                Origin: input.origin ?? TRUSTED_ORIGIN,
-                Cookie: input.cookie,
-                'content-type': 'application/json',
-              },
-              body: input.rawBody ?? JSON.stringify({ email: input.email }),
+              path: `/api/v1/homes/${input.homeId}/invitations/${input.invitationId}/revoke`,
+              headers,
+              ...(input.omitBody === true
+                ? {}
+                : {
+                    body: input.rawBody ?? JSON.stringify({}),
+                  }),
             });
           }
 
           const admin = await signUp('Admin');
           const roommate = await signUp('Roommate');
-          const outsider = await signUp('Outsider');
+          const otherAdmin = await signUp('OtherAdmin');
 
           const homeA = randomUUID();
-          const archivedHome = randomUUID();
-          const missingHome = randomUUID();
-          homeIds.push(homeA, archivedHome);
-
+          const homeB = randomUUID();
+          homeIds.push(homeA, homeB);
           const membershipAdmin = randomUUID();
           const membershipRoommate = randomUUID();
-          const archivedMembership = randomUUID();
+          const membershipOther = randomUUID();
 
-          await insertHome(database.pool, { id: homeA, name: 'Invite Home' });
-          await insertHome(database.pool, {
-            id: archivedHome,
-            name: 'Archived',
-            archived: true,
-          });
+          await insertHome(database.pool, { id: homeA, name: 'Revoke Home A' });
+          await insertHome(database.pool, { id: homeB, name: 'Revoke Home B' });
           await insertMembership(database.pool, {
             id: membershipAdmin,
             homeId: homeA,
@@ -232,160 +269,45 @@ void describe('POST invitation HTTP PostgreSQL', () => {
             role: 'ROOMMATE',
           });
           await insertMembership(database.pool, {
-            id: archivedMembership,
-            homeId: archivedHome,
-            userId: admin.id,
+            id: membershipOther,
+            homeId: homeB,
+            userId: otherAdmin.id,
             role: 'ADMIN',
           });
 
-          const created = await invite({
-            cookie: admin.cookie,
-            homeId: homeA,
-            email: '  New.Roommate@Example.com ',
-          });
-          assert.equal(created.status, 201);
-          const afterTrusted = await database.pool.query<{ count: string }>(
-            `SELECT count(*)::text AS count
-             FROM invitations
-             WHERE home_id = $1`,
-            [homeA],
-          );
-          assert.equal(afterTrusted.rows[0]?.count, '1');
-          assert.equal(
-            created.headers.get('cache-control'),
-            'private, no-store',
-          );
-          const body = createdInvitationDtoSchema.parse(created.json());
-          assert.equal(body.invitation.email, 'new.roommate@example.com');
-          const inviteUrl = new URL(body.inviteUrl);
-          assert.equal(inviteUrl.origin, CANONICAL_FRONTEND_ORIGIN);
-          assert.notEqual(inviteUrl.origin, TRUSTED_ORIGIN);
-          assert.equal(
-            inviteUrl.pathname,
-            `/invitations/${body.invitation.id}`,
-          );
-          assert.equal(inviteUrl.search, '');
-          assert.match(inviteUrl.hash, /^#secret=/);
-          const rawSecret = inviteUrl.hash.slice('#secret='.length);
-          assert.ok(rawSecret.length > 0);
-          assert.equal(JSON.stringify(body).includes('tokenHash'), false);
-
-          const stored = await database.pool.query<{
-            token_hash: Uint8Array;
-            invited_email: string;
-          }>(
-            'SELECT token_hash, invited_email FROM invitations WHERE id = $1',
-            [body.invitation.id],
-          );
-          assert.equal(
-            stored.rows[0]?.invited_email,
-            normalizeEmail('new.roommate@example.com'),
-          );
-          assert.deepEqual(
-            [...(stored.rows[0]?.token_hash ?? [])],
-            [...hashInvitationSecretBytes(decodeInvitationSecret(rawSecret))],
-          );
-          assert.equal(
-            JSON.stringify(stored.rows[0]).includes(rawSecret),
-            false,
-          );
-
-          const roommateDenied = await invite({
-            cookie: roommate.cookie,
-            homeId: homeA,
-            email: `m22c-room-${randomUUID()}@example.test`,
-          });
-          assert.equal(roommateDenied.status, 403);
-          assert.equal(
-            (roommateDenied.json() as ApiErrorBody).error.code,
-            'FORBIDDEN',
-          );
-
-          const outsiderDenied = await invite({
-            cookie: outsider.cookie,
-            homeId: homeA,
-            email: `m22c-out-${randomUUID()}@example.test`,
-          });
-          assert.equal(outsiderDenied.status, 404);
-
-          const archived = await invite({
-            cookie: admin.cookie,
-            homeId: archivedHome,
-            email: `m22c-arch-${randomUUID()}@example.test`,
-          });
-          assert.equal(archived.status, 404);
-
-          const missing = await invite({
-            cookie: admin.cookie,
-            homeId: missingHome,
-            email: `m22c-miss-${randomUUID()}@example.test`,
-          });
-          assert.equal(missing.status, 404);
-
-          const duplicate = await invite({
-            cookie: admin.cookie,
-            homeId: homeA,
-            email: 'New.Roommate@Example.com',
-          });
-          assert.equal(duplicate.status, 409);
-          assert.equal(
-            (duplicate.json() as ApiErrorBody).error.code,
-            'INVITATION_ALREADY_PENDING',
-          );
-          assert.equal(duplicate.text.includes(rawSecret), false);
-
-          const alreadyMember = await invite({
-            cookie: admin.cookie,
-            homeId: homeA,
-            email: roommate.email,
-          });
-          assert.equal(alreadyMember.status, 409);
-          assert.equal(
-            (alreadyMember.json() as ApiErrorBody).error.code,
-            'ALREADY_HOME_MEMBER',
-          );
-
-          const malformed = await invite({
-            cookie: admin.cookie,
-            homeId: homeA,
-            email: 'unused',
-            rawBody: '{"email":',
-          });
-          assert.equal(malformed.status, 400);
-          assert.equal(
-            (malformed.json() as ApiErrorBody).error.code,
-            'BAD_REQUEST',
-          );
-
-          const extraField = await invite({
-            cookie: admin.cookie,
-            homeId: homeA,
-            email: 'unused',
-            rawBody: JSON.stringify({
-              email: 'extra@example.com',
-              role: 'ADMIN',
+          const created = await request({
+            method: 'POST',
+            path: `/api/v1/homes/${homeA}/invitations`,
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: admin.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({
+              email: `m22f-pending-${randomUUID()}@example.test`,
             }),
           });
-          assert.equal(extraField.status, 400);
+          assert.equal(created.status, 201);
+          const invitationId = (
+            created.json() as { invitation: { id: string } }
+          ).invitation.id;
+          const inviteUrl = (created.json() as { inviteUrl: string }).inviteUrl;
+          const rawSecret = new URL(inviteUrl).hash.slice('#secret='.length);
+
+          const unauthenticated = await revoke({
+            homeId: homeA,
+            invitationId,
+          });
+          assert.equal(unauthenticated.status, 401);
           assert.equal(
-            (extraField.json() as ApiErrorBody).error.code,
-            'INVALID_REQUEST',
+            (unauthenticated.json() as ApiErrorBody).error.code,
+            'UNAUTHENTICATED',
           );
 
-          const hostileEmail = `m22c-hostile-${randomUUID()}@example.test`;
-          const normalizedHostileEmail = normalizeEmail(hostileEmail);
-          const beforeHostile = await database.pool.query<{ count: string }>(
-            `SELECT count(*)::text AS count
-             FROM invitations
-             WHERE home_id = $1 AND invited_email = $2`,
-            [homeA, normalizedHostileEmail],
-          );
-          assert.equal(beforeHostile.rows[0]?.count, '0');
-
-          const hostile = await invite({
+          const hostile = await revoke({
             cookie: admin.cookie,
             homeId: homeA,
-            email: hostileEmail,
+            invitationId,
             origin: HOSTILE_ORIGIN,
           });
           assert.equal(hostile.status, 403);
@@ -393,29 +315,12 @@ void describe('POST invitation HTTP PostgreSQL', () => {
             (hostile.json() as ApiErrorBody).error.code,
             'FORBIDDEN',
           );
-          assert.equal(
-            (hostile.json() as ApiErrorBody).error.message,
-            'Forbidden',
-          );
-          assert.equal(
-            hostile.headers.get('access-control-allow-origin'),
-            null,
-          );
-          assert.equal('inviteUrl' in (hostile.json() as object), false);
-          assert.equal(hostile.text.includes('#secret='), false);
-          assert.equal(hostile.text.includes(HOSTILE_ORIGIN), false);
-          assert.equal(hostile.text.includes(TRUSTED_ORIGIN), false);
-          assert.equal(hostile.text.includes('TRUSTED_ORIGINS'), false);
 
-          const missingOriginEmail = `m22c-missing-${randomUUID()}@example.test`;
-          const missingOrigin = await request({
-            method: 'POST',
-            path: `/api/v1/homes/${homeA}/invitations`,
-            headers: {
-              Cookie: admin.cookie,
-              'content-type': 'application/json',
-            },
-            body: JSON.stringify({ email: missingOriginEmail }),
+          const missingOrigin = await revoke({
+            cookie: admin.cookie,
+            homeId: homeA,
+            invitationId,
+            origin: '',
           });
           assert.equal(missingOrigin.status, 403);
           assert.equal(
@@ -423,23 +328,134 @@ void describe('POST invitation HTTP PostgreSQL', () => {
             'FORBIDDEN',
           );
 
-          const afterHostile = await database.pool.query<{ count: string }>(
-            `SELECT count(*)::text AS count
-             FROM invitations
-             WHERE home_id = $1 AND invited_email = $2`,
-            [homeA, normalizedHostileEmail],
+          const roommateDenied = await revoke({
+            cookie: roommate.cookie,
+            homeId: homeA,
+            invitationId,
+          });
+          assert.equal(roommateDenied.status, 403);
+          assert.equal(
+            (roommateDenied.json() as ApiErrorBody).error.code,
+            'FORBIDDEN',
           );
-          assert.equal(afterHostile.rows[0]?.count, '0');
-          const afterMissing = await database.pool.query<{ count: string }>(
-            `SELECT count(*)::text AS count
-             FROM invitations
-             WHERE home_id = $1`,
-            [homeA],
+
+          const stillPending = await database.pool.query<{
+            revoked_at: Date | null;
+          }>('SELECT revoked_at FROM invitations WHERE id = $1', [
+            invitationId,
+          ]);
+          assert.equal(stillPending.rows[0]?.revoked_at, null);
+
+          const success = await revoke({
+            cookie: admin.cookie,
+            homeId: homeA,
+            invitationId,
+            omitBody: true,
+          });
+          assert.equal(success.status, 204);
+          assert.equal(success.text, '');
+          assert.equal(
+            success.headers.get('cache-control'),
+            'private, no-store',
           );
-          assert.equal(afterMissing.rows[0]?.count, '1');
+
+          const revoked = await database.pool.query<{
+            revoked_at: Date | null;
+            revocation_cause: string | null;
+            invited_email: string;
+          }>(
+            `SELECT revoked_at, revocation_cause, invited_email
+             FROM invitations WHERE id = $1`,
+            [invitationId],
+          );
+          assert.ok(revoked.rows[0]?.revoked_at instanceof Date);
+          assert.equal(revoked.rows[0]?.revocation_cause, 'ADMIN_REVOKED');
+
+          const already = await revoke({
+            cookie: admin.cookie,
+            homeId: homeA,
+            invitationId,
+          });
+          assert.equal(already.status, 404);
+          assert.equal(
+            (already.json() as ApiErrorBody).error.code,
+            'INVITATION_NOT_AVAILABLE',
+          );
+
+          const expiredId = randomUUID();
+          const acceptedId = randomUUID();
+          const foreignId = randomUUID();
+          await insertInvitationRow(database.pool, {
+            id: expiredId,
+            homeId: homeA,
+            email: `m22f-exp-${randomUUID()}@example.test`,
+            createdByMembershipId: membershipAdmin,
+            createdAt: new Date('2026-09-01T00:00:00.000Z'),
+            expiresAt: new Date('2026-09-08T00:00:00.000Z'),
+          });
+          await insertInvitationRow(database.pool, {
+            id: acceptedId,
+            homeId: homeA,
+            email: `m22f-acc-${randomUUID()}@example.test`,
+            createdByMembershipId: membershipAdmin,
+            createdAt: new Date('2026-10-01T00:00:00.000Z'),
+            expiresAt: new Date('2026-10-08T00:00:00.000Z'),
+            acceptedAt: new Date('2026-10-02T00:00:00.000Z'),
+            acceptedMembershipId: membershipRoommate,
+          });
+          await insertInvitationRow(database.pool, {
+            id: foreignId,
+            homeId: homeB,
+            email: `m22f-for-${randomUUID()}@example.test`,
+            createdByMembershipId: membershipOther,
+            createdAt: new Date('2026-10-01T00:00:00.000Z'),
+            expiresAt: new Date('2026-10-08T00:00:00.000Z'),
+          });
+
+          for (const invitation of [expiredId, acceptedId, foreignId]) {
+            const res = await revoke({
+              cookie: admin.cookie,
+              homeId: homeA,
+              invitationId: invitation,
+            });
+            assert.equal(res.status, 404);
+            assert.equal(
+              (res.json() as ApiErrorBody).error.code,
+              'INVITATION_NOT_AVAILABLE',
+            );
+            assertNoForbiddenLeak({
+              context: 'revoke unavailable',
+              text: res.text,
+              forbidden: [
+                ...COMMON_SECRET_SENTINELS,
+                rawSecret,
+                revoked.rows[0]?.invited_email ?? '',
+                'token_hash',
+                'tokenHash',
+                homeB,
+              ],
+            });
+          }
+
+          const foreignUnchanged = await database.pool.query<{
+            revoked_at: Date | null;
+          }>('SELECT revoked_at FROM invitations WHERE id = $1', [foreignId]);
+          assert.equal(foreignUnchanged.rows[0]?.revoked_at, null);
+
+          const extraField = await revoke({
+            cookie: admin.cookie,
+            homeId: homeA,
+            invitationId: expiredId,
+            rawBody: JSON.stringify({ reason: 'nope' }),
+          });
+          assert.equal(extraField.status, 400);
+          assert.equal(
+            (extraField.json() as ApiErrorBody).error.code,
+            'INVALID_REQUEST',
+          );
 
           assertNoForbiddenLeak({
-            context: 'invitation HTTP logs',
+            context: 'revoke HTTP logs',
             text: logs.join('\n'),
             forbidden: [...COMMON_SECRET_SENTINELS, rawSecret, PASSWORD],
           });

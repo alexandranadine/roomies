@@ -80,6 +80,19 @@ WHERE id = $3::uuid
   AND expires_at > $1::timestamptz
 `;
 
+export const REVOKE_LOCKED_INVITATION_SQL = `
+UPDATE invitations
+SET revoked_at = $1::timestamptz,
+    revocation_cause = $2::text
+WHERE id = $3::uuid
+  AND home_id = $4::uuid
+  AND accepted_at IS NULL
+  AND accepted_membership_id IS NULL
+  AND revoked_at IS NULL
+  AND revocation_cause IS NULL
+  AND expires_at > $1::timestamptz
+`;
+
 export const FIND_EFFECTIVE_PENDING_INVITATION_SQL = `
 SELECT ${INVITATION_COLUMNS}
 FROM invitations
@@ -237,6 +250,15 @@ export type InvitationRepository = Readonly<{
       acceptedAt: Date;
     },
   ): Promise<number>;
+  revokeLocked(
+    tx: TransactionContext,
+    input: {
+      invitationId: string;
+      homeId: string;
+      revokedAt: Date;
+      cause: InvitationRevocationCause;
+    },
+  ): Promise<number>;
   findEffectivePending(
     tx: TransactionContext,
     input: { homeId: string; invitedEmail: NormalizedEmail; at: Date },
@@ -333,6 +355,20 @@ export function createInvitationRepository(pool: Pool): InvitationRepository {
         const result = await tx.query(ACCEPT_LOCKED_INVITATION_SQL, [
           input.acceptedAt,
           input.membershipId,
+          input.invitationId,
+          input.homeId,
+        ]);
+        return result.rowCount ?? 0;
+      } catch {
+        throw new InvitationPersistenceError();
+      }
+    },
+
+    async revokeLocked(tx, input) {
+      try {
+        const result = await tx.query(REVOKE_LOCKED_INVITATION_SQL, [
+          input.revokedAt,
+          input.cause,
           input.invitationId,
           input.homeId,
         ]);

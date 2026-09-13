@@ -98,6 +98,8 @@ function buildApp(
               rawSecret: RAW_SECRET,
             };
           },
+          revokeInvitation: () =>
+            Promise.reject(new Error('revoke must not run for create tests')),
         },
       }),
     }),

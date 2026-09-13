@@ -24,6 +24,7 @@ import {
 import {
   createInvitationsRouter,
   type CreateInvitationCommand,
+  type RevokeInvitationCommand,
 } from './invitations.js';
 
 export type CreateRoomiesApiRouterOptions = {
@@ -36,6 +37,7 @@ export type CreateRoomiesApiRouterOptions = {
   removeMembership: RemoveMembershipCommand;
   invitations?: {
     createInvitation: CreateInvitationCommand;
+    revokeInvitation: RevokeInvitationCommand;
     frontendOrigin: string;
   };
   previewInvitation?: PreviewInvitationCommand;
@@ -60,6 +62,7 @@ export function createRoomiesApiRouter(
         principalResolver: options.principalResolver,
         activeHomeActorResolver: options.activeHomeActorResolver,
         createInvitation: options.invitations.createInvitation,
+        revokeInvitation: options.invitations.revokeInvitation,
         frontendOrigin: options.invitations.frontendOrigin,
       }),
     );
