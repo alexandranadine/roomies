@@ -78,7 +78,12 @@ void describe('temporary no-op membership ending cleanup adapters', () => {
     );
 
     assert.match(taskSource, /TEMPORARY no-op Task cleanup/);
-    assert.match(taskSource, /MUST be[\s\S]*replaced when M3 Tasks ships/);
+    assert.match(taskSource, /Task persistence tables now exist/);
+    assert.match(
+      taskSource,
+      /intentionally remains a no-op until[\s\S]*Task application behavior is implemented/,
+    );
+    assert.doesNotMatch(taskSource, /do not exist yet/);
     assert.match(taskSource, /createTemporaryNoOpMembershipEndingTaskCleanup/);
     assert.doesNotMatch(taskSource, /end-membership-within-home-structure/);
     assert.doesNotMatch(taskSource, /pool\.connect/);
