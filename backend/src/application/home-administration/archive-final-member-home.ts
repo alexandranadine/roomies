@@ -25,7 +25,7 @@ import {
 import type { Clock } from '../../platform/time/clock.js';
 import { systemClock } from '../../platform/time/clock.js';
 import {
-  createApplyMembershipEndingWithinHomeStructureWithTemporaryNoOpCleanup,
+  createApplyMembershipEndingWithinHomeStructureFromPool,
   type ApplyMembershipEndingWithinHomeStructure,
 } from './end-membership-within-home-structure.js';
 import { createInvitationHomeArchiveCleanupFromPool } from '../../domains/invitations/home-archive-cleanup.js';
@@ -143,7 +143,7 @@ export function createArchiveFinalMemberHomeFromPool(
       pool as Parameters<typeof createInvitationHomeArchiveCleanupFromPool>[0],
     ),
     applyMembershipEnding:
-      createApplyMembershipEndingWithinHomeStructureWithTemporaryNoOpCleanup(),
+      createApplyMembershipEndingWithinHomeStructureFromPool(pool),
     homeArchive: createHomeArchiveWriter(),
     outbox: outboxWriter,
     ids: systemUuidV7,

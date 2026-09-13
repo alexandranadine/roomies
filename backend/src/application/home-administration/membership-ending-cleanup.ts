@@ -15,7 +15,7 @@ export type MembershipEndingCleanupInput = Readonly<{
 
 /**
  * Public Task-module port for synchronous membership-ending consequences.
- * M3 Tasks will replace the temporary no-op adapter that implements this.
+ * Tasks implements this via createMembershipEndingTaskCleanup.
  */
 export type MembershipEndingTaskCleanup = {
   handleMembershipEnded(

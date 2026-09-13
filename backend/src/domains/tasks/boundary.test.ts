@@ -32,6 +32,7 @@ void describe('tasks domain boundary', () => {
       assert.doesNotMatch(source, /active-home-actor-lookup/, rel);
       assert.doesNotMatch(source, /homes\/repository/, rel);
       assert.doesNotMatch(source, /home-repository/, rel);
+      assert.doesNotMatch(source, /home-administration/, rel);
     }
   });
 
@@ -54,6 +55,8 @@ void describe('tasks domain boundary', () => {
     assert.match(source, /findByHomeAndId/);
     assert.match(source, /lockByHomeAndId/);
     assert.match(source, /completeOpenTask/);
+    assert.match(source, /unassignOpenTasksForMembership/);
+    assert.match(source, /unassignActiveDefinitionsForMembership/);
     assert.match(source, /scheduled_for::text/);
     assert.match(source, /\$4::date/);
     assert.match(source, /'MANUAL'/);
@@ -62,14 +65,21 @@ void describe('tasks domain boundary', () => {
     assert.match(source, /NULLS LAST/);
     assert.match(source, /FOR UPDATE/i);
     assert.match(source, /completed_at IS NULL/);
+    assert.match(source, /UNASSIGN_OPEN_TASK_INSTANCES_FOR_MEMBERSHIP_SQL/);
+    assert.match(source, /UNASSIGN_ACTIVE_TASK_DEFINITIONS_FOR_MEMBERSHIP_SQL/);
+    assert.match(source, /home_id = \$1::uuid/);
+    assert.match(source, /assigned_membership_id = \$2::uuid/);
+    assert.match(source, /status = 'OPEN'/);
+    assert.match(source, /deactivated_at IS NULL/);
     assert.doesNotMatch(source, /findById\(/);
     assert.doesNotMatch(source, /new Date\(/);
     assert.doesNotMatch(source, /Date\.UTC/);
-    assert.doesNotMatch(source, /task_definitions/);
+    assert.doesNotMatch(source, /creator_membership_id =/);
     assert.doesNotMatch(source, /outbox/);
     assert.doesNotMatch(source, /from ['"]express['"]/);
     assert.doesNotMatch(source, /better-auth/);
     assert.doesNotMatch(source, /user_id/);
+    assert.doesNotMatch(source, /home-administration/);
   });
 
   void it('keeps Task policies free of Home-read authz and Admin bypass', async () => {

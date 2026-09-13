@@ -69,8 +69,15 @@ void describe('home-administration application boundary', () => {
     assert.doesNotMatch(source, /ForbiddenError/);
     assert.match(source, /handleMembershipEnded/);
     assert.match(source, /createMembershipEndedV1Event/);
-    assert.match(source, /createTemporaryNoOpMembershipEndingTaskCleanup/);
+    assert.match(source, /createMembershipEndingTaskCleanupFromPool/);
     assert.match(source, /createTemporaryNoOpMembershipEndingSupplyCleanup/);
+    assert.doesNotMatch(
+      source,
+      /createTemporaryNoOpMembershipEndingTaskCleanup/,
+    );
+    assert.doesNotMatch(source, /tasks\/repository/);
+    assert.doesNotMatch(source, /FROM\s+task_instances/i);
+    assert.doesNotMatch(source, /FROM\s+task_definitions/i);
   });
 
   void it('orchestrates voluntary leave through the locked structure and ending seam', async () => {
@@ -96,11 +103,13 @@ void describe('home-administration application boundary', () => {
     assert.match(source, /decideMembershipLeave/);
     assert.match(source, /decideMembershipLeaveSelf/);
     assert.match(source, /VOLUNTARY_LEAVE/);
-    assert.match(
-      source,
-      /createEndMembershipWithinHomeStructureWithTemporaryNoOpCleanup/,
-    );
+    assert.match(source, /createEndMembershipWithinHomeStructureFromPool/);
     assert.doesNotMatch(source, /endMembership\?:/);
+    assert.doesNotMatch(source, /tasks\/repository/);
+    assert.ok(
+      source.lastIndexOf('deps.clock.now()') >
+        source.lastIndexOf('lockHomeStructure(tx'),
+    );
   });
 
   void it('orchestrates admin remove through the locked structure and ending seam', async () => {
@@ -128,11 +137,13 @@ void describe('home-administration application boundary', () => {
     assert.match(source, /decideMembershipRemove/);
     assert.match(source, /decideMembershipRemoveSelf/);
     assert.match(source, /ADMIN_REMOVAL/);
-    assert.match(
-      source,
-      /createEndMembershipWithinHomeStructureWithTemporaryNoOpCleanup/,
-    );
+    assert.match(source, /createEndMembershipWithinHomeStructureFromPool/);
     assert.doesNotMatch(source, /endMembership\?:/);
+    assert.doesNotMatch(source, /tasks\/repository/);
+    assert.ok(
+      source.lastIndexOf('deps.clock.now()') >
+        source.lastIndexOf('lockHomeStructure(tx'),
+    );
   });
 
   void it('owns final archive sequencing without repository or fake lock infrastructure', async () => {
@@ -150,8 +161,13 @@ void describe('home-administration application boundary', () => {
     assert.match(source, /lockHomeStructure/);
     assert.match(source, /decideArchiveFinalMember/);
     assert.match(source, /createInvitationHomeArchiveCleanupFromPool/);
+    assert.match(
+      source,
+      /createApplyMembershipEndingWithinHomeStructureFromPool/,
+    );
     assert.match(source, /applyMembershipEnding/);
     assert.match(source, /archiveActiveHome/);
+    assert.doesNotMatch(source, /tasks\/repository/);
     assert.doesNotMatch(
       source,
       /TemporaryNoOpFinalMemberArchiveInvitationRevoker/,
@@ -162,20 +178,33 @@ void describe('home-administration application boundary', () => {
       source.lastIndexOf('createMembershipEndedV1Event') <
         source.lastIndexOf('createHomeArchivedV1Event'),
     );
+    assert.ok(
+      source.lastIndexOf('deps.clock.now()') >
+        source.lastIndexOf('lockHomeStructure(tx'),
+    );
+    assert.ok(
+      source.lastIndexOf('deps.clock.now()') >
+        source.lastIndexOf('decideArchiveFinalMember'),
+    );
   });
 
-  void it('makes temporary Task/Supply no-op replacement obligatory and explicit', async () => {
+  void it('makes Task cleanup public-seam-only and Supply no-op replacement obligatory', async () => {
     const composition = await readFile(
       path.join(dir, 'end-membership-within-home-structure.ts'),
       'utf8',
     );
-    assert.match(
-      composition,
-      /createEndMembershipWithinHomeStructureWithTemporaryNoOpCleanup/,
-    );
-    assert.match(composition, /MUST be replaced when M3 Tasks \/ M4 Supplies/);
+    assert.match(composition, /createEndMembershipWithinHomeStructureFromPool/);
+    assert.match(composition, /createMembershipEndingTaskCleanupFromPool/);
+    assert.match(composition, /MUST be replaced when M4 Supplies/);
     assert.doesNotMatch(composition, /taskCleanup\?:/);
     assert.doesNotMatch(composition, /supplyCleanup\?:/);
+    assert.doesNotMatch(
+      composition,
+      /createTemporaryNoOpMembershipEndingTaskCleanup/,
+    );
+    assert.doesNotMatch(composition, /tasks\/repository/);
+    assert.doesNotMatch(composition, /FROM\s+task_instances/i);
+    assert.doesNotMatch(composition, /FROM\s+task_definitions/i);
 
     const files = await walkProduction(dir);
     for (const file of files) {
@@ -183,6 +212,7 @@ void describe('home-administration application boundary', () => {
       const rel = file.replaceAll('\\', '/');
       assert.doesNotMatch(source, /memberships\/repository/, rel);
       assert.doesNotMatch(source, /homes\/repository/, rel);
+      assert.doesNotMatch(source, /tasks\/repository/, rel);
       assert.doesNotMatch(source, /from ['"]express['"]/, rel);
       assert.doesNotMatch(source, /better-auth/, rel);
       assert.doesNotMatch(source, /from ['"]pg['"]/, rel);

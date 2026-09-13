@@ -92,6 +92,35 @@ WHERE home_id = $1::uuid
 RETURNING ${TASK_INSTANCE_COLUMNS}
 `;
 
+/**
+ * Membership-ending cleanup for OPEN TaskInstances. Exact Home + exact
+ * Membership tenure only. COMPLETED rows keep historical assignment.
+ */
+export const UNASSIGN_OPEN_TASK_INSTANCES_FOR_MEMBERSHIP_SQL = `
+UPDATE task_instances
+SET
+  assigned_membership_id = NULL,
+  updated_at = $3::timestamptz
+WHERE home_id = $1::uuid
+  AND assigned_membership_id = $2::uuid
+  AND status = 'OPEN'
+`;
+
+/**
+ * Membership-ending cleanup for active TaskDefinitions. Exact Home + exact
+ * Membership tenure only. Deactivated rows keep historical assignment.
+ * creator_membership_id is never written.
+ */
+export const UNASSIGN_ACTIVE_TASK_DEFINITIONS_FOR_MEMBERSHIP_SQL = `
+UPDATE task_definitions
+SET
+  assigned_membership_id = NULL,
+  updated_at = $3::timestamptz
+WHERE home_id = $1::uuid
+  AND assigned_membership_id = $2::uuid
+  AND deactivated_at IS NULL
+`;
+
 export type NewManualTaskInstance = Readonly<{
   id: string;
   homeId: string;
@@ -105,6 +134,12 @@ export type CompleteOpenTaskInstance = Readonly<{
   homeId: string;
   taskId: string;
   completedAt: Date;
+  updatedAt: Date;
+}>;
+
+export type UnassignMembershipAssignments = Readonly<{
+  homeId: string;
+  membershipId: string;
   updatedAt: Date;
 }>;
 
@@ -124,6 +159,14 @@ export type TaskRepository = Readonly<{
     tx: TransactionContext,
     input: CompleteOpenTaskInstance,
   ): Promise<TaskInstance | null>;
+  unassignOpenTasksForMembership(
+    tx: TransactionContext,
+    input: UnassignMembershipAssignments,
+  ): Promise<number>;
+  unassignActiveDefinitionsForMembership(
+    tx: TransactionContext,
+    input: UnassignMembershipAssignments,
+  ): Promise<number>;
 }>;
 
 type TaskInstanceRow = {
@@ -329,6 +372,36 @@ export function createTaskRepository(pool: Pool): TaskRepository {
         return null;
       }
       return oneRow(rows, input.homeId);
+    },
+
+    async unassignOpenTasksForMembership(tx, input) {
+      try {
+        const result = await tx.query(
+          UNASSIGN_OPEN_TASK_INSTANCES_FOR_MEMBERSHIP_SQL,
+          [input.homeId, input.membershipId, input.updatedAt],
+        );
+        return result.rowCount ?? 0;
+      } catch (error) {
+        if (error instanceof TaskPersistenceError) {
+          throw error;
+        }
+        throw new TaskPersistenceError();
+      }
+    },
+
+    async unassignActiveDefinitionsForMembership(tx, input) {
+      try {
+        const result = await tx.query(
+          UNASSIGN_ACTIVE_TASK_DEFINITIONS_FOR_MEMBERSHIP_SQL,
+          [input.homeId, input.membershipId, input.updatedAt],
+        );
+        return result.rowCount ?? 0;
+      } catch (error) {
+        if (error instanceof TaskPersistenceError) {
+          throw error;
+        }
+        throw new TaskPersistenceError();
+      }
     },
   });
 }

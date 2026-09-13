@@ -23,8 +23,10 @@ import {
 } from '../../platform/persistence/transaction.js';
 import type { Clock } from '../../platform/time/clock.js';
 import { systemClock } from '../../platform/time/clock.js';
-import type { EndMembershipWithinHomeStructure } from './end-membership-within-home-structure.js';
-import { createEndMembershipWithinHomeStructureWithTemporaryNoOpCleanup } from './end-membership-within-home-structure.js';
+import {
+  createEndMembershipWithinHomeStructureFromPool,
+  type EndMembershipWithinHomeStructure,
+} from './end-membership-within-home-structure.js';
 
 export type LeaveMembershipDependencies = {
   runTransaction: <T>(
@@ -48,8 +50,6 @@ export function createLeaveMembership(
   deps: LeaveMembershipDependencies,
 ): (input: LeaveMembershipInput) => Promise<void> {
   return async (input) => {
-    const endedAt = deps.clock.now();
-
     await deps.runTransaction(async (tx) => {
       const locked = await deps.lockHomeStructure(tx, {
         homeId: input.homeId,
@@ -89,6 +89,8 @@ export function createLeaveMembership(
         throw new LastAdminRequiredError();
       }
 
+      const endedAt = deps.clock.now();
+
       await deps.endMembership(tx, {
         homeId: locked.home.id,
         membershipId: locked.actor.membershipId,
@@ -106,7 +108,6 @@ export function createLeaveMembershipFromPool(
     runTransaction: (work) => runInReadCommittedTransaction(pool, work),
     lockHomeStructure,
     clock: systemClock,
-    endMembership:
-      createEndMembershipWithinHomeStructureWithTemporaryNoOpCleanup(),
+    endMembership: createEndMembershipWithinHomeStructureFromPool(pool),
   });
 }

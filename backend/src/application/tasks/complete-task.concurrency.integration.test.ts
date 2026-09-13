@@ -4,8 +4,8 @@ import { describe, it } from 'node:test';
 import type { Pool } from 'pg';
 import { createArchiveFinalMemberHome } from '../home-administration/archive-final-member-home.js';
 import {
-  createApplyMembershipEndingWithinHomeStructureWithTemporaryNoOpCleanup,
-  createEndMembershipWithinHomeStructureWithTemporaryNoOpCleanup,
+  createApplyMembershipEndingWithinHomeStructureFromPool,
+  createEndMembershipWithinHomeStructureFromPool,
 } from '../home-administration/end-membership-within-home-structure.js';
 import { createLeaveMembership } from '../home-administration/leave-membership.js';
 import { createHomeArchiveWriter } from '../../domains/homes/archive-home.js';
@@ -221,7 +221,7 @@ function archiveCommand(
     clock: systemClock,
     invitationRevoker: createInvitationHomeArchiveCleanupFromPool(pool),
     applyMembershipEnding:
-      createApplyMembershipEndingWithinHomeStructureWithTemporaryNoOpCleanup(),
+      createApplyMembershipEndingWithinHomeStructureFromPool(pool),
     homeArchive: createHomeArchiveWriter(),
     outbox: outboxWriter,
     ids: systemUuidV7,
@@ -248,8 +248,7 @@ function leaveCommand(
       return locked;
     },
     clock: systemClock,
-    endMembership:
-      createEndMembershipWithinHomeStructureWithTemporaryNoOpCleanup(),
+    endMembership: createEndMembershipWithinHomeStructureFromPool(pool),
   });
 }
 

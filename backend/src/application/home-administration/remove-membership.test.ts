@@ -69,11 +69,23 @@ function adminRoommateHome(): LockedHomeStructure {
 
 function commandOf(options: { locked: LockedHomeStructure; endError?: Error }) {
   const endings: EndMembershipWithinHomeStructureInput[] = [];
+  const steps: string[] = [];
+  let clockCalls = 0;
   const remove = createRemoveMembership({
     runTransaction: async (work) => work({} as TransactionContext),
-    lockHomeStructure: () => Promise.resolve(options.locked),
-    clock: { now: () => ENDED_AT },
+    lockHomeStructure: () => {
+      steps.push('lock-home-structure');
+      return Promise.resolve(options.locked);
+    },
+    clock: {
+      now() {
+        clockCalls += 1;
+        steps.push('clock-now');
+        return ENDED_AT;
+      },
+    },
     endMembership(_tx, input) {
+      steps.push('end-membership');
       if (options.endError) {
         return Promise.reject(options.endError);
       }
@@ -81,7 +93,7 @@ function commandOf(options: { locked: LockedHomeStructure; endError?: Error }) {
       return Promise.resolve({ membershipId: input.membershipId });
     },
   });
-  return { remove, endings };
+  return { remove, endings, steps, clockCalls: () => clockCalls };
 }
 
 function input(
@@ -97,7 +109,9 @@ function input(
 
 void describe('removeMembership application orchestration', () => {
   void it('allows an Admin to remove a Roommate through the ending seam', async () => {
-    const { remove, endings } = commandOf({ locked: adminRoommateHome() });
+    const { remove, endings, steps, clockCalls } = commandOf({
+      locked: adminRoommateHome(),
+    });
 
     await remove(input({ membershipId: MEMBERSHIP_B }));
 
@@ -109,10 +123,18 @@ void describe('removeMembership application orchestration', () => {
         cause: 'ADMIN_REMOVAL',
       },
     ]);
+    assert.deepEqual(steps, [
+      'lock-home-structure',
+      'clock-now',
+      'end-membership',
+    ]);
+    assert.equal(clockCalls(), 1);
   });
 
   void it('allows an Admin to remove another Admin when an Admin remains', async () => {
-    const { remove, endings } = commandOf({ locked: twoAdminHome() });
+    const { remove, endings, steps, clockCalls } = commandOf({
+      locked: twoAdminHome(),
+    });
 
     await remove(input({ membershipId: MEMBERSHIP_B }));
 
@@ -124,10 +146,16 @@ void describe('removeMembership application orchestration', () => {
         cause: 'ADMIN_REMOVAL',
       },
     ]);
+    assert.deepEqual(steps, [
+      'lock-home-structure',
+      'clock-now',
+      'end-membership',
+    ]);
+    assert.equal(clockCalls(), 1);
   });
 
   void it('forbids a Roommate before target lookup so existence is not leaked', async () => {
-    const { remove, endings } = commandOf({
+    const { remove, endings, clockCalls } = commandOf({
       locked: structure(
         [
           { id: MEMBERSHIP_A, userId: USER_A, homeId: HOME, role: 'ROOMMATE' },
@@ -158,10 +186,13 @@ void describe('removeMembership application orchestration', () => {
       ForbiddenError,
     );
     assert.deepEqual(endings, []);
+    assert.equal(clockCalls(), 0);
   });
 
   void it('forbids self-remove without treating it as leave or archive', async () => {
-    const { remove, endings } = commandOf({ locked: adminRoommateHome() });
+    const { remove, endings, clockCalls } = commandOf({
+      locked: adminRoommateHome(),
+    });
 
     await assert.rejects(
       () => remove(input({ membershipId: MEMBERSHIP_A })),
@@ -175,10 +206,11 @@ void describe('removeMembership application orchestration', () => {
         !(error instanceof LastAdminRequiredError),
     );
     assert.deepEqual(endings, []);
+    assert.equal(clockCalls(), 0);
   });
 
   void it('forbids sole-Admin self-remove without LAST_ROOMMATE_REQUIRES_ARCHIVE', async () => {
-    const { remove, endings } = commandOf({
+    const { remove, endings, clockCalls } = commandOf({
       locked: structure([
         { id: MEMBERSHIP_A, userId: USER_A, homeId: HOME, role: 'ADMIN' },
       ]),
@@ -193,10 +225,11 @@ void describe('removeMembership application orchestration', () => {
       (error: unknown) => !(error instanceof LastRoommateRequiresArchiveError),
     );
     assert.deepEqual(endings, []);
+    assert.equal(clockCalls(), 0);
   });
 
   void it('rejects a proposed zero-Admin remaining set without invoking the seam', async () => {
-    const { remove, endings } = commandOf({
+    const { remove, endings, steps, clockCalls } = commandOf({
       locked: structure(
         [
           { id: MEMBERSHIP_A, userId: USER_A, homeId: HOME, role: 'ROOMMATE' },
@@ -215,10 +248,12 @@ void describe('removeMembership application orchestration', () => {
       LastAdminRequiredError,
     );
     assert.deepEqual(endings, []);
+    assert.deepEqual(steps, ['lock-home-structure']);
+    assert.equal(clockCalls(), 0);
   });
 
   void it('treats a current zero-Admin snapshot as structural integrity before policy', async () => {
-    const { remove, endings } = commandOf({
+    const { remove, endings, clockCalls } = commandOf({
       locked: structure([
         { id: MEMBERSHIP_A, userId: USER_A, homeId: HOME, role: 'ROOMMATE' },
         { id: MEMBERSHIP_B, userId: USER_B, homeId: HOME, role: 'ROOMMATE' },
@@ -227,10 +262,11 @@ void describe('removeMembership application orchestration', () => {
 
     await assert.rejects(() => remove(input()), StructuralIntegrityError);
     assert.deepEqual(endings, []);
+    assert.equal(clockCalls(), 0);
   });
 
   void it('authorizes from the locked role when the HTTP snapshot is stale ADMIN', async () => {
-    const { remove, endings } = commandOf({
+    const { remove, endings, clockCalls } = commandOf({
       locked: structure(
         [
           { id: MEMBERSHIP_A, userId: USER_A, homeId: HOME, role: 'ROOMMATE' },
@@ -251,10 +287,13 @@ void describe('removeMembership application orchestration', () => {
       ForbiddenError,
     );
     assert.deepEqual(endings, []);
+    assert.equal(clockCalls(), 0);
   });
 
   void it('conceals a target that is not in the locked active set', async () => {
-    const { remove, endings } = commandOf({ locked: adminRoommateHome() });
+    const { remove, endings, clockCalls } = commandOf({
+      locked: adminRoommateHome(),
+    });
 
     await assert.rejects(
       () => remove(input({ membershipId: MEMBERSHIP_OLD })),
@@ -265,10 +304,13 @@ void describe('removeMembership application orchestration', () => {
       ConcealedNotFoundError,
     );
     assert.deepEqual(endings, []);
+    assert.equal(clockCalls(), 0);
   });
 
   void it('ends the locked Home target, not a remapped request Home id', async () => {
-    const { remove, endings } = commandOf({ locked: adminRoommateHome() });
+    const { remove, endings, clockCalls } = commandOf({
+      locked: adminRoommateHome(),
+    });
 
     await remove(
       input({
@@ -280,10 +322,11 @@ void describe('removeMembership application orchestration', () => {
     assert.equal(endings[0]?.homeId, HOME);
     assert.equal(endings[0]?.membershipId, MEMBERSHIP_B);
     assert.equal(endings[0]?.cause, 'ADMIN_REMOVAL');
+    assert.equal(clockCalls(), 1);
   });
 
   void it('does not invoke the ending seam when authorization fails', async () => {
-    const { remove, endings } = commandOf({
+    const { remove, endings, clockCalls } = commandOf({
       locked: structure(
         [
           { id: MEMBERSHIP_A, userId: USER_A, homeId: HOME, role: 'ROOMMATE' },
@@ -304,5 +347,51 @@ void describe('removeMembership application orchestration', () => {
       ForbiddenError,
     );
     assert.deepEqual(endings, []);
+    assert.equal(clockCalls(), 0);
+  });
+
+  void it('does not request clock.now until the Home structural lock is established', async () => {
+    let lockResolved = false;
+    let clockBeforeLock = false;
+    let resolveLock!: () => void;
+    const lockHeld = new Promise<void>((resolve) => {
+      resolveLock = resolve;
+    });
+    let resolveReached!: () => void;
+    const reachedLock = new Promise<void>((resolve) => {
+      resolveReached = resolve;
+    });
+    let clockCalls = 0;
+
+    const remove = createRemoveMembership({
+      clock: {
+        now() {
+          clockCalls += 1;
+          if (!lockResolved) {
+            clockBeforeLock = true;
+          }
+          return ENDED_AT;
+        },
+      },
+      runTransaction: async (work) => work({} as TransactionContext),
+      lockHomeStructure: async () => {
+        resolveReached();
+        await lockHeld;
+        lockResolved = true;
+        return adminRoommateHome();
+      },
+      endMembership: () => Promise.resolve({ membershipId: MEMBERSHIP_B }),
+    });
+
+    const pending = remove(input({ membershipId: MEMBERSHIP_B }));
+    await reachedLock;
+    assert.equal(lockResolved, false);
+    assert.equal(clockBeforeLock, false);
+    assert.equal(clockCalls, 0);
+    resolveLock();
+    await pending;
+    assert.equal(lockResolved, true);
+    assert.equal(clockBeforeLock, false);
+    assert.equal(clockCalls, 1);
   });
 });

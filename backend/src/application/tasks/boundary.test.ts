@@ -120,23 +120,41 @@ void describe('tasks application boundary', () => {
     }
   });
 
-  void it('leaves Membership-ending Task cleanup as the temporary no-op', async () => {
+  void it('owns Membership-ending Task cleanup without Home-administration internals', async () => {
     const cleanup = await readFile(
-      path.join(endingDir, 'temporary-noop-membership-ending-task-cleanup.ts'),
+      path.join(dir, 'membership-ending-task-cleanup.ts'),
       'utf8',
     );
     const composition = await readFile(
       path.join(endingDir, 'end-membership-within-home-structure.ts'),
       'utf8',
     );
-    assert.match(cleanup, /TEMPORARY no-op Task cleanup/);
-    assert.match(
+    assert.match(cleanup, /createMembershipEndingTaskCleanup/);
+    assert.match(cleanup, /unassignOpenTasksForMembership/);
+    assert.match(cleanup, /unassignActiveDefinitionsForMembership/);
+    assert.match(cleanup, /updatedAt: input.endedAt/);
+    assert.doesNotMatch(cleanup, /home-administration/);
+    assert.doesNotMatch(cleanup, /memberships\/repository/);
+    assert.doesNotMatch(cleanup, /homes\/repository/);
+    assert.doesNotMatch(cleanup, /from ['"]pg['"]/);
+    assert.doesNotMatch(cleanup, /Date\.now/);
+    assert.doesNotMatch(cleanup, /new Date\(/);
+    assert.doesNotMatch(cleanup, /clock/i);
+    assert.doesNotMatch(cleanup, /outbox/);
+    assert.doesNotMatch(cleanup, /task\.unassigned/);
+    assert.doesNotMatch(cleanup, /BEGIN/);
+    assert.doesNotMatch(cleanup, /COMMIT/);
+    assert.doesNotMatch(cleanup, /runInReadCommittedTransaction/);
+    assert.doesNotMatch(cleanup, /lockHomeStructure/);
+    assert.doesNotMatch(cleanup, /lockHomeAndExactMemberships/);
+    assert.match(composition, /createEndMembershipWithinHomeStructureFromPool/);
+    assert.match(composition, /createMembershipEndingTaskCleanupFromPool/);
+    assert.doesNotMatch(
       composition,
-      /createEndMembershipWithinHomeStructureWithTemporaryNoOpCleanup/,
+      /createTemporaryNoOpMembershipEndingTaskCleanup/,
     );
-    assert.doesNotMatch(cleanup, /task_instances/);
-    assert.doesNotMatch(cleanup, /assigned_membership_id/);
-    assert.doesNotMatch(composition, /createTaskRepository/);
-    assert.doesNotMatch(composition, /unassign/);
+    assert.doesNotMatch(composition, /tasks\/repository/);
+    assert.doesNotMatch(composition, /FROM\s+task_instances/i);
+    assert.doesNotMatch(composition, /FROM\s+task_definitions/i);
   });
 });

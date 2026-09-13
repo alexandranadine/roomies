@@ -4,12 +4,8 @@ import path from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import type { TransactionContext } from '../../platform/persistence/transaction.js';
-import type {
-  MembershipEndingSupplyCleanup,
-  MembershipEndingTaskCleanup,
-} from './membership-ending-cleanup.js';
+import type { MembershipEndingSupplyCleanup } from './membership-ending-cleanup.js';
 import { createTemporaryNoOpMembershipEndingSupplyCleanup } from './temporary-noop-membership-ending-supply-cleanup.js';
-import { createTemporaryNoOpMembershipEndingTaskCleanup } from './temporary-noop-membership-ending-task-cleanup.js';
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
 const HOME = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -24,15 +20,6 @@ function forbiddenTx(): TransactionContext {
   };
 }
 
-function isTaskCleanup(value: unknown): value is MembershipEndingTaskCleanup {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'handleMembershipEnded' in value &&
-    typeof value.handleMembershipEnded === 'function'
-  );
-}
-
 function isSupplyCleanup(
   value: unknown,
 ): value is MembershipEndingSupplyCleanup {
@@ -45,17 +32,6 @@ function isSupplyCleanup(
 }
 
 void describe('temporary no-op membership ending cleanup adapters', () => {
-  void it('implements the public Task port without SQL, connections, or events', async () => {
-    const cleanup = createTemporaryNoOpMembershipEndingTaskCleanup();
-    assert.equal(isTaskCleanup(cleanup), true);
-    await cleanup.handleMembershipEnded(forbiddenTx(), {
-      homeId: HOME,
-      membershipId: MEMBERSHIP,
-      endedAt: ENDED_AT,
-      cause: 'VOLUNTARY_LEAVE',
-    });
-  });
-
   void it('implements the public Supply port without SQL, connections, or events', async () => {
     const cleanup = createTemporaryNoOpMembershipEndingSupplyCleanup();
     assert.equal(isSupplyCleanup(cleanup), true);
@@ -67,30 +43,22 @@ void describe('temporary no-op membership ending cleanup adapters', () => {
     });
   });
 
-  void it('names the adapters as temporary no-ops with a visible replacement obligation', async () => {
-    const taskSource = await readFile(
-      path.join(dir, 'temporary-noop-membership-ending-task-cleanup.ts'),
-      'utf8',
+  void it('no longer ships a temporary Task no-op that production can select', async () => {
+    await assert.rejects(
+      () =>
+        readFile(
+          path.join(dir, 'temporary-noop-membership-ending-task-cleanup.ts'),
+          'utf8',
+        ),
+      (error: NodeJS.ErrnoException) => error.code === 'ENOENT',
     );
+  });
+
+  void it('names the Supply adapter as a temporary no-op with a visible replacement obligation', async () => {
     const supplySource = await readFile(
       path.join(dir, 'temporary-noop-membership-ending-supply-cleanup.ts'),
       'utf8',
     );
-
-    assert.match(taskSource, /TEMPORARY no-op Task cleanup/);
-    assert.match(taskSource, /Task persistence tables now exist/);
-    assert.match(
-      taskSource,
-      /intentionally remains a no-op until[\s\S]*Task application behavior is implemented/,
-    );
-    assert.doesNotMatch(taskSource, /do not exist yet/);
-    assert.match(taskSource, /createTemporaryNoOpMembershipEndingTaskCleanup/);
-    assert.doesNotMatch(taskSource, /end-membership-within-home-structure/);
-    assert.doesNotMatch(taskSource, /pool\.connect/);
-    assert.doesNotMatch(taskSource, /tx\.query/);
-    assert.doesNotMatch(taskSource, /outbox/i);
-    assert.doesNotMatch(taskSource, /INSERT /i);
-    assert.doesNotMatch(taskSource, /UPDATE /i);
 
     assert.match(supplySource, /TEMPORARY no-op Supply cleanup/);
     assert.match(supplySource, /MUST be[\s\S]*replaced when M4 Supplies ships/);

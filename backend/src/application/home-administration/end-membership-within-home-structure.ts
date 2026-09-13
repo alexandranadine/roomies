@@ -12,13 +12,16 @@ import type { OutboxWriter } from '../../platform/events/outbox-writer.js';
 import { outboxWriter } from '../../platform/events/outbox-writer.js';
 import type { UuidV7Generator } from '../../platform/ids/uuid-v7.js';
 import { systemUuidV7 } from '../../platform/ids/uuid-v7.js';
-import type { TransactionContext } from '../../platform/persistence/transaction.js';
+import type {
+  TransactionContext,
+  TransactionPool,
+} from '../../platform/persistence/transaction.js';
+import { createMembershipEndingTaskCleanupFromPool } from '../tasks/membership-ending-task-cleanup.js';
 import type {
   MembershipEndingSupplyCleanup,
   MembershipEndingTaskCleanup,
 } from './membership-ending-cleanup.js';
 import { createTemporaryNoOpMembershipEndingSupplyCleanup } from './temporary-noop-membership-ending-supply-cleanup.js';
-import { createTemporaryNoOpMembershipEndingTaskCleanup } from './temporary-noop-membership-ending-task-cleanup.js';
 
 /**
  * Exact active Membership tenure to end. The caller already locked Home then
@@ -125,15 +128,16 @@ export function createEndMembershipWithinHomeStructure(
 }
 
 /**
- * Composition wiring for later leave/remove/archive commands.
- *
- * Injects the temporary no-op Task and Supply adapters explicitly. Those
- * adapters MUST be replaced when M3 Tasks / M4 Supplies ship. Does not
- * acquire a pool or begin a transaction.
+ * Production composition for leave/remove. Injects the Tasks-owned
+ * Membership-ending cleanup and the temporary no-op Supply adapter. The
+ * Supply adapter MUST be replaced when M4 Supplies ships. Does not begin
+ * a transaction; callers own the outer structural transaction.
  */
-export function createEndMembershipWithinHomeStructureWithTemporaryNoOpCleanup(): EndMembershipWithinHomeStructure {
+export function createEndMembershipWithinHomeStructureFromPool(
+  pool: TransactionPool,
+): EndMembershipWithinHomeStructure {
   return createEndMembershipWithinHomeStructure({
-    taskCleanup: createTemporaryNoOpMembershipEndingTaskCleanup(),
+    taskCleanup: createMembershipEndingTaskCleanupFromPool(pool),
     supplyCleanup: createTemporaryNoOpMembershipEndingSupplyCleanup(),
     membershipEnding: createMembershipEndingWriter(),
     outbox: outboxWriter,
@@ -141,9 +145,11 @@ export function createEndMembershipWithinHomeStructureWithTemporaryNoOpCleanup()
   });
 }
 
-export function createApplyMembershipEndingWithinHomeStructureWithTemporaryNoOpCleanup(): ApplyMembershipEndingWithinHomeStructure {
+export function createApplyMembershipEndingWithinHomeStructureFromPool(
+  pool: TransactionPool,
+): ApplyMembershipEndingWithinHomeStructure {
   return createApplyMembershipEndingWithinHomeStructure({
-    taskCleanup: createTemporaryNoOpMembershipEndingTaskCleanup(),
+    taskCleanup: createMembershipEndingTaskCleanupFromPool(pool),
     supplyCleanup: createTemporaryNoOpMembershipEndingSupplyCleanup(),
     membershipEnding: createMembershipEndingWriter(),
   });

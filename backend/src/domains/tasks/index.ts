@@ -41,9 +41,12 @@ export {
   INSERT_MANUAL_TASK_INSTANCE_SQL,
   LIST_TASK_INSTANCES_BY_HOME_SQL,
   LOCK_TASK_INSTANCE_BY_HOME_AND_ID_SQL,
+  UNASSIGN_ACTIVE_TASK_DEFINITIONS_FOR_MEMBERSHIP_SQL,
+  UNASSIGN_OPEN_TASK_INSTANCES_FOR_MEMBERSHIP_SQL,
   type CompleteOpenTaskInstance,
   type NewManualTaskInstance,
   type TaskRepository,
+  type UnassignMembershipAssignments,
 } from './repository.js';
 export {
   isTaskSource,

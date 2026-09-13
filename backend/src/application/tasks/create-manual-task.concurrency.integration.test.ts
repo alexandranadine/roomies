@@ -4,8 +4,8 @@ import { describe, it } from 'node:test';
 import type { Pool } from 'pg';
 import { createArchiveFinalMemberHome } from '../home-administration/archive-final-member-home.js';
 import {
-  createApplyMembershipEndingWithinHomeStructureWithTemporaryNoOpCleanup,
-  createEndMembershipWithinHomeStructureWithTemporaryNoOpCleanup,
+  createApplyMembershipEndingWithinHomeStructureFromPool,
+  createEndMembershipWithinHomeStructureFromPool,
 } from '../home-administration/end-membership-within-home-structure.js';
 import { createLeaveMembership } from '../home-administration/leave-membership.js';
 import { createHomeArchiveWriter } from '../../domains/homes/archive-home.js';
@@ -206,7 +206,7 @@ function archiveCommand(
     clock: systemClock,
     invitationRevoker: createInvitationHomeArchiveCleanupFromPool(pool),
     applyMembershipEnding:
-      createApplyMembershipEndingWithinHomeStructureWithTemporaryNoOpCleanup(),
+      createApplyMembershipEndingWithinHomeStructureFromPool(pool),
     homeArchive: createHomeArchiveWriter(),
     outbox: outboxWriter,
     ids: systemUuidV7,
@@ -233,8 +233,7 @@ function leaveCommand(
       return locked;
     },
     clock: systemClock,
-    endMembership:
-      createEndMembershipWithinHomeStructureWithTemporaryNoOpCleanup(),
+    endMembership: createEndMembershipWithinHomeStructureFromPool(pool),
   });
 }
 
@@ -712,15 +711,14 @@ void describe('manual Task create concurrency PostgreSQL', () => {
         assert.ok(await membershipEndedAt(database.pool, assigneeMembershipId));
         const assigned = await database.pool.query<{
           assigned_membership_id: string | null;
+          status: string;
         }>(
-          `SELECT assigned_membership_id FROM task_instances
+          `SELECT assigned_membership_id, status FROM task_instances
            WHERE home_id = $1 AND title = $2`,
           [homeId, 'Create wins assignee-end'],
         );
-        assert.equal(
-          assigned.rows[0]?.assigned_membership_id,
-          assigneeMembershipId,
-        );
+        assert.equal(assigned.rows[0]?.status, 'OPEN');
+        assert.equal(assigned.rows[0]?.assigned_membership_id, null);
       } finally {
         await cleanup(database.pool, {
           homeIds: [homeId],
@@ -993,6 +991,14 @@ void describe('manual Task create concurrency PostgreSQL', () => {
               created.value.assignedMembershipId,
               assigneeMembershipId,
             );
+            const leftover = await database.pool.query<{ count: string }>(
+              `SELECT count(*)::text AS count FROM task_instances
+               WHERE home_id = $1
+                 AND status = 'OPEN'
+                 AND assigned_membership_id = $2`,
+              [homeId, assigneeMembershipId],
+            );
+            assert.equal(leftover.rows[0]?.count, '0');
           } else {
             assert.equal(count, 0);
             assert.ok(created.reason instanceof InvalidRequestError);

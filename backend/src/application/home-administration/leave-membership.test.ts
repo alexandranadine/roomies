@@ -69,11 +69,23 @@ function adminRoommateHome(): LockedHomeStructure {
 
 function commandOf(options: { locked: LockedHomeStructure; endError?: Error }) {
   const endings: EndMembershipWithinHomeStructureInput[] = [];
+  const steps: string[] = [];
+  let clockCalls = 0;
   const leave = createLeaveMembership({
     runTransaction: async (work) => work({} as TransactionContext),
-    lockHomeStructure: () => Promise.resolve(options.locked),
-    clock: { now: () => ENDED_AT },
+    lockHomeStructure: () => {
+      steps.push('lock-home-structure');
+      return Promise.resolve(options.locked);
+    },
+    clock: {
+      now() {
+        clockCalls += 1;
+        steps.push('clock-now');
+        return ENDED_AT;
+      },
+    },
     endMembership(_tx, input) {
+      steps.push('end-membership');
       if (options.endError) {
         return Promise.reject(options.endError);
       }
@@ -81,7 +93,7 @@ function commandOf(options: { locked: LockedHomeStructure; endError?: Error }) {
       return Promise.resolve({ membershipId: input.membershipId });
     },
   });
-  return { leave, endings };
+  return { leave, endings, steps, clockCalls: () => clockCalls };
 }
 
 function input(
@@ -97,7 +109,7 @@ function input(
 
 void describe('leaveMembership application orchestration', () => {
   void it('allows a Roommate leave when an Admin remains', async () => {
-    const { leave, endings } = commandOf({
+    const { leave, endings, steps, clockCalls } = commandOf({
       locked: structure(
         [
           { id: MEMBERSHIP_A, userId: USER_A, homeId: HOME, role: 'ADMIN' },
@@ -130,10 +142,18 @@ void describe('leaveMembership application orchestration', () => {
         cause: 'VOLUNTARY_LEAVE',
       },
     ]);
+    assert.deepEqual(steps, [
+      'lock-home-structure',
+      'clock-now',
+      'end-membership',
+    ]);
+    assert.equal(clockCalls(), 1);
   });
 
   void it('allows an Admin leave when another Admin remains', async () => {
-    const { leave, endings } = commandOf({ locked: twoAdminHome() });
+    const { leave, endings, steps, clockCalls } = commandOf({
+      locked: twoAdminHome(),
+    });
 
     await leave(input({ membershipId: MEMBERSHIP_A }));
 
@@ -145,20 +165,30 @@ void describe('leaveMembership application orchestration', () => {
         cause: 'VOLUNTARY_LEAVE',
       },
     ]);
+    assert.deepEqual(steps, [
+      'lock-home-structure',
+      'clock-now',
+      'end-membership',
+    ]);
+    assert.equal(clockCalls(), 1);
   });
 
   void it('rejects last-Admin leave without invoking the ending seam', async () => {
-    const { leave, endings } = commandOf({ locked: adminRoommateHome() });
+    const { leave, endings, steps, clockCalls } = commandOf({
+      locked: adminRoommateHome(),
+    });
 
     await assert.rejects(
       () => leave(input({ membershipId: MEMBERSHIP_A })),
       LastAdminRequiredError,
     );
     assert.deepEqual(endings, []);
+    assert.deepEqual(steps, ['lock-home-structure']);
+    assert.equal(clockCalls(), 0);
   });
 
   void it('rejects sole-Admin leave with LAST_ROOMMATE_REQUIRES_ARCHIVE', async () => {
-    const { leave, endings } = commandOf({
+    const { leave, endings, steps, clockCalls } = commandOf({
       locked: structure([
         { id: MEMBERSHIP_A, userId: USER_A, homeId: HOME, role: 'ADMIN' },
       ]),
@@ -169,10 +199,12 @@ void describe('leaveMembership application orchestration', () => {
       LastRoommateRequiresArchiveError,
     );
     assert.deepEqual(endings, []);
+    assert.deepEqual(steps, ['lock-home-structure']);
+    assert.equal(clockCalls(), 0);
   });
 
   void it('treats a current zero-Admin snapshot as structural integrity before policy', async () => {
-    const { leave, endings } = commandOf({
+    const { leave, endings, steps, clockCalls } = commandOf({
       locked: structure([
         { id: MEMBERSHIP_A, userId: USER_A, homeId: HOME, role: 'ROOMMATE' },
       ]),
@@ -183,10 +215,12 @@ void describe('leaveMembership application orchestration', () => {
       StructuralIntegrityError,
     );
     assert.deepEqual(endings, []);
+    assert.deepEqual(steps, ['lock-home-structure']);
+    assert.equal(clockCalls(), 0);
   });
 
   void it('evaluates leave from the locked role when the HTTP snapshot is stale ADMIN', async () => {
-    const { leave, endings } = commandOf({
+    const { leave, endings, clockCalls } = commandOf({
       locked: structure(
         [
           { id: MEMBERSHIP_A, userId: USER_A, homeId: HOME, role: 'ROOMMATE' },
@@ -211,20 +245,26 @@ void describe('leaveMembership application orchestration', () => {
         cause: 'VOLUNTARY_LEAVE',
       },
     ]);
+    assert.equal(clockCalls(), 1);
   });
 
   void it('forbids leave against another visible same-Home Membership', async () => {
-    const { leave, endings } = commandOf({ locked: adminRoommateHome() });
+    const { leave, endings, clockCalls } = commandOf({
+      locked: adminRoommateHome(),
+    });
 
     await assert.rejects(
       () => leave(input({ membershipId: MEMBERSHIP_B })),
       ForbiddenError,
     );
     assert.deepEqual(endings, []);
+    assert.equal(clockCalls(), 0);
   });
 
   void it('conceals a path target absent from the locked active set', async () => {
-    const { leave, endings } = commandOf({ locked: adminRoommateHome() });
+    const { leave, endings, clockCalls } = commandOf({
+      locked: adminRoommateHome(),
+    });
 
     await assert.rejects(
       () => leave(input({ membershipId: MEMBERSHIP_OLD })),
@@ -235,10 +275,13 @@ void describe('leaveMembership application orchestration', () => {
       ConcealedNotFoundError,
     );
     assert.deepEqual(endings, []);
+    assert.equal(clockCalls(), 0);
   });
 
   void it('ends the locked actor Membership, not a remapped Home id', async () => {
-    const { leave, endings } = commandOf({ locked: twoAdminHome() });
+    const { leave, endings, clockCalls } = commandOf({
+      locked: twoAdminHome(),
+    });
 
     await leave(
       input({
@@ -250,5 +293,51 @@ void describe('leaveMembership application orchestration', () => {
     assert.equal(endings[0]?.homeId, HOME);
     assert.equal(endings[0]?.membershipId, MEMBERSHIP_A);
     assert.equal(endings[0]?.cause, 'VOLUNTARY_LEAVE');
+    assert.equal(clockCalls(), 1);
+  });
+
+  void it('does not request clock.now until the Home structural lock is established', async () => {
+    let lockResolved = false;
+    let clockBeforeLock = false;
+    let resolveLock!: () => void;
+    const lockHeld = new Promise<void>((resolve) => {
+      resolveLock = resolve;
+    });
+    let resolveReached!: () => void;
+    const reachedLock = new Promise<void>((resolve) => {
+      resolveReached = resolve;
+    });
+    let clockCalls = 0;
+
+    const leave = createLeaveMembership({
+      clock: {
+        now() {
+          clockCalls += 1;
+          if (!lockResolved) {
+            clockBeforeLock = true;
+          }
+          return ENDED_AT;
+        },
+      },
+      runTransaction: async (work) => work({} as TransactionContext),
+      lockHomeStructure: async () => {
+        resolveReached();
+        await lockHeld;
+        lockResolved = true;
+        return twoAdminHome();
+      },
+      endMembership: () => Promise.resolve({ membershipId: MEMBERSHIP_A }),
+    });
+
+    const pending = leave(input({ membershipId: MEMBERSHIP_A }));
+    await reachedLock;
+    assert.equal(lockResolved, false);
+    assert.equal(clockBeforeLock, false);
+    assert.equal(clockCalls, 0);
+    resolveLock();
+    await pending;
+    assert.equal(lockResolved, true);
+    assert.equal(clockBeforeLock, false);
+    assert.equal(clockCalls, 1);
   });
 });
