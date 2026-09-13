@@ -397,7 +397,7 @@ void describe('SupplyEntry create/list PostgreSQL', () => {
 
         const dto = toSupplyEntryDto(first);
         assert.equal('homeId' in dto, false);
-        assert.equal('activeClaim' in dto, false);
+        assert.equal(dto.activeClaim, null);
 
         await assert.rejects(
           () =>

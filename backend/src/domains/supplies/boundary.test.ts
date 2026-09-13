@@ -42,6 +42,9 @@ void describe('supplies domain boundary', () => {
       'insertSupplyEntry',
       'insertSupplyClaim',
       'findActiveClaimByEntry',
+      'lockSupplyEntryByHomeAndId',
+      'lockActiveClaimByEntry',
+      'releaseActiveClaimOwnedByMembership',
       'listClaimsForEntry',
       'listOpenEntriesByHome',
       'listSupplyEntriesByHome',
@@ -56,14 +59,21 @@ void describe('supplies domain boundary', () => {
     assert.match(source, /home_id = \$1::uuid/);
     assert.match(source, /released_at IS NULL/);
     assert.match(source, /ORDER BY claimed_at ASC, id ASC/);
-    assert.match(source, /ORDER BY created_at ASC, id ASC/);
+    assert.match(source, /ORDER BY e\.created_at ASC, e\.id ASC/);
     assert.match(source, /LIST_SUPPLY_ENTRIES_BY_HOME_SQL/);
     assert.match(source, /LIST_SUPPLY_ENTRIES_BY_HOME_AND_STATUS_SQL/);
+    assert.match(source, /LEFT JOIN supply_claims/);
+    assert.match(source, /c\.home_id = e\.home_id/);
+    assert.match(source, /c\.supply_entry_id = e\.id/);
+    assert.match(source, /c\.released_at IS NULL/);
+    assert.match(source, /supply_claims_one_active_per_entry_1e26d778/);
+    assert.match(source, /LOCK_SUPPLY_ENTRY_BY_HOME_AND_ID_SQL/);
+    assert.match(source, /LOCK_ACTIVE_CLAIM_BY_ENTRY_SQL/);
+    assert.match(source, /RELEASE_ACTIVE_CLAIM_OWNED_BY_MEMBERSHIP_SQL/);
     assert.doesNotMatch(source, /DELETE /i);
     assert.doesNotMatch(source, /claimed_by_membership_id/);
     assert.doesNotMatch(source, /quantity|price|reimbursement/i);
-    assert.doesNotMatch(source, /supply_claims[\s\S]*JOIN/i);
-    assert.doesNotMatch(source, /JOIN\s+supply_claims/i);
+    assert.doesNotMatch(source, /findActiveClaimByEntry\([\s\S]*FOR UPDATE/i);
   });
 
   void it('keeps title rules free of persistence, HTTP, and JS Date', async () => {
@@ -80,13 +90,20 @@ void describe('supplies domain boundary', () => {
   });
 
   void it('keeps Supply policies free of Home-read authz and Admin bypass', async () => {
-    for (const name of ['create-policy.ts', 'list-policy.ts', 'actions.ts']) {
+    for (const name of [
+      'create-policy.ts',
+      'list-policy.ts',
+      'claim-policy.ts',
+      'release-policy.ts',
+      'actions.ts',
+    ]) {
       const source = await readFile(path.join(suppliesDir, name), 'utf8');
       assert.doesNotMatch(source, /decideHomeRead/);
       assert.doesNotMatch(source, /isHomeAdmin/);
       assert.doesNotMatch(source, /from ['"]pg['"]/);
       assert.doesNotMatch(source, /from ['"]express['"]/);
       assert.doesNotMatch(source, /FOR UPDATE/i);
+      assert.doesNotMatch(source, /actor\.userId|input\.userId/);
     }
     const actions = await readFile(
       path.join(suppliesDir, 'actions.ts'),
@@ -94,7 +111,8 @@ void describe('supplies domain boundary', () => {
     );
     assert.match(actions, /supply\.create/);
     assert.match(actions, /supply\.list/);
-    assert.doesNotMatch(actions, /supply\.claim/);
+    assert.match(actions, /supply\.claim/);
+    assert.match(actions, /supply\.release_claim/);
     assert.doesNotMatch(actions, /supply\.obtain/);
     assert.doesNotMatch(actions, /supply\.cancel/);
   });
@@ -103,6 +121,14 @@ void describe('supplies domain boundary', () => {
     const source = await readFile(path.join(suppliesDir, 'http.ts'), 'utf8');
     assert.match(source, /router\.post\('\/:homeId\/supplies'/);
     assert.match(source, /router\.get\('\/:homeId\/supplies'/);
+    assert.match(
+      source,
+      /router\.post\('\/:homeId\/supplies\/:supplyEntryId\/claim'/,
+    );
+    assert.match(
+      source,
+      /router\.post\(\s*'\/:homeId\/supplies\/:supplyEntryId\/release-claim'/,
+    );
     assert.match(source, /createRequireHomeContext/);
     assert.match(source, /createRequireAuth/);
     assert.match(source, /setPrivateNoStoreHeaders/);
@@ -117,9 +143,7 @@ void describe('supplies domain boundary', () => {
     assert.doesNotMatch(source, /router\.delete/i);
     assert.doesNotMatch(source, /\/obtain/);
     assert.doesNotMatch(source, /\/cancel/);
-    assert.doesNotMatch(source, /\/claim/);
-    assert.doesNotMatch(source, /\/release/);
     assert.doesNotMatch(source, /router\.patch/i);
-    assert.doesNotMatch(source, /activeClaim|claimedBy|canClaim/);
+    assert.doesNotMatch(source, /claimedBy|canClaim/);
   });
 });

@@ -23,6 +23,12 @@ import {
   LastRoommateRequiresArchiveError,
 } from '../../domains/memberships/errors.js';
 import {
+  SupplyAlreadyClaimedError,
+  SupplyClaimNotActiveError,
+  SupplyNotOpenError,
+  SupplyPersistenceError,
+} from '../../domains/supplies/errors.js';
+import {
   TaskAlreadyCompletedError,
   TaskPersistenceError,
 } from '../../domains/tasks/errors.js';
@@ -135,6 +141,38 @@ void describe('HTTP known-error mappings', () => {
     assert.equal(body.error.message, 'Task already completed');
   });
 
+  void it('maps SupplyAlreadyClaimedError to 409 SUPPLY_ALREADY_CLAIMED', async () => {
+    const res = await appRequest(
+      appThatThrows(new SupplyAlreadyClaimedError()),
+      { path: '/throw' },
+    );
+    assert.equal(res.status, 409);
+    const body = res.json() as ApiErrorBody;
+    assert.equal(body.error.code, 'SUPPLY_ALREADY_CLAIMED');
+    assert.equal(body.error.message, 'Supply already claimed');
+  });
+
+  void it('maps SupplyNotOpenError to 409 SUPPLY_NOT_OPEN', async () => {
+    const res = await appRequest(appThatThrows(new SupplyNotOpenError()), {
+      path: '/throw',
+    });
+    assert.equal(res.status, 409);
+    const body = res.json() as ApiErrorBody;
+    assert.equal(body.error.code, 'SUPPLY_NOT_OPEN');
+    assert.equal(body.error.message, 'Supply is not open');
+  });
+
+  void it('maps SupplyClaimNotActiveError to 409 SUPPLY_CLAIM_NOT_ACTIVE', async () => {
+    const res = await appRequest(
+      appThatThrows(new SupplyClaimNotActiveError()),
+      { path: '/throw' },
+    );
+    assert.equal(res.status, 409);
+    const body = res.json() as ApiErrorBody;
+    assert.equal(body.error.code, 'SUPPLY_CLAIM_NOT_ACTIVE');
+    assert.equal(body.error.message, 'Supply claim is not active');
+  });
+
   void it('maps AlreadyHomeMemberError to 409 ALREADY_HOME_MEMBER', async () => {
     const res = await appRequest(appThatThrows(new AlreadyHomeMemberError()), {
       path: '/throw',
@@ -227,6 +265,17 @@ void describe('HTTP known-error mappings', () => {
     assert.equal(body.error.code, 'INTERNAL_ERROR');
     assert.equal(body.error.message, 'An unexpected error occurred');
     assert.equal(res.text.includes('Home structure integrity failure'), false);
+  });
+
+  void it('maps SupplyPersistenceError to a safe 500', async () => {
+    const res = await appRequest(appThatThrows(new SupplyPersistenceError()), {
+      path: '/throw',
+    });
+    assert.equal(res.status, 500);
+    const body = res.json() as ApiErrorBody;
+    assert.equal(body.error.code, 'INTERNAL_ERROR');
+    assert.equal(body.error.message, 'An unexpected error occurred');
+    assert.equal(res.text.includes('Supply persistence failure'), false);
   });
 
   void it('maps TaskPersistenceError to a safe 500', async () => {

@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { describe, it } from 'node:test';
 import type { Pool } from 'pg';
+import { createClaimSupplyEntryFromPool } from '../../application/supplies/claim-supply-entry.js';
 import { createCreateSupplyEntryFromPool } from '../../application/supplies/create-supply-entry.js';
 import { createListHomeSuppliesFromPool } from '../../application/supplies/list-home-supplies.js';
+import { createReleaseSupplyClaimFromPool } from '../../application/supplies/release-supply-claim.js';
 import { createHomeRepository } from '../homes/index.js';
 import { createRoomiesApiRouter } from '../../http/create-roomies-api.js';
 import { createActiveHomeActorResolver } from '../memberships/index.js';
@@ -109,6 +111,7 @@ const dtoKeys = [
   'canceledAt',
   'createdAt',
   'updatedAt',
+  'activeClaim',
 ];
 
 void describe('Supply HTTP PostgreSQL', () => {
@@ -166,6 +169,10 @@ void describe('Supply HTTP PostgreSQL', () => {
             supplies: {
               createSupplyEntry: createCreateSupplyEntryFromPool(database.pool),
               listHomeSupplies: createListHomeSuppliesFromPool(database.pool),
+              claimSupplyEntry: createClaimSupplyEntryFromPool(database.pool),
+              releaseSupplyClaim: createReleaseSupplyClaimFromPool(
+                database.pool,
+              ),
             },
           }),
         });
@@ -260,7 +267,7 @@ void describe('Supply HTTP PostgreSQL', () => {
           assert.equal(createdBody.obtainedAt, null);
           assert.equal(createdBody.canceledAt, null);
           assert.equal('homeId' in (created.json() as object), false);
-          assert.equal('activeClaim' in (created.json() as object), false);
+          assert.equal(createdBody.activeClaim, null);
           assert.equal('claimedBy' in (created.json() as object), false);
           assert.equal('canClaim' in (created.json() as object), false);
 
@@ -279,6 +286,7 @@ void describe('Supply HTTP PostgreSQL', () => {
           assert.equal(listBody.length, 1);
           assert.deepEqual(Object.keys(listBody[0] ?? {}), dtoKeys);
           assert.equal(listBody[0]?.id, createdBody.id);
+          assert.equal(listBody[0]?.activeClaim, null);
 
           const listedWithoutOrigin = await request({
             method: 'GET',
@@ -412,6 +420,148 @@ void describe('Supply HTTP PostgreSQL', () => {
             [homeA],
           );
           assert.equal(claims.rows[0]?.count, '0');
+
+          const claimed = await request({
+            method: 'POST',
+            path: `/api/v1/homes/${homeA}/supplies/${createdBody.id}/claim`,
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: roommate.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          });
+          assert.equal(claimed.status, 201);
+          assert.equal(
+            claimed.headers.get('cache-control'),
+            'private, no-store',
+          );
+          const claimedBody = claimed.json() as {
+            claimantMembershipId?: string;
+            releasedAt?: unknown;
+            homeId?: unknown;
+          };
+          assert.equal(claimedBody.claimantMembershipId, membershipA);
+          assert.equal(claimedBody.releasedAt, null);
+          assert.equal('homeId' in claimedBody, false);
+
+          const listedClaimed = await request({
+            method: 'GET',
+            path: `/api/v1/homes/${homeA}/supplies`,
+            headers: { Cookie: roommate.cookie },
+          });
+          assert.equal(listedClaimed.status, 200);
+          const listedClaimedBody = listedClaimed.json() as SupplyEntryDto[];
+          assert.equal(
+            listedClaimedBody[0]?.activeClaim?.claimantMembershipId,
+            membershipA,
+          );
+
+          const released = await request({
+            method: 'POST',
+            path: `/api/v1/homes/${homeA}/supplies/${createdBody.id}/release-claim`,
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: roommate.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          });
+          assert.equal(released.status, 204);
+          assert.equal(released.text, '');
+          assert.equal(
+            released.headers.get('cache-control'),
+            'private, no-store',
+          );
+
+          const listedReleased = await request({
+            method: 'GET',
+            path: `/api/v1/homes/${homeA}/supplies`,
+            headers: { Cookie: roommate.cookie },
+          });
+          assert.equal(
+            (listedReleased.json() as SupplyEntryDto[])[0]?.activeClaim,
+            null,
+          );
+
+          const repeatRelease = await request({
+            method: 'POST',
+            path: `/api/v1/homes/${homeA}/supplies/${createdBody.id}/release-claim`,
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: roommate.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          });
+          assert.equal(repeatRelease.status, 409);
+          assert.equal(
+            (repeatRelease.json() as ApiErrorBody).error.code,
+            'SUPPLY_CLAIM_NOT_ACTIVE',
+          );
+
+          const repeatClaim = await request({
+            method: 'POST',
+            path: `/api/v1/homes/${homeA}/supplies/${createdBody.id}/claim`,
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: roommate.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          });
+          assert.equal(repeatClaim.status, 201);
+
+          const already = await request({
+            method: 'POST',
+            path: `/api/v1/homes/${homeA}/supplies/${createdBody.id}/claim`,
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: roommate.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          });
+          assert.equal(already.status, 409);
+          assert.equal(
+            (already.json() as ApiErrorBody).error.code,
+            'SUPPLY_ALREADY_CLAIMED',
+          );
+
+          const hostileClaim = await request({
+            method: 'POST',
+            path: `/api/v1/homes/${homeA}/supplies/${createdBody.id}/release-claim`,
+            headers: {
+              Origin: HOSTILE_ORIGIN,
+              Cookie: roommate.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          });
+          assert.equal(hostileClaim.status, 403);
+
+          const missingAuthClaim = await request({
+            method: 'POST',
+            path: `/api/v1/homes/${homeA}/supplies/${createdBody.id}/claim`,
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          });
+          assert.equal(missingAuthClaim.status, 401);
+
+          const extraClaimBody = await request({
+            method: 'POST',
+            path: `/api/v1/homes/${homeA}/supplies/${createdBody.id}/claim`,
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: roommate.cookie,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({ claimantMembershipId: membershipB }),
+          });
+          assert.equal(extraClaimBody.status, 400);
 
           assertNoForbiddenLeak({
             context: 'supply HTTP logs',

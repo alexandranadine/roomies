@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import type { SupplyEntry } from '../../domains/supplies/supply.js';
+import type { ListedSupplyEntry } from '../../domains/supplies/supply.js';
 import type { ActiveHomeActor } from '../../platform/authz/context.js';
 import { ConcealedNotFoundError } from '../../platform/authz/errors.js';
 import { listHomeSupplies } from './list-home-supplies.js';
@@ -16,7 +16,7 @@ const actor: ActiveHomeActor = {
   role: 'ROOMMATE',
 };
 
-function entry(overrides: Partial<SupplyEntry> = {}): SupplyEntry {
+function entry(overrides: Partial<ListedSupplyEntry> = {}): ListedSupplyEntry {
   return {
     id: '018f1e2c-7e3a-7000-8000-1234567890ab',
     homeId: HOME,
@@ -27,6 +27,7 @@ function entry(overrides: Partial<SupplyEntry> = {}): SupplyEntry {
     canceledAt: null,
     createdAt: CREATED,
     updatedAt: CREATED,
+    activeClaim: null,
     ...overrides,
   };
 }
@@ -56,6 +57,32 @@ void describe('listHomeSupplies', () => {
       },
     );
     assert.equal(listed.length, 2);
+    assert.equal(listed[0]?.activeClaim, null);
+  });
+
+  void it('returns the repository activeClaim projection without extra queries', async () => {
+    const claimed = entry({
+      activeClaim: {
+        claimantMembershipId: actor.membershipId,
+        claimedAt: CREATED,
+      },
+    });
+    let allListCalls = 0;
+    const listed = await listHomeSupplies(
+      { actor, homeId: HOME },
+      {
+        listOpenEntriesByHome: () =>
+          Promise.reject(new Error('must not list OPEN-only when unfiltered')),
+        listSupplyEntriesByHome: () => {
+          allListCalls += 1;
+          return Promise.resolve([claimed]);
+        },
+        listSupplyEntriesByHomeAndStatus: () =>
+          Promise.reject(new Error('must not filter when status omitted')),
+      },
+    );
+    assert.equal(allListCalls, 1);
+    assert.deepEqual(listed[0]?.activeClaim, claimed.activeClaim);
   });
 
   void it('lets an active Admin list through the same supply.list path', async () => {

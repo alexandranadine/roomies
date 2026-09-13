@@ -35,6 +35,16 @@ export type SupplyClaim = Readonly<{
   updatedAt: Date;
 }>;
 
+export type ActiveSupplyClaimProjection = Readonly<{
+  claimantMembershipId: string;
+  claimedAt: Date;
+}>;
+
+export type ListedSupplyEntry = SupplyEntry &
+  Readonly<{
+    activeClaim: ActiveSupplyClaimProjection | null;
+  }>;
+
 export function isSupplyEntryStatus(
   value: unknown,
 ): value is SupplyEntryStatus {

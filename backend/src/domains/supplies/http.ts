@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import type { ClaimSupplyEntryInput } from '../../application/supplies/claim-supply-entry.js';
 import type { CreateSupplyEntryInput } from '../../application/supplies/create-supply-entry.js';
 import type { ListHomeSuppliesInput } from '../../application/supplies/list-home-supplies.js';
+import type { ReleaseSupplyClaimInput } from '../../application/supplies/release-supply-claim.js';
 import type { PrincipalResolver } from '../../platform/auth/principal.js';
 import {
   InvalidRequestError,
@@ -15,8 +17,11 @@ import { parsePathUuid } from '../../platform/http/path-id.js';
 import { setPrivateNoStoreHeaders } from '../../platform/http/private-response.js';
 import { createRequireAuth } from '../../platform/http/require-auth.js';
 import { InvalidSupplyTitleError } from './errors.js';
+import { toSupplyClaimDto } from './supply-claim-dto.js';
 import {
   isSupplyEntryStatus,
+  type ListedSupplyEntry,
+  type SupplyClaim,
   type SupplyEntry,
   type SupplyEntryStatus,
 } from './supply.js';
@@ -29,19 +34,31 @@ const createSupplyEntryBodySchema = z
   })
   .strict();
 
+const emptySupplyMutationBodySchema = z.object({}).strict();
+
 export type CreateSupplyEntryCommand = (
   input: CreateSupplyEntryInput,
 ) => Promise<SupplyEntry>;
 
 export type ListHomeSuppliesCommand = (
   input: ListHomeSuppliesInput,
-) => Promise<readonly SupplyEntry[]>;
+) => Promise<readonly ListedSupplyEntry[]>;
+
+export type ClaimSupplyEntryCommand = (
+  input: ClaimSupplyEntryInput,
+) => Promise<SupplyClaim>;
+
+export type ReleaseSupplyClaimCommand = (
+  input: ReleaseSupplyClaimInput,
+) => Promise<void>;
 
 export type CreateSuppliesRouterOptions = {
   principalResolver: Pick<PrincipalResolver, 'requirePrincipal'>;
   activeHomeActorResolver: Pick<ActiveHomeActorResolver, 'resolve'>;
   createSupplyEntry: CreateSupplyEntryCommand;
   listHomeSupplies: ListHomeSuppliesCommand;
+  claimSupplyEntry: ClaimSupplyEntryCommand;
+  releaseSupplyClaim: ReleaseSupplyClaimCommand;
 };
 
 function parseCreateSupplyEntryBody(body: unknown): { title: string } {
@@ -57,6 +74,16 @@ function parseCreateSupplyEntryBody(body: unknown): { title: string } {
       throw new InvalidRequestError();
     }
     throw error;
+  }
+}
+
+function parseEmptySupplyMutationBody(body: unknown): void {
+  if (body === undefined) {
+    return;
+  }
+  const parsed = emptySupplyMutationBodySchema.safeParse(body);
+  if (!parsed.success) {
+    throw new InvalidRequestError();
   }
 }
 
@@ -116,6 +143,39 @@ export function createSuppliesRouter(
       res.status(200).json(toSupplyEntryListDto(entries));
     })().catch(next);
   });
+
+  router.post('/:homeId/supplies/:supplyEntryId/claim', (req, res, next) => {
+    void (async () => {
+      const actor = getActiveHomeActor(res);
+      const homeId = parsePathUuid(req.params['homeId']);
+      const supplyEntryId = parsePathUuid(req.params['supplyEntryId']);
+      parseEmptySupplyMutationBody(req.body);
+      const claimed = await options.claimSupplyEntry({
+        actor,
+        homeId,
+        supplyEntryId,
+      });
+      res.status(201).json(toSupplyClaimDto(claimed));
+    })().catch(next);
+  });
+
+  router.post(
+    '/:homeId/supplies/:supplyEntryId/release-claim',
+    (req, res, next) => {
+      void (async () => {
+        const actor = getActiveHomeActor(res);
+        const homeId = parsePathUuid(req.params['homeId']);
+        const supplyEntryId = parsePathUuid(req.params['supplyEntryId']);
+        parseEmptySupplyMutationBody(req.body);
+        await options.releaseSupplyClaim({
+          actor,
+          homeId,
+          supplyEntryId,
+        });
+        res.status(204).end();
+      })().catch(next);
+    },
+  );
 
   return router;
 }

@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import type { ClaimSupplyEntryInput } from '../../application/supplies/claim-supply-entry.js';
 import type { CreateSupplyEntryInput } from '../../application/supplies/create-supply-entry.js';
+import type { ReleaseSupplyClaimInput } from '../../application/supplies/release-supply-claim.js';
 import { createRoomiesApiRouter } from '../../http/create-roomies-api.js';
 import { UnauthenticatedError } from '../../platform/auth/errors.js';
 import type { PrincipalResolver } from '../../platform/auth/principal.js';
 import type { ActiveHomeActor } from '../../platform/authz/context.js';
+import { ConcealedNotFoundError } from '../../platform/authz/errors.js';
 import { appRequest } from '../../platform/http/app-request.test-helper.js';
 import {
   assertNoForbiddenLeak,
@@ -12,21 +15,29 @@ import {
 } from '../../platform/http/assert-no-forbidden-leak.js';
 import { createApp } from '../../platform/http/create-app.js';
 import type { ApiErrorBody } from '../../platform/http/errors.js';
+import {
+  SupplyAlreadyClaimedError,
+  SupplyClaimNotActiveError,
+  SupplyNotOpenError,
+} from './errors.js';
 import { SUPPLY_TITLE_MAX_LENGTH } from './supply-title.js';
+import { supplyClaimDtoSchema } from './supply-claim-dto.js';
 import {
   supplyEntryDtoSchema,
   type SupplyEntryDto,
 } from './supply-entry-dto.js';
-import type { SupplyEntry } from './supply.js';
+import type { ListedSupplyEntry, SupplyClaim, SupplyEntry } from './supply.js';
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 const HOME_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const OTHER_HOME_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const MEMBERSHIP_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const ENTRY_ID = '018f1e2c-7e3a-7000-8000-1234567890ab';
+const CLAIM_ID = '018f1e2c-7e3a-7000-8000-1234567890ad';
 const TRUSTED_ORIGIN = 'http://localhost:5173';
 const HOSTILE_ORIGIN = 'https://evil.example';
 const CREATED = new Date('2026-09-12T18:00:00.000Z');
+const CLAIMED = new Date('2026-09-12T19:00:00.000Z');
 
 function actor(role: ActiveHomeActor['role'] = 'ROOMMATE'): ActiveHomeActor {
   return {
@@ -52,6 +63,29 @@ function entry(overrides: Partial<SupplyEntry> = {}): SupplyEntry {
   };
 }
 
+function listed(overrides: Partial<ListedSupplyEntry> = {}): ListedSupplyEntry {
+  return {
+    ...entry(),
+    activeClaim: null,
+    ...overrides,
+  };
+}
+
+function claim(overrides: Partial<SupplyClaim> = {}): SupplyClaim {
+  return {
+    id: CLAIM_ID,
+    homeId: HOME_ID,
+    supplyEntryId: ENTRY_ID,
+    claimantMembershipId: MEMBERSHIP_ID,
+    claimedAt: CLAIMED,
+    releasedAt: null,
+    releaseReason: null,
+    createdAt: CLAIMED,
+    updatedAt: CLAIMED,
+    ...overrides,
+  };
+}
+
 function unusedHomeReader() {
   return {
     findActiveHomeById: () =>
@@ -71,7 +105,9 @@ function buildApp(
       actor: ActiveHomeActor;
       homeId: string;
       status?: SupplyEntry['status'];
-    }) => Promise<readonly SupplyEntry[]>;
+    }) => Promise<readonly ListedSupplyEntry[]>;
+    claimSupplyEntry?: (input: ClaimSupplyEntryInput) => Promise<SupplyClaim>;
+    releaseSupplyClaim?: (input: ReleaseSupplyClaimInput) => Promise<void>;
   } = {},
 ) {
   const createCalls: CreateSupplyEntryInput[] = [];
@@ -80,9 +116,13 @@ function buildApp(
     homeId: string;
     status?: SupplyEntry['status'];
   }[] = [];
+  const claimCalls: ClaimSupplyEntryInput[] = [];
+  const releaseCalls: ReleaseSupplyClaimInput[] = [];
   return {
     createCalls,
     listCalls,
+    claimCalls,
+    releaseCalls,
     app: createApp({
       config: { trustedOrigins: [TRUSTED_ORIGIN], trustProxyHops: 0 },
       readiness: { checkReady: () => Promise.resolve(true) },
@@ -121,6 +161,19 @@ function buildApp(
             }
             return [];
           },
+          claimSupplyEntry: async (input) => {
+            claimCalls.push(input);
+            if (options.claimSupplyEntry) {
+              return options.claimSupplyEntry(input);
+            }
+            return claim();
+          },
+          releaseSupplyClaim: async (input) => {
+            releaseCalls.push(input);
+            if (options.releaseSupplyClaim) {
+              return options.releaseSupplyClaim(input);
+            }
+          },
         },
       }),
     }),
@@ -140,11 +193,20 @@ const dtoKeys = [
   'canceledAt',
   'createdAt',
   'updatedAt',
+  'activeClaim',
+];
+
+const claimDtoKeys = [
+  'id',
+  'supplyEntryId',
+  'claimantMembershipId',
+  'claimedAt',
+  'releasedAt',
+  'releaseReason',
 ];
 
 const leakSentinels = [
   ...COMMON_SECRET_SENTINELS,
-  'activeClaim',
   'claimedBy',
   'canClaim',
   'claimant',
@@ -175,7 +237,7 @@ void describe('POST /api/v1/homes/:homeId/supplies', () => {
     assert.equal(body.obtainedAt, null);
     assert.equal(body.canceledAt, null);
     assert.equal('homeId' in (res.json() as object), false);
-    assert.equal('activeClaim' in (res.json() as object), false);
+    assert.equal(body.activeClaim, null);
     assert.equal('claimedBy' in (res.json() as object), false);
     assert.equal('canClaim' in (res.json() as object), false);
     assert.deepEqual(createCalls, [
@@ -286,8 +348,8 @@ void describe('GET /api/v1/homes/:homeId/supplies', () => {
     const { app, listCalls } = buildApp({
       listHomeSupplies: () =>
         Promise.resolve([
-          entry({ title: 'Open first' }),
-          entry({
+          listed({ title: 'Open first' }),
+          listed({
             id: '018f1e2c-7e3a-7000-8000-1234567890ac',
             title: 'Terminal',
             status: 'CANCELED',
@@ -303,7 +365,7 @@ void describe('GET /api/v1/homes/:homeId/supplies', () => {
     assert.equal(body.length, 2);
     assert.deepEqual(Object.keys(body[0] ?? {}), dtoKeys);
     assert.equal('homeId' in (body[0] ?? {}), false);
-    assert.equal('activeClaim' in (body[0] ?? {}), false);
+    assert.equal(body[0]?.activeClaim, null);
     assert.equal('claimedBy' in (body[0] ?? {}), false);
     assert.equal('canClaim' in (body[0] ?? {}), false);
     assert.deepEqual(listCalls[0]?.homeId, HOME_ID);
@@ -379,6 +441,337 @@ void describe('GET /api/v1/homes/:homeId/supplies', () => {
     assertNoForbiddenLeak({
       context: 'concealed supply list',
       text: res.text,
+      forbidden: leakSentinels,
+    });
+  });
+
+  void it('returns the evolved activeClaim projection', async () => {
+    const { app } = buildApp({
+      listHomeSupplies: () =>
+        Promise.resolve([
+          listed({
+            activeClaim: {
+              claimantMembershipId: MEMBERSHIP_ID,
+              claimedAt: CLAIMED,
+            },
+          }),
+        ]),
+    });
+    const res = await appRequest(app, { path: supplyPath() });
+    assert.equal(res.status, 200);
+    const body = res.json() as SupplyEntryDto[];
+    assert.deepEqual(body[0]?.activeClaim, {
+      claimantMembershipId: MEMBERSHIP_ID,
+      claimedAt: CLAIMED.toISOString(),
+    });
+    assert.equal('id' in (body[0]?.activeClaim ?? {}), false);
+    assert.equal('homeId' in (body[0]?.activeClaim ?? {}), false);
+  });
+});
+
+function claimPath(
+  homeId: string = HOME_ID,
+  entryId: string = ENTRY_ID,
+): string {
+  return `/api/v1/homes/${homeId}/supplies/${entryId}/claim`;
+}
+
+function releasePath(
+  homeId: string = HOME_ID,
+  entryId: string = ENTRY_ID,
+): string {
+  return `/api/v1/homes/${homeId}/supplies/${entryId}/release-claim`;
+}
+
+void describe('POST /api/v1/homes/:homeId/supplies/:supplyEntryId/claim', () => {
+  void it('returns 201 with the exact safe Claim DTO from a trusted Origin', async () => {
+    const { app, claimCalls } = buildApp();
+    const res = await appRequest(app, {
+      method: 'POST',
+      path: claimPath(),
+      headers: {
+        Origin: TRUSTED_ORIGIN,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    });
+    assert.equal(res.status, 201);
+    assert.equal(res.headers.get('cache-control'), 'private, no-store');
+    const body = supplyClaimDtoSchema.parse(res.json());
+    assert.deepEqual(Object.keys(body), claimDtoKeys);
+    assert.equal(body.supplyEntryId, ENTRY_ID);
+    assert.equal(body.claimantMembershipId, MEMBERSHIP_ID);
+    assert.equal(body.releasedAt, null);
+    assert.equal(body.releaseReason, null);
+    assert.equal('homeId' in (res.json() as object), false);
+    assert.equal('userId' in (res.json() as object), false);
+    assert.equal('createdAt' in (res.json() as object), false);
+    assert.equal('updatedAt' in (res.json() as object), false);
+    assert.deepEqual(claimCalls, [
+      {
+        actor: actor(),
+        homeId: HOME_ID,
+        supplyEntryId: ENTRY_ID,
+      },
+    ]);
+  });
+
+  void it('accepts an absent body', async () => {
+    const { app, claimCalls } = buildApp();
+    const res = await appRequest(app, {
+      method: 'POST',
+      path: claimPath(),
+      headers: { Origin: TRUSTED_ORIGIN },
+    });
+    assert.equal(res.status, 201);
+    assert.equal(claimCalls.length, 1);
+  });
+
+  void it('rejects arrays, primitives, explicit null, and object properties', async () => {
+    const { app, claimCalls } = buildApp();
+    for (const body of [null, [], 'claim', 1, true, { extra: 1 }]) {
+      const res = await appRequest(app, {
+        method: 'POST',
+        path: claimPath(),
+        headers: {
+          Origin: TRUSTED_ORIGIN,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+      assert.equal(res.status, 400);
+      assert.equal((res.json() as ApiErrorBody).error.code, 'INVALID_REQUEST');
+    }
+    assert.deepEqual(claimCalls, []);
+  });
+
+  void it('rejects a hostile or missing mutation Origin without invoking the command', async () => {
+    const hostile = buildApp();
+    const hostileRes = await appRequest(hostile.app, {
+      method: 'POST',
+      path: claimPath(),
+      headers: {
+        Origin: HOSTILE_ORIGIN,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    });
+    assert.equal(hostileRes.status, 403);
+    assert.deepEqual(hostile.claimCalls, []);
+
+    const missing = buildApp();
+    const missingRes = await appRequest(missing.app, {
+      method: 'POST',
+      path: claimPath(),
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    assert.equal(missingRes.status, 403);
+    assert.deepEqual(missing.claimCalls, []);
+  });
+
+  void it('returns 401 for unauthenticated requests without invoking the command', async () => {
+    const { app, claimCalls } = buildApp({
+      requirePrincipal: () => Promise.reject(new UnauthenticatedError()),
+    });
+    const res = await appRequest(app, {
+      method: 'POST',
+      path: claimPath(),
+      headers: {
+        Origin: TRUSTED_ORIGIN,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    });
+    assert.equal(res.status, 401);
+    assert.equal((res.json() as ApiErrorBody).error.code, 'UNAUTHENTICATED');
+    assert.deepEqual(claimCalls, []);
+  });
+
+  void it('maps claim conflicts without leaking claimant identity', async () => {
+    const already = buildApp({
+      claimSupplyEntry: () => Promise.reject(new SupplyAlreadyClaimedError()),
+    });
+    const claimed = await appRequest(already.app, {
+      method: 'POST',
+      path: claimPath(),
+      headers: {
+        Origin: TRUSTED_ORIGIN,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    });
+    assert.equal(claimed.status, 409);
+    assert.equal(
+      (claimed.json() as ApiErrorBody).error.code,
+      'SUPPLY_ALREADY_CLAIMED',
+    );
+
+    const closed = buildApp({
+      claimSupplyEntry: () => Promise.reject(new SupplyNotOpenError()),
+    });
+    const notOpen = await appRequest(closed.app, {
+      method: 'POST',
+      path: claimPath(),
+      headers: {
+        Origin: TRUSTED_ORIGIN,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    });
+    assert.equal(notOpen.status, 409);
+    assert.equal(
+      (notOpen.json() as ApiErrorBody).error.code,
+      'SUPPLY_NOT_OPEN',
+    );
+    assertNoForbiddenLeak({
+      context: 'claim conflict HTTP',
+      text: `${claimed.text}\n${notOpen.text}`,
+      forbidden: leakSentinels,
+    });
+  });
+
+  void it('conceals an inaccessible Home', async () => {
+    const { app, claimCalls } = buildApp({
+      resolve: () => Promise.resolve(null),
+    });
+    const res = await appRequest(app, {
+      method: 'POST',
+      path: claimPath(OTHER_HOME_ID),
+      headers: {
+        Origin: TRUSTED_ORIGIN,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    });
+    assert.equal(res.status, 404);
+    assert.equal((res.json() as ApiErrorBody).error.code, 'NOT_FOUND');
+    assert.deepEqual(claimCalls, []);
+  });
+});
+
+void describe('POST /api/v1/homes/:homeId/supplies/:supplyEntryId/release-claim', () => {
+  void it('returns empty private 204 from a trusted Origin', async () => {
+    const { app, releaseCalls } = buildApp();
+    const res = await appRequest(app, {
+      method: 'POST',
+      path: releasePath(),
+      headers: {
+        Origin: TRUSTED_ORIGIN,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    });
+    assert.equal(res.status, 204);
+    assert.equal(res.text, '');
+    assert.equal(res.headers.get('cache-control'), 'private, no-store');
+    assert.deepEqual(releaseCalls, [
+      {
+        actor: actor(),
+        homeId: HOME_ID,
+        supplyEntryId: ENTRY_ID,
+      },
+    ]);
+  });
+
+  void it('accepts an absent body', async () => {
+    const { app, releaseCalls } = buildApp();
+    const res = await appRequest(app, {
+      method: 'POST',
+      path: releasePath(),
+      headers: { Origin: TRUSTED_ORIGIN },
+    });
+    assert.equal(res.status, 204);
+    assert.equal(releaseCalls.length, 1);
+  });
+
+  void it('rejects arrays, primitives, explicit null, and object properties', async () => {
+    const { app, releaseCalls } = buildApp();
+    for (const body of [null, [], 'release', 1, true, { extra: 1 }]) {
+      const res = await appRequest(app, {
+        method: 'POST',
+        path: releasePath(),
+        headers: {
+          Origin: TRUSTED_ORIGIN,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+      assert.equal(res.status, 400);
+      assert.equal((res.json() as ApiErrorBody).error.code, 'INVALID_REQUEST');
+    }
+    assert.deepEqual(releaseCalls, []);
+  });
+
+  void it('rejects a hostile or missing mutation Origin without invoking the command', async () => {
+    const hostile = buildApp();
+    const hostileRes = await appRequest(hostile.app, {
+      method: 'POST',
+      path: releasePath(),
+      headers: { Origin: HOSTILE_ORIGIN },
+    });
+    assert.equal(hostileRes.status, 403);
+    assert.deepEqual(hostile.releaseCalls, []);
+
+    const missing = buildApp();
+    const missingRes = await appRequest(missing.app, {
+      method: 'POST',
+      path: releasePath(),
+    });
+    assert.equal(missingRes.status, 403);
+    assert.deepEqual(missing.releaseCalls, []);
+  });
+
+  void it('returns 401 for unauthenticated requests without invoking the command', async () => {
+    const { app, releaseCalls } = buildApp({
+      requirePrincipal: () => Promise.reject(new UnauthenticatedError()),
+    });
+    const res = await appRequest(app, {
+      method: 'POST',
+      path: releasePath(),
+      headers: { Origin: TRUSTED_ORIGIN },
+    });
+    assert.equal(res.status, 401);
+    assert.equal((res.json() as ApiErrorBody).error.code, 'UNAUTHENTICATED');
+    assert.deepEqual(releaseCalls, []);
+  });
+
+  void it('maps inactive claims and conceals nonclaimant denials', async () => {
+    const inactive = buildApp({
+      releaseSupplyClaim: () => Promise.reject(new SupplyClaimNotActiveError()),
+    });
+    const inactiveRes = await appRequest(inactive.app, {
+      method: 'POST',
+      path: releasePath(),
+      headers: {
+        Origin: TRUSTED_ORIGIN,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    });
+    assert.equal(inactiveRes.status, 409);
+    assert.equal(
+      (inactiveRes.json() as ApiErrorBody).error.code,
+      'SUPPLY_CLAIM_NOT_ACTIVE',
+    );
+
+    const concealed = buildApp({
+      releaseSupplyClaim: () => Promise.reject(new ConcealedNotFoundError()),
+    });
+    const concealedRes = await appRequest(concealed.app, {
+      method: 'POST',
+      path: releasePath(),
+      headers: {
+        Origin: TRUSTED_ORIGIN,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    });
+    assert.equal(concealedRes.status, 404);
+    assert.equal((concealedRes.json() as ApiErrorBody).error.code, 'NOT_FOUND');
+    assertNoForbiddenLeak({
+      context: 'release HTTP',
+      text: `${inactiveRes.text}\n${concealedRes.text}`,
       forbidden: leakSentinels,
     });
   });

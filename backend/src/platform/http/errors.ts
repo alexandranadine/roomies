@@ -25,6 +25,12 @@ import {
   LastRoommateRequiresArchiveError,
 } from '../../domains/memberships/errors.js';
 import {
+  SupplyAlreadyClaimedError,
+  SupplyClaimNotActiveError,
+  SupplyNotOpenError,
+  SupplyPersistenceError,
+} from '../../domains/supplies/errors.js';
+import {
   TaskAlreadyCompletedError,
   TaskDefinitionAlreadyDeactivatedError,
   TaskPersistenceError,
@@ -245,6 +251,33 @@ export function errorHandler(
     return;
   }
 
+  if (err instanceof SupplyAlreadyClaimedError) {
+    sendApiError(
+      res,
+      409,
+      'SUPPLY_ALREADY_CLAIMED',
+      'Supply already claimed',
+      requestId,
+    );
+    return;
+  }
+
+  if (err instanceof SupplyNotOpenError) {
+    sendApiError(res, 409, 'SUPPLY_NOT_OPEN', 'Supply is not open', requestId);
+    return;
+  }
+
+  if (err instanceof SupplyClaimNotActiveError) {
+    sendApiError(
+      res,
+      409,
+      'SUPPLY_CLAIM_NOT_ACTIVE',
+      'Supply claim is not active',
+      requestId,
+    );
+    return;
+  }
+
   if (err instanceof TaskDefinitionAlreadyDeactivatedError) {
     sendApiError(
       res,
@@ -270,6 +303,7 @@ export function errorHandler(
     err instanceof AuthorizationIntegrityError ||
     err instanceof StructuralIntegrityError ||
     err instanceof TaskPersistenceError ||
+    err instanceof SupplyPersistenceError ||
     err instanceof TransactionInfrastructureError ||
     err instanceof AuthInfrastructureError
   ) {

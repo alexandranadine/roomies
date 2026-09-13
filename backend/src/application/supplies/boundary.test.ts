@@ -109,12 +109,13 @@ void describe('supplies application boundary', () => {
     assert.doesNotMatch(source, /outbox/);
     assert.doesNotMatch(source, /supply\.created/);
     assert.doesNotMatch(source, /insertSupplyClaim/);
+    assert.doesNotMatch(source, /lockSupplyEntryByHomeAndId/);
     assert.doesNotMatch(source, /SERIALIZABLE/);
     assert.doesNotMatch(source, /pg_advisory/i);
     assert.doesNotMatch(source, /user_id/);
   });
 
-  void it('lists Home Supplies through the public repository without claim joins', async () => {
+  void it('lists Home Supplies through the public repository projection', async () => {
     const source = await readFile(
       path.join(dir, 'list-home-supplies.ts'),
       'utf8',
@@ -123,6 +124,7 @@ void describe('supplies application boundary', () => {
     assert.match(source, /listSupplyEntriesByHome/);
     assert.match(source, /listOpenEntriesByHome/);
     assert.match(source, /listSupplyEntriesByHomeAndStatus/);
+    assert.match(source, /ListedSupplyEntry/);
     assert.doesNotMatch(source, /decideHomeRead/);
     assert.doesNotMatch(source, /memberships\/repository/);
     assert.doesNotMatch(source, /homes\/repository/);
@@ -133,7 +135,60 @@ void describe('supplies application boundary', () => {
     assert.doesNotMatch(source, /lockHomeStructure/);
     assert.doesNotMatch(source, /lockHomeAndExactMemberships/);
     assert.doesNotMatch(source, /FOR UPDATE/i);
-    assert.doesNotMatch(source, /supply_claims/);
-    assert.doesNotMatch(source, /activeClaim|claimedBy|canClaim/);
+    assert.doesNotMatch(source, /LEFT JOIN/);
+    assert.doesNotMatch(source, /findActiveClaimByEntry/);
+    assert.doesNotMatch(source, /claimedBy|canClaim/);
+  });
+
+  void it('claims through Home lock and Supplies primitives without outbox', async () => {
+    const source = await readFile(
+      path.join(dir, 'claim-supply-entry.ts'),
+      'utf8',
+    );
+    assert.match(source, /decideSupplyClaim/);
+    assert.match(source, /lockHomeAndExactMemberships/);
+    assert.match(source, /lockSupplyEntryByHomeAndId/);
+    assert.match(source, /lockActiveClaimByEntry/);
+    assert.match(source, /insertSupplyClaim/);
+    assert.match(source, /runInReadCommittedTransaction/);
+    assert.match(source, /claimantMembershipId: actor\.membershipId/);
+    assert.doesNotMatch(source, /findActiveClaimByEntry/);
+    assert.doesNotMatch(source, /memberships\/repository/);
+    assert.doesNotMatch(source, /homes\/repository/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+    assert.doesNotMatch(source, /Date\.now/);
+    assert.doesNotMatch(source, /new Date\(/);
+    assert.doesNotMatch(source, /outbox/);
+    assert.doesNotMatch(source, /supply\.claimed/);
+    assert.doesNotMatch(source, /SERIALIZABLE/);
+    assert.doesNotMatch(source, /pg_advisory/i);
+    assert.doesNotMatch(source, /Idempotency-Key/);
+  });
+
+  void it('releases through ownership policy and conditional update without Admin bypass', async () => {
+    const source = await readFile(
+      path.join(dir, 'release-supply-claim.ts'),
+      'utf8',
+    );
+    assert.match(source, /decideSupplyReleaseClaim/);
+    assert.match(source, /lockHomeAndExactMemberships/);
+    assert.match(source, /lockSupplyEntryByHomeAndId/);
+    assert.match(source, /lockActiveClaimByEntry/);
+    assert.match(source, /releaseActiveClaimOwnedByMembership/);
+    assert.match(source, /runInReadCommittedTransaction/);
+    assert.doesNotMatch(source, /findActiveClaimByEntry/);
+    assert.doesNotMatch(source, /isHomeAdmin/);
+    assert.doesNotMatch(source, /memberships\/repository/);
+    assert.doesNotMatch(source, /homes\/repository/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+    assert.doesNotMatch(source, /Date\.now/);
+    assert.doesNotMatch(source, /new Date\(/);
+    assert.doesNotMatch(source, /outbox/);
+    assert.doesNotMatch(source, /supply\.released/);
+    assert.doesNotMatch(source, /SERIALIZABLE/);
+    assert.doesNotMatch(source, /pg_advisory/i);
+    assert.doesNotMatch(source, /Idempotency-Key/);
   });
 });

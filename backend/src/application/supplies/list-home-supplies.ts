@@ -4,7 +4,7 @@ import {
   type SupplyRepository,
 } from '../../domains/supplies/repository.js';
 import type {
-  SupplyEntry,
+  ListedSupplyEntry,
   SupplyEntryStatus,
 } from '../../domains/supplies/supply.js';
 import type { ActiveHomeActor } from '../../platform/authz/context.js';
@@ -25,13 +25,13 @@ export type ListHomeSuppliesRepository = Pick<
 >;
 
 /**
- * Authorized Home SupplyEntry list. Uses supply.list. Does not take
- * structural locks, join claims, or emit events.
+ * Authorized Home SupplyEntry list. Uses supply.list and the Home-scoped
+ * active-claim projection. Does not take structural locks or emit events.
  */
 export async function listHomeSupplies(
   input: ListHomeSuppliesInput,
   supplies: ListHomeSuppliesRepository,
-): Promise<readonly SupplyEntry[]> {
+): Promise<readonly ListedSupplyEntry[]> {
   const decision = decideSupplyList({
     actor: input.actor,
     targetHomeId: input.homeId,
@@ -51,7 +51,7 @@ export async function listHomeSupplies(
 
 export function createListHomeSuppliesFromPool(
   pool: TransactionPool,
-): (input: ListHomeSuppliesInput) => Promise<readonly SupplyEntry[]> {
+): (input: ListHomeSuppliesInput) => Promise<readonly ListedSupplyEntry[]> {
   const supplies = createSupplyRepository(
     pool as Parameters<typeof createSupplyRepository>[0],
   );
