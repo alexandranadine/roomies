@@ -9,6 +9,9 @@ import { createLeaveMembershipFromPool } from './application/home-administration
 import { createRemoveMembershipFromPool } from './application/home-administration/remove-membership.js';
 import { createCompleteTaskFromPool } from './application/tasks/complete-task.js';
 import { createCreateManualTaskFromPool } from './application/tasks/create-manual-task.js';
+import { createCreateRecurringTaskDefinitionFromPool } from './application/tasks/create-recurring-task-definition.js';
+import { createDeactivateTaskDefinitionFromPool } from './application/tasks/deactivate-task-definition.js';
+import { createListHomeTaskDefinitionsFromPool } from './application/tasks/list-home-task-definitions.js';
 import { createListHomeTasksFromPool } from './application/tasks/list-home-tasks.js';
 import {
   createActiveHomesForUserReader,
@@ -89,6 +92,14 @@ function main(): void {
         createManualTask: createCreateManualTaskFromPool(databasePool.pool),
         listHomeTasks: createListHomeTasksFromPool(databasePool.pool),
         completeTask: createCompleteTaskFromPool(databasePool.pool),
+        createRecurringTaskDefinition:
+          createCreateRecurringTaskDefinitionFromPool(databasePool.pool),
+        listHomeTaskDefinitions: createListHomeTaskDefinitionsFromPool(
+          databasePool.pool,
+        ),
+        deactivateTaskDefinition: createDeactivateTaskDefinitionFromPool(
+          databasePool.pool,
+        ),
       },
     }),
   });

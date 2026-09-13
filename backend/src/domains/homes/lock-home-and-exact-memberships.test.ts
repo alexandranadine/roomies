@@ -23,7 +23,7 @@ type RecordedQuery = {
 };
 
 function txWith(script: {
-  home?: { id: string; archived_at: Date | null }[];
+  home?: { id: string; archived_at: Date | null; timezone?: string }[];
   memberships?: Record<
     string,
     {
@@ -36,7 +36,9 @@ function txWith(script: {
   >;
   failOn?: 'home' | 'membership';
 }): { tx: TransactionContext; queries: RecordedQuery[] } {
-  const home = script.home ?? [{ id: HOME_A, archived_at: null }];
+  const home = script.home ?? [
+    { id: HOME_A, archived_at: null, timezone: 'UTC' },
+  ];
   const memberships = script.memberships ?? {};
   const queries: RecordedQuery[] = [];
 
@@ -136,6 +138,7 @@ void describe('lockHomeAndExactMemberships', () => {
       [MEMBERSHIP_LOW, MEMBERSHIP_HIGH],
     );
     assert.equal(locked.home.archivedAt, null);
+    assert.equal(locked.home.timezone, 'UTC');
   });
 
   void it('locks a Membership only once when actor and assignee are the same', async () => {
@@ -208,7 +211,7 @@ void describe('lockHomeAndExactMemberships', () => {
 
   void it('conceals an archived Home before locking Memberships', async () => {
     const { tx, queries } = txWith({
-      home: [{ id: HOME_A, archived_at: new Date() }],
+      home: [{ id: HOME_A, archived_at: new Date(), timezone: 'UTC' }],
     });
     await assert.rejects(
       () =>

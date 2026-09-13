@@ -34,3 +34,24 @@ export class TaskAlreadyCompletedError extends Error {
     super('Task already completed');
   }
 }
+
+export class InvalidRecurrenceConfigurationError extends Error {
+  override readonly name = 'InvalidRecurrenceConfigurationError';
+
+  constructor() {
+    super('Invalid recurrence configuration');
+  }
+}
+
+/**
+ * Visible state conflict: deactivation happens exactly once.
+ * A second deactivate does not rewrite deactivatedAt or the cleared cursor.
+ */
+export class TaskDefinitionAlreadyDeactivatedError extends Error {
+  override readonly name = 'TaskDefinitionAlreadyDeactivatedError';
+  readonly code = 'TASK_DEFINITION_ALREADY_DEACTIVATED';
+
+  constructor() {
+    super('Task definition already deactivated');
+  }
+}

@@ -1,7 +1,15 @@
+import type { Temporal } from '@js-temporal/polyfill';
 import type { Pool } from 'pg';
 import type { TransactionContext } from '../../platform/persistence/transaction.js';
 import { TaskPersistenceError } from './errors.js';
-import { HOME_LOCAL_DATE_PATTERN } from './home-local-date.js';
+import {
+  HOME_LOCAL_DATE_PATTERN,
+  parseHomeLocalDate,
+} from './home-local-date.js';
+import type { DateString } from './home-local-date.js';
+import { isTaskRecurrenceFrequency } from './recurrence-config.js';
+import type { TaskRecurrenceFrequency } from './recurrence-cursor.js';
+import type { TaskDefinition } from './task-definition.js';
 import { isTaskSource, isTaskStatus, type TaskInstance } from './task.js';
 
 const UUID_PATTERN =
@@ -121,6 +129,90 @@ WHERE home_id = $1::uuid
   AND deactivated_at IS NULL
 `;
 
+const TASK_DEFINITION_COLUMNS = `
+id,
+home_id,
+title,
+recurrence_frequency,
+recurrence_weekday,
+recurrence_day_of_month,
+assigned_membership_id,
+creator_membership_id,
+next_occurrence_date::text AS next_occurrence_date,
+next_occurrence_at,
+deactivated_at,
+created_at,
+updated_at
+`;
+
+export const INSERT_TASK_DEFINITION_SQL = `
+INSERT INTO task_definitions (
+  id,
+  home_id,
+  title,
+  assigned_membership_id,
+  creator_membership_id,
+  recurrence_frequency,
+  recurrence_weekday,
+  recurrence_day_of_month,
+  next_occurrence_date,
+  next_occurrence_at,
+  deactivated_at,
+  created_at,
+  updated_at
+)
+VALUES (
+  $1::uuid,
+  $2::uuid,
+  $3,
+  $4::uuid,
+  $5::uuid,
+  $6,
+  $7,
+  $8,
+  $9::date,
+  $10::timestamptz,
+  NULL,
+  $11::timestamptz,
+  $11::timestamptz
+)
+RETURNING ${TASK_DEFINITION_COLUMNS}
+`;
+
+export const LIST_TASK_DEFINITIONS_BY_HOME_SQL = `
+SELECT ${TASK_DEFINITION_COLUMNS}
+FROM task_definitions
+WHERE home_id = $1::uuid
+ORDER BY
+  CASE WHEN deactivated_at IS NULL THEN 0 ELSE 1 END,
+  COALESCE(deactivated_at, created_at) ASC,
+  id ASC
+`;
+
+export const LOCK_TASK_DEFINITION_BY_HOME_AND_ID_SQL = `
+SELECT ${TASK_DEFINITION_COLUMNS}
+FROM task_definitions
+WHERE home_id = $1::uuid
+  AND id = $2::uuid
+LIMIT 2
+FOR UPDATE
+`;
+
+export const DEACTIVATE_ACTIVE_TASK_DEFINITION_SQL = `
+UPDATE task_definitions
+SET
+  deactivated_at = $3::timestamptz,
+  next_occurrence_date = NULL,
+  next_occurrence_at = NULL,
+  updated_at = $3::timestamptz
+WHERE home_id = $1::uuid
+  AND id = $2::uuid
+  AND deactivated_at IS NULL
+  AND next_occurrence_date IS NOT NULL
+  AND next_occurrence_at IS NOT NULL
+RETURNING ${TASK_DEFINITION_COLUMNS}
+`;
+
 export type NewManualTaskInstance = Readonly<{
   id: string;
   homeId: string;
@@ -141,6 +233,26 @@ export type UnassignMembershipAssignments = Readonly<{
   homeId: string;
   membershipId: string;
   updatedAt: Date;
+}>;
+
+export type NewTaskDefinition = Readonly<{
+  id: string;
+  homeId: string;
+  title: string;
+  frequency: TaskRecurrenceFrequency;
+  weekday: number | null;
+  dayOfMonth: number | null;
+  assignedMembershipId: string | null;
+  creatorMembershipId: string;
+  nextOccurrenceDate: DateString;
+  nextOccurrenceAt: Temporal.Instant;
+  createdAt: Date;
+}>;
+
+export type DeactivateActiveTaskDefinition = Readonly<{
+  homeId: string;
+  taskDefinitionId: string;
+  deactivatedAt: Date;
 }>;
 
 export type TaskRepository = Readonly<{
@@ -167,6 +279,20 @@ export type TaskRepository = Readonly<{
     tx: TransactionContext,
     input: UnassignMembershipAssignments,
   ): Promise<number>;
+  insertDefinition(
+    tx: TransactionContext,
+    definition: NewTaskDefinition,
+  ): Promise<TaskDefinition>;
+  listDefinitionsByHome(homeId: string): Promise<readonly TaskDefinition[]>;
+  lockDefinitionByHomeAndId(
+    tx: TransactionContext,
+    homeId: string,
+    taskDefinitionId: string,
+  ): Promise<TaskDefinition | null>;
+  deactivateActiveDefinition(
+    tx: TransactionContext,
+    input: DeactivateActiveTaskDefinition,
+  ): Promise<TaskDefinition | null>;
 }>;
 
 type TaskInstanceRow = {
@@ -270,6 +396,117 @@ function oneRow(
     throw new TaskPersistenceError();
   }
   return parseTaskInstanceRow(rows[0], homeId);
+}
+
+type TaskDefinitionRow = {
+  id: unknown;
+  home_id: unknown;
+  title: unknown;
+  recurrence_frequency: unknown;
+  recurrence_weekday: unknown;
+  recurrence_day_of_month: unknown;
+  assigned_membership_id: unknown;
+  creator_membership_id: unknown;
+  next_occurrence_date: unknown;
+  next_occurrence_at: unknown;
+  deactivated_at: unknown;
+  created_at: unknown;
+  updated_at: unknown;
+};
+
+function parseOptionalInteger(value: unknown): number | null {
+  if (value === null) {
+    return null;
+  }
+  if (typeof value === 'number' && Number.isInteger(value)) {
+    return value;
+  }
+  if (typeof value === 'string' && /^-?\d+$/.test(value)) {
+    const parsed = Number(value);
+    if (Number.isInteger(parsed)) {
+      return parsed;
+    }
+  }
+  throw new TaskPersistenceError();
+}
+
+function parseOptionalDateString(value: unknown): DateString | null {
+  if (value === null) {
+    return null;
+  }
+  if (typeof value === 'string' && HOME_LOCAL_DATE_PATTERN.test(value)) {
+    return parseHomeLocalDate(value);
+  }
+  throw new TaskPersistenceError();
+}
+
+function parseOptionalDate(value: unknown): Date | null {
+  if (value === null) {
+    return null;
+  }
+  if (isDate(value)) {
+    return value;
+  }
+  throw new TaskPersistenceError();
+}
+
+function parseTaskDefinitionRow(
+  row: TaskDefinitionRow,
+  homeId: string,
+): TaskDefinition {
+  if (
+    !isUuid(row.id) ||
+    !isUuid(row.home_id) ||
+    row.home_id !== homeId ||
+    typeof row.title !== 'string' ||
+    !isTaskRecurrenceFrequency(row.recurrence_frequency) ||
+    !isUuid(row.creator_membership_id) ||
+    !isDate(row.created_at) ||
+    !isDate(row.updated_at)
+  ) {
+    throw new TaskPersistenceError();
+  }
+
+  const weekday = parseOptionalInteger(row.recurrence_weekday);
+  const dayOfMonth = parseOptionalInteger(row.recurrence_day_of_month);
+  const assignedMembershipId = parseOptionalUuid(row.assigned_membership_id);
+  const nextOccurrenceDate = parseOptionalDateString(row.next_occurrence_date);
+  const nextOccurrenceAt = parseOptionalDate(row.next_occurrence_at);
+  const deactivatedAt = parseOptionalDate(row.deactivated_at);
+
+  if (deactivatedAt === null) {
+    if (nextOccurrenceDate === null || nextOccurrenceAt === null) {
+      throw new TaskPersistenceError();
+    }
+  } else if (nextOccurrenceDate !== null || nextOccurrenceAt !== null) {
+    throw new TaskPersistenceError();
+  }
+
+  return Object.freeze({
+    id: row.id,
+    homeId: row.home_id,
+    title: row.title,
+    frequency: row.recurrence_frequency,
+    weekday,
+    dayOfMonth,
+    assignedMembershipId,
+    creatorMembershipId: row.creator_membership_id,
+    nextOccurrenceDate,
+    nextOccurrenceAt,
+    deactivatedAt,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  });
+}
+
+function oneDefinitionRow(
+  rows: readonly TaskDefinitionRow[],
+  homeId: string,
+): TaskDefinition {
+  if (rows.length !== 1 || rows[0] === undefined) {
+    throw new TaskPersistenceError();
+  }
+  return parseTaskDefinitionRow(rows[0], homeId);
 }
 
 export function createTaskRepository(pool: Pool): TaskRepository {
@@ -402,6 +639,92 @@ export function createTaskRepository(pool: Pool): TaskRepository {
         }
         throw new TaskPersistenceError();
       }
+    },
+
+    async insertDefinition(tx, definition) {
+      let rows: TaskDefinitionRow[];
+      try {
+        rows = (
+          await tx.query<TaskDefinitionRow>(INSERT_TASK_DEFINITION_SQL, [
+            definition.id,
+            definition.homeId,
+            definition.title,
+            definition.assignedMembershipId,
+            definition.creatorMembershipId,
+            definition.frequency,
+            definition.weekday,
+            definition.dayOfMonth,
+            definition.nextOccurrenceDate,
+            definition.nextOccurrenceAt.toString(),
+            definition.createdAt,
+          ])
+        ).rows;
+      } catch (error) {
+        if (error instanceof TaskPersistenceError) {
+          throw error;
+        }
+        throw new TaskPersistenceError();
+      }
+      return oneDefinitionRow(rows, definition.homeId);
+    },
+
+    async listDefinitionsByHome(homeId) {
+      let rows: TaskDefinitionRow[];
+      try {
+        rows = (
+          await pool.query<TaskDefinitionRow>(
+            LIST_TASK_DEFINITIONS_BY_HOME_SQL,
+            [homeId],
+          )
+        ).rows;
+      } catch {
+        throw new TaskPersistenceError();
+      }
+      return Object.freeze(
+        rows.map((row) => parseTaskDefinitionRow(row, homeId)),
+      );
+    },
+
+    async lockDefinitionByHomeAndId(tx, homeId, taskDefinitionId) {
+      let rows: TaskDefinitionRow[];
+      try {
+        rows = (
+          await tx.query<TaskDefinitionRow>(
+            LOCK_TASK_DEFINITION_BY_HOME_AND_ID_SQL,
+            [homeId, taskDefinitionId],
+          )
+        ).rows;
+      } catch (error) {
+        if (error instanceof TaskPersistenceError) {
+          throw error;
+        }
+        throw new TaskPersistenceError();
+      }
+      if (rows.length === 0) {
+        return null;
+      }
+      return oneDefinitionRow(rows, homeId);
+    },
+
+    async deactivateActiveDefinition(tx, input) {
+      let rows: TaskDefinitionRow[];
+      try {
+        rows = (
+          await tx.query<TaskDefinitionRow>(
+            DEACTIVATE_ACTIVE_TASK_DEFINITION_SQL,
+            [input.homeId, input.taskDefinitionId, input.deactivatedAt],
+          )
+        ).rows;
+      } catch (error) {
+        if (error instanceof TaskPersistenceError) {
+          throw error;
+        }
+        throw new TaskPersistenceError();
+      }
+      if (rows.length === 0) {
+        return null;
+      }
+      return oneDefinitionRow(rows, input.homeId);
     },
   });
 }

@@ -19,6 +19,9 @@ import {
   createTasksRouter,
   type CompleteTaskCommand,
   type CreateManualTaskCommand,
+  type CreateRecurringTaskDefinitionCommand,
+  type DeactivateTaskDefinitionCommand,
+  type ListHomeTaskDefinitionsCommand,
   type ListHomeTasksCommand,
 } from '../domains/tasks/http.js';
 import { createCurrentUserRouter } from '../domains/users/http.js';
@@ -59,6 +62,9 @@ export type CreateRoomiesApiRouterOptions = {
     createManualTask: CreateManualTaskCommand;
     listHomeTasks: ListHomeTasksCommand;
     completeTask: CompleteTaskCommand;
+    createRecurringTaskDefinition: CreateRecurringTaskDefinitionCommand;
+    listHomeTaskDefinitions: ListHomeTaskDefinitionsCommand;
+    deactivateTaskDefinition: DeactivateTaskDefinitionCommand;
   };
 };
 
@@ -120,6 +126,10 @@ export function createRoomiesApiRouter(
         createManualTask: options.tasks.createManualTask,
         listHomeTasks: options.tasks.listHomeTasks,
         completeTask: options.tasks.completeTask,
+        createRecurringTaskDefinition:
+          options.tasks.createRecurringTaskDefinition,
+        listHomeTaskDefinitions: options.tasks.listHomeTaskDefinitions,
+        deactivateTaskDefinition: options.tasks.deactivateTaskDefinition,
       }),
     );
   }

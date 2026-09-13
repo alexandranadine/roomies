@@ -90,6 +90,83 @@ void describe('tasks application boundary', () => {
     assert.doesNotMatch(source, /completedBy/);
   });
 
+  void it('creates recurring TaskDefinitions through locked Home timezone without instances or outbox', async () => {
+    const source = await readFile(
+      path.join(dir, 'create-recurring-task-definition.ts'),
+      'utf8',
+    );
+    assert.match(source, /decideTaskDefinitionCreate/);
+    assert.match(source, /lockHomeAndExactMemberships/);
+    assert.match(source, /insertDefinition/);
+    assert.match(source, /computeInitialRecurrenceCursor/);
+    assert.match(source, /locked\.home\.timezone/);
+    assert.match(source, /runInReadCommittedTransaction/);
+    assert.match(source, /normalizeTaskTitle/);
+    assert.match(source, /normalizeRecurrenceConfiguration/);
+    assert.match(source, /creatorMembershipId: actor\.membershipId/);
+    assert.doesNotMatch(source, /decideHomeRead/);
+    assert.doesNotMatch(source, /findActiveHomeMembership/);
+    assert.doesNotMatch(source, /memberships\/repository/);
+    assert.doesNotMatch(source, /homes\/repository/);
+    assert.doesNotMatch(source, /lockHomeStructure/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+    assert.doesNotMatch(source, /Date\.now/);
+    assert.doesNotMatch(source, /new Date\(/);
+    assert.doesNotMatch(source, /outbox/);
+    assert.doesNotMatch(source, /task_definition\.created/);
+    assert.doesNotMatch(source, /insertManual/);
+    assert.doesNotMatch(source, /SERIALIZABLE/);
+    assert.doesNotMatch(source, /user_id/);
+  });
+
+  void it('lists Home TaskDefinitions through the public repository without joins', async () => {
+    const source = await readFile(
+      path.join(dir, 'list-home-task-definitions.ts'),
+      'utf8',
+    );
+    assert.match(source, /decideTaskDefinitionList/);
+    assert.match(source, /listDefinitionsByHome/);
+    assert.doesNotMatch(source, /decideHomeRead/);
+    assert.doesNotMatch(source, /memberships\/repository/);
+    assert.doesNotMatch(source, /homes\/repository/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+    assert.doesNotMatch(source, /outbox/);
+    assert.doesNotMatch(source, /lockHomeStructure/);
+    assert.doesNotMatch(source, /lockHomeAndExactMemberships/);
+    assert.doesNotMatch(source, /FOR UPDATE/i);
+    assert.doesNotMatch(source, /user_id/);
+    assert.doesNotMatch(source, /email/);
+  });
+
+  void it('deactivates TaskDefinitions through exact creator-or-Admin without assignee locks', async () => {
+    const source = await readFile(
+      path.join(dir, 'deactivate-task-definition.ts'),
+      'utf8',
+    );
+    assert.match(source, /decideTaskDefinitionDeactivate/);
+    assert.match(source, /lockHomeAndExactMemberships/);
+    assert.match(source, /lockDefinitionByHomeAndId/);
+    assert.match(source, /deactivateActiveDefinition/);
+    assert.match(source, /TaskDefinitionAlreadyDeactivatedError/);
+    assert.match(source, /runInReadCommittedTransaction/);
+    assert.doesNotMatch(source, /decideHomeRead/);
+    assert.doesNotMatch(source, /isHomeAdmin/);
+    assert.doesNotMatch(source, /assignedMembershipId/);
+    assert.doesNotMatch(source, /memberships\/repository/);
+    assert.doesNotMatch(source, /homes\/repository/);
+    assert.doesNotMatch(source, /lockHomeStructure/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+    assert.doesNotMatch(source, /Date\.now/);
+    assert.doesNotMatch(source, /new Date\(/);
+    assert.doesNotMatch(source, /outbox/);
+    assert.doesNotMatch(source, /task_definition\.deactivated/);
+    assert.doesNotMatch(source, /SERIALIZABLE/);
+    assert.doesNotMatch(source, /user_id/);
+  });
+
   void it('lists Home Tasks through the public repository without definition joins', async () => {
     const source = await readFile(path.join(dir, 'list-home-tasks.ts'), 'utf8');
     assert.match(source, /decideTaskList/);

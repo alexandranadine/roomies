@@ -18,7 +18,7 @@ import { evaluateHomeStructureInvariant } from './structure-invariant.js';
  * mutex. Missing and archived Homes share the same concealed 404.
  */
 export const LOCK_HOME_FOR_UPDATE_SQL = `
-SELECT id, archived_at
+SELECT id, archived_at, timezone
 FROM homes
 WHERE id = $1
 FOR UPDATE

@@ -26,6 +26,7 @@ import {
 } from '../../domains/memberships/errors.js';
 import {
   TaskAlreadyCompletedError,
+  TaskDefinitionAlreadyDeactivatedError,
   TaskPersistenceError,
 } from '../../domains/tasks/errors.js';
 import { getRequestId } from './request-id.js';
@@ -239,6 +240,17 @@ export function errorHandler(
       409,
       'TASK_ALREADY_COMPLETED',
       'Task already completed',
+      requestId,
+    );
+    return;
+  }
+
+  if (err instanceof TaskDefinitionAlreadyDeactivatedError) {
+    sendApiError(
+      res,
+      409,
+      'TASK_DEFINITION_ALREADY_DEACTIVATED',
+      'Task definition already deactivated',
       requestId,
     );
     return;

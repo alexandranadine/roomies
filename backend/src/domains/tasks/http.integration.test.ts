@@ -4,6 +4,9 @@ import { describe, it } from 'node:test';
 import type { Pool } from 'pg';
 import { createCompleteTaskFromPool } from '../../application/tasks/complete-task.js';
 import { createCreateManualTaskFromPool } from '../../application/tasks/create-manual-task.js';
+import { createCreateRecurringTaskDefinitionFromPool } from '../../application/tasks/create-recurring-task-definition.js';
+import { createDeactivateTaskDefinitionFromPool } from '../../application/tasks/deactivate-task-definition.js';
+import { createListHomeTaskDefinitionsFromPool } from '../../application/tasks/list-home-task-definitions.js';
 import { createListHomeTasksFromPool } from '../../application/tasks/list-home-tasks.js';
 import { createHomeRepository } from '../homes/index.js';
 import { createRoomiesApiRouter } from '../../http/create-roomies-api.js';
@@ -153,6 +156,14 @@ void describe('Task HTTP PostgreSQL', () => {
               createManualTask: createCreateManualTaskFromPool(database.pool),
               listHomeTasks: createListHomeTasksFromPool(database.pool),
               completeTask: createCompleteTaskFromPool(database.pool),
+              createRecurringTaskDefinition:
+                createCreateRecurringTaskDefinitionFromPool(database.pool),
+              listHomeTaskDefinitions: createListHomeTaskDefinitionsFromPool(
+                database.pool,
+              ),
+              deactivateTaskDefinition: createDeactivateTaskDefinitionFromPool(
+                database.pool,
+              ),
             },
           }),
         });
@@ -466,6 +477,14 @@ void describe('Task HTTP PostgreSQL', () => {
               createManualTask: createCreateManualTaskFromPool(database.pool),
               listHomeTasks: createListHomeTasksFromPool(database.pool),
               completeTask: createCompleteTaskFromPool(database.pool),
+              createRecurringTaskDefinition:
+                createCreateRecurringTaskDefinitionFromPool(database.pool),
+              listHomeTaskDefinitions: createListHomeTaskDefinitionsFromPool(
+                database.pool,
+              ),
+              deactivateTaskDefinition: createDeactivateTaskDefinitionFromPool(
+                database.pool,
+              ),
             },
           }),
         });

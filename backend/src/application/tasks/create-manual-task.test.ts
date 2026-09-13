@@ -120,6 +120,7 @@ function harness(options: HarnessOptions = {}) {
         home: {
           id: lookup.homeId,
           archivedAt: options.homeArchived === true ? OCCURRED_AT : null,
+          timezone: 'UTC',
         },
         memberships: options.memberships ?? [
           lockedMembership(),

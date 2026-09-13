@@ -57,6 +57,13 @@ void describe('tasks domain boundary', () => {
     assert.match(source, /completeOpenTask/);
     assert.match(source, /unassignOpenTasksForMembership/);
     assert.match(source, /unassignActiveDefinitionsForMembership/);
+    assert.match(source, /insertDefinition/);
+    assert.match(source, /listDefinitionsByHome/);
+    assert.match(source, /lockDefinitionByHomeAndId/);
+    assert.match(source, /deactivateActiveDefinition/);
+    assert.match(source, /next_occurrence_date::text/);
+    assert.match(source, /next_occurrence_date IS NOT NULL/);
+    assert.match(source, /next_occurrence_at IS NOT NULL/);
     assert.match(source, /scheduled_for::text/);
     assert.match(source, /\$4::date/);
     assert.match(source, /'MANUAL'/);
@@ -87,6 +94,9 @@ void describe('tasks domain boundary', () => {
       'create-policy.ts',
       'list-policy.ts',
       'complete-policy.ts',
+      'definition-create-policy.ts',
+      'definition-list-policy.ts',
+      'definition-deactivate-policy.ts',
       'actions.ts',
     ]) {
       const source = await readFile(path.join(tasksDir, name), 'utf8');
@@ -100,6 +110,9 @@ void describe('tasks domain boundary', () => {
     assert.match(actions, /task\.create/);
     assert.match(actions, /task\.list/);
     assert.match(actions, /task\.complete/);
+    assert.match(actions, /task_definition\.create/);
+    assert.match(actions, /task_definition\.list/);
+    assert.match(actions, /task_definition\.deactivate/);
   });
 
   void it('keeps Task HTTP adapter-only on the existing Home authz path', async () => {
@@ -107,6 +120,12 @@ void describe('tasks domain boundary', () => {
     assert.match(source, /router\.post\('\/:homeId\/tasks'/);
     assert.match(source, /router\.get\('\/:homeId\/tasks'/);
     assert.match(source, /router\.post\('\/:homeId\/tasks\/:taskId\/complete'/);
+    assert.match(source, /router\.post\('\/:homeId\/task-definitions'/);
+    assert.match(source, /router\.get\('\/:homeId\/task-definitions'/);
+    assert.match(
+      source,
+      /router\.post\(\s*'\/:homeId\/task-definitions\/:taskDefinitionId\/deactivate'/,
+    );
     assert.match(source, /createRequireHomeContext/);
     assert.match(source, /createRequireAuth/);
     assert.match(source, /setPrivateNoStoreHeaders/);

@@ -44,6 +44,7 @@ export type LockedHomeAndExactMemberships = Readonly<{
   home: Readonly<{
     id: string;
     archivedAt: Date | null;
+    timezone: string;
   }>;
   memberships: readonly ExactLockedMembership[];
 }>;
@@ -54,6 +55,7 @@ const UUID_PATTERN =
 type HomeLockRow = {
   id: unknown;
   archived_at: unknown;
+  timezone: unknown;
 };
 
 type MembershipLockRow = {
@@ -140,7 +142,9 @@ export async function lockHomeAndExactMemberships(
   if (
     !isUuid(homeRow.id) ||
     homeRow.id !== input.homeId ||
-    !isDateOrNull(homeRow.archived_at)
+    !isDateOrNull(homeRow.archived_at) ||
+    typeof homeRow.timezone !== 'string' ||
+    homeRow.timezone.length === 0
   ) {
     logStructuralFailure('home');
     throw new StructuralIntegrityError();
@@ -181,6 +185,7 @@ export async function lockHomeAndExactMemberships(
     home: Object.freeze({
       id: homeRow.id,
       archivedAt: homeRow.archived_at,
+      timezone: homeRow.timezone,
     }),
     memberships: Object.freeze(memberships),
   });
