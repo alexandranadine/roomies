@@ -6,6 +6,7 @@ import { HomeShellPage } from '../homes/home-shell-page.js';
 import { InvitationLandingPage } from '../invitations/invitation-landing-page.js';
 import { MaintenanceDetailPage } from '../maintenance/maintenance-detail-page.js';
 import { MaintenanceListPage } from '../maintenance/maintenance-list-page.js';
+import { NotificationsListPage } from '../notifications/notifications-list-page.js';
 import { AppShell } from './app-shell.js';
 import { NotFoundPage } from './not-found-page.js';
 import { RequireAuth } from './require-auth.js';
@@ -23,6 +24,7 @@ export type CreateAppRouterOptions = {
  * Router foundation:
  * - `/` — authenticated active-Home discovery
  * - `/homes/:homeId` — URL-backed authorized Home shell
+ * - `/notifications` — authenticated global Notifications inbox
  * - `/invitations/:invitationId` — signed-out invitation preview landing
  * - `/__dev/ui` — development visual QA fixture (never in production)
  * - `*` — not-found
@@ -79,6 +81,14 @@ export function buildAppChildRoutes(includeDevRoutes: boolean): RouteObject[] {
           element: <MaintenanceDetailPage />,
         },
       ],
+    },
+    {
+      path: 'notifications',
+      element: (
+        <RequireAuth>
+          <NotificationsListPage />
+        </RequireAuth>
+      ),
     },
     {
       path: 'invitations/:invitationId',

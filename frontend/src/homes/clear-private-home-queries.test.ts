@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { notificationKeys } from '../notifications/notifications-query-keys.js';
 import { createAppQueryClient } from '../platform/query/query-client.js';
 import { clearPrivateHomeQueryState } from './clear-private-home-queries.js';
 import {
@@ -10,7 +11,7 @@ import {
 const HOME_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
 describe('clearPrivateHomeQueryState', () => {
-  it('removes Home discovery and Home-scoped cache without requiring persistence', () => {
+  it('removes Home discovery, Home-scoped cache, and Notifications without requiring persistence', () => {
     const queryClient = createAppQueryClient();
     queryClient.setQueryData(currentUserQueryKey, { id: HOME_ID });
     queryClient.setQueryData(currentUserHomesQueryKey, [
@@ -21,6 +22,10 @@ describe('clearPrivateHomeQueryState', () => {
       name: 'Oak Street',
       timezone: 'UTC',
     });
+    queryClient.setQueryData(notificationKeys.list({}), {
+      pages: [{ items: [], hasMore: false, nextCursor: null }],
+      pageParams: [undefined],
+    });
 
     clearPrivateHomeQueryState(queryClient);
 
@@ -28,6 +33,7 @@ describe('clearPrivateHomeQueryState', () => {
     expect(
       queryClient.getQueryData(homeContextQueryKey(HOME_ID)),
     ).toBeUndefined();
+    expect(queryClient.getQueryData(notificationKeys.list({}))).toBeUndefined();
     expect(queryClient.getQueryData(currentUserQueryKey)).toEqual({
       id: HOME_ID,
     });
