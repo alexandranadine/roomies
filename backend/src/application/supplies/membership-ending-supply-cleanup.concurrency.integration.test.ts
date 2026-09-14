@@ -33,6 +33,7 @@ import {
 import { createLeaveMembership } from '../home-administration/leave-membership.js';
 import { createRemoveMembership } from '../home-administration/remove-membership.js';
 import { createMembershipEndingSupplyCleanupFromPool } from './membership-ending-supply-cleanup.js';
+import { createMembershipEndingNotificationCleanupFromPool } from '../notifications/membership-ending-notification-cleanup.js';
 import { createMembershipEndingTaskCleanupFromPool } from '../tasks/membership-ending-task-cleanup.js';
 
 const skipWithoutDatabase = skipUnlessDedicatedTestDatabase();
@@ -263,6 +264,8 @@ function endingSeam(pool: Pool) {
   return createEndMembershipWithinHomeStructure({
     taskCleanup: createMembershipEndingTaskCleanupFromPool(pool),
     supplyCleanup: createMembershipEndingSupplyCleanupFromPool(pool),
+    notificationCleanup:
+      createMembershipEndingNotificationCleanupFromPool(pool),
     membershipEnding: createMembershipEndingWriter(),
     outbox: createOutboxWriter(),
     ids: { next: () => createUuidV7() },

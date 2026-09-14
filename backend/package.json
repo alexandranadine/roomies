@@ -19,7 +19,8 @@
     "db:test:supply-persistence": "tsx scripts/verify-supply-schema.ts",
     "db:test:maintenance-persistence": "tsx scripts/verify-maintenance-schema.ts",
     "db:test:activity-persistence": "tsx scripts/verify-activity-schema.ts",
-    "db:test:membership-persistence": "tsx scripts/verify-membership-schema.ts"
+    "db:test:membership-persistence": "tsx scripts/verify-membership-schema.ts",
+    "db:test:notification-persistence": "tsx scripts/verify-notification-schema.ts"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

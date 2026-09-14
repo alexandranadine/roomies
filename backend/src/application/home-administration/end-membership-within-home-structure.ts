@@ -16,9 +16,11 @@ import type {
   TransactionContext,
   TransactionPool,
 } from '../../platform/persistence/transaction.js';
+import { createMembershipEndingNotificationCleanupFromPool } from '../notifications/membership-ending-notification-cleanup.js';
 import { createMembershipEndingSupplyCleanupFromPool } from '../supplies/membership-ending-supply-cleanup.js';
 import { createMembershipEndingTaskCleanupFromPool } from '../tasks/membership-ending-task-cleanup.js';
 import type {
+  MembershipEndingNotificationCleanup,
   MembershipEndingSupplyCleanup,
   MembershipEndingTaskCleanup,
 } from './membership-ending-cleanup.js';
@@ -47,6 +49,7 @@ export type EndMembershipWithinHomeStructure = (
 export type EndMembershipWithinHomeStructureDependencies = {
   taskCleanup: MembershipEndingTaskCleanup;
   supplyCleanup: MembershipEndingSupplyCleanup;
+  notificationCleanup: MembershipEndingNotificationCleanup;
   membershipEnding: MembershipEndingWriter;
   outbox: Pick<OutboxWriter, 'append'>;
   ids: UuidV7Generator;
@@ -54,7 +57,7 @@ export type EndMembershipWithinHomeStructureDependencies = {
 
 export type ApplyMembershipEndingWithinHomeStructureDependencies = Pick<
   EndMembershipWithinHomeStructureDependencies,
-  'taskCleanup' | 'supplyCleanup' | 'membershipEnding'
+  'taskCleanup' | 'supplyCleanup' | 'notificationCleanup' | 'membershipEnding'
 >;
 
 export type ApplyMembershipEndingWithinHomeStructure =
@@ -64,8 +67,8 @@ export type ApplyMembershipEndingWithinHomeStructure =
  * Internal no-event mutation primitive for callers that must sequence another
  * structural write before appending membership.ended.v1.
  *
- * Order: Task cleanup → Supply cleanup → exact Membership
- * ended_at + ended_by_membership_id.
+ * Order: Task cleanup → Supply cleanup → Notification cleanup → exact
+ * Membership ended_at + ended_by_membership_id.
  */
 export function createApplyMembershipEndingWithinHomeStructure(
   deps: ApplyMembershipEndingWithinHomeStructureDependencies,
@@ -84,6 +87,7 @@ export function createApplyMembershipEndingWithinHomeStructure(
 
     await deps.taskCleanup.handleMembershipEnded(tx, cleanupInput);
     await deps.supplyCleanup.handleMembershipEnded(tx, cleanupInput);
+    await deps.notificationCleanup.handleMembershipEnded(tx, cleanupInput);
 
     const updated = await deps.membershipEnding.endActiveMembership(tx, {
       membershipId: input.membershipId,
@@ -104,8 +108,8 @@ export function createApplyMembershipEndingWithinHomeStructure(
  * structural transaction. Does not begin, commit, or roll back; does not
  * lock Home; does not decide whether leave/remove/archive is permitted.
  *
- * Order: Task cleanup → Supply cleanup → Membership ended_at +
- * ended_by_membership_id → outbox.
+ * Order: Task cleanup → Supply cleanup → Notification cleanup →
+ * Membership ended_at + ended_by_membership_id → outbox.
  */
 export function createEndMembershipWithinHomeStructure(
   deps: EndMembershipWithinHomeStructureDependencies,
@@ -131,9 +135,10 @@ export function createEndMembershipWithinHomeStructure(
 }
 
 /**
- * Production composition for leave/remove. Injects the Tasks-owned and
- * Supplies-owned Membership-ending cleanups. Does not begin a transaction;
- * callers own the outer structural transaction.
+ * Production composition for leave/remove. Injects the Tasks-owned,
+ * Supplies-owned, and Notifications-owned Membership-ending cleanups.
+ * Does not begin a transaction; callers own the outer structural
+ * transaction.
  */
 export function createEndMembershipWithinHomeStructureFromPool(
   pool: TransactionPool,
@@ -141,6 +146,8 @@ export function createEndMembershipWithinHomeStructureFromPool(
   return createEndMembershipWithinHomeStructure({
     taskCleanup: createMembershipEndingTaskCleanupFromPool(pool),
     supplyCleanup: createMembershipEndingSupplyCleanupFromPool(pool),
+    notificationCleanup:
+      createMembershipEndingNotificationCleanupFromPool(pool),
     membershipEnding: createMembershipEndingWriter(),
     outbox: outboxWriter,
     ids: systemUuidV7,
@@ -153,6 +160,8 @@ export function createApplyMembershipEndingWithinHomeStructureFromPool(
   return createApplyMembershipEndingWithinHomeStructure({
     taskCleanup: createMembershipEndingTaskCleanupFromPool(pool),
     supplyCleanup: createMembershipEndingSupplyCleanupFromPool(pool),
+    notificationCleanup:
+      createMembershipEndingNotificationCleanupFromPool(pool),
     membershipEnding: createMembershipEndingWriter(),
   });
 }

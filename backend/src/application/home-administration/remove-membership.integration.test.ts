@@ -169,6 +169,11 @@ function createCommand(
           return Promise.resolve();
         },
       },
+      notificationCleanup: {
+        handleMembershipEnded() {
+          return Promise.resolve();
+        },
+      },
       membershipEnding: createMembershipEndingWriter(),
       outbox: createOutboxWriter(),
       ids: { next: nextEventId },
@@ -1089,6 +1094,11 @@ void describe('removeMembership PostgreSQL', () => {
                 return Promise.resolve();
               },
             },
+            notificationCleanup: {
+              handleMembershipEnded() {
+                return Promise.resolve();
+              },
+            },
             membershipEnding: createMembershipEndingWriter(),
             outbox: createOutboxWriter(),
             ids: { next: nextEventId },
@@ -1178,6 +1188,11 @@ void describe('removeMembership PostgreSQL', () => {
                 );
               },
             },
+            notificationCleanup: {
+              handleMembershipEnded() {
+                return Promise.resolve();
+              },
+            },
             membershipEnding: createMembershipEndingWriter(),
             outbox: createOutboxWriter(),
             ids: { next: nextEventId },
@@ -1261,6 +1276,11 @@ void describe('removeMembership PostgreSQL', () => {
               },
             },
             supplyCleanup: {
+              handleMembershipEnded() {
+                return Promise.resolve();
+              },
+            },
+            notificationCleanup: {
               handleMembershipEnded() {
                 return Promise.resolve();
               },

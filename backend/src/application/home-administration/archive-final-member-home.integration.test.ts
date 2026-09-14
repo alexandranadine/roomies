@@ -200,6 +200,11 @@ function createCommand(pool: Pool, overrides: CommandOverrides = {}) {
           return Promise.resolve();
         },
       },
+      notificationCleanup: {
+        handleMembershipEnded() {
+          return Promise.resolve();
+        },
+      },
       membershipEnding: createMembershipEndingWriter(),
     }),
     homeArchive: createHomeArchiveWriter(),
@@ -613,6 +618,11 @@ void describe('archiveFinalMemberHome PostgreSQL', () => {
                 return Promise.resolve();
               },
             },
+            notificationCleanup: {
+              handleMembershipEnded() {
+                return Promise.resolve();
+              },
+            },
             membershipEnding: createMembershipEndingWriter(),
             outbox: createOutboxWriter(),
             ids: { next: nextEventId },
@@ -730,6 +740,11 @@ void describe('archiveFinalMemberHome PostgreSQL', () => {
                     return Promise.resolve();
                   },
                 },
+                notificationCleanup: {
+                  handleMembershipEnded() {
+                    return Promise.resolve();
+                  },
+                },
                 membershipEnding: membershipWriter,
               }),
           }),
@@ -751,6 +766,11 @@ void describe('archiveFinalMemberHome PostgreSQL', () => {
                 supplyCleanup: {
                   handleMembershipEnded() {
                     return Promise.reject(new Error('injected Supply failure'));
+                  },
+                },
+                notificationCleanup: {
+                  handleMembershipEnded() {
+                    return Promise.resolve();
                   },
                 },
                 membershipEnding: membershipWriter,
@@ -775,6 +795,11 @@ void describe('archiveFinalMemberHome PostgreSQL', () => {
                   },
                 },
                 supplyCleanup: {
+                  handleMembershipEnded() {
+                    return Promise.resolve();
+                  },
+                },
+                notificationCleanup: {
                   handleMembershipEnded() {
                     return Promise.resolve();
                   },

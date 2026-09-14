@@ -1,0 +1,560 @@
+[
+  {
+    "id": "table.notifications",
+    "label": "Create table \"notifications\"",
+    "summary": "Creates table \"notifications\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "notifications"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"notifications\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"notifications\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"notifications\"",
+        "sql": "CREATE TABLE \"public\".\"notifications\" (\n  \"actor_membership_id\" uuid,\n  \"created_at\" timestamptz NOT NULL,\n  \"home_id\" uuid NOT NULL,\n  \"id\" uuid NOT NULL,\n  \"kind\" text NOT NULL,\n  \"occurred_at\" timestamptz NOT NULL,\n  \"read_at\" timestamptz,\n  \"recipient_membership_id\" uuid NOT NULL,\n  \"source_entity_id\" uuid NOT NULL,\n  \"source_entity_type\" text NOT NULL,\n  \"source_outbox_event_id\" uuid NOT NULL,\n  PRIMARY KEY (\"id\"),\n  CONSTRAINT \"notifications_kind_check_c456c50a\" CHECK (\"kind\" IN ('MEMBERSHIP_ROLE_CHANGED', 'ASSIGNED_TASK_COMPLETED', 'CREATED_SUPPLY_OBTAINED', 'PRIVATE_MAINTENANCE_CREATED', 'PRIVATE_MAINTENANCE_RESOLVED')),\n  CONSTRAINT \"notifications_kind_source_check\" CHECK ((((kind = 'MEMBERSHIP_ROLE_CHANGED'::text) AND (source_entity_type = 'MEMBERSHIP'::text)) OR ((kind = 'ASSIGNED_TASK_COMPLETED'::text) AND (source_entity_type = 'TASK'::text)) OR ((kind = 'CREATED_SUPPLY_OBTAINED'::text) AND (source_entity_type = 'SUPPLY'::text)) OR ((kind = 'PRIVATE_MAINTENANCE_CREATED'::text) AND (source_entity_type = 'MAINTENANCE'::text)) OR ((kind = 'PRIVATE_MAINTENANCE_RESOLVED'::text) AND (source_entity_type = 'MAINTENANCE'::text)))),\n  CONSTRAINT \"notifications_source_entity_type_check_0ee9d6e1\" CHECK (\"source_entity_type\" IN ('MEMBERSHIP', 'TASK', 'SUPPLY', 'MAINTENANCE'))\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"notifications\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"notifications\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.notifications.notifications_actor_membership_id_idx_a5b20b69",
+    "label": "Create index \"notifications_actor_membership_id_idx_a5b20b69\" on \"notifications\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "notifications_actor_membership_id_idx_a5b20b69",
+        "table": "notifications"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"notifications_actor_membership_id_idx_a5b20b69\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"notifications_actor_membership_id_idx_a5b20b69\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"notifications_actor_membership_id_idx_a5b20b69\"",
+        "sql": "CREATE INDEX \"notifications_actor_membership_id_idx_a5b20b69\" ON \"public\".\"notifications\" (\"actor_membership_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"notifications_actor_membership_id_idx_a5b20b69\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"notifications_actor_membership_id_idx_a5b20b69\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.notifications.notifications_home_id_actor_membership_id_idx_59ee34c2",
+    "label": "Create index \"notifications_home_id_actor_membership_id_idx_59ee34c2\" on \"notifications\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "notifications_home_id_actor_membership_id_idx_59ee34c2",
+        "table": "notifications"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"notifications_home_id_actor_membership_id_idx_59ee34c2\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"notifications_home_id_actor_membership_id_idx_59ee34c2\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"notifications_home_id_actor_membership_id_idx_59ee34c2\"",
+        "sql": "CREATE INDEX \"notifications_home_id_actor_membership_id_idx_59ee34c2\" ON \"public\".\"notifications\" (\"home_id\", \"actor_membership_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"notifications_home_id_actor_membership_id_idx_59ee34c2\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"notifications_home_id_actor_membership_id_idx_59ee34c2\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.notifications.notifications_home_id_idx_f881d5c1",
+    "label": "Create index \"notifications_home_id_idx_f881d5c1\" on \"notifications\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "notifications_home_id_idx_f881d5c1",
+        "table": "notifications"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"notifications_home_id_idx_f881d5c1\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"notifications_home_id_idx_f881d5c1\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"notifications_home_id_idx_f881d5c1\"",
+        "sql": "CREATE INDEX \"notifications_home_id_idx_f881d5c1\" ON \"public\".\"notifications\" (\"home_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"notifications_home_id_idx_f881d5c1\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"notifications_home_id_idx_f881d5c1\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.notifications.notifications_home_id_recipient_membership_id_idx_d6e4e47a",
+    "label": "Create index \"notifications_home_id_recipient_membership_id_idx_d6e4e47a\" on \"notifications\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "notifications_home_id_recipient_membership_id_idx_d6e4e47a",
+        "table": "notifications"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"notifications_home_id_recipient_membership_id_idx_d6e4e47a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"notifications_home_id_recipient_membership_id_idx_d6e4e47a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"notifications_home_id_recipient_membership_id_idx_d6e4e47a\"",
+        "sql": "CREATE INDEX \"notifications_home_id_recipient_membership_id_idx_d6e4e47a\" ON \"public\".\"notifications\" (\"home_id\", \"recipient_membership_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"notifications_home_id_recipient_membership_id_idx_d6e4e47a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"notifications_home_id_recipient_membership_id_idx_d6e4e47a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.notifications.notifications_home_recipient_occurred_idx_97c4c8ff",
+    "label": "Create index \"notifications_home_recipient_occurred_idx_97c4c8ff\" on \"notifications\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "notifications_home_recipient_occurred_idx_97c4c8ff",
+        "table": "notifications"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"notifications_home_recipient_occurred_idx_97c4c8ff\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"notifications_home_recipient_occurred_idx_97c4c8ff\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"notifications_home_recipient_occurred_idx_97c4c8ff\"",
+        "sql": "CREATE INDEX \"notifications_home_recipient_occurred_idx_97c4c8ff\" ON \"public\".\"notifications\" (\"home_id\", \"recipient_membership_id\", \"occurred_at\", \"id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"notifications_home_recipient_occurred_idx_97c4c8ff\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"notifications_home_recipient_occurred_idx_97c4c8ff\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.notifications.notifications_home_recipient_unread_idx_537467f2",
+    "label": "Create index \"notifications_home_recipient_unread_idx_537467f2\" on \"notifications\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "notifications_home_recipient_unread_idx_537467f2",
+        "table": "notifications"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"notifications_home_recipient_unread_idx_537467f2\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"notifications_home_recipient_unread_idx_537467f2\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"notifications_home_recipient_unread_idx_537467f2\"",
+        "sql": "CREATE INDEX \"notifications_home_recipient_unread_idx_537467f2\" ON \"public\".\"notifications\" (\"home_id\", \"recipient_membership_id\", \"created_at\", \"id\") WHERE ((read_at IS NULL))",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"notifications_home_recipient_unread_idx_537467f2\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"notifications_home_recipient_unread_idx_537467f2\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.notifications.notifications_retention_idx_e92395ef",
+    "label": "Create index \"notifications_retention_idx_e92395ef\" on \"notifications\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "notifications_retention_idx_e92395ef",
+        "table": "notifications"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"notifications_retention_idx_e92395ef\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"notifications_retention_idx_e92395ef\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"notifications_retention_idx_e92395ef\"",
+        "sql": "CREATE INDEX \"notifications_retention_idx_e92395ef\" ON \"public\".\"notifications\" (\"occurred_at\", \"id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"notifications_retention_idx_e92395ef\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"notifications_retention_idx_e92395ef\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.notifications.notifications_source_erasure_idx_f94ef0c8",
+    "label": "Create index \"notifications_source_erasure_idx_f94ef0c8\" on \"notifications\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "notifications_source_erasure_idx_f94ef0c8",
+        "table": "notifications"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"notifications_source_erasure_idx_f94ef0c8\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"notifications_source_erasure_idx_f94ef0c8\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"notifications_source_erasure_idx_f94ef0c8\"",
+        "sql": "CREATE INDEX \"notifications_source_erasure_idx_f94ef0c8\" ON \"public\".\"notifications\" (\"home_id\", \"source_entity_type\", \"source_entity_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"notifications_source_erasure_idx_f94ef0c8\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"notifications_source_erasure_idx_f94ef0c8\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.notifications.notifications_source_recipient_kind_key_15fab2f3",
+    "label": "Create index \"notifications_source_recipient_kind_key_15fab2f3\" on \"notifications\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "notifications_source_recipient_kind_key_15fab2f3",
+        "table": "notifications"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"notifications_source_recipient_kind_key_15fab2f3\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"notifications_source_recipient_kind_key_15fab2f3\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"notifications_source_recipient_kind_key_15fab2f3\"",
+        "sql": "CREATE UNIQUE INDEX \"notifications_source_recipient_kind_key_15fab2f3\" ON \"public\".\"notifications\" (\"source_outbox_event_id\", \"recipient_membership_id\", \"kind\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"notifications_source_recipient_kind_key_15fab2f3\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"notifications_source_recipient_kind_key_15fab2f3\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.notifications.notifications_home_id_fkey",
+    "label": "Add foreign key \"notifications_home_id_fkey\" on \"notifications\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "notifications_home_id_fkey",
+        "table": "notifications"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"notifications_home_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notifications_home_id_fkey",
+          "public",
+          "\"public\".\"notifications\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"notifications_home_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"notifications\"\nADD CONSTRAINT \"notifications_home_id_fkey\"\nFOREIGN KEY (\"home_id\")\nREFERENCES \"public\".\"homes\" (\"id\")\nON DELETE CASCADE\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"notifications_home_id_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notifications_home_id_fkey",
+          "public",
+          "\"public\".\"notifications\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.notifications.notifications_recipient_home_membership_fkey",
+    "label": "Add foreign key \"notifications_recipient_home_membership_fkey\" on \"notifications\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "notifications_recipient_home_membership_fkey",
+        "table": "notifications"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"notifications_recipient_home_membership_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notifications_recipient_home_membership_fkey",
+          "public",
+          "\"public\".\"notifications\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"notifications_recipient_home_membership_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"notifications\"\nADD CONSTRAINT \"notifications_recipient_home_membership_fkey\"\nFOREIGN KEY (\"home_id\", \"recipient_membership_id\")\nREFERENCES \"public\".\"memberships\" (\"home_id\", \"id\")\nON DELETE CASCADE\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"notifications_recipient_home_membership_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notifications_recipient_home_membership_fkey",
+          "public",
+          "\"public\".\"notifications\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.notifications.notifications_actor_membership_fkey",
+    "label": "Add foreign key \"notifications_actor_membership_fkey\" on \"notifications\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "notifications_actor_membership_fkey",
+        "table": "notifications"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"notifications_actor_membership_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notifications_actor_membership_fkey",
+          "public",
+          "\"public\".\"notifications\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"notifications_actor_membership_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"notifications\"\nADD CONSTRAINT \"notifications_actor_membership_fkey\"\nFOREIGN KEY (\"actor_membership_id\")\nREFERENCES \"public\".\"memberships\" (\"id\")\nON DELETE SET NULL\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"notifications_actor_membership_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notifications_actor_membership_fkey",
+          "public",
+          "\"public\".\"notifications\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.notifications.notifications_actor_home_membership_fkey",
+    "label": "Add foreign key \"notifications_actor_home_membership_fkey\" on \"notifications\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "notifications_actor_home_membership_fkey",
+        "table": "notifications"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"notifications_actor_home_membership_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notifications_actor_home_membership_fkey",
+          "public",
+          "\"public\".\"notifications\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"notifications_actor_home_membership_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"notifications\"\nADD CONSTRAINT \"notifications_actor_home_membership_fkey\"\nFOREIGN KEY (\"home_id\", \"actor_membership_id\")\nREFERENCES \"public\".\"memberships\" (\"home_id\", \"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"notifications_actor_home_membership_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notifications_actor_home_membership_fkey",
+          "public",
+          "\"public\".\"notifications\""
+        ]
+      }
+    ]
+  }
+]

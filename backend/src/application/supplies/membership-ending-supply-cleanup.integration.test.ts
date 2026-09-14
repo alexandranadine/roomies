@@ -30,6 +30,7 @@ import {
 } from '../../platform/persistence/test-database.js';
 import { runInReadCommittedTransaction } from '../../platform/persistence/transaction.js';
 import { createMembershipEndingSupplyCleanupFromPool } from './membership-ending-supply-cleanup.js';
+import { createMembershipEndingNotificationCleanupFromPool } from '../notifications/membership-ending-notification-cleanup.js';
 import { createMembershipEndingTaskCleanupFromPool } from '../tasks/membership-ending-task-cleanup.js';
 
 const skipWithoutDatabase = skipUnlessDedicatedTestDatabase();
@@ -249,6 +250,8 @@ function leaveCommand(pool: Pool) {
     endMembership: createEndMembershipWithinHomeStructure({
       taskCleanup: createMembershipEndingTaskCleanupFromPool(pool),
       supplyCleanup: createMembershipEndingSupplyCleanupFromPool(pool),
+      notificationCleanup:
+        createMembershipEndingNotificationCleanupFromPool(pool),
       membershipEnding: createMembershipEndingWriter(),
       outbox: createOutboxWriter(),
       ids: { next: nextEventId },
@@ -264,6 +267,8 @@ function removeCommand(pool: Pool) {
     endMembership: createEndMembershipWithinHomeStructure({
       taskCleanup: createMembershipEndingTaskCleanupFromPool(pool),
       supplyCleanup: createMembershipEndingSupplyCleanupFromPool(pool),
+      notificationCleanup:
+        createMembershipEndingNotificationCleanupFromPool(pool),
       membershipEnding: createMembershipEndingWriter(),
       outbox: createOutboxWriter(),
       ids: { next: nextEventId },
@@ -1388,6 +1393,9 @@ void describe('Membership-ending Supply cleanup PostgreSQL', () => {
         supplyCleanup: createMembershipEndingSupplyCleanupFromPool(
           database.pool,
         ),
+        notificationCleanup: createMembershipEndingNotificationCleanupFromPool(
+          database.pool,
+        ),
         membershipEnding: {
           endActiveMembership() {
             return Promise.reject(
@@ -1518,6 +1526,9 @@ void describe('Membership-ending Supply cleanup PostgreSQL', () => {
       const endMembership = createEndMembershipWithinHomeStructure({
         taskCleanup: createMembershipEndingTaskCleanupFromPool(database.pool),
         supplyCleanup: createMembershipEndingSupplyCleanupFromPool(
+          database.pool,
+        ),
+        notificationCleanup: createMembershipEndingNotificationCleanupFromPool(
           database.pool,
         ),
         membershipEnding: createMembershipEndingWriter(),

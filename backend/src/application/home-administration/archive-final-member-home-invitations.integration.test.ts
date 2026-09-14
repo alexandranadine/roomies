@@ -247,6 +247,11 @@ function createCommand(pool: Pool, overrides: CommandOverrides = {}) {
           return Promise.resolve();
         },
       },
+      notificationCleanup: {
+        handleMembershipEnded() {
+          return Promise.resolve();
+        },
+      },
       membershipEnding: createMembershipEndingWriter(),
     }),
     homeArchive: createHomeArchiveWriter(),

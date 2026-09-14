@@ -21,6 +21,7 @@ import {
 import type { MembershipEndingCleanupInput } from './membership-ending-cleanup.js';
 import { createEndMembershipWithinHomeStructure } from './end-membership-within-home-structure.js';
 import { createMembershipEndingSupplyCleanupFromPool } from '../supplies/membership-ending-supply-cleanup.js';
+import { createMembershipEndingNotificationCleanupFromPool } from '../notifications/membership-ending-notification-cleanup.js';
 import { createMembershipEndingTaskCleanupFromPool } from '../tasks/membership-ending-task-cleanup.js';
 
 const skipWithoutDatabase = skipUnlessDedicatedTestDatabase();
@@ -187,6 +188,11 @@ function createEndingSeam(
         if (options.supplyError) {
           return Promise.reject(options.supplyError);
         }
+        return Promise.resolve();
+      },
+    },
+    notificationCleanup: {
+      handleMembershipEnded() {
         return Promise.resolve();
       },
     },
@@ -938,6 +944,9 @@ void describe('endMembershipWithinHomeStructure PostgreSQL', () => {
         supplyCleanup: createMembershipEndingSupplyCleanupFromPool(
           database.pool,
         ),
+        notificationCleanup: createMembershipEndingNotificationCleanupFromPool(
+          database.pool,
+        ),
         membershipEnding: createMembershipEndingWriter(),
         outbox: createOutboxWriter(),
         ids: { next: nextEventId },
@@ -985,12 +994,13 @@ void describe('endMembershipWithinHomeStructure PostgreSQL', () => {
             cause: 'HOME_ARCHIVED',
           });
           const cleanupSql = queries.slice(beforeCleanup);
-          assert.equal(cleanupSql.length, 5);
+          assert.equal(cleanupSql.length, 6);
           assert.match(cleanupSql[0] ?? '', /UPDATE task_instances/);
           assert.match(cleanupSql[1] ?? '', /UPDATE task_definitions/);
           assert.match(cleanupSql[2] ?? '', /UPDATE supply_claims/);
-          assert.match(cleanupSql[3] ?? '', /UPDATE memberships/);
-          assert.match(cleanupSql[4] ?? '', /INSERT INTO outbox_events/);
+          assert.match(cleanupSql[3] ?? '', /DELETE FROM notifications/);
+          assert.match(cleanupSql[4] ?? '', /UPDATE memberships/);
+          assert.match(cleanupSql[5] ?? '', /INSERT INTO outbox_events/);
         });
       } finally {
         await cleanup(database.pool, {

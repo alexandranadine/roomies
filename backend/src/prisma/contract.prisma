@@ -72,6 +72,23 @@ enum ActivityVisibilityClass {
   SOURCE_AUTHORIZED
 }
 
+enum NotificationKind {
+  @@type("pg/text@1")
+  MEMBERSHIP_ROLE_CHANGED
+  ASSIGNED_TASK_COMPLETED
+  CREATED_SUPPLY_OBTAINED
+  PRIVATE_MAINTENANCE_CREATED
+  PRIVATE_MAINTENANCE_RESOLVED
+}
+
+enum NotificationSourceEntityType {
+  @@type("pg/text@1")
+  MEMBERSHIP
+  TASK
+  SUPPLY
+  MAINTENANCE
+}
+
 model User {
   id          Uuid                 @id @default(uuid(7))
   createdAt   temporal.createdAt() @map("created_at")
@@ -100,6 +117,7 @@ model Home {
   activities                 Activity[]
   activityRecipients         ActivityRecipient[]
   membershipRoleTransitions  MembershipRoleTransition[]
+  notifications              Notification[]
 
   @@map("homes")
 }
@@ -133,6 +151,9 @@ model Membership {
   activityRecipients            ActivityRecipient[]     @relation("ActivityRecipientMembership")
   subjectRoleTransitions MembershipRoleTransition[] @relation("MembershipRoleTransitionSubject")
   actorRoleTransitions   MembershipRoleTransition[] @relation("MembershipRoleTransitionActor")
+  receivedNotifications         Notification[]          @relation("NotificationRecipientMembership")
+  actedNotifications            Notification[]          @relation("NotificationActorMembership")
+  actedHomeNotifications        Notification[]          @relation("NotificationActorHomeMembership")
 
   // At most one active tenure per (home, user). Ended rows may coexist so
   // leave-and-rejoin creates a new Membership id rather than reopening one.
@@ -642,4 +663,53 @@ model ActivityRecipient {
   @@id([homeId, activityId, membershipId], map: "activity_recipients_pkey")
   @@index([homeId, membershipId, activityId], name: "activity_recipients_home_membership_activity_idx")
   @@map("activity_recipients")
+}
+
+// Notification persistence. Recipient authorization is exact Membership tenure
+// in the same Home — never a userId. No display snapshots, payload, title,
+// details, audience, or source-domain FKs. source_outbox_event_id is a logical
+// reference only so outbox pruning cannot govern Notification retention.
+//
+// Kind/source matrix is CHECK-enforced:
+// MEMBERSHIP_ROLE_CHANGED → MEMBERSHIP
+// ASSIGNED_TASK_COMPLETED → TASK
+// CREATED_SUPPLY_OBTAINED → SUPPLY
+// PRIVATE_MAINTENANCE_CREATED → MAINTENANCE
+// PRIVATE_MAINTENANCE_RESOLVED → MAINTENANCE
+//
+// created_at may be later than occurred_at (delayed projection).
+model Notification {
+  id                     Uuid                          @id
+  homeId                 Uuid                          @map("home_id")
+  recipientMembershipId  Uuid                          @map("recipient_membership_id")
+  sourceOutboxEventId    Uuid                          @map("source_outbox_event_id")
+  kind                   NotificationKind
+  sourceEntityType       NotificationSourceEntityType  @map("source_entity_type")
+  sourceEntityId         Uuid                          @map("source_entity_id")
+  actorMembershipId      Uuid?                         @map("actor_membership_id")
+  occurredAt             Timestamptz                   @map("occurred_at")
+  createdAt              Timestamptz                   @map("created_at")
+  readAt                 Timestamptz?                  @map("read_at")
+
+  home Home @relation(fields: [homeId], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "notifications_home_id_fkey")
+  recipientMembership Membership @relation("NotificationRecipientMembership", fields: [homeId, recipientMembershipId], references: [homeId, id], onDelete: Cascade, onUpdate: Restrict, map: "notifications_recipient_home_membership_fkey")
+  // Actor same-Home is a composite Restrict FK (MATCH SIMPLE when actor is
+  // null). Actor hard-delete SET NULL cannot use that composite because
+  // home_id is NOT NULL; the single-column FK owns SET NULL. After SET NULL,
+  // the composite no longer references the deleted Membership.
+  actorMembership Membership? @relation("NotificationActorMembership", fields: [actorMembershipId], references: [id], onDelete: SetNull, onUpdate: Restrict, map: "notifications_actor_membership_fkey")
+  actorHomeMembership Membership? @relation("NotificationActorHomeMembership", fields: [homeId, actorMembershipId], references: [homeId, id], onDelete: Restrict, onUpdate: Restrict, map: "notifications_actor_home_membership_fkey")
+
+  @@check(
+    expression: "(((kind = 'MEMBERSHIP_ROLE_CHANGED'::text) AND (source_entity_type = 'MEMBERSHIP'::text)) OR ((kind = 'ASSIGNED_TASK_COMPLETED'::text) AND (source_entity_type = 'TASK'::text)) OR ((kind = 'CREATED_SUPPLY_OBTAINED'::text) AND (source_entity_type = 'SUPPLY'::text)) OR ((kind = 'PRIVATE_MAINTENANCE_CREATED'::text) AND (source_entity_type = 'MAINTENANCE'::text)) OR ((kind = 'PRIVATE_MAINTENANCE_RESOLVED'::text) AND (source_entity_type = 'MAINTENANCE'::text)))",
+    map: "notifications_kind_source_check"
+  )
+  @@index([sourceOutboxEventId, recipientMembershipId, kind], unique: true, name: "notifications_source_recipient_kind_key")
+  // Eligible list: recipient + Home, occurred_at DESC / id DESC via backward scan.
+  // Also serves exact-tenure recipient cleanup (home_id, recipient_membership_id).
+  @@index([homeId, recipientMembershipId, occurredAt, id], name: "notifications_home_recipient_occurred_idx")
+  @@index([homeId, sourceEntityType, sourceEntityId], name: "notifications_source_erasure_idx")
+  @@index([occurredAt, id], name: "notifications_retention_idx")
+  @@index([homeId, recipientMembershipId, createdAt, id], where: "(read_at IS NULL)", name: "notifications_home_recipient_unread_idx")
+  @@map("notifications")
 }

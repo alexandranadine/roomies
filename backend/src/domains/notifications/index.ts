@@ -1,0 +1,31 @@
+export { NotificationPersistenceError } from './errors.js';
+export {
+  isNotificationKind,
+  isNotificationKindSourceCompatible,
+  isNotificationSourceEntityType,
+  NOTIFICATION_KIND_SOURCE_TYPE,
+  NOTIFICATION_KINDS,
+  NOTIFICATION_SOURCE_ENTITY_TYPES,
+  type Notification,
+  type NotificationKind,
+  type NotificationSourceEntityType,
+} from './notification.js';
+export {
+  createNotificationRepository,
+  DELETE_NOTIFICATIONS_BY_RECIPIENT_MEMBERSHIP_SQL,
+  DELETE_NOTIFICATIONS_BY_SOURCE_SQL,
+  FIND_NOTIFICATION_BY_SOURCE_RECIPIENT_KIND_SQL,
+  INSERT_NOTIFICATION_SQL,
+  NOTIFICATION_PRUNE_BATCH_SIZE,
+  NOTIFICATION_RETENTION_DAYS,
+  NOTIFICATION_SOURCE_RECIPIENT_KIND_UNIQUE_CONSTRAINT,
+  PRUNE_EXPIRED_NOTIFICATIONS_SQL,
+  type DeleteByRecipientMembership,
+  type DeleteBySource,
+  type NewNotification,
+  type NotificationInsertResult,
+  type NotificationPruneResult,
+  type NotificationRepository,
+  type NotificationSourceKey,
+  type PruneExpiredNotifications,
+} from './repository.js';

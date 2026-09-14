@@ -34,3 +34,15 @@ export type MembershipEndingSupplyCleanup = {
     input: MembershipEndingCleanupInput,
   ): Promise<void>;
 };
+
+/**
+ * Public Notification-module port for synchronous membership-ending
+ * consequences. Notifications implements this via
+ * createMembershipEndingNotificationCleanup.
+ */
+export type MembershipEndingNotificationCleanup = {
+  handleMembershipEnded(
+    tx: TransactionContext,
+    input: MembershipEndingCleanupInput,
+  ): Promise<void>;
+};

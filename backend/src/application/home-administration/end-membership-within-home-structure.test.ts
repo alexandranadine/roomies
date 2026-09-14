@@ -19,20 +19,23 @@ const MEMBERSHIP_OLD = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 const EVENT_ID = '018f1e2c-7e3a-7000-8000-1234567890ab';
 const ENDED_AT = new Date('2026-03-15T12:34:56.789Z');
 
-type Step = 'task' | 'supply' | 'membership' | 'outbox';
+type Step = 'task' | 'supply' | 'notification' | 'membership' | 'outbox';
 
 function commandOf(options: {
   updateRows?: number;
   taskError?: Error;
   supplyError?: Error;
+  notificationError?: Error;
   outboxError?: Error;
 }) {
   const tx = {} as TransactionContext;
   const steps: Step[] = [];
   const taskInputs: MembershipEndingCleanupInput[] = [];
   const supplyInputs: MembershipEndingCleanupInput[] = [];
+  const notificationInputs: MembershipEndingCleanupInput[] = [];
   const taskTxs: TransactionContext[] = [];
   const supplyTxs: TransactionContext[] = [];
+  const notificationTxs: TransactionContext[] = [];
   const membershipUpdates: unknown[] = [];
   const events: OutboxEventInput<string, JsonObject>[] = [];
 
@@ -55,6 +58,17 @@ function commandOf(options: {
         supplyInputs.push(input);
         if (options.supplyError) {
           return Promise.reject(options.supplyError);
+        }
+        return Promise.resolve();
+      },
+    },
+    notificationCleanup: {
+      handleMembershipEnded(receivedTx, input) {
+        steps.push('notification');
+        notificationTxs.push(receivedTx);
+        notificationInputs.push(input);
+        if (options.notificationError) {
+          return Promise.reject(options.notificationError);
         }
         return Promise.resolve();
       },
@@ -85,8 +99,10 @@ function commandOf(options: {
     steps,
     taskInputs,
     supplyInputs,
+    notificationInputs,
     taskTxs,
     supplyTxs,
+    notificationTxs,
     membershipUpdates,
     events,
   };
@@ -109,6 +125,12 @@ void describe('endMembershipWithinHomeStructure application orchestration', () =
           return Promise.resolve();
         },
       },
+      notificationCleanup: {
+        handleMembershipEnded: () => {
+          steps.push('notification');
+          return Promise.resolve();
+        },
+      },
       membershipEnding: {
         endActiveMembership: () => {
           steps.push('membership');
@@ -124,18 +146,20 @@ void describe('endMembershipWithinHomeStructure application orchestration', () =
       endedByMembershipId: MEMBERSHIP,
       cause: 'HOME_ARCHIVED',
     });
-    assert.deepEqual(steps, ['task', 'supply', 'membership']);
+    assert.deepEqual(steps, ['task', 'supply', 'notification', 'membership']);
   });
 
-  void it('invokes Task then Supply then Membership UPDATE then outbox once each', async () => {
+  void it('invokes Task then Supply then Notification then Membership UPDATE then outbox once each', async () => {
     const {
       tx,
       endMembership,
       steps,
       taskInputs,
       supplyInputs,
+      notificationInputs,
       taskTxs,
       supplyTxs,
+      notificationTxs,
       membershipUpdates,
       events,
     } = commandOf({});
@@ -149,13 +173,22 @@ void describe('endMembershipWithinHomeStructure application orchestration', () =
     });
 
     assert.deepEqual(result, { membershipId: MEMBERSHIP });
-    assert.deepEqual(steps, ['task', 'supply', 'membership', 'outbox']);
+    assert.deepEqual(steps, [
+      'task',
+      'supply',
+      'notification',
+      'membership',
+      'outbox',
+    ]);
     assert.equal(taskInputs.length, 1);
     assert.equal(supplyInputs.length, 1);
+    assert.equal(notificationInputs.length, 1);
     assert.equal(taskTxs[0], tx);
     assert.equal(supplyTxs[0], tx);
+    assert.equal(notificationTxs[0], tx);
     assert.equal(taskTxs[0], supplyTxs[0]);
     assert.equal(taskInputs[0], supplyInputs[0]);
+    assert.equal(taskInputs[0], notificationInputs[0]);
     assert.deepEqual(taskInputs[0], {
       homeId: HOME,
       membershipId: MEMBERSHIP,
@@ -164,6 +197,7 @@ void describe('endMembershipWithinHomeStructure application orchestration', () =
     });
     assert.equal(taskInputs[0]?.endedAt, ENDED_AT);
     assert.equal(supplyInputs[0]?.endedAt, ENDED_AT);
+    assert.equal(notificationInputs[0]?.endedAt, ENDED_AT);
     assert.deepEqual(membershipUpdates, [
       {
         membershipId: MEMBERSHIP,
@@ -199,7 +233,7 @@ void describe('endMembershipWithinHomeStructure application orchestration', () =
     }
   });
 
-  void it('does not call Supply, Membership, or outbox when Task cleanup fails', async () => {
+  void it('does not call Supply, Notification, Membership, or outbox when Task cleanup fails', async () => {
     const { tx, endMembership, steps, membershipUpdates, events } = commandOf({
       taskError: new Error('injected task cleanup failure'),
     });
@@ -241,6 +275,27 @@ void describe('endMembershipWithinHomeStructure application orchestration', () =
     assert.deepEqual(events, []);
   });
 
+  void it('does not update Membership or append outbox when Notification cleanup fails', async () => {
+    const { tx, endMembership, steps, membershipUpdates, events } = commandOf({
+      notificationError: new Error('injected notification cleanup failure'),
+    });
+
+    await assert.rejects(
+      () =>
+        endMembership(tx, {
+          homeId: HOME,
+          membershipId: MEMBERSHIP,
+          endedAt: ENDED_AT,
+          endedByMembershipId: MEMBERSHIP,
+          cause: 'VOLUNTARY_LEAVE',
+        }),
+      /injected notification cleanup failure/,
+    );
+    assert.deepEqual(steps, ['task', 'supply', 'notification']);
+    assert.deepEqual(membershipUpdates, []);
+    assert.deepEqual(events, []);
+  });
+
   void it('treats a post-lock zero-row UPDATE as structural integrity', async () => {
     const { tx, endMembership, steps, events } = commandOf({ updateRows: 0 });
 
@@ -255,7 +310,7 @@ void describe('endMembershipWithinHomeStructure application orchestration', () =
         }),
       StructuralIntegrityError,
     );
-    assert.deepEqual(steps, ['task', 'supply', 'membership']);
+    assert.deepEqual(steps, ['task', 'supply', 'notification', 'membership']);
     assert.deepEqual(events, []);
   });
 
@@ -275,7 +330,13 @@ void describe('endMembershipWithinHomeStructure application orchestration', () =
         }),
       /injected outbox failure/,
     );
-    assert.deepEqual(steps, ['task', 'supply', 'membership', 'outbox']);
+    assert.deepEqual(steps, [
+      'task',
+      'supply',
+      'notification',
+      'membership',
+      'outbox',
+    ]);
     assert.deepEqual(membershipUpdates, [
       {
         membershipId: MEMBERSHIP,

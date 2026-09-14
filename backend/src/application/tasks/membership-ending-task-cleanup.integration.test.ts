@@ -18,6 +18,7 @@ import {
 } from '../../platform/persistence/test-database.js';
 import { runInReadCommittedTransaction } from '../../platform/persistence/transaction.js';
 import { createMembershipEndingSupplyCleanupFromPool } from '../supplies/membership-ending-supply-cleanup.js';
+import { createMembershipEndingNotificationCleanupFromPool } from '../notifications/membership-ending-notification-cleanup.js';
 import { createMembershipEndingTaskCleanupFromPool } from './membership-ending-task-cleanup.js';
 
 const skipWithoutDatabase = skipUnlessDedicatedTestDatabase();
@@ -271,6 +272,8 @@ function leaveCommand(pool: Pool) {
     endMembership: createEndMembershipWithinHomeStructure({
       taskCleanup: createMembershipEndingTaskCleanupFromPool(pool),
       supplyCleanup: createMembershipEndingSupplyCleanupFromPool(pool),
+      notificationCleanup:
+        createMembershipEndingNotificationCleanupFromPool(pool),
       membershipEnding: createMembershipEndingWriter(),
       outbox: createOutboxWriter(),
       ids: { next: nextEventId },
@@ -787,6 +790,11 @@ void describe('Membership-ending Task cleanup PostgreSQL', () => {
         supplyCleanup: {
           handleMembershipEnded() {
             return Promise.reject(new Error('injected supply cleanup failure'));
+          },
+        },
+        notificationCleanup: {
+          handleMembershipEnded() {
+            return Promise.resolve();
           },
         },
         membershipEnding: createMembershipEndingWriter(),
