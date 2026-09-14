@@ -9,3 +9,12 @@ export class NotificationPersistenceError extends Error {
     super('Notification persistence failure');
   }
 }
+
+export class InvalidNotificationRequestError extends Error {
+  override readonly name = 'InvalidNotificationRequestError';
+  readonly code = 'INVALID_REQUEST';
+
+  constructor() {
+    super('Invalid request');
+  }
+}

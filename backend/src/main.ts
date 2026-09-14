@@ -10,6 +10,9 @@ import { createRemoveMembershipFromPool } from './application/home-administratio
 import { createListActiveHomeMembershipsFromPool } from './application/memberships/list-active-home-memberships.js';
 import { createCreateMaintenanceEntryFromPool } from './application/maintenance/create-maintenance-entry.js';
 import { createListHomeActivityFromPool } from './application/activity/list-home-activity.js';
+import { createListCurrentUserNotificationsFromPool } from './application/notifications/list-current-user-notifications.js';
+import { createMarkNotificationReadFromPool } from './application/notifications/mark-notification-read.js';
+import { createReadAllNotificationsFromPool } from './application/notifications/read-all-notifications.js';
 import { createListHomeMaintenanceFromPool } from './application/maintenance/list-home-maintenance.js';
 import { createReadMaintenanceEntryFromPool } from './application/maintenance/read-maintenance-entry.js';
 import { createResolveMaintenanceEntryFromPool } from './application/maintenance/resolve-maintenance-entry.js';
@@ -148,6 +151,16 @@ function createWebHttpRuntime(
       },
       activity: {
         listHomeActivity: createListHomeActivityFromPool(databasePool.pool),
+      },
+      notifications: {
+        listCurrentUserNotifications:
+          createListCurrentUserNotificationsFromPool(databasePool.pool),
+        markNotificationRead: createMarkNotificationReadFromPool(
+          databasePool.pool,
+        ),
+        readAllNotifications: createReadAllNotificationsFromPool(
+          databasePool.pool,
+        ),
       },
     }),
   });

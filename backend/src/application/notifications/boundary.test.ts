@@ -98,8 +98,70 @@ void describe('notifications application boundary', () => {
       assert.doesNotMatch(source, /better-auth/, rel);
       assert.doesNotMatch(source, /from ['"]pg['"]/, rel);
       assert.doesNotMatch(source, /console\./, rel);
-      assert.doesNotMatch(source, /title|details|audience/, rel);
+      if (!rel.endsWith('/list-current-user-notifications.ts')) {
+        assert.doesNotMatch(source, /title|details|audience/, rel);
+      }
     }
+  });
+
+  void it('lists through repository eligibility then public display ports', async () => {
+    const source = await readFile(
+      path.join(dir, 'list-current-user-notifications.ts'),
+      'utf8',
+    );
+    assert.match(source, /decideNotificationList/);
+    assert.match(source, /listEligiblePageForUser/);
+    assert.match(source, /findHistoricalMembershipDisplays/);
+    assert.match(source, /findTaskActivityDisplays/);
+    assert.match(source, /findSupplyActivityDisplays/);
+    assert.doesNotMatch(source, /findMaintenanceActivityDisplays/);
+    assert.doesNotMatch(source, /items\.filter/);
+    assert.doesNotMatch(source, /sort\(/);
+    assert.doesNotMatch(source, /decodeNotificationListCursor/);
+    assert.doesNotMatch(source, /bindNotificationListCursor/);
+    assert.doesNotMatch(source, /isHomeAdmin/);
+    assert.doesNotMatch(source, /audienceMembershipIds/);
+    assert.doesNotMatch(source, /\.details/);
+    assert.doesNotMatch(source, /activity\/repository/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+  });
+
+  void it('marks one eligible row without returning counts', async () => {
+    const source = await readFile(
+      path.join(dir, 'mark-notification-read.ts'),
+      'utf8',
+    );
+    assert.match(source, /decideNotificationMarkOne/);
+    assert.match(source, /markEligibleRead/);
+    assert.match(source, /runInReadCommittedTransaction/);
+    assert.match(source, /ConcealedNotFoundError/);
+    assert.doesNotMatch(source, /rowCount/);
+    assert.doesNotMatch(source, /affected/);
+    assert.doesNotMatch(source, /isHomeAdmin/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+  });
+
+  void it('reads all with REPEATABLE READ, Home-first locks, and createdAt cutoff', async () => {
+    const source = await readFile(
+      path.join(dir, 'read-all-notifications.ts'),
+      'utf8',
+    );
+    assert.match(source, /decideNotificationReadAll/);
+    assert.match(source, /runInRepeatableReadTransaction/);
+    assert.match(source, /runWithBoundedSerializationRetry/);
+    assert.match(source, /readTransactionTimestamp/);
+    assert.match(source, /findActiveRecipientTenures/);
+    assert.match(source, /LOCK_HOME_FOR_UPDATE_SQL/);
+    assert.match(source, /LOCK_EXACT_MEMBERSHIP_FOR_UPDATE_SQL/);
+    assert.match(source, /readAllEligibleUnread/);
+    assert.match(source, /readThrough/);
+    assert.doesNotMatch(source, /SERIALIZABLE/);
+    assert.doesNotMatch(source, /occurredAt/);
+    assert.doesNotMatch(source, /occurred_at/);
+    assert.doesNotMatch(source, /findAllNotificationsForUser/);
+    assert.doesNotMatch(source, /lockHomeStructure/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
   });
 
   void it('uses the global dispatcher, exact-tenure locks, and content-free persistence', async () => {

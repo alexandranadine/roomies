@@ -29,6 +29,10 @@ import {
   InvalidActivityRequestError,
 } from '../../domains/activity/errors.js';
 import {
+  InvalidNotificationRequestError,
+  NotificationPersistenceError,
+} from '../../domains/notifications/errors.js';
+import {
   InvalidMaintenanceRequestError,
   MaintenanceNotOpenError,
   MaintenancePersistenceError,
@@ -159,7 +163,8 @@ export function errorHandler(
   if (
     err instanceof InvalidRequestError ||
     err instanceof InvalidMaintenanceRequestError ||
-    err instanceof InvalidActivityRequestError
+    err instanceof InvalidActivityRequestError ||
+    err instanceof InvalidNotificationRequestError
   ) {
     sendApiError(res, 400, 'INVALID_REQUEST', 'Invalid request', requestId);
     return;
@@ -330,6 +335,7 @@ export function errorHandler(
     err instanceof SupplyPersistenceError ||
     err instanceof MaintenancePersistenceError ||
     err instanceof ActivityPersistenceError ||
+    err instanceof NotificationPersistenceError ||
     err instanceof TransactionInfrastructureError ||
     err instanceof AuthInfrastructureError
   ) {

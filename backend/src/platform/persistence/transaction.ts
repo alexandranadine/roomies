@@ -43,13 +43,12 @@ function createTransactionContext(
   });
 }
 
-/**
- * Run work on one client from the caller-owned pool.
- * BEGIN READ COMMITTED → work → COMMIT, or ROLLBACK on failure.
- * Does not close the pool.
- */
-export async function runInReadCommittedTransaction<T>(
+const READ_COMMITTED_BEGIN = 'BEGIN ISOLATION LEVEL READ COMMITTED';
+const REPEATABLE_READ_BEGIN = 'BEGIN ISOLATION LEVEL REPEATABLE READ';
+
+async function runInIsolatedTransaction<T>(
   pool: TransactionPool,
+  beginSql: typeof READ_COMMITTED_BEGIN | typeof REPEATABLE_READ_BEGIN,
   work: (tx: TransactionContext) => Promise<T>,
 ): Promise<T> {
   let client: TransactionClient | PoolClient;
@@ -61,7 +60,7 @@ export async function runInReadCommittedTransaction<T>(
 
   try {
     try {
-      await client.query('BEGIN ISOLATION LEVEL READ COMMITTED');
+      await client.query(beginSql);
     } catch {
       try {
         await client.query('ROLLBACK');
@@ -95,4 +94,29 @@ export async function runInReadCommittedTransaction<T>(
   } finally {
     client.release();
   }
+}
+
+/**
+ * Run work on one client from the caller-owned pool.
+ * BEGIN READ COMMITTED → work → COMMIT, or ROLLBACK on failure.
+ * Does not close the pool.
+ */
+export async function runInReadCommittedTransaction<T>(
+  pool: TransactionPool,
+  work: (tx: TransactionContext) => Promise<T>,
+): Promise<T> {
+  return runInIsolatedTransaction(pool, READ_COMMITTED_BEGIN, work);
+}
+
+/**
+ * Run work on one client from the caller-owned pool.
+ * BEGIN REPEATABLE READ → work → COMMIT, or ROLLBACK on failure.
+ * The first statement inside `work` establishes the snapshot.
+ * Does not close the pool.
+ */
+export async function runInRepeatableReadTransaction<T>(
+  pool: TransactionPool,
+  work: (tx: TransactionContext) => Promise<T>,
+): Promise<T> {
+  return runInIsolatedTransaction(pool, REPEATABLE_READ_BEGIN, work);
 }

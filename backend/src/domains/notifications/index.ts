@@ -1,4 +1,33 @@
-export { NotificationPersistenceError } from './errors.js';
+export { NOTIFICATION_ACTION, type NotificationAction } from './actions.js';
+export {
+  NOTIFICATION_LIST_CURSOR_VERSION,
+  NOTIFICATION_LIST_DEFAULT_LIMIT,
+  NOTIFICATION_LIST_MAX_LIMIT,
+  NOTIFICATION_LIST_MIN_LIMIT,
+  NOTIFICATION_LIST_QUERY_FINGERPRINT,
+  assertNotificationListLimit,
+  bindNotificationListCursor,
+  decodeNotificationListCursor,
+  encodeNotificationListCursor,
+  type NotificationListCursorBinding,
+  type NotificationListCursorPayload,
+} from './cursor.js';
+export {
+  InvalidNotificationRequestError,
+  NotificationPersistenceError,
+} from './errors.js';
+export {
+  createNotificationsRouter,
+  type CreateNotificationsRouterOptions,
+  type ListCurrentUserNotificationsCommand,
+  type MarkNotificationReadCommand,
+  type ReadAllNotificationsCommand,
+} from './http.js';
+export {
+  decideNotificationList,
+  decideNotificationMarkOne,
+  decideNotificationReadAll,
+} from './list-policy.js';
 export {
   isNotificationKind,
   isNotificationKindSourceCompatible,
@@ -11,21 +40,54 @@ export {
   type NotificationSourceEntityType,
 } from './notification.js';
 export {
+  notificationDestinationDtoSchema,
+  notificationListItemDtoSchema,
+  notificationListPageDtoSchema,
+  toNotificationListItemDto,
+  toNotificationListPageDto,
+  type NotificationListItemDto,
+  type NotificationListPageDto,
+} from './notification-dto.js';
+export type {
+  EligibleNotification,
+  NotificationActorDisplay,
+  NotificationDestination,
+  NotificationHomeDisplay,
+  NotificationListItem,
+  NotificationListPage,
+  NotificationRepositoryPage,
+  NotificationSourcePresentation,
+} from './notification-list-item.js';
+export {
   createNotificationRepository,
   DELETE_NOTIFICATIONS_BY_RECIPIENT_MEMBERSHIP_SQL,
   DELETE_NOTIFICATIONS_BY_SOURCE_SQL,
+  FIND_ACTIVE_RECIPIENT_TENURES_SQL,
+  FIND_ELIGIBLE_NOTIFICATION_SQL,
   FIND_NOTIFICATION_BY_SOURCE_RECIPIENT_KIND_SQL,
   INSERT_NOTIFICATION_SQL,
+  LIST_ELIGIBLE_NOTIFICATION_PAGE_SQL,
+  MARK_ELIGIBLE_NOTIFICATION_READ_SQL,
   NOTIFICATION_PRUNE_BATCH_SIZE,
+  NOTIFICATION_PRIVATE_MAINTENANCE_VISIBLE_SQL,
+  NOTIFICATION_RECIPIENT_HOME_SQL,
+  NOTIFICATION_RECIPIENT_MEMBERSHIP_SQL,
   NOTIFICATION_RETENTION_DAYS,
   NOTIFICATION_SOURCE_RECIPIENT_KIND_UNIQUE_CONSTRAINT,
   PRUNE_EXPIRED_NOTIFICATIONS_SQL,
+  READ_ALL_ELIGIBLE_UNREAD_SQL,
+  SELECT_TRANSACTION_TIMESTAMP_SQL,
+  type ActiveRecipientTenure,
   type DeleteByRecipientMembership,
   type DeleteBySource,
+  type EligibleNotificationLookup,
+  type ListEligibleNotificationPage,
+  type MarkEligibleNotificationReadResult,
   type NewNotification,
   type NotificationInsertResult,
   type NotificationPruneResult,
   type NotificationRepository,
   type NotificationSourceKey,
   type PruneExpiredNotifications,
+  type ReadAllEligibleUnread,
 } from './repository.js';

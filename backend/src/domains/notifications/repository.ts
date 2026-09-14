@@ -1,6 +1,9 @@
 import type { Pool } from 'pg';
 import type { TransactionContext } from '../../platform/persistence/transaction.js';
-import { NotificationPersistenceError } from './errors.js';
+import {
+  InvalidNotificationRequestError,
+  NotificationPersistenceError,
+} from './errors.js';
 import {
   isNotificationKind,
   isNotificationKindSourceCompatible,
@@ -9,6 +12,16 @@ import {
   type NotificationKind,
   type NotificationSourceEntityType,
 } from './notification.js';
+import type {
+  EligibleNotification,
+  NotificationRepositoryPage,
+} from './notification-list-item.js';
+import {
+  NOTIFICATION_LIST_QUERY_FINGERPRINT,
+  assertNotificationListLimit,
+  bindNotificationListCursor,
+  encodeNotificationListCursor,
+} from './cursor.js';
 
 /**
  * Deployed UNIQUE index for (source_outbox_event_id, recipient_membership_id,
@@ -103,6 +116,174 @@ WHERE id IN (
 RETURNING id
 `;
 
+/**
+ * Exact current-user recipient Membership predicate. Identity is the
+ * authenticated User joined to an exact active Membership whose Home
+ * matches the Notification. Capability never widens visibility. The
+ * recipient account identifier is never persisted on notifications.
+ */
+export const NOTIFICATION_RECIPIENT_MEMBERSHIP_SQL = `
+memberships.id = n.recipient_membership_id
+AND memberships.user_id = $1::uuid
+AND memberships.ended_at IS NULL
+AND memberships.home_id = n.home_id
+`;
+
+export const NOTIFICATION_RECIPIENT_HOME_SQL = `
+homes.id = memberships.home_id
+AND homes.archived_at IS NULL
+`;
+
+/**
+ * PRIVATE Maintenance remains list/update visible only while the canonical
+ * source still exists, stays PRIVATE in the Notification Home, and the exact
+ * recipient Membership remains in the immutable audience. HOUSEHOLD sources
+ * never satisfy this predicate.
+ */
+export const NOTIFICATION_PRIVATE_MAINTENANCE_VISIBLE_SQL = `
+(
+  n.kind NOT IN (
+    'PRIVATE_MAINTENANCE_CREATED',
+    'PRIVATE_MAINTENANCE_RESOLVED'
+  )
+  OR (
+    n.source_entity_type = 'MAINTENANCE'
+    AND EXISTS (
+      SELECT 1
+      FROM maintenance_entries e
+      WHERE e.id = n.source_entity_id
+        AND e.home_id = n.home_id
+        AND e.visibility = 'PRIVATE'
+        AND EXISTS (
+          SELECT 1
+          FROM maintenance_audiences a
+          WHERE a.home_id = e.home_id
+            AND a.maintenance_entry_id = e.id
+            AND a.membership_id = n.recipient_membership_id
+        )
+    )
+  )
+)
+`;
+
+const ELIGIBLE_NOTIFICATION_COLUMNS = `
+n.id,
+n.home_id,
+n.recipient_membership_id,
+n.source_outbox_event_id,
+n.kind,
+n.source_entity_type,
+n.source_entity_id,
+n.actor_membership_id,
+n.occurred_at,
+n.created_at,
+n.read_at,
+homes.name AS home_name
+`;
+
+/**
+ * Visibility is applied before the cursor boundary, order, and LIMIT.
+ */
+export const LIST_ELIGIBLE_NOTIFICATION_PAGE_SQL = `
+SELECT
+  ${ELIGIBLE_NOTIFICATION_COLUMNS}
+FROM notifications n
+INNER JOIN memberships
+  ON ${NOTIFICATION_RECIPIENT_MEMBERSHIP_SQL}
+INNER JOIN homes
+  ON ${NOTIFICATION_RECIPIENT_HOME_SQL}
+WHERE ${NOTIFICATION_PRIVATE_MAINTENANCE_VISIBLE_SQL}
+  AND (
+    $3::uuid IS NULL
+    OR (
+      n.occurred_at < $2::timestamptz
+      OR (
+        n.occurred_at = $2::timestamptz
+        AND n.id < $3::uuid
+      )
+    )
+  )
+ORDER BY
+  n.occurred_at DESC,
+  n.id DESC
+LIMIT $4
+`;
+
+export const FIND_ELIGIBLE_NOTIFICATION_SQL = `
+SELECT
+  ${ELIGIBLE_NOTIFICATION_COLUMNS}
+FROM notifications n
+INNER JOIN memberships
+  ON ${NOTIFICATION_RECIPIENT_MEMBERSHIP_SQL}
+INNER JOIN homes
+  ON ${NOTIFICATION_RECIPIENT_HOME_SQL}
+WHERE n.id = $2::uuid
+  AND ${NOTIFICATION_PRIVATE_MAINTENANCE_VISIBLE_SQL}
+LIMIT 2
+`;
+
+export const MARK_ELIGIBLE_NOTIFICATION_READ_SQL = `
+WITH eligible AS (
+  SELECT n.id, n.read_at
+  FROM notifications n
+  INNER JOIN memberships
+    ON ${NOTIFICATION_RECIPIENT_MEMBERSHIP_SQL}
+  INNER JOIN homes
+    ON ${NOTIFICATION_RECIPIENT_HOME_SQL}
+  WHERE n.id = $2::uuid
+    AND ${NOTIFICATION_PRIVATE_MAINTENANCE_VISIBLE_SQL}
+),
+updated AS (
+  UPDATE notifications AS target
+  SET read_at = transaction_timestamp()
+  FROM eligible
+  WHERE target.id = eligible.id
+    AND eligible.read_at IS NULL
+  RETURNING target.id, target.read_at
+)
+SELECT
+  eligible.id,
+  eligible.read_at AS previous_read_at,
+  updated.read_at AS written_read_at
+FROM eligible
+LEFT JOIN updated ON updated.id = eligible.id
+`;
+
+export const FIND_ACTIVE_RECIPIENT_TENURES_SQL = `
+SELECT
+  memberships.id AS membership_id,
+  memberships.home_id
+FROM memberships
+INNER JOIN homes
+  ON homes.id = memberships.home_id
+WHERE memberships.user_id = $1::uuid
+  AND memberships.ended_at IS NULL
+  AND homes.archived_at IS NULL
+ORDER BY
+  memberships.home_id ASC,
+  memberships.id ASC
+`;
+
+/**
+ * Visibility-first unread update. created_at is the cutoff, never occurred_at.
+ * Hidden PRIVATE rows cannot enter the update relation.
+ */
+export const READ_ALL_ELIGIBLE_UNREAD_SQL = `
+UPDATE notifications n
+SET read_at = $2::timestamptz
+FROM memberships
+INNER JOIN homes
+  ON ${NOTIFICATION_RECIPIENT_HOME_SQL}
+WHERE ${NOTIFICATION_RECIPIENT_MEMBERSHIP_SQL}
+  AND n.read_at IS NULL
+  AND n.created_at <= $2::timestamptz
+  AND ${NOTIFICATION_PRIVATE_MAINTENANCE_VISIBLE_SQL}
+`;
+
+export const SELECT_TRANSACTION_TIMESTAMP_SQL = `
+SELECT transaction_timestamp() AS read_through
+`;
+
 export type NewNotification = Readonly<{
   id: string;
   homeId: string;
@@ -153,6 +334,32 @@ export type NotificationPruneResult = Readonly<{
   ids: readonly string[];
 }>;
 
+export type ListEligibleNotificationPage = Readonly<{
+  userId: string;
+  limit: number;
+  cursor?: string;
+}>;
+
+export type EligibleNotificationLookup = Readonly<{
+  userId: string;
+  notificationId: string;
+}>;
+
+export type ReadAllEligibleUnread = Readonly<{
+  userId: string;
+  readThrough: Date;
+}>;
+
+export type ActiveRecipientTenure = Readonly<{
+  membershipId: string;
+  homeId: string;
+}>;
+
+export type MarkEligibleNotificationReadResult =
+  | Readonly<{ outcome: 'not_found' }>
+  | Readonly<{ outcome: 'already_read'; readAt: Date }>
+  | Readonly<{ outcome: 'marked'; readAt: Date }>;
+
 export type NotificationRepository = Readonly<{
   insertNotification(
     tx: TransactionContext,
@@ -178,6 +385,22 @@ export type NotificationRepository = Readonly<{
     tx: TransactionContext,
     input: PruneExpiredNotifications,
   ): Promise<NotificationPruneResult>;
+  listEligiblePageForUser(
+    input: ListEligibleNotificationPage,
+  ): Promise<NotificationRepositoryPage>;
+  markEligibleRead(
+    tx: TransactionContext,
+    input: EligibleNotificationLookup,
+  ): Promise<MarkEligibleNotificationReadResult>;
+  findActiveRecipientTenures(
+    tx: TransactionContext,
+    userId: string,
+  ): Promise<readonly ActiveRecipientTenure[]>;
+  readTransactionTimestamp(tx: TransactionContext): Promise<Date>;
+  readAllEligibleUnread(
+    tx: TransactionContext,
+    input: ReadAllEligibleUnread,
+  ): Promise<void>;
 }>;
 
 type NotificationRow = {
@@ -194,6 +417,21 @@ type NotificationRow = {
   read_at: unknown;
 };
 
+type EligibleNotificationRow = NotificationRow & {
+  home_name: unknown;
+};
+
+type MarkReadRow = {
+  id: unknown;
+  previous_read_at: unknown;
+  written_read_at: unknown;
+};
+
+type ActiveRecipientTenureRow = {
+  membership_id: unknown;
+  home_id: unknown;
+};
+
 function hasConstraint(error: unknown, constraint: string): boolean {
   return (
     typeof error === 'object' &&
@@ -203,6 +441,25 @@ function hasConstraint(error: unknown, constraint: string): boolean {
     'constraint' in error &&
     error.constraint === constraint
   );
+}
+
+function isPostgresSerializationFailure(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === '40001'
+  );
+}
+
+function rethrowQueryFailure(error: unknown): never {
+  if (isPostgresSerializationFailure(error)) {
+    throw error;
+  }
+  if (error instanceof NotificationPersistenceError) {
+    throw error;
+  }
+  throw new NotificationPersistenceError();
 }
 
 function isUuid(value: unknown): value is string {
@@ -231,6 +488,19 @@ function optionalDate(value: unknown): Date | null {
     return value;
   }
   throw new NotificationPersistenceError();
+}
+
+function parseEligibleNotificationRow(
+  row: EligibleNotificationRow,
+): EligibleNotification {
+  const notification = parseNotificationRow(row);
+  if (typeof row.home_name !== 'string' || row.home_name.length === 0) {
+    throw new NotificationPersistenceError();
+  }
+  return Object.freeze({
+    ...notification,
+    homeName: row.home_name,
+  });
 }
 
 function parseNotificationRow(row: NotificationRow): Notification {
@@ -391,7 +661,6 @@ async function insertOne(
 export function createNotificationRepository(
   pool: Pool,
 ): NotificationRepository {
-  void pool;
   return Object.freeze({
     async insertNotification(tx, notification) {
       return insertOne(tx, notification);
@@ -493,6 +762,158 @@ export function createNotificationRepository(
           throw error;
         }
         throw new NotificationPersistenceError();
+      }
+    },
+
+    async listEligiblePageForUser(input) {
+      if (!isUuid(input.userId)) {
+        throw new NotificationPersistenceError();
+      }
+      const limit = assertNotificationListLimit(input.limit);
+      const cursor =
+        input.cursor === undefined
+          ? null
+          : bindNotificationListCursor(input.cursor, {
+              userId: input.userId,
+              queryFingerprint: NOTIFICATION_LIST_QUERY_FINGERPRINT,
+            });
+      try {
+        const result = await pool.query<EligibleNotificationRow>(
+          LIST_ELIGIBLE_NOTIFICATION_PAGE_SQL,
+          [
+            input.userId,
+            cursor === null ? null : new Date(cursor.occurredAt),
+            cursor?.id ?? null,
+            limit + 1,
+          ],
+        );
+        const parsed = result.rows.map((row) =>
+          parseEligibleNotificationRow(row),
+        );
+        const hasMore = parsed.length > limit;
+        const items = Object.freeze(hasMore ? parsed.slice(0, limit) : parsed);
+        const last = items[items.length - 1];
+        const nextCursor =
+          hasMore && last !== undefined
+            ? encodeNotificationListCursor({
+                v: 1,
+                occurredAt: last.occurredAt.toISOString(),
+                id: last.id,
+                userId: input.userId,
+                queryFingerprint: NOTIFICATION_LIST_QUERY_FINGERPRINT,
+              })
+            : null;
+        return Object.freeze({
+          items,
+          hasMore,
+          nextCursor,
+        });
+      } catch (error) {
+        if (
+          error instanceof NotificationPersistenceError ||
+          error instanceof InvalidNotificationRequestError
+        ) {
+          throw error;
+        }
+        throw new NotificationPersistenceError();
+      }
+    },
+
+    async markEligibleRead(tx, input) {
+      if (!isUuid(input.userId) || !isUuid(input.notificationId)) {
+        throw new NotificationPersistenceError();
+      }
+      try {
+        const result = await tx.query<MarkReadRow>(
+          MARK_ELIGIBLE_NOTIFICATION_READ_SQL,
+          [input.userId, input.notificationId],
+        );
+        if (result.rows.length === 0) {
+          return Object.freeze({ outcome: 'not_found' });
+        }
+        if (result.rows.length !== 1 || result.rows[0] === undefined) {
+          throw new NotificationPersistenceError();
+        }
+        const row = result.rows[0];
+        if (row.written_read_at !== null) {
+          if (!isDate(row.written_read_at)) {
+            throw new NotificationPersistenceError();
+          }
+          return Object.freeze({
+            outcome: 'marked',
+            readAt: row.written_read_at,
+          });
+        }
+        if (!isDate(row.previous_read_at)) {
+          throw new NotificationPersistenceError();
+        }
+        return Object.freeze({
+          outcome: 'already_read',
+          readAt: row.previous_read_at,
+        });
+      } catch (error) {
+        if (error instanceof NotificationPersistenceError) {
+          throw error;
+        }
+        throw new NotificationPersistenceError();
+      }
+    },
+
+    async findActiveRecipientTenures(tx, userId) {
+      if (!isUuid(userId)) {
+        throw new NotificationPersistenceError();
+      }
+      try {
+        const result = await tx.query<ActiveRecipientTenureRow>(
+          FIND_ACTIVE_RECIPIENT_TENURES_SQL,
+          [userId],
+        );
+        return Object.freeze(
+          result.rows.map((row) => {
+            if (!isUuid(row.membership_id) || !isUuid(row.home_id)) {
+              throw new NotificationPersistenceError();
+            }
+            return Object.freeze({
+              membershipId: row.membership_id,
+              homeId: row.home_id,
+            });
+          }),
+        );
+      } catch (error) {
+        rethrowQueryFailure(error);
+      }
+    },
+
+    async readTransactionTimestamp(tx) {
+      try {
+        const result = await tx.query<{ read_through: unknown }>(
+          SELECT_TRANSACTION_TIMESTAMP_SQL,
+        );
+        const row = result.rows[0];
+        if (
+          result.rows.length !== 1 ||
+          row === undefined ||
+          !isDate(row.read_through)
+        ) {
+          throw new NotificationPersistenceError();
+        }
+        return row.read_through;
+      } catch (error) {
+        rethrowQueryFailure(error);
+      }
+    },
+
+    async readAllEligibleUnread(tx, input) {
+      if (!isUuid(input.userId) || !isDate(input.readThrough)) {
+        throw new NotificationPersistenceError();
+      }
+      try {
+        await tx.query(READ_ALL_ELIGIBLE_UNREAD_SQL, [
+          input.userId,
+          input.readThrough,
+        ]);
+      } catch (error) {
+        rethrowQueryFailure(error);
       }
     },
   });

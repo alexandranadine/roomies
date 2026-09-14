@@ -21,6 +21,12 @@ import {
   type ListHomeActivityCommand,
 } from '../domains/activity/http.js';
 import {
+  createNotificationsRouter,
+  type ListCurrentUserNotificationsCommand,
+  type MarkNotificationReadCommand,
+  type ReadAllNotificationsCommand,
+} from '../domains/notifications/http.js';
+import {
   createMaintenanceRouter,
   type CreateMaintenanceEntryCommand,
   type ListHomeMaintenanceCommand,
@@ -104,6 +110,11 @@ export type CreateRoomiesApiRouterOptions = {
   };
   activity?: {
     listHomeActivity: ListHomeActivityCommand;
+  };
+  notifications?: {
+    listCurrentUserNotifications: ListCurrentUserNotificationsCommand;
+    markNotificationRead: MarkNotificationReadCommand;
+    readAllNotifications: ReadAllNotificationsCommand;
   };
 };
 
@@ -207,6 +218,18 @@ export function createRoomiesApiRouter(
         principalResolver: options.principalResolver,
         activeHomeActorResolver: options.activeHomeActorResolver,
         listHomeActivity: options.activity.listHomeActivity,
+      }),
+    );
+  }
+  if (options.notifications !== undefined) {
+    router.use(
+      '/notifications',
+      createNotificationsRouter({
+        principalResolver: options.principalResolver,
+        listCurrentUserNotifications:
+          options.notifications.listCurrentUserNotifications,
+        markNotificationRead: options.notifications.markNotificationRead,
+        readAllNotifications: options.notifications.readAllNotifications,
       }),
     );
   }

@@ -4,6 +4,7 @@ import { AuthorizationIntegrityError } from '../authz/errors.js';
 import { TransactionInfrastructureError } from './errors.js';
 import {
   runInReadCommittedTransaction,
+  runInRepeatableReadTransaction,
   type TransactionClient,
   type TransactionContext,
   type TransactionPool,
@@ -196,5 +197,24 @@ void describe('runInReadCommittedTransaction', () => {
 
     assert.equal(contexts.size, 1);
     assert.equal(client.commands.includes('COMMIT'), true);
+  });
+});
+
+void describe('runInRepeatableReadTransaction', () => {
+  void it('begins REPEATABLE READ, commits, and releases the client', async () => {
+    const client = new ScriptedClient();
+    const pool = poolOf(client);
+
+    const value = await runInRepeatableReadTransaction(pool, async (tx) => {
+      await tx.query('SELECT transaction_timestamp()');
+      return 7;
+    });
+
+    assert.equal(value, 7);
+    assert.equal(client.commands[0], 'BEGIN ISOLATION LEVEL REPEATABLE READ');
+    assert.equal(client.commands.at(-1), 'COMMIT');
+    assert.equal(client.commands.includes('ROLLBACK'), false);
+    assert.equal(client.released, true);
+    assert.equal(pool.ended, false);
   });
 });
