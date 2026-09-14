@@ -151,6 +151,38 @@ async function mockAuthenticatedNotificationApis(page: Page): Promise<void> {
       });
       return;
     }
+    if (
+      path === `/api/v1/homes/${HOME_A}/pulse` ||
+      path === `/api/v1/homes/${HOME_B}/pulse`
+    ) {
+      await json(route, 200, {
+        generatedAt: '2026-09-14T04:00:00.000Z',
+        homeLocalDate: '2026-09-14',
+        items: [
+          {
+            type: 'TASKS',
+            state: 'CLEAR',
+            assignedOpenCount: 0,
+            unassignedOpenCount: 0,
+            dueTodayRelevantCount: 0,
+            overdueRelevantCount: 0,
+          },
+          {
+            type: 'SUPPLIES',
+            state: 'CLEAR',
+            openCount: 0,
+            unclaimedOpenCount: 0,
+            claimedByMeCount: 0,
+          },
+          {
+            type: 'MAINTENANCE',
+            state: 'CLEAR',
+            openVisibleCount: 0,
+          },
+        ],
+      });
+      return;
+    }
     await json(route, 404, {
       error: { code: 'NOT_FOUND', message: 'Not found' },
     });

@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../platform/api/index.js';
+import { pulseKeys } from '../pulse/pulse-query-keys.js';
 import {
   resolveMaintenanceEntry,
   type MaintenanceDetail,
@@ -14,6 +15,7 @@ export type ResolveMaintenanceVariables = {
 /**
  * Resolves a visible OPEN Maintenance entry.
  * On 404: clears the detail cache so protected content cannot linger.
+ * On success: invalidates same-Home lists + Pulse.
  */
 export function useResolveMaintenance() {
   const queryClient = useQueryClient();
@@ -28,6 +30,9 @@ export function useResolveMaintenance() {
       );
       void queryClient.invalidateQueries({
         queryKey: [...maintenanceKeys.all(variables.homeId), 'list'],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: pulseKeys.all(variables.homeId),
       });
     },
     onError: (error, variables) => {

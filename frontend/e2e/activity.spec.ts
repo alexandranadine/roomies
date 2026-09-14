@@ -136,6 +136,64 @@ async function mockAuthenticatedActivityApis(page: Page): Promise<void> {
       await json(route, 200, HOME_B_PAGE);
       return;
     }
+    if (path === `/api/v1/homes/${HOME_A}/pulse`) {
+      await json(route, 200, {
+        generatedAt: '2026-09-14T04:00:00.000Z',
+        homeLocalDate: '2026-09-14',
+        items: [
+          {
+            type: 'TASKS',
+            state: 'CLEAR',
+            assignedOpenCount: 0,
+            unassignedOpenCount: 0,
+            dueTodayRelevantCount: 0,
+            overdueRelevantCount: 0,
+          },
+          {
+            type: 'SUPPLIES',
+            state: 'CLEAR',
+            openCount: 0,
+            unclaimedOpenCount: 0,
+            claimedByMeCount: 0,
+          },
+          {
+            type: 'MAINTENANCE',
+            state: 'CLEAR',
+            openVisibleCount: 0,
+          },
+        ],
+      });
+      return;
+    }
+    if (path === `/api/v1/homes/${HOME_B}/pulse`) {
+      await json(route, 200, {
+        generatedAt: '2026-09-14T04:00:00.000Z',
+        homeLocalDate: '2026-09-14',
+        items: [
+          {
+            type: 'TASKS',
+            state: 'CLEAR',
+            assignedOpenCount: 0,
+            unassignedOpenCount: 0,
+            dueTodayRelevantCount: 0,
+            overdueRelevantCount: 0,
+          },
+          {
+            type: 'SUPPLIES',
+            state: 'CLEAR',
+            openCount: 0,
+            unclaimedOpenCount: 0,
+            claimedByMeCount: 0,
+          },
+          {
+            type: 'MAINTENANCE',
+            state: 'CLEAR',
+            openVisibleCount: 0,
+          },
+        ],
+      });
+      return;
+    }
     if (path === `/api/v1/homes/${HOME_A}`) {
       await json(route, 200, {
         id: HOME_A,

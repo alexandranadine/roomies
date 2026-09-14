@@ -1,5 +1,6 @@
 import { vi } from 'vitest';
 import type { ActiveHomeMemberships } from '../homes/home-memberships-api.js';
+import { clearHousePulse } from '../pulse/test-fixtures.js';
 import type {
   MaintenanceDetail,
   MaintenanceListPage,
@@ -298,6 +299,11 @@ export function stubMaintenanceApis(options: MaintenanceStubOptions = {}) {
           );
         }
         return Promise.resolve(jsonResponse(200, configured));
+      }
+
+      const pulseMatch = /^\/api\/v1\/homes\/([^/]+)\/pulse$/i.exec(path);
+      if (pulseMatch?.[1] !== undefined && method === 'GET') {
+        return Promise.resolve(jsonResponse(200, clearHousePulse()));
       }
 
       const homeMatch = /^\/api\/v1\/homes\/([^/]+)$/i.exec(path);

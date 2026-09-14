@@ -2,6 +2,8 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { resetApiClientForTests } from '../platform/api/index.js';
+import { pulseKeys } from '../pulse/pulse-query-keys.js';
+import { clearHousePulse } from '../pulse/test-fixtures.js';
 import { renderApp } from '../test/render.js';
 import { maintenanceKeys } from './maintenance-query-keys.js';
 import {
@@ -56,7 +58,7 @@ describe('Maintenance resolve UI', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('POSTs resolve with {} and updates detail + same-Home lists only', async () => {
+  it('POSTs resolve with {} and updates detail + same-Home lists and Pulse only', async () => {
     const resolved = detailFromListItem(
       {
         ...FIXTURE_H,
@@ -99,6 +101,11 @@ describe('Maintenance resolve UI', () => {
     const otherBefore = queryClient.getQueryState(
       maintenanceKeys.list(TEST_HOME_B, {}),
     )?.dataUpdatedAt;
+    queryClient.setQueryData(pulseKeys.all(TEST_HOME_A), clearHousePulse());
+    queryClient.setQueryData(pulseKeys.all(TEST_HOME_B), clearHousePulse());
+    const otherPulseBefore = queryClient.getQueryState(
+      pulseKeys.all(TEST_HOME_B),
+    )?.dataUpdatedAt;
 
     const button = await screen.findByRole('button', { name: 'Mark resolved' });
     await userEvent.click(button);
@@ -116,6 +123,17 @@ describe('Maintenance resolve UI', () => {
       queryClient.getQueryState(maintenanceKeys.list(TEST_HOME_B, {}))
         ?.dataUpdatedAt,
     ).toBe(otherBefore);
+    await waitFor(() => {
+      expect(
+        queryClient.getQueryState(pulseKeys.all(TEST_HOME_A))?.isInvalidated,
+      ).toBe(true);
+    });
+    expect(
+      queryClient.getQueryState(pulseKeys.all(TEST_HOME_B))?.dataUpdatedAt,
+    ).toBe(otherPulseBefore);
+    expect(
+      queryClient.getQueryState(pulseKeys.all(TEST_HOME_B))?.isInvalidated,
+    ).not.toBe(true);
     expect(
       screen.queryByRole('button', { name: 'Mark resolved' }),
     ).not.toBeInTheDocument();

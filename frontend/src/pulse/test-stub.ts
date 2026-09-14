@@ -1,7 +1,7 @@
 import { vi } from 'vitest';
-import { clearHousePulse } from '../pulse/test-fixtures.js';
-import type { ActivityListPage } from './activity-api.js';
+import type { HousePulseDto } from './pulse-api.js';
 import {
+  clearHousePulse,
   jsonResponse,
   notFoundBody,
   TEST_HOME_A,
@@ -16,10 +16,9 @@ type HomeContextBody = {
   timezone: string;
 };
 
-export type ActivityListResult =
-  ActivityListPage | { status: number; body: unknown };
+export type PulseResult = HousePulseDto | { status: number; body: unknown };
 
-export type ActivityStubOptions = {
+export type PulseStubOptions = {
   homes?: readonly {
     id: string;
     name: string;
@@ -27,12 +26,9 @@ export type ActivityStubOptions = {
     role: 'ADMIN' | 'ROOMMATE';
   }[];
   contexts?: Record<string, { status: number; body: unknown }>;
-  listByHome?: Record<
-    string,
-    ActivityListResult | ((url: URL) => ActivityListResult)
-  >;
+  pulseByHome?: Record<string, PulseResult | (() => PulseResult)>;
   meStatus?: number | (() => number);
-  listDelayMs?: number;
+  pulseDelayMs?: number;
   delayedHomeId?: string;
 };
 
@@ -43,19 +39,15 @@ function defaultContext(homeId: string): HomeContextBody {
   return { id: TEST_HOME_A, name: 'Oak Street', timezone: 'UTC' };
 }
 
-function resolveListResult(
-  configured: ActivityListResult | ((url: URL) => ActivityListResult),
-  url: URL,
-): Response {
-  const result =
-    typeof configured === 'function' ? configured(url) : configured;
+function resolvePulse(configured: PulseResult | (() => PulseResult)): Response {
+  const result = typeof configured === 'function' ? configured() : configured;
   if ('status' in result && 'body' in result && !('items' in result)) {
     return jsonResponse(result.status, result.body);
   }
   return jsonResponse(200, result);
 }
 
-export function stubActivityApis(options: ActivityStubOptions = {}) {
+export function stubPulseApis(options: PulseStubOptions = {}) {
   const fetchMock = vi
     .fn()
     .mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
@@ -101,37 +93,28 @@ export function stubActivityApis(options: ActivityStubOptions = {}) {
         return Promise.resolve(jsonResponse(200, { id: TEST_USER_ID }));
       }
 
-      const listMatch = /^\/api\/v1\/homes\/([^/]+)\/activity$/i.exec(path);
-      if (listMatch?.[1] !== undefined && method === 'GET') {
-        const homeId = listMatch[1];
-        const configured = options.listByHome?.[homeId];
+      const pulseMatch = /^\/api\/v1\/homes\/([^/]+)\/pulse$/i.exec(path);
+      if (pulseMatch?.[1] !== undefined && method === 'GET') {
+        const homeId = pulseMatch[1];
+        const configured = options.pulseByHome?.[homeId];
         const respond = () => {
           if (configured === undefined) {
-            return jsonResponse(200, {
-              items: [],
-              hasMore: false,
-              nextCursor: null,
-            });
+            return jsonResponse(200, clearHousePulse());
           }
-          return resolveListResult(configured, url);
+          return resolvePulse(configured);
         };
         if (
-          options.listDelayMs !== undefined &&
+          options.pulseDelayMs !== undefined &&
           (options.delayedHomeId === undefined ||
             options.delayedHomeId === homeId)
         ) {
           return new Promise<Response>((resolve) => {
             setTimeout(() => {
               resolve(respond());
-            }, options.listDelayMs);
+            }, options.pulseDelayMs);
           });
         }
         return Promise.resolve(respond());
-      }
-
-      const pulseMatch = /^\/api\/v1\/homes\/([^/]+)\/pulse$/i.exec(path);
-      if (pulseMatch?.[1] !== undefined && method === 'GET') {
-        return Promise.resolve(jsonResponse(200, clearHousePulse()));
       }
 
       const homeMatch = /^\/api\/v1\/homes\/([^/]+)$/i.exec(path);

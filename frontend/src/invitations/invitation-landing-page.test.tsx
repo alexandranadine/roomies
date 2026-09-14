@@ -2,6 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { resetApiClientForTests } from '../platform/api/index.js';
+import { clearHousePulse } from '../pulse/test-fixtures.js';
 import { renderApp } from '../test/render.js';
 import {
   captureInvitationFragment,
@@ -262,7 +263,15 @@ describe('invitation landing page', () => {
           ),
         );
       }
-      if (String(url).includes(`/api/v1/homes/${homeId}`)) {
+      if (String(url).includes(`/api/v1/homes/${homeId}/pulse`)) {
+        return Promise.resolve(
+          new Response(JSON.stringify(clearHousePulse()), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        );
+      }
+      if (String(url).match(new RegExp(`/api/v1/homes/${homeId}$`))) {
         return Promise.resolve(
           new Response(
             JSON.stringify({

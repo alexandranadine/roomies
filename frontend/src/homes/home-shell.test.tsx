@@ -2,6 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { resetApiClientForTests } from '../platform/api/index.js';
+import { clearHousePulse } from '../pulse/test-fixtures.js';
 import { renderApp } from '../test/render.js';
 import {
   currentUserHomesQueryKey,
@@ -54,7 +55,10 @@ function stubRoomiesApis(options: {
       }
       return Promise.resolve(jsonResponse(200, { id: USER_ID }));
     }
-    const homeMatch = /\/api\/v1\/homes\/([0-9a-f-]+)/i.exec(path);
+    if (/\/api\/v1\/homes\/[0-9a-f-]+\/pulse$/i.test(path)) {
+      return Promise.resolve(jsonResponse(200, clearHousePulse()));
+    }
+    const homeMatch = /\/api\/v1\/homes\/([0-9a-f-]+)$/i.exec(path);
     if (homeMatch?.[1] !== undefined) {
       const homeId = homeMatch[1];
       const override = options.contexts?.[homeId];
@@ -299,7 +303,10 @@ describe('active Home discovery and shell', () => {
         }
         return Promise.resolve(jsonResponse(200, { id: USER_ID }));
       }
-      if (path.includes(`/api/v1/homes/${HOME_A}`)) {
+      if (path.includes(`/api/v1/homes/${HOME_A}/pulse`)) {
+        return Promise.resolve(jsonResponse(200, clearHousePulse()));
+      }
+      if (path.match(new RegExp(`/api/v1/homes/${HOME_A}$`))) {
         return Promise.resolve(
           jsonResponse(200, {
             id: HOME_A,

@@ -2,12 +2,13 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { resetApiClientForTests } from '../platform/api/index.js';
+import { clearHousePulse } from '../pulse/test-fixtures.js';
 import { renderApp } from '../test/render.js';
-import { HOME_NAME_MAX_LENGTH } from './supported-timezones.js';
 import {
   currentUserHomesQueryKey,
   currentUserQueryKey,
 } from './home-query-keys.js';
+import { HOME_NAME_MAX_LENGTH } from './supported-timezones.js';
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 const HOME_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -62,7 +63,10 @@ function stubDiscoveryApis(options: {
         }
         return Promise.resolve(response);
       }
-      if (path.includes(`/api/v1/homes/${HOME_ID}`)) {
+      if (path.includes(`/api/v1/homes/${HOME_ID}/pulse`)) {
+        return Promise.resolve(jsonResponse(200, clearHousePulse()));
+      }
+      if (path.match(new RegExp(`/api/v1/homes/${HOME_ID}$`))) {
         return Promise.resolve(
           jsonResponse(
             options.homeContext?.status ?? 200,

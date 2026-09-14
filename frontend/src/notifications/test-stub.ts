@@ -1,4 +1,5 @@
 import { vi } from 'vitest';
+import { clearHousePulse } from '../pulse/test-fixtures.js';
 import type { NotificationListPage } from './notifications-api.js';
 import {
   emptyResponse,
@@ -149,6 +150,11 @@ export function stubNotificationsApis(options: NotificationStubOptions = {}) {
         return Promise.resolve(
           jsonResponse(configured.status, configured.body ?? notFoundBody()),
         );
+      }
+
+      const pulseMatch = /^\/api\/v1\/homes\/([^/]+)\/pulse$/i.exec(path);
+      if (pulseMatch?.[1] !== undefined && method === 'GET') {
+        return Promise.resolve(jsonResponse(200, clearHousePulse()));
       }
 
       const homeMatch = /^\/api\/v1\/homes\/([^/]+)$/i.exec(path);
