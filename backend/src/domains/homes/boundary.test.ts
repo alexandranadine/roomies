@@ -112,6 +112,26 @@ void describe('homes domain boundary', () => {
     assert.match(source, /uniqueSortedMembershipIds/);
   });
 
+  void it('loads Pulse snapshot timezone without locks or Home internals leaks', async () => {
+    const source = await readFile(
+      path.join(homesDir, 'find-house-pulse-snapshot.ts'),
+      'utf8',
+    );
+    assert.match(source, /SELECT_HOUSE_PULSE_GENERATED_AT_SQL/);
+    assert.match(source, /transaction_timestamp\(\)/);
+    assert.match(source, /FIND_HOUSE_PULSE_TIMEZONE_SQL/);
+    assert.match(source, /h\.timezone/);
+    assert.match(source, /m\.ended_at IS NULL/);
+    assert.match(source, /h\.archived_at IS NULL/);
+    assert.match(source, /canonicalizeIanaTimeZone/);
+    assert.doesNotMatch(source, /FOR UPDATE/i);
+    assert.doesNotMatch(source, /SERIALIZABLE/);
+    assert.doesNotMatch(source, /user_id/);
+    assert.doesNotMatch(source, /h\.name/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+  });
+
   void it('does not import Membership repository internals', async () => {
     const files = await walk(homesDir);
 

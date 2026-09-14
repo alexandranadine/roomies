@@ -26,6 +26,7 @@ export {
   MaintenanceNotificationSourceIntegrityError,
   MaintenanceNotOpenError,
   MaintenancePersistenceError,
+  MaintenancePulseSummaryIntegrityError,
 } from './errors.js';
 export {
   MAINTENANCE_CREATED_V1,
@@ -58,6 +59,13 @@ export {
   type FindMaintenanceNotificationSource,
   type MaintenanceNotificationSource,
 } from './find-maintenance-notification-source.js';
+export {
+  FIND_MAINTENANCE_PULSE_SUMMARY_SQL,
+  findMaintenancePulseSummary,
+  type FindMaintenancePulseSummary,
+  type FindMaintenancePulseSummaryInput,
+  type MaintenancePulseSummary,
+} from './find-maintenance-pulse-summary.js';
 export {
   decideMaintenanceList,
   isMaintenanceListCapableRole,

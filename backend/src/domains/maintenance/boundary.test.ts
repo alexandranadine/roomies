@@ -118,6 +118,24 @@ void describe('maintenance domain boundary', () => {
     assert.doesNotMatch(source, /from ['"]\.\/repository/);
   });
 
+  void it('counts Pulse-visible OPEN Maintenance after visibility, without content', async () => {
+    const source = await readFile(
+      path.join(maintenanceDir, 'find-maintenance-pulse-summary.ts'),
+      'utf8',
+    );
+    assert.match(source, /FIND_MAINTENANCE_PULSE_SUMMARY_SQL/);
+    assert.match(source, /SELECT COUNT\(\*\)::int AS open_visible_count/);
+    assert.match(source, /e\.status = 'OPEN'/);
+    assert.match(source, /e\.visibility = 'HOUSEHOLD'/);
+    assert.match(source, /e\.visibility = 'PRIVATE'/);
+    assert.match(source, /maintenance_audiences/);
+    assert.match(source, /a\.membership_id = \$2::uuid/);
+    assert.doesNotMatch(source, /e\.title|e\.details/);
+    assert.doesNotMatch(source, /isHomeAdmin/);
+    assert.doesNotMatch(source, /user_id|email|\bname\b/);
+    assert.doesNotMatch(source, /from ['"]\.\/repository/);
+  });
+
   void it('keeps Activity list display free of PRIVATE title, details, and audience', async () => {
     const source = await readFile(
       path.join(maintenanceDir, 'find-maintenance-activity-display.ts'),

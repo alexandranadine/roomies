@@ -28,6 +28,7 @@ import { createCreateRecurringTaskDefinitionFromPool } from './application/tasks
 import { createDeactivateTaskDefinitionFromPool } from './application/tasks/deactivate-task-definition.js';
 import { createListHomeTaskDefinitionsFromPool } from './application/tasks/list-home-task-definitions.js';
 import { createListHomeTasksFromPool } from './application/tasks/list-home-tasks.js';
+import { createGetHousePulseFromPool } from './application/pulse/get-house-pulse.js';
 import {
   createActiveHomesForUserReader,
   createHomeRepository,
@@ -161,6 +162,9 @@ function createWebHttpRuntime(
         readAllNotifications: createReadAllNotificationsFromPool(
           databasePool.pool,
         ),
+      },
+      pulse: {
+        getHousePulse: createGetHousePulseFromPool(databasePool.pool),
       },
     }),
   });

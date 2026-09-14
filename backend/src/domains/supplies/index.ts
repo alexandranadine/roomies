@@ -25,6 +25,7 @@ export {
   SupplyNotificationSourceIntegrityError,
   SupplyNotOpenError,
   SupplyPersistenceError,
+  SupplyPulseSummaryIntegrityError,
 } from './errors.js';
 export {
   SUPPLY_OBTAINED_V1,
@@ -52,6 +53,13 @@ export {
   type FindSupplyNotificationSource,
   type SupplyNotificationSource,
 } from './find-supply-notification-source.js';
+export {
+  FIND_SUPPLY_PULSE_SUMMARY_SQL,
+  findSupplyPulseSummary,
+  type FindSupplyPulseSummary,
+  type FindSupplyPulseSummaryInput,
+  type SupplyPulseSummary,
+} from './find-supply-pulse-summary.js';
 export {
   createSuppliesRouter,
   type CancelSupplyEntryCommand,

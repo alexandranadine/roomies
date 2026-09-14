@@ -128,6 +128,22 @@ void describe('supplies domain boundary', () => {
     assert.doesNotMatch(source, /from ['"]\.\/repository/);
   });
 
+  void it('exposes only Pulse Supply counts without returning rows or titles', async () => {
+    const source = await readFile(
+      path.join(suppliesDir, 'find-supply-pulse-summary.ts'),
+      'utf8',
+    );
+    assert.match(source, /FIND_SUPPLY_PULSE_SUMMARY_SQL/);
+    assert.match(source, /COUNT\(\*\)::int AS open_count/);
+    assert.match(source, /released_at IS NULL/);
+    assert.match(source, /e\.status = 'OPEN'/);
+    assert.match(source, /claimant_membership_id = \$2::uuid/);
+    assert.doesNotMatch(source, /e\.title/);
+    assert.doesNotMatch(source, /user_id|email|\bname\b/);
+    assert.doesNotMatch(source, /from ['"]\.\/repository/);
+    assert.doesNotMatch(source, /isHomeAdmin|\brole\b/);
+  });
+
   void it('keeps title rules free of persistence, HTTP, and JS Date', async () => {
     const source = await readFile(
       path.join(suppliesDir, 'supply-title.ts'),

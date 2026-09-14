@@ -27,6 +27,10 @@ import {
   type ReadAllNotificationsCommand,
 } from '../domains/notifications/http.js';
 import {
+  createPulseRouter,
+  type GetHousePulseCommand,
+} from '../domains/pulse/http.js';
+import {
   createMaintenanceRouter,
   type CreateMaintenanceEntryCommand,
   type ListHomeMaintenanceCommand,
@@ -115,6 +119,9 @@ export type CreateRoomiesApiRouterOptions = {
     listCurrentUserNotifications: ListCurrentUserNotificationsCommand;
     markNotificationRead: MarkNotificationReadCommand;
     readAllNotifications: ReadAllNotificationsCommand;
+  };
+  pulse?: {
+    getHousePulse: GetHousePulseCommand;
   };
 };
 
@@ -230,6 +237,16 @@ export function createRoomiesApiRouter(
           options.notifications.listCurrentUserNotifications,
         markNotificationRead: options.notifications.markNotificationRead,
         readAllNotifications: options.notifications.readAllNotifications,
+      }),
+    );
+  }
+  if (options.pulse !== undefined) {
+    router.use(
+      '/homes',
+      createPulseRouter({
+        principalResolver: options.principalResolver,
+        activeHomeActorResolver: options.activeHomeActorResolver,
+        getHousePulse: options.pulse.getHousePulse,
       }),
     );
   }

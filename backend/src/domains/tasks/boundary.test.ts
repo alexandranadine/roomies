@@ -123,6 +123,27 @@ void describe('tasks domain boundary', () => {
     assert.doesNotMatch(source, /from ['"]\.\/repository/);
   });
 
+  void it('exposes only Pulse Task counts without returning rows or titles', async () => {
+    const source = await readFile(
+      path.join(tasksDir, 'find-task-pulse-summary.ts'),
+      'utf8',
+    );
+    assert.match(source, /FIND_TASK_PULSE_SUMMARY_SQL/);
+    assert.match(source, /COUNT\(\*\) FILTER/);
+    assert.match(source, /status = 'OPEN'/);
+    assert.match(source, /assigned_membership_id = \$2::uuid/);
+    assert.match(source, /assigned_membership_id IS NULL/);
+    assert.match(source, /scheduled_for = \$3::date/);
+    assert.match(source, /scheduled_for < \$3::date/);
+    assert.match(source, /home_id = \$1::uuid/);
+    assert.doesNotMatch(source, /t\.title|e\.title/);
+    assert.doesNotMatch(source, /task_definitions/);
+    assert.doesNotMatch(source, /user_id|email|\bname\b/);
+    assert.doesNotMatch(source, /SELECT[\s\S]*FROM task_instances[\s\S]*id,/);
+    assert.doesNotMatch(source, /from ['"]\.\/repository/);
+    assert.doesNotMatch(source, /isHomeAdmin|\brole\b/);
+  });
+
   void it('exposes only persisted assignment and completion evidence to Notifications', async () => {
     const source = await readFile(
       path.join(tasksDir, 'find-task-notification-source.ts'),

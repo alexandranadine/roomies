@@ -79,3 +79,15 @@ export class TaskNotificationSourceIntegrityError extends Error {
     super('Task notification source integrity failure');
   }
 }
+
+/**
+ * House Pulse Task summary could not be read safely.
+ * Messages never include titles, assignees, Home, or Membership IDs.
+ */
+export class TaskPulseSummaryIntegrityError extends Error {
+  override readonly name = 'TaskPulseSummaryIntegrityError';
+
+  constructor() {
+    super('Task pulse summary integrity failure');
+  }
+}

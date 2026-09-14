@@ -67,3 +67,15 @@ export class MaintenanceNotOpenError extends Error {
     super('Maintenance is not open');
   }
 }
+
+/**
+ * House Pulse Maintenance summary could not be read safely.
+ * Messages never include title, details, audience, Home, or Membership IDs.
+ */
+export class MaintenancePulseSummaryIntegrityError extends Error {
+  override readonly name = 'MaintenancePulseSummaryIntegrityError';
+
+  constructor() {
+    super('Maintenance pulse summary integrity failure');
+  }
+}

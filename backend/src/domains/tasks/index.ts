@@ -25,6 +25,7 @@ export {
   TaskDefinitionAlreadyDeactivatedError,
   TaskNotificationSourceIntegrityError,
   TaskPersistenceError,
+  TaskPulseSummaryIntegrityError,
 } from './errors.js';
 export {
   TASK_COMPLETED_V1,
@@ -53,7 +54,15 @@ export {
   type TaskNotificationSource,
 } from './find-task-notification-source.js';
 export {
+  FIND_TASK_PULSE_SUMMARY_SQL,
+  findTaskPulseSummary,
+  type FindTaskPulseSummary,
+  type FindTaskPulseSummaryInput,
+  type TaskPulseSummary,
+} from './find-task-pulse-summary.js';
+export {
   HOME_LOCAL_DATE_PATTERN,
+  homeLocalDateFromInstant,
   parseHomeLocalDate,
   type DateString,
 } from './home-local-date.js';

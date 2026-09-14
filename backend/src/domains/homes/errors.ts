@@ -7,3 +7,15 @@ export class FinalMemberRequiredError extends Error {
     super('Final member required');
   }
 }
+
+/**
+ * House Pulse Home snapshot could not be read safely.
+ * Messages never include Home names, Membership IDs, or user identity.
+ */
+export class HousePulseSnapshotIntegrityError extends Error {
+  override readonly name = 'HousePulseSnapshotIntegrityError';
+
+  constructor() {
+    super('House pulse snapshot integrity failure');
+  }
+}

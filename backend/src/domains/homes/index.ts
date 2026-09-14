@@ -23,7 +23,18 @@ export {
   type CreateCurrentUserHomesRouterOptions,
   type ListActiveHomesCommand,
 } from './current-user-homes-http.js';
-export { FinalMemberRequiredError } from './errors.js';
+export {
+  FinalMemberRequiredError,
+  HousePulseSnapshotIntegrityError,
+} from './errors.js';
+export {
+  FIND_HOUSE_PULSE_TIMEZONE_SQL,
+  findHousePulseSnapshot,
+  SELECT_HOUSE_PULSE_GENERATED_AT_SQL,
+  type FindHousePulseSnapshot,
+  type FindHousePulseSnapshotInput,
+  type HousePulseSnapshot,
+} from './find-house-pulse-snapshot.js';
 export { getHome } from './get-home.js';
 export {
   assertUniqueActiveHomeIds,

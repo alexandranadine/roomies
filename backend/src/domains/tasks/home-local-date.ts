@@ -1,3 +1,5 @@
+import { Temporal } from '@js-temporal/polyfill';
+import { canonicalizeIanaTimeZone } from '../../platform/time/iana-timezone.js';
 import { InvalidHomeLocalDateError } from './errors.js';
 
 declare const DATE_STRING_BRAND: unique symbol;
@@ -58,4 +60,20 @@ export function parseHomeLocalDate(raw: string): DateString {
   }
 
   return raw as DateString;
+}
+
+/**
+ * Home-local calendar DATE for an instant using the authoritative Home IANA
+ * timezone. Not UTC-midnight semantics and not the server-local timezone.
+ */
+export function homeLocalDateFromInstant(
+  instant: Temporal.Instant,
+  homeTimeZone: string,
+): DateString {
+  return parseHomeLocalDate(
+    instant
+      .toZonedDateTimeISO(canonicalizeIanaTimeZone(homeTimeZone))
+      .toPlainDate()
+      .toString(),
+  );
 }

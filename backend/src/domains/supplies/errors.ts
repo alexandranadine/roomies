@@ -75,3 +75,15 @@ export class SupplyNotificationSourceIntegrityError extends Error {
     super('Supply notification source integrity failure');
   }
 }
+
+/**
+ * House Pulse Supply summary could not be read safely.
+ * Messages never include titles, claimants, Home, or Membership IDs.
+ */
+export class SupplyPulseSummaryIntegrityError extends Error {
+  override readonly name = 'SupplyPulseSummaryIntegrityError';
+
+  constructor() {
+    super('Supply pulse summary integrity failure');
+  }
+}
