@@ -134,8 +134,8 @@ async function insertMembership(
   },
 ): Promise<void> {
   await pool.query(
-    `INSERT INTO memberships (id, home_id, user_id, role, ended_at)
-     VALUES ($1, $2, $3, $4, NULL)`,
+    `INSERT INTO memberships (id, home_id, user_id, role, ended_at, ended_by_membership_id)
+     VALUES ($1, $2, $3, $4, NULL, NULL)`,
     [input.id, input.homeId, input.userId, input.role],
   );
 }
@@ -157,9 +157,34 @@ async function cleanup(
     await pool.query('DELETE FROM outbox_events WHERE home_id = ANY($1)', [
       input.homeIds,
     ]);
-    await pool.query('DELETE FROM memberships WHERE home_id = ANY($1)', [
-      input.homeIds,
-    ]);
+    await pool.query(
+      'DELETE FROM membership_role_transitions WHERE home_id = ANY($1::uuid[])',
+      [input.homeIds],
+    );
+    await pool.query(
+      `UPDATE memberships
+       SET ended_by_membership_id = id
+       WHERE home_id = ANY($1::uuid[]) AND ended_at IS NOT NULL`,
+      [input.homeIds],
+    );
+    await pool.query(
+      `DELETE FROM memberships
+       WHERE home_id = ANY($1::uuid[]) AND ended_at IS NULL`,
+      [input.homeIds],
+    );
+    const remainingMemberships = await pool.query<{ id: string }>(
+      'SELECT id FROM memberships WHERE home_id = ANY($1::uuid[])',
+      [input.homeIds],
+    );
+    for (const row of remainingMemberships.rows) {
+      await pool.query(
+        `UPDATE memberships
+         SET ended_at = NULL, ended_by_membership_id = NULL
+         WHERE id = $1`,
+        [row.id],
+      );
+      await pool.query('DELETE FROM memberships WHERE id = $1', [row.id]);
+    }
     await pool.query('DELETE FROM homes WHERE id = ANY($1)', [input.homeIds]);
   }
   if (input.userIds.length > 0) {
@@ -215,7 +240,9 @@ function obtainCommand(pool: Pool, options: LockHooks = {}) {
     runTransaction: (work) => runInReadCommittedTransaction(pool, work),
     lockHomeAndExactMemberships: wrapHomeLock(options),
     supplies: createSupplyRepository(pool),
+    outbox: outboxWriter,
     clock: systemClock,
+    ids: systemUuidV7,
   });
 }
 
@@ -282,6 +309,26 @@ async function entryStatus(pool: Pool, entryId: string): Promise<string> {
     [entryId],
   );
   return result.rows[0]?.status ?? '';
+}
+
+async function entryActor(
+  pool: Pool,
+  entryId: string,
+): Promise<{
+  status: string;
+  obtainedByMembershipId: string | null;
+}> {
+  const result = await pool.query<{
+    status: string;
+    obtained_by_membership_id: string | null;
+  }>(
+    'SELECT status, obtained_by_membership_id FROM supply_entries WHERE id = $1',
+    [entryId],
+  );
+  return {
+    status: result.rows[0]?.status ?? '',
+    obtainedByMembershipId: result.rows[0]?.obtained_by_membership_id ?? null,
+  };
 }
 
 async function claimReason(
@@ -856,12 +903,16 @@ void describe('Supply obtain/cancel concurrency PostgreSQL', () => {
         const obtained = await obtainRun;
         const canceled = await laterCancel;
         assert.equal(obtained.status, 'OBTAINED');
+        assert.equal(obtained.obtainedByMembershipId, membershipA);
+        assert.notEqual(obtained.obtainedByMembershipId, membershipB);
         assert.equal(canceled.status, 'rejected');
         assert.ok(canceled.reason instanceof SupplyNotOpenError);
-        assert.equal(
-          await entryStatus(database.pool, obtainVsCancel.id),
-          'OBTAINED',
+        const obtainVsCancelRow = await entryActor(
+          database.pool,
+          obtainVsCancel.id,
         );
+        assert.equal(obtainVsCancelRow.status, 'OBTAINED');
+        assert.equal(obtainVsCancelRow.obtainedByMembershipId, membershipA);
 
         const cancelVsObtain = await create({
           actor: roommateA,
@@ -901,15 +952,22 @@ void describe('Supply obtain/cancel concurrency PostgreSQL', () => {
         const obtainedLater = await laterObtain;
         assert.equal(obtainedLater.status, 'rejected');
         assert.ok(obtainedLater.reason instanceof SupplyNotOpenError);
-        assert.equal(
-          await entryStatus(database.pool, cancelVsObtain.id),
-          'CANCELED',
+        const cancelVsObtainRow = await entryActor(
+          database.pool,
+          cancelVsObtain.id,
         );
+        assert.equal(cancelVsObtainRow.status, 'CANCELED');
+        assert.equal(cancelVsObtainRow.obtainedByMembershipId, null);
 
         const obtainVsObtain = await create({
           actor: roommateA,
           homeId,
           title: 'Obtain vs obtain',
+        });
+        await claimCommand(database.pool)({
+          actor: roommateA,
+          homeId,
+          supplyEntryId: obtainVsObtain.id,
         });
         const firstObtainLocked = deferred();
         const firstObtainMayFinish = deferred();
@@ -920,7 +978,7 @@ void describe('Supply obtain/cancel concurrency PostgreSQL', () => {
             await firstObtainMayFinish.promise;
           },
         })({
-          actor: roommateA,
+          actor: roommateB,
           homeId,
           supplyEntryId: obtainVsObtain.id,
         });
@@ -931,7 +989,7 @@ void describe('Supply obtain/cancel concurrency PostgreSQL', () => {
               secondObtainPid.resolve(pid);
             },
           })({
-            actor: roommateB,
+            actor: roommateA,
             homeId,
             supplyEntryId: obtainVsObtain.id,
           }),
@@ -942,10 +1000,31 @@ void describe('Supply obtain/cancel concurrency PostgreSQL', () => {
           ),
         );
         firstObtainMayFinish.resolve();
-        await firstObtain;
+        const winnerObtain = await firstObtain;
         const second = await secondObtain;
+        assert.equal(winnerObtain.status, 'OBTAINED');
+        assert.equal(winnerObtain.obtainedByMembershipId, membershipB);
+        assert.notEqual(winnerObtain.obtainedByMembershipId, membershipA);
+        assert.notEqual(
+          winnerObtain.obtainedByMembershipId,
+          obtainVsObtain.createdByMembershipId,
+        );
         assert.equal(second.status, 'rejected');
         assert.ok(second.reason instanceof SupplyNotOpenError);
+        const obtainVsObtainRow = await entryActor(
+          database.pool,
+          obtainVsObtain.id,
+        );
+        assert.equal(obtainVsObtainRow.status, 'OBTAINED');
+        assert.equal(obtainVsObtainRow.obtainedByMembershipId, membershipB);
+        assert.equal(
+          await activeClaimCount(database.pool, obtainVsObtain.id),
+          0,
+        );
+        assert.equal(
+          await claimReason(database.pool, obtainVsObtain.id),
+          'ENTRY_OBTAINED',
+        );
 
         const cancelVsCancel = await create({
           actor: roommateA,

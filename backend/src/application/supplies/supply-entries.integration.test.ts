@@ -67,14 +67,15 @@ async function insertMembership(
   },
 ): Promise<void> {
   await pool.query(
-    `INSERT INTO memberships (id, home_id, user_id, role, ended_at)
-     VALUES ($1, $2, $3, $4, $5)`,
+    `INSERT INTO memberships (id, home_id, user_id, role, ended_at, ended_by_membership_id)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
     [
       input.id,
       input.homeId,
       input.userId,
       input.role,
       input.ended === true ? new Date() : null,
+      input.ended === true ? input.id : null,
     ],
   );
 }
@@ -93,9 +94,34 @@ async function cleanup(
     await pool.query('DELETE FROM outbox_events WHERE home_id = ANY($1)', [
       input.homeIds,
     ]);
-    await pool.query('DELETE FROM memberships WHERE home_id = ANY($1)', [
-      input.homeIds,
-    ]);
+    await pool.query(
+      'DELETE FROM membership_role_transitions WHERE home_id = ANY($1::uuid[])',
+      [input.homeIds],
+    );
+    await pool.query(
+      `UPDATE memberships
+       SET ended_by_membership_id = id
+       WHERE home_id = ANY($1::uuid[]) AND ended_at IS NOT NULL`,
+      [input.homeIds],
+    );
+    await pool.query(
+      `DELETE FROM memberships
+       WHERE home_id = ANY($1::uuid[]) AND ended_at IS NULL`,
+      [input.homeIds],
+    );
+    const remainingMemberships = await pool.query<{ id: string }>(
+      'SELECT id FROM memberships WHERE home_id = ANY($1::uuid[])',
+      [input.homeIds],
+    );
+    for (const row of remainingMemberships.rows) {
+      await pool.query(
+        `UPDATE memberships
+         SET ended_at = NULL, ended_by_membership_id = NULL
+         WHERE id = $1`,
+        [row.id],
+      );
+      await pool.query('DELETE FROM memberships WHERE id = $1', [row.id]);
+    }
     await pool.query('DELETE FROM homes WHERE id = ANY($1)', [input.homeIds]);
   }
   if (input.userIds.length > 0) {
@@ -308,6 +334,7 @@ void describe('SupplyEntry create/list PostgreSQL', () => {
           status: 'OPEN',
           createdByMembershipId: membershipA,
           obtainedAt: null,
+          obtainedByMembershipId: null,
           canceledAt: null,
           createdAt: openCreated,
           updatedAt: openCreated,
@@ -319,6 +346,7 @@ void describe('SupplyEntry create/list PostgreSQL', () => {
           status: 'OPEN',
           createdByMembershipId: membershipA,
           obtainedAt: null,
+          obtainedByMembershipId: null,
           canceledAt: null,
           createdAt: openCreatedLater,
           updatedAt: openCreatedLater,
@@ -330,6 +358,7 @@ void describe('SupplyEntry create/list PostgreSQL', () => {
           status: 'OBTAINED',
           createdByMembershipId: membershipA,
           obtainedAt: terminalUpdatedLater,
+          obtainedByMembershipId: membershipA,
           canceledAt: null,
           createdAt: openCreated,
           updatedAt: terminalUpdatedLater,
@@ -341,6 +370,7 @@ void describe('SupplyEntry create/list PostgreSQL', () => {
           status: 'CANCELED',
           createdByMembershipId: membershipA,
           obtainedAt: null,
+          obtainedByMembershipId: null,
           canceledAt: terminalUpdatedEarlier,
           createdAt: openCreated,
           updatedAt: terminalUpdatedEarlier,
@@ -428,7 +458,7 @@ void describe('SupplyEntry create/list PostgreSQL', () => {
         );
 
         await database.pool.query(
-          'UPDATE memberships SET ended_at = NOW() WHERE id = $1',
+          'UPDATE memberships SET ended_at = NOW(), ended_by_membership_id = $1 WHERE id = $1',
           [membershipA],
         );
         const afterEnd = await list({ actor: actorAdmin, homeId: homeA });
@@ -522,6 +552,7 @@ void describe('SupplyEntry create/list PostgreSQL', () => {
             status: 'OPEN',
             createdByMembershipId: membershipB,
             obtainedAt: null,
+            obtainedByMembershipId: null,
             canceledAt: null,
             createdAt: new Date('2026-09-12T18:00:00.000Z'),
             updatedAt: new Date('2026-09-12T18:00:00.000Z'),

@@ -60,6 +60,7 @@ function persisted(task: NewManualTaskInstance): TaskInstance {
     scheduledFor: task.scheduledFor,
     assignedMembershipId: task.assignedMembershipId,
     completedAt: null,
+    completedByMembershipId: null,
     createdAt: task.createdAt,
     updatedAt: task.createdAt,
   });

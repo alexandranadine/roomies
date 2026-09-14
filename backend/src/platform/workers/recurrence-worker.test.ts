@@ -144,6 +144,30 @@ void describe('createRecurrenceWorker', () => {
     await worker.stop();
   });
 
+  void it('passes the shutdown abort signal into process', async () => {
+    const first = deferred<RecurrenceProcessResult>();
+    let seen: AbortSignal | undefined;
+    const { pending, sleep } = createControllableSleep();
+    const worker = createRecurrenceWorker({
+      pollIntervalMs: 30_000,
+      sleep,
+      yieldToEventLoop: () => Promise.resolve(),
+      logger: createRecordingLogger().logger,
+      process: async (signal) => {
+        seen = signal;
+        return first.promise;
+      },
+    });
+
+    worker.start();
+    await waitFor(() => seen !== undefined, 'process received signal');
+    assert.equal(seen?.aborted, false);
+    first.resolve(idleResult);
+    await waitFor(() => pending.length === 1, 'poll sleep');
+    await worker.stop();
+    assert.equal(seen?.aborted, true);
+  });
+
   void it('does not overlap invocations when a poll interval elapses during a slow run', async () => {
     const first = deferred<RecurrenceProcessResult>();
     let inFlight = 0;

@@ -80,14 +80,15 @@ async function insertMembership(
   },
 ): Promise<void> {
   await pool.query(
-    `INSERT INTO memberships (id, home_id, user_id, role, ended_at)
-     VALUES ($1, $2, $3, $4, $5)`,
+    `INSERT INTO memberships (id, home_id, user_id, role, ended_at, ended_by_membership_id)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
     [
       input.id,
       input.homeId,
       input.userId,
       input.role,
       input.ended === true ? new Date() : null,
+      input.ended === true ? input.id : null,
     ],
   );
 }
@@ -106,9 +107,34 @@ async function cleanup(
     await pool.query('DELETE FROM outbox_events WHERE home_id = ANY($1)', [
       input.homeIds,
     ]);
-    await pool.query('DELETE FROM memberships WHERE home_id = ANY($1)', [
-      input.homeIds,
-    ]);
+    await pool.query(
+      'DELETE FROM membership_role_transitions WHERE home_id = ANY($1::uuid[])',
+      [input.homeIds],
+    );
+    await pool.query(
+      `UPDATE memberships
+       SET ended_by_membership_id = id
+       WHERE home_id = ANY($1::uuid[]) AND ended_at IS NOT NULL`,
+      [input.homeIds],
+    );
+    await pool.query(
+      `DELETE FROM memberships
+       WHERE home_id = ANY($1::uuid[]) AND ended_at IS NULL`,
+      [input.homeIds],
+    );
+    const remainingMemberships = await pool.query<{ id: string }>(
+      'SELECT id FROM memberships WHERE home_id = ANY($1::uuid[])',
+      [input.homeIds],
+    );
+    for (const row of remainingMemberships.rows) {
+      await pool.query(
+        `UPDATE memberships
+         SET ended_at = NULL, ended_by_membership_id = NULL
+         WHERE id = $1`,
+        [row.id],
+      );
+      await pool.query('DELETE FROM memberships WHERE id = $1', [row.id]);
+    }
     await pool.query('DELETE FROM homes WHERE id = ANY($1)', [input.homeIds]);
   }
   if (input.userIds.length > 0) {

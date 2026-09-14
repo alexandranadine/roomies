@@ -26,6 +26,7 @@ export {
 export {
   LastAdminRequiredError,
   LastRoommateRequiresArchiveError,
+  MembershipActivitySourceIntegrityError,
 } from './errors.js';
 export {
   FIND_ACTIVE_EXACT_MEMBERSHIP_IDS_IN_HOME_SQL,
@@ -40,13 +41,44 @@ export {
   type ActiveHomeMembershipLookup,
 } from './find-active-home-membership.js';
 export {
+  createMembershipEndedV1Event,
+  createMembershipRoleChangedV1Event,
   createMembershipStartedV1Event,
   isMembershipEndedCause,
   MEMBERSHIP_ENDED_CAUSES,
+  MEMBERSHIP_ENDED_V1,
+  MEMBERSHIP_ROLE_CHANGED_V1,
   MEMBERSHIP_STARTED_V1,
   type MembershipEndedCause,
+  type MembershipEndedV1Payload,
+  type MembershipRoleChangedV1Payload,
   type MembershipStartedV1Payload,
 } from './events.js';
+export {
+  FIND_HISTORICAL_MEMBERSHIP_DISPLAYS_SQL,
+  findHistoricalMembershipDisplays,
+  type FindHistoricalMembershipDisplays,
+  type FindHistoricalMembershipDisplaysInput,
+  type HistoricalMembershipDisplay,
+  type HistoricalMembershipDisplayQueryable,
+} from './find-historical-membership-display.js';
+export {
+  FIND_MEMBERSHIP_ENDED_ACTIVITY_SOURCE_SQL,
+  FIND_MEMBERSHIP_ROLE_TRANSITION_ACTIVITY_SOURCE_SQL,
+  FIND_MEMBERSHIP_STARTED_ACTIVITY_SOURCE_SQL,
+  findMembershipEndedActivitySource,
+  findMembershipRoleTransitionActivitySource,
+  findMembershipStartedActivitySource,
+  type FindMembershipEndedActivitySource,
+  type FindMembershipEndedActivitySourceInput,
+  type FindMembershipRoleTransitionActivitySource,
+  type FindMembershipRoleTransitionActivitySourceInput,
+  type FindMembershipStartedActivitySource,
+  type FindMembershipStartedActivitySourceInput,
+  type MembershipEndedActivitySource,
+  type MembershipRoleTransitionActivitySource,
+  type MembershipStartedActivitySource,
+} from './find-membership-activity-source.js';
 export {
   createMembershipsRouter,
   type ChangeMembershipRoleCommand,
@@ -72,6 +104,12 @@ export {
   INSERT_ACTIVE_MEMBERSHIP_SQL,
   type NewActiveMembership,
 } from './insert-active-membership.js';
+export {
+  createMembershipRoleTransitionWriter,
+  INSERT_MEMBERSHIP_ROLE_TRANSITION_SQL,
+  type MembershipRoleTransitionWriter,
+  type NewMembershipRoleTransition,
+} from './insert-membership-role-transition.js';
 export type { LeaveMembershipInput } from './leave.js';
 export {
   decideMembershipLeave,

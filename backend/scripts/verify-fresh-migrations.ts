@@ -24,10 +24,12 @@ import {
   assertSafeTestDatabase,
   resolveTestDatabaseUrl,
 } from '../src/platform/persistence/test-database.js';
+import { verifyActivitySchema } from './verify-activity-schema.js';
 import { verifyAuthPersistence } from './verify-auth-persistence.js';
 import { verifyInvitationSchema } from './verify-invitation-schema.js';
 import { verifyOutboxSchema } from './verify-outbox-schema.js';
 import { verifyMaintenanceSchema } from './verify-maintenance-schema.js';
+import { verifyMembershipSchema } from './verify-membership-schema.js';
 import { verifySupplySchema } from './verify-supply-schema.js';
 import { verifyTaskSchema } from './verify-task-schema.js';
 
@@ -84,5 +86,7 @@ await verifyInvitationSchema(databaseUrl);
 await verifyTaskSchema(databaseUrl);
 await verifySupplySchema(databaseUrl);
 await verifyMaintenanceSchema(databaseUrl);
+await verifyActivitySchema(databaseUrl);
+await verifyMembershipSchema(databaseUrl);
 
 console.log('Fresh migrations and strict persistence verification passed.');

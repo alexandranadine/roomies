@@ -4,6 +4,7 @@ import {
 } from '../../domains/homes/lock-home-and-exact-memberships.js';
 import { decideTaskComplete } from '../../domains/tasks/complete-policy.js';
 import { TaskAlreadyCompletedError } from '../../domains/tasks/errors.js';
+import { createTaskCompletedV1Event } from '../../domains/tasks/events.js';
 import {
   createTaskRepository,
   type CompleteOpenTaskInstance,
@@ -12,6 +13,10 @@ import {
 import type { TaskInstance } from '../../domains/tasks/task.js';
 import type { ActiveHomeActor } from '../../platform/authz/context.js';
 import { ConcealedNotFoundError } from '../../platform/authz/errors.js';
+import type { OutboxWriter } from '../../platform/events/outbox-writer.js';
+import { outboxWriter } from '../../platform/events/outbox-writer.js';
+import type { UuidV7Generator } from '../../platform/ids/uuid-v7.js';
+import { systemUuidV7 } from '../../platform/ids/uuid-v7.js';
 import {
   runInReadCommittedTransaction,
   type TransactionContext,
@@ -33,7 +38,9 @@ export type CompleteTaskDependencies = Readonly<{
   ) => Promise<T>;
   lockHomeAndExactMemberships: LockHomeAndExactMemberships;
   tasks: Pick<TaskRepository, 'lockByHomeAndId' | 'completeOpenTask'>;
+  outbox: Pick<OutboxWriter, 'append'>;
   clock: Clock;
+  ids: UuidV7Generator;
 }>;
 
 function revalidatedActor(
@@ -79,7 +86,8 @@ function assertStillOpen(task: TaskInstance): void {
  * Mutation order inside READ COMMITTED:
  * Home FOR UPDATE → revalidate Home → exact actor Membership FOR UPDATE →
  * revalidate actor → authorize task.complete → Task FOR UPDATE scoped by
- * homeId + taskId → revalidate OPEN → conditional OPEN → COMPLETED UPDATE.
+ * homeId + taskId → revalidate OPEN → conditional OPEN → COMPLETED UPDATE →
+ * same-transaction task.completed.v1.
  */
 export function createCompleteTask(
   deps: CompleteTaskDependencies,
@@ -125,12 +133,22 @@ export function createCompleteTask(
         homeId: locked.home.id,
         taskId: task.id,
         completedAt: occurredAt,
+        completedByMembershipId: actor.membershipId,
         updatedAt: occurredAt,
       });
       const completed = await deps.tasks.completeOpenTask(tx, persistable);
       if (completed === null) {
         throw new TaskAlreadyCompletedError();
       }
+      await deps.outbox.append(
+        tx,
+        createTaskCompletedV1Event({
+          eventId: deps.ids.next(),
+          occurredAt,
+          homeId: locked.home.id,
+          taskInstanceId: completed.id,
+        }),
+      );
       return completed;
     });
   };
@@ -145,6 +163,8 @@ export function createCompleteTaskFromPool(
     tasks: createTaskRepository(
       pool as Parameters<typeof createTaskRepository>[0],
     ),
+    outbox: outboxWriter,
     clock: systemClock,
+    ids: systemUuidV7,
   });
 }

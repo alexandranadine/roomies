@@ -4,6 +4,14 @@
   "target": "postgres",
   "profileHash": "3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2",
   "roots": {
+    "activities": {
+      "model": "Activity",
+      "namespace": "public"
+    },
+    "activity_recipients": {
+      "model": "ActivityRecipient",
+      "namespace": "public"
+    },
     "auth_accounts": {
       "model": "AuthAccount",
       "namespace": "public"
@@ -34,6 +42,10 @@
     },
     "maintenance_entries": {
       "model": "MaintenanceEntry",
+      "namespace": "public"
+    },
+    "membership_role_transitions": {
+      "model": "MembershipRoleTransition",
       "namespace": "public"
     },
     "memberships": {
@@ -69,6 +81,40 @@
     "namespaces": {
       "public": {
         "enum": {
+          "ActivitySourceEntityType": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "MEMBERSHIP",
+                "value": "MEMBERSHIP"
+              },
+              {
+                "name": "TASK",
+                "value": "TASK"
+              },
+              {
+                "name": "SUPPLY",
+                "value": "SUPPLY"
+              },
+              {
+                "name": "MAINTENANCE",
+                "value": "MAINTENANCE"
+              }
+            ]
+          },
+          "ActivityVisibilityClass": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "HOME_VISIBLE",
+                "value": "HOME_VISIBLE"
+              },
+              {
+                "name": "SOURCE_AUTHORIZED",
+                "value": "SOURCE_AUTHORIZED"
+              }
+            ]
+          },
           "MaintenanceStatus": {
             "codecId": "pg/text@1",
             "members": [
@@ -191,6 +237,283 @@
           }
         },
         "models": {
+          "Activity": {
+            "fields": {
+              "actorMembershipId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "eventType": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sql/varchar@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 200
+                  }
+                }
+              },
+              "homeId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "occurredAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "sourceEntityId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "sourceEntityType": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "ActivitySourceEntityType",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "sourceOutboxEventId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "visibilityClass": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "ActivityVisibilityClass",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              }
+            },
+            "relations": {
+              "actorMembership": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "actorMembershipId"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Membership",
+                  "namespace": "public"
+                }
+              },
+              "home": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "homeId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Home",
+                  "namespace": "public"
+                }
+              },
+              "recipients": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "id"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "activityId"
+                  ]
+                },
+                "to": {
+                  "model": "ActivityRecipient",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "actorMembershipId": {
+                  "column": "actor_membership_id"
+                },
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "eventType": {
+                  "column": "event_type"
+                },
+                "homeId": {
+                  "column": "home_id"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "occurredAt": {
+                  "column": "occurred_at"
+                },
+                "sourceEntityId": {
+                  "column": "source_entity_id"
+                },
+                "sourceEntityType": {
+                  "column": "source_entity_type"
+                },
+                "sourceOutboxEventId": {
+                  "column": "source_outbox_event_id"
+                },
+                "visibilityClass": {
+                  "column": "visibility_class"
+                }
+              },
+              "namespaceId": "public",
+              "table": "activities"
+            }
+          },
+          "ActivityRecipient": {
+            "fields": {
+              "activityId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "homeId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "membershipId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "activity": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "activityId"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Activity",
+                  "namespace": "public"
+                }
+              },
+              "home": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "homeId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Home",
+                  "namespace": "public"
+                }
+              },
+              "membership": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "membershipId"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Membership",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "activityId": {
+                  "column": "activity_id"
+                },
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "homeId": {
+                  "column": "home_id"
+                },
+                "membershipId": {
+                  "column": "membership_id"
+                }
+              },
+              "namespaceId": "public",
+              "table": "activity_recipients"
+            }
+          },
           "AuthAccount": {
             "fields": {
               "accessToken": {
@@ -699,6 +1022,36 @@
               }
             },
             "relations": {
+              "activities": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "homeId"
+                  ]
+                },
+                "to": {
+                  "model": "Activity",
+                  "namespace": "public"
+                }
+              },
+              "activityRecipients": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "homeId"
+                  ]
+                },
+                "to": {
+                  "model": "ActivityRecipient",
+                  "namespace": "public"
+                }
+              },
               "invitations": {
                 "cardinality": "1:N",
                 "on": {
@@ -741,6 +1094,21 @@
                 },
                 "to": {
                   "model": "MaintenanceEntry",
+                  "namespace": "public"
+                }
+              },
+              "membershipRoleTransitions": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "homeId"
+                  ]
+                },
+                "to": {
+                  "model": "MembershipRoleTransition",
                   "namespace": "public"
                 }
               },
@@ -1326,6 +1694,13 @@
                   "kind": "scalar"
                 }
               },
+              "endedByMembershipId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
               "homeId": {
                 "nullable": false,
                 "type": {
@@ -1386,6 +1761,57 @@
                   "namespace": "public"
                 }
               },
+              "actedActivities": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "id"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "actorMembershipId"
+                  ]
+                },
+                "to": {
+                  "model": "Activity",
+                  "namespace": "public"
+                }
+              },
+              "activityRecipients": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "id"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "membershipId"
+                  ]
+                },
+                "to": {
+                  "model": "ActivityRecipient",
+                  "namespace": "public"
+                }
+              },
+              "actorRoleTransitions": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "id"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "actorMembershipId"
+                  ]
+                },
+                "to": {
+                  "model": "MembershipRoleTransition",
+                  "namespace": "public"
+                }
+              },
               "assignedTaskDefinitions": {
                 "cardinality": "1:N",
                 "on": {
@@ -1413,6 +1839,23 @@
                   "targetFields": [
                     "homeId",
                     "assignedMembershipId"
+                  ]
+                },
+                "to": {
+                  "model": "TaskInstance",
+                  "namespace": "public"
+                }
+              },
+              "completedTaskInstances": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "id"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "completedByMembershipId"
                   ]
                 },
                 "to": {
@@ -1488,6 +1931,40 @@
                   "namespace": "public"
                 }
               },
+              "endedByMembership": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "endedByMembershipId"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Membership",
+                  "namespace": "public"
+                }
+              },
+              "endedMemberships": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "id"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "endedByMembershipId"
+                  ]
+                },
+                "to": {
+                  "model": "Membership",
+                  "namespace": "public"
+                }
+              },
               "home": {
                 "cardinality": "N:1",
                 "on": {
@@ -1520,6 +1997,23 @@
                   "namespace": "public"
                 }
               },
+              "obtainedSupplyEntries": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "id"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "obtainedByMembershipId"
+                  ]
+                },
+                "to": {
+                  "model": "SupplyEntry",
+                  "namespace": "public"
+                }
+              },
               "resolvedMaintenanceEntries": {
                 "cardinality": "1:N",
                 "on": {
@@ -1534,6 +2028,23 @@
                 },
                 "to": {
                   "model": "MaintenanceEntry",
+                  "namespace": "public"
+                }
+              },
+              "subjectRoleTransitions": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "id"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "membershipId"
+                  ]
+                },
+                "to": {
+                  "model": "MembershipRoleTransition",
                   "namespace": "public"
                 }
               },
@@ -1575,6 +2086,9 @@
                 "endedAt": {
                   "column": "ended_at"
                 },
+                "endedByMembershipId": {
+                  "column": "ended_by_membership_id"
+                },
                 "homeId": {
                   "column": "home_id"
                 },
@@ -1593,6 +2107,127 @@
               },
               "namespaceId": "public",
               "table": "memberships"
+            }
+          },
+          "MembershipRoleTransition": {
+            "fields": {
+              "actorMembershipId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "changedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "homeId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "membershipId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "actorMembership": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "actorMembershipId"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Membership",
+                  "namespace": "public"
+                }
+              },
+              "home": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "homeId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Home",
+                  "namespace": "public"
+                }
+              },
+              "membership": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "membershipId"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Membership",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "actorMembershipId": {
+                  "column": "actor_membership_id"
+                },
+                "changedAt": {
+                  "column": "changed_at"
+                },
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "homeId": {
+                  "column": "home_id"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "membershipId": {
+                  "column": "membership_id"
+                }
+              },
+              "namespaceId": "public",
+              "table": "membership_role_transitions"
             }
           },
           "OutboxEvent": {
@@ -1963,6 +2598,13 @@
                   "kind": "scalar"
                 }
               },
+              "obtainedByMembershipId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
               "status": {
                 "nullable": false,
                 "type": {
@@ -2040,6 +2682,23 @@
                   "model": "Home",
                   "namespace": "public"
                 }
+              },
+              "obtainedByMembership": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "obtainedByMembershipId"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Membership",
+                  "namespace": "public"
+                }
               }
             },
             "storage": {
@@ -2061,6 +2720,9 @@
                 },
                 "obtainedAt": {
                   "column": "obtained_at"
+                },
+                "obtainedByMembershipId": {
+                  "column": "obtained_by_membership_id"
                 },
                 "status": {
                   "column": "status"
@@ -2306,6 +2968,13 @@
                   "kind": "scalar"
                 }
               },
+              "completedByMembershipId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
               "createdAt": {
                 "nullable": false,
                 "type": {
@@ -2400,6 +3069,23 @@
                   "namespace": "public"
                 }
               },
+              "completedByMembership": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "homeId",
+                    "completedByMembershipId"
+                  ],
+                  "targetFields": [
+                    "homeId",
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Membership",
+                  "namespace": "public"
+                }
+              },
               "home": {
                 "cardinality": "N:1",
                 "on": {
@@ -2440,6 +3126,9 @@
                 },
                 "completedAt": {
                   "column": "completed_at"
+                },
+                "completedByMembershipId": {
+                  "column": "completed_by_membership_id"
                 },
                 "createdAt": {
                   "column": "created_at"
@@ -2554,6 +3243,328 @@
       "public": {
         "entries": {
           "table": {
+            "activities": {
+              "checks": [
+                {
+                  "expression": "((char_length((event_type)::text) >= 1) AND (char_length((event_type)::text) <= 200))",
+                  "name": "activities_event_type_length_check"
+                },
+                {
+                  "expression": "\"source_entity_type\" IN ('MEMBERSHIP', 'TASK', 'SUPPLY', 'MAINTENANCE')",
+                  "name": "activities_source_entity_type_check_0ee9d6e1",
+                  "prefix": "activities_source_entity_type_check"
+                },
+                {
+                  "expression": "\"visibility_class\" IN ('HOME_VISIBLE', 'SOURCE_AUTHORIZED')",
+                  "name": "activities_visibility_class_check_b3389067",
+                  "prefix": "activities_visibility_class_check"
+                }
+              ],
+              "columns": {
+                "actor_membership_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": true
+                },
+                "created_at": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "event_type": {
+                  "codecId": "sql/varchar@1",
+                  "nativeType": "character varying",
+                  "nullable": false,
+                  "typeParams": {
+                    "length": 200
+                  }
+                },
+                "home_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "occurred_at": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "source_entity_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "source_entity_type": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "ActivitySourceEntityType",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "source_outbox_event_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "visibility_class": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "ActivityVisibilityClass",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                }
+              },
+              "foreignKeys": [
+                {
+                  "name": "activities_home_id_fkey",
+                  "onDelete": "restrict",
+                  "onUpdate": "restrict",
+                  "source": {
+                    "columns": [
+                      "home_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "activities"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "homes"
+                  }
+                },
+                {
+                  "name": "activities_actor_home_membership_fkey",
+                  "onDelete": "restrict",
+                  "onUpdate": "restrict",
+                  "source": {
+                    "columns": [
+                      "home_id",
+                      "actor_membership_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "activities"
+                  },
+                  "target": {
+                    "columns": [
+                      "home_id",
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "memberships"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "home_id",
+                    "occurred_at",
+                    "id"
+                  ],
+                  "name": "activities_home_feed_idx_ac1573bd",
+                  "prefix": "activities_home_feed_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "actor_membership_id"
+                  ],
+                  "name": "activities_home_id_actor_membership_id_idx_59ee34c2",
+                  "prefix": "activities_home_id_actor_membership_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "id"
+                  ],
+                  "name": "activities_home_id_id_key_2f2cccd8",
+                  "prefix": "activities_home_id_id_key",
+                  "unique": true
+                },
+                {
+                  "columns": [
+                    "home_id"
+                  ],
+                  "name": "activities_home_id_idx_f881d5c1",
+                  "prefix": "activities_home_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "source_entity_type",
+                    "source_entity_id"
+                  ],
+                  "name": "activities_source_entity_idx_cd47c954",
+                  "prefix": "activities_source_entity_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "source_outbox_event_id"
+                  ],
+                  "name": "activities_source_outbox_event_id_key_17bba872",
+                  "prefix": "activities_source_outbox_event_id_key",
+                  "unique": true
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            },
+            "activity_recipients": {
+              "columns": {
+                "activity_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "created_at": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "home_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "membership_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "name": "activity_recipients_home_id_fkey",
+                  "onDelete": "restrict",
+                  "onUpdate": "restrict",
+                  "source": {
+                    "columns": [
+                      "home_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "activity_recipients"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "homes"
+                  }
+                },
+                {
+                  "name": "activity_recipients_activity_home_fkey",
+                  "onDelete": "restrict",
+                  "onUpdate": "restrict",
+                  "source": {
+                    "columns": [
+                      "home_id",
+                      "activity_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "activity_recipients"
+                  },
+                  "target": {
+                    "columns": [
+                      "home_id",
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "activities"
+                  }
+                },
+                {
+                  "name": "activity_recipients_home_membership_fkey",
+                  "onDelete": "restrict",
+                  "onUpdate": "restrict",
+                  "source": {
+                    "columns": [
+                      "home_id",
+                      "membership_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "activity_recipients"
+                  },
+                  "target": {
+                    "columns": [
+                      "home_id",
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "memberships"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "home_id",
+                    "activity_id"
+                  ],
+                  "name": "activity_recipients_home_id_activity_id_idx_d6247ab2",
+                  "prefix": "activity_recipients_home_id_activity_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "home_id"
+                  ],
+                  "name": "activity_recipients_home_id_idx_f881d5c1",
+                  "prefix": "activity_recipients_home_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "membership_id"
+                  ],
+                  "name": "activity_recipients_home_id_membership_id_idx_3d66ba27",
+                  "prefix": "activity_recipients_home_id_membership_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "membership_id",
+                    "activity_id"
+                  ],
+                  "name": "activity_recipients_home_membership_activity_idx_5cd11f82",
+                  "prefix": "activity_recipients_home_membership_activity_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "home_id",
+                  "activity_id",
+                  "membership_id"
+                ],
+                "name": "activity_recipients_pkey"
+              },
+              "uniques": []
+            },
             "auth_accounts": {
               "columns": {
                 "access_token": {
@@ -3584,8 +4595,143 @@
               },
               "uniques": []
             },
+            "membership_role_transitions": {
+              "columns": {
+                "actor_membership_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "changed_at": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "created_at": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "home_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "membership_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "name": "membership_role_transitions_home_id_fkey",
+                  "onDelete": "restrict",
+                  "onUpdate": "restrict",
+                  "source": {
+                    "columns": [
+                      "home_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "membership_role_transitions"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "homes"
+                  }
+                },
+                {
+                  "name": "membership_role_transitions_subject_home_membership_fkey",
+                  "onDelete": "restrict",
+                  "onUpdate": "restrict",
+                  "source": {
+                    "columns": [
+                      "home_id",
+                      "membership_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "membership_role_transitions"
+                  },
+                  "target": {
+                    "columns": [
+                      "home_id",
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "memberships"
+                  }
+                },
+                {
+                  "name": "membership_role_transitions_actor_home_membership_fkey",
+                  "onDelete": "restrict",
+                  "onUpdate": "restrict",
+                  "source": {
+                    "columns": [
+                      "home_id",
+                      "actor_membership_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "membership_role_transitions"
+                  },
+                  "target": {
+                    "columns": [
+                      "home_id",
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "memberships"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "home_id",
+                    "actor_membership_id"
+                  ],
+                  "name": "membership_role_transitions_home_id_actor_membership_i_59ee34c2",
+                  "prefix": "membership_role_transitions_home_id_actor_membership_i",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "home_id"
+                  ],
+                  "name": "membership_role_transitions_home_id_idx_f881d5c1",
+                  "prefix": "membership_role_transitions_home_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "membership_id"
+                  ],
+                  "name": "membership_role_transitions_home_id_membership_id_idx_3d66ba27",
+                  "prefix": "membership_role_transitions_home_id_membership_id_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            },
             "memberships": {
               "checks": [
+                {
+                  "expression": "((ended_at IS NULL) = (ended_by_membership_id IS NULL))",
+                  "name": "memberships_end_actor_check"
+                },
                 {
                   "expression": "\"role\" IN ('ROOMMATE', 'ADMIN')",
                   "name": "memberships_role_check_a32cd7eb",
@@ -3596,6 +4742,11 @@
                 "ended_at": {
                   "codecId": "pg/timestamptz-temporal@1",
                   "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "ended_by_membership_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
                   "nullable": true
                 },
                 "home_id": {
@@ -3672,9 +4823,39 @@
                     "namespaceId": "public",
                     "tableName": "users"
                   }
+                },
+                {
+                  "name": "memberships_ended_by_home_membership_fkey",
+                  "onDelete": "restrict",
+                  "onUpdate": "restrict",
+                  "source": {
+                    "columns": [
+                      "home_id",
+                      "ended_by_membership_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "memberships"
+                  },
+                  "target": {
+                    "columns": [
+                      "home_id",
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "memberships"
+                  }
                 }
               ],
               "indexes": [
+                {
+                  "columns": [
+                    "home_id",
+                    "ended_by_membership_id"
+                  ],
+                  "name": "memberships_home_id_ended_by_membership_id_idx_82a6b407",
+                  "prefix": "memberships_home_id_ended_by_membership_id_idx",
+                  "unique": false
+                },
                 {
                   "columns": [
                     "home_id"
@@ -4095,6 +5276,10 @@
                   "name": "supply_entries_lifecycle_check"
                 },
                 {
+                  "expression": "((obtained_at IS NULL) = (obtained_by_membership_id IS NULL))",
+                  "name": "supply_entries_obtain_actor_check"
+                },
+                {
                   "expression": "\"status\" IN ('OPEN', 'OBTAINED', 'CANCELED')",
                   "name": "supply_entries_status_check_cbe78413",
                   "prefix": "supply_entries_status_check"
@@ -4137,6 +5322,11 @@
                 "obtained_at": {
                   "codecId": "pg/timestamptz-temporal@1",
                   "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "obtained_by_membership_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
                   "nullable": true
                 },
                 "status": {
@@ -4205,6 +5395,27 @@
                     "namespaceId": "public",
                     "tableName": "memberships"
                   }
+                },
+                {
+                  "name": "supply_entries_obtained_by_home_membership_fkey",
+                  "onDelete": "restrict",
+                  "onUpdate": "restrict",
+                  "source": {
+                    "columns": [
+                      "home_id",
+                      "obtained_by_membership_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "supply_entries"
+                  },
+                  "target": {
+                    "columns": [
+                      "home_id",
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "memberships"
+                  }
                 }
               ],
               "indexes": [
@@ -4243,6 +5454,15 @@
                   ],
                   "name": "supply_entries_home_id_idx_f881d5c1",
                   "prefix": "supply_entries_home_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "obtained_by_membership_id"
+                  ],
+                  "name": "supply_entries_home_id_obtained_by_membership_id_idx_d353905d",
+                  "prefix": "supply_entries_home_id_obtained_by_membership_id_idx",
                   "unique": false
                 },
                 {
@@ -4507,6 +5727,10 @@
                   "name": "task_instances_completed_time_check"
                 },
                 {
+                  "expression": "((completed_at IS NULL) = (completed_by_membership_id IS NULL))",
+                  "name": "task_instances_completion_actor_check"
+                },
+                {
                   "expression": "(((status = 'OPEN'::text) AND (completed_at IS NULL)) OR ((status = 'COMPLETED'::text) AND (completed_at IS NOT NULL)))",
                   "name": "task_instances_completion_state_check"
                 },
@@ -4534,6 +5758,11 @@
                 "completed_at": {
                   "codecId": "pg/timestamptz-temporal@1",
                   "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "completed_by_membership_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
                   "nullable": true
                 },
                 "created_at": {
@@ -4644,6 +5873,27 @@
                   }
                 },
                 {
+                  "name": "task_instances_completed_by_home_membership_fkey",
+                  "onDelete": "restrict",
+                  "onUpdate": "restrict",
+                  "source": {
+                    "columns": [
+                      "home_id",
+                      "completed_by_membership_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "task_instances"
+                  },
+                  "target": {
+                    "columns": [
+                      "home_id",
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "memberships"
+                  }
+                },
+                {
                   "name": "task_instances_definition_home_fkey",
                   "onDelete": "restrict",
                   "onUpdate": "restrict",
@@ -4694,6 +5944,15 @@
                   ],
                   "name": "task_instances_home_id_assigned_membership_id_idx_8e6c14e4",
                   "prefix": "task_instances_home_id_assigned_membership_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "home_id",
+                    "completed_by_membership_id"
+                  ],
+                  "name": "task_instances_home_id_completed_by_membership_id_idx_746c7e3c",
+                  "prefix": "task_instances_home_id_completed_by_membership_id_idx",
                   "unique": false
                 },
                 {
@@ -4777,6 +6036,22 @@
             }
           },
           "valueSet": {
+            "ActivitySourceEntityType": {
+              "kind": "valueSet",
+              "values": [
+                "MEMBERSHIP",
+                "TASK",
+                "SUPPLY",
+                "MAINTENANCE"
+              ]
+            },
+            "ActivityVisibilityClass": {
+              "kind": "valueSet",
+              "values": [
+                "HOME_VISIBLE",
+                "SOURCE_AUTHORIZED"
+              ]
+            },
             "MaintenanceStatus": {
               "kind": "valueSet",
               "values": [
@@ -4843,12 +6118,23 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "29198392131d455122e9c05441c5036decaffe594b242677f6f461b9651846b9"
+    "storageHash": "86008540b79dc111c5b0c915ce7fc527efbdd99327fe50856f013473072a76db"
   },
   "execution": {
-    "executionHash": "2c332e06e2d1dacc348760680e2355d43a1fa70f9f24d43a5c60b1a0a6b47b53",
+    "executionHash": "0c0f47ccd4cd66b32552e6311fba58a0afe7d5bea262e54370c5459bb93d79b1",
     "mutations": {
       "defaults": [
+        {
+          "onCreate": {
+            "id": "uuidv7",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "public",
+            "table": "activities"
+          }
+        },
         {
           "onCreate": {
             "id": "uuidv7",

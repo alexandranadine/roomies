@@ -404,9 +404,9 @@ async function createFixture(
     [...fixture.homes],
   );
   await client.query(
-    `INSERT INTO memberships (id, home_id, user_id, role, ended_at)
-     VALUES ($1, $3, $5, 'ADMIN', NULL),
-            ($2, $4, $6, 'ADMIN', NULL)`,
+    `INSERT INTO memberships (id, home_id, user_id, role, ended_at, ended_by_membership_id)
+     VALUES ($1, $3, $5, 'ADMIN', NULL, NULL),
+            ($2, $4, $6, 'ADMIN', NULL, NULL)`,
     [
       fixture.memberships[0],
       fixture.memberships[1],

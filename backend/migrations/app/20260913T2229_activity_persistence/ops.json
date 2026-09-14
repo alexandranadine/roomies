@@ -1,0 +1,680 @@
+[
+  {
+    "id": "table.activities",
+    "label": "Create table \"activities\"",
+    "summary": "Creates table \"activities\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "activities"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"activities\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"activities\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"activities\"",
+        "sql": "CREATE TABLE \"public\".\"activities\" (\n  \"actor_membership_id\" uuid,\n  \"created_at\" timestamptz NOT NULL,\n  \"event_type\" character varying(200) NOT NULL,\n  \"home_id\" uuid NOT NULL,\n  \"id\" uuid NOT NULL,\n  \"occurred_at\" timestamptz NOT NULL,\n  \"source_entity_id\" uuid NOT NULL,\n  \"source_entity_type\" text NOT NULL,\n  \"source_outbox_event_id\" uuid NOT NULL,\n  \"visibility_class\" text NOT NULL,\n  PRIMARY KEY (\"id\"),\n  CONSTRAINT \"activities_event_type_length_check\" CHECK (((char_length((event_type)::text) >= 1) AND (char_length((event_type)::text) <= 200))),\n  CONSTRAINT \"activities_source_entity_type_check_0ee9d6e1\" CHECK (\"source_entity_type\" IN ('MEMBERSHIP', 'TASK', 'SUPPLY', 'MAINTENANCE')),\n  CONSTRAINT \"activities_visibility_class_check_b3389067\" CHECK (\"visibility_class\" IN ('HOME_VISIBLE', 'SOURCE_AUTHORIZED'))\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"activities\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"activities\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.activity_recipients",
+    "label": "Create table \"activity_recipients\"",
+    "summary": "Creates table \"activity_recipients\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "activity_recipients"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"activity_recipients\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"activity_recipients\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"activity_recipients\"",
+        "sql": "CREATE TABLE \"public\".\"activity_recipients\" (\n  \"activity_id\" uuid NOT NULL,\n  \"created_at\" timestamptz NOT NULL,\n  \"home_id\" uuid NOT NULL,\n  \"membership_id\" uuid NOT NULL,\n  CONSTRAINT \"activity_recipients_pkey\" PRIMARY KEY (\"home_id\", \"activity_id\", \"membership_id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"activity_recipients\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"activity_recipients\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.activities.activities_home_feed_idx_ac1573bd",
+    "label": "Create index \"activities_home_feed_idx_ac1573bd\" on \"activities\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "activities_home_feed_idx_ac1573bd",
+        "table": "activities"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"activities_home_feed_idx_ac1573bd\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"activities_home_feed_idx_ac1573bd\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"activities_home_feed_idx_ac1573bd\"",
+        "sql": "CREATE INDEX \"activities_home_feed_idx_ac1573bd\" ON \"public\".\"activities\" (\"home_id\", \"occurred_at\", \"id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"activities_home_feed_idx_ac1573bd\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"activities_home_feed_idx_ac1573bd\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.activities.activities_home_id_actor_membership_id_idx_59ee34c2",
+    "label": "Create index \"activities_home_id_actor_membership_id_idx_59ee34c2\" on \"activities\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "activities_home_id_actor_membership_id_idx_59ee34c2",
+        "table": "activities"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"activities_home_id_actor_membership_id_idx_59ee34c2\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"activities_home_id_actor_membership_id_idx_59ee34c2\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"activities_home_id_actor_membership_id_idx_59ee34c2\"",
+        "sql": "CREATE INDEX \"activities_home_id_actor_membership_id_idx_59ee34c2\" ON \"public\".\"activities\" (\"home_id\", \"actor_membership_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"activities_home_id_actor_membership_id_idx_59ee34c2\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"activities_home_id_actor_membership_id_idx_59ee34c2\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.activities.activities_home_id_id_key_2f2cccd8",
+    "label": "Create index \"activities_home_id_id_key_2f2cccd8\" on \"activities\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "activities_home_id_id_key_2f2cccd8",
+        "table": "activities"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"activities_home_id_id_key_2f2cccd8\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"activities_home_id_id_key_2f2cccd8\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"activities_home_id_id_key_2f2cccd8\"",
+        "sql": "CREATE UNIQUE INDEX \"activities_home_id_id_key_2f2cccd8\" ON \"public\".\"activities\" (\"home_id\", \"id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"activities_home_id_id_key_2f2cccd8\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"activities_home_id_id_key_2f2cccd8\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.activities.activities_home_id_idx_f881d5c1",
+    "label": "Create index \"activities_home_id_idx_f881d5c1\" on \"activities\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "activities_home_id_idx_f881d5c1",
+        "table": "activities"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"activities_home_id_idx_f881d5c1\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"activities_home_id_idx_f881d5c1\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"activities_home_id_idx_f881d5c1\"",
+        "sql": "CREATE INDEX \"activities_home_id_idx_f881d5c1\" ON \"public\".\"activities\" (\"home_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"activities_home_id_idx_f881d5c1\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"activities_home_id_idx_f881d5c1\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.activities.activities_source_entity_idx_cd47c954",
+    "label": "Create index \"activities_source_entity_idx_cd47c954\" on \"activities\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "activities_source_entity_idx_cd47c954",
+        "table": "activities"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"activities_source_entity_idx_cd47c954\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"activities_source_entity_idx_cd47c954\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"activities_source_entity_idx_cd47c954\"",
+        "sql": "CREATE INDEX \"activities_source_entity_idx_cd47c954\" ON \"public\".\"activities\" (\"source_entity_type\", \"source_entity_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"activities_source_entity_idx_cd47c954\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"activities_source_entity_idx_cd47c954\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.activities.activities_source_outbox_event_id_key_17bba872",
+    "label": "Create index \"activities_source_outbox_event_id_key_17bba872\" on \"activities\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "activities_source_outbox_event_id_key_17bba872",
+        "table": "activities"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"activities_source_outbox_event_id_key_17bba872\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"activities_source_outbox_event_id_key_17bba872\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"activities_source_outbox_event_id_key_17bba872\"",
+        "sql": "CREATE UNIQUE INDEX \"activities_source_outbox_event_id_key_17bba872\" ON \"public\".\"activities\" (\"source_outbox_event_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"activities_source_outbox_event_id_key_17bba872\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"activities_source_outbox_event_id_key_17bba872\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.activity_recipients.activity_recipients_home_id_activity_id_idx_d6247ab2",
+    "label": "Create index \"activity_recipients_home_id_activity_id_idx_d6247ab2\" on \"activity_recipients\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "activity_recipients_home_id_activity_id_idx_d6247ab2",
+        "table": "activity_recipients"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"activity_recipients_home_id_activity_id_idx_d6247ab2\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"activity_recipients_home_id_activity_id_idx_d6247ab2\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"activity_recipients_home_id_activity_id_idx_d6247ab2\"",
+        "sql": "CREATE INDEX \"activity_recipients_home_id_activity_id_idx_d6247ab2\" ON \"public\".\"activity_recipients\" (\"home_id\", \"activity_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"activity_recipients_home_id_activity_id_idx_d6247ab2\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"activity_recipients_home_id_activity_id_idx_d6247ab2\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.activity_recipients.activity_recipients_home_id_idx_f881d5c1",
+    "label": "Create index \"activity_recipients_home_id_idx_f881d5c1\" on \"activity_recipients\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "activity_recipients_home_id_idx_f881d5c1",
+        "table": "activity_recipients"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"activity_recipients_home_id_idx_f881d5c1\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"activity_recipients_home_id_idx_f881d5c1\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"activity_recipients_home_id_idx_f881d5c1\"",
+        "sql": "CREATE INDEX \"activity_recipients_home_id_idx_f881d5c1\" ON \"public\".\"activity_recipients\" (\"home_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"activity_recipients_home_id_idx_f881d5c1\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"activity_recipients_home_id_idx_f881d5c1\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.activity_recipients.activity_recipients_home_id_membership_id_idx_3d66ba27",
+    "label": "Create index \"activity_recipients_home_id_membership_id_idx_3d66ba27\" on \"activity_recipients\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "activity_recipients_home_id_membership_id_idx_3d66ba27",
+        "table": "activity_recipients"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"activity_recipients_home_id_membership_id_idx_3d66ba27\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"activity_recipients_home_id_membership_id_idx_3d66ba27\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"activity_recipients_home_id_membership_id_idx_3d66ba27\"",
+        "sql": "CREATE INDEX \"activity_recipients_home_id_membership_id_idx_3d66ba27\" ON \"public\".\"activity_recipients\" (\"home_id\", \"membership_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"activity_recipients_home_id_membership_id_idx_3d66ba27\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"activity_recipients_home_id_membership_id_idx_3d66ba27\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.activity_recipients.activity_recipients_home_membership_activity_idx_5cd11f82",
+    "label": "Create index \"activity_recipients_home_membership_activity_idx_5cd11f82\" on \"activity_recipients\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "activity_recipients_home_membership_activity_idx_5cd11f82",
+        "table": "activity_recipients"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"activity_recipients_home_membership_activity_idx_5cd11f82\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"activity_recipients_home_membership_activity_idx_5cd11f82\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"activity_recipients_home_membership_activity_idx_5cd11f82\"",
+        "sql": "CREATE INDEX \"activity_recipients_home_membership_activity_idx_5cd11f82\" ON \"public\".\"activity_recipients\" (\"home_id\", \"membership_id\", \"activity_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"activity_recipients_home_membership_activity_idx_5cd11f82\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"activity_recipients_home_membership_activity_idx_5cd11f82\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.activities.activities_home_id_fkey",
+    "label": "Add foreign key \"activities_home_id_fkey\" on \"activities\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "activities_home_id_fkey",
+        "table": "activities"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"activities_home_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "activities_home_id_fkey",
+          "public",
+          "\"public\".\"activities\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"activities_home_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"activities\"\nADD CONSTRAINT \"activities_home_id_fkey\"\nFOREIGN KEY (\"home_id\")\nREFERENCES \"public\".\"homes\" (\"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"activities_home_id_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "activities_home_id_fkey",
+          "public",
+          "\"public\".\"activities\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.activities.activities_actor_home_membership_fkey",
+    "label": "Add foreign key \"activities_actor_home_membership_fkey\" on \"activities\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "activities_actor_home_membership_fkey",
+        "table": "activities"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"activities_actor_home_membership_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "activities_actor_home_membership_fkey",
+          "public",
+          "\"public\".\"activities\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"activities_actor_home_membership_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"activities\"\nADD CONSTRAINT \"activities_actor_home_membership_fkey\"\nFOREIGN KEY (\"home_id\", \"actor_membership_id\")\nREFERENCES \"public\".\"memberships\" (\"home_id\", \"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"activities_actor_home_membership_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "activities_actor_home_membership_fkey",
+          "public",
+          "\"public\".\"activities\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.activity_recipients.activity_recipients_home_id_fkey",
+    "label": "Add foreign key \"activity_recipients_home_id_fkey\" on \"activity_recipients\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "activity_recipients_home_id_fkey",
+        "table": "activity_recipients"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"activity_recipients_home_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "activity_recipients_home_id_fkey",
+          "public",
+          "\"public\".\"activity_recipients\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"activity_recipients_home_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"activity_recipients\"\nADD CONSTRAINT \"activity_recipients_home_id_fkey\"\nFOREIGN KEY (\"home_id\")\nREFERENCES \"public\".\"homes\" (\"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"activity_recipients_home_id_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "activity_recipients_home_id_fkey",
+          "public",
+          "\"public\".\"activity_recipients\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.activity_recipients.activity_recipients_activity_home_fkey",
+    "label": "Add foreign key \"activity_recipients_activity_home_fkey\" on \"activity_recipients\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "activity_recipients_activity_home_fkey",
+        "table": "activity_recipients"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"activity_recipients_activity_home_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "activity_recipients_activity_home_fkey",
+          "public",
+          "\"public\".\"activity_recipients\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"activity_recipients_activity_home_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"activity_recipients\"\nADD CONSTRAINT \"activity_recipients_activity_home_fkey\"\nFOREIGN KEY (\"home_id\", \"activity_id\")\nREFERENCES \"public\".\"activities\" (\"home_id\", \"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"activity_recipients_activity_home_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "activity_recipients_activity_home_fkey",
+          "public",
+          "\"public\".\"activity_recipients\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.activity_recipients.activity_recipients_home_membership_fkey",
+    "label": "Add foreign key \"activity_recipients_home_membership_fkey\" on \"activity_recipients\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "activity_recipients_home_membership_fkey",
+        "table": "activity_recipients"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"activity_recipients_home_membership_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "activity_recipients_home_membership_fkey",
+          "public",
+          "\"public\".\"activity_recipients\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"activity_recipients_home_membership_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"activity_recipients\"\nADD CONSTRAINT \"activity_recipients_home_membership_fkey\"\nFOREIGN KEY (\"home_id\", \"membership_id\")\nREFERENCES \"public\".\"memberships\" (\"home_id\", \"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"activity_recipients_home_membership_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "activity_recipients_home_membership_fkey",
+          "public",
+          "\"public\".\"activity_recipients\""
+        ]
+      }
+    ]
+  }
+]

@@ -12,7 +12,9 @@ import { createMaintenanceRepository } from '../../domains/maintenance/repositor
 import type { ActiveHomeActor } from '../../platform/authz/context.js';
 import { ConcealedNotFoundError } from '../../platform/authz/errors.js';
 import type { AppConfig } from '../../platform/config/types.js';
+import { outboxWriter } from '../../platform/events/outbox-writer.js';
 import { createUuidV7 } from '../../platform/ids/uuid-v7.js';
+import { systemUuidV7 } from '../../platform/ids/uuid-v7.js';
 import { createDatabasePool } from '../../platform/persistence/pool.js';
 import {
   parseDatabaseUrl,
@@ -81,14 +83,15 @@ async function insertMembership(
   },
 ): Promise<void> {
   await pool.query(
-    `INSERT INTO memberships (id, home_id, user_id, role, ended_at)
-     VALUES ($1, $2, $3, $4, $5)`,
+    `INSERT INTO memberships (id, home_id, user_id, role, ended_at, ended_by_membership_id)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
     [
       input.id,
       input.homeId,
       input.userId,
       input.role,
       input.ended === true ? new Date() : null,
+      input.ended === true ? input.id : null,
     ],
   );
 }
@@ -98,6 +101,13 @@ async function cleanup(
   input: { homeIds: string[]; userIds: string[] },
 ): Promise<void> {
   if (input.homeIds.length > 0) {
+    await pool.query(
+      'DELETE FROM activity_recipients WHERE home_id = ANY($1::uuid[])',
+      [input.homeIds],
+    );
+    await pool.query('DELETE FROM activities WHERE home_id = ANY($1::uuid[])', [
+      input.homeIds,
+    ]);
     await pool.query(
       'DELETE FROM maintenance_audiences WHERE home_id = ANY($1)',
       [input.homeIds],
@@ -112,9 +122,34 @@ async function cleanup(
     await pool.query('DELETE FROM outbox_events WHERE home_id = ANY($1)', [
       input.homeIds,
     ]);
-    await pool.query('DELETE FROM memberships WHERE home_id = ANY($1)', [
-      input.homeIds,
-    ]);
+    await pool.query(
+      'DELETE FROM membership_role_transitions WHERE home_id = ANY($1::uuid[])',
+      [input.homeIds],
+    );
+    await pool.query(
+      `UPDATE memberships
+       SET ended_by_membership_id = id
+       WHERE home_id = ANY($1::uuid[]) AND ended_at IS NOT NULL`,
+      [input.homeIds],
+    );
+    await pool.query(
+      `DELETE FROM memberships
+       WHERE home_id = ANY($1::uuid[]) AND ended_at IS NULL`,
+      [input.homeIds],
+    );
+    const remainingMemberships = await pool.query<{ id: string }>(
+      'SELECT id FROM memberships WHERE home_id = ANY($1::uuid[])',
+      [input.homeIds],
+    );
+    for (const row of remainingMemberships.rows) {
+      await pool.query(
+        `UPDATE memberships
+         SET ended_at = NULL, ended_by_membership_id = NULL
+         WHERE id = $1`,
+        [row.id],
+      );
+      await pool.query('DELETE FROM memberships WHERE id = $1', [row.id]);
+    }
     await pool.query('DELETE FROM homes WHERE id = ANY($1)', [input.homeIds]);
   }
   if (input.userIds.length > 0) {
@@ -211,7 +246,9 @@ function resolveWithClock(pool: Pool, clock: { now: () => Date }) {
     runTransaction: (work) => runInReadCommittedTransaction(pool, work),
     lockHomeAndExactMemberships,
     maintenance: createMaintenanceRepository(pool),
+    outbox: outboxWriter,
     clock,
+    ids: systemUuidV7,
   });
 }
 
@@ -398,7 +435,35 @@ void describe('Maintenance resolve PostgreSQL', () => {
         );
         assert.equal((await entryRow(database.pool, privateA2)).status, 'OPEN');
         assert.equal((await entryRow(database.pool, privateB2)).status, 'OPEN');
-        assert.equal(await maintenanceOutboxCount(database.pool, [homeId]), 0);
+        const outbox = await database.pool.query<{
+          event_type: string;
+          payload: unknown;
+        }>(
+          `SELECT event_type, payload FROM outbox_events
+           WHERE home_id = $1 AND event_type LIKE 'maintenance%'
+           ORDER BY created_at ASC`,
+          [homeId],
+        );
+        assert.equal(outbox.rows.length, 3);
+        assert.deepEqual(
+          outbox.rows.map((row) => row.event_type),
+          [
+            'maintenance.resolved.v1',
+            'maintenance.resolved.v1',
+            'maintenance.resolved.v1',
+          ],
+        );
+        for (const row of outbox.rows) {
+          assert.deepEqual(Object.keys(row.payload ?? {}), [
+            'maintenanceEntryId',
+          ]);
+          const serialized = JSON.stringify(row.payload);
+          assert.equal(serialized.includes('Private A'), false);
+          assert.equal(serialized.includes('Private B'), false);
+          assert.equal(serialized.includes('Household H'), false);
+          assert.equal(serialized.includes(userAlex), false);
+          assert.equal(serialized.includes(alex), false);
+        }
       } finally {
         await cleanup(database.pool, {
           homeIds: [homeId],
@@ -1034,7 +1099,9 @@ void describe('Maintenance resolve PostgreSQL', () => {
                     new Error('force rollback before resolve write'),
                   ),
               },
+              outbox: outboxWriter,
               clock: { now: () => OCCURRED },
+              ids: systemUuidV7,
             })({
               actor: roommate,
               homeId,
@@ -1066,7 +1133,9 @@ void describe('Maintenance resolve PostgreSQL', () => {
                   ),
                 resolveOpenEntry: () => Promise.resolve(null),
               },
+              outbox: outboxWriter,
               clock: { now: () => OCCURRED },
+              ids: systemUuidV7,
             })({
               actor: roommate,
               homeId,
@@ -1144,7 +1213,9 @@ void describe('Maintenance resolve PostgreSQL', () => {
                   throw new Error('force rollback before commit');
                 },
               },
+              outbox: outboxWriter,
               clock: { now: () => OCCURRED },
+              ids: systemUuidV7,
             })({
               actor: roommate,
               homeId,

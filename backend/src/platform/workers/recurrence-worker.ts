@@ -8,7 +8,9 @@ export type RecurrenceProcessResult = Readonly<{
   moreDueWorkLikely: boolean;
 }>;
 
-export type RecurrenceProcess = () => Promise<RecurrenceProcessResult>;
+export type RecurrenceProcess = (
+  signal?: AbortSignal,
+) => Promise<RecurrenceProcessResult>;
 
 export type RecurrenceWorkerSleep = (
   ms: number,
@@ -136,7 +138,7 @@ export function createRecurrenceWorker(
     while (!controller.signal.aborted && !isInfrastructureClosed()) {
       const invocationStartedAt = nowMs();
       try {
-        const result = await deps.process();
+        const result = await deps.process(controller.signal);
         consecutiveFailureCount = 0;
         logger.info('invocation completed', {
           durationMs: nowMs() - invocationStartedAt,

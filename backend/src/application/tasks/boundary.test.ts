@@ -57,7 +57,7 @@ void describe('tasks application boundary', () => {
     assert.doesNotMatch(source, /completedAt/);
   });
 
-  void it('completes Tasks through Home-first locks without assignee or outbox writes', async () => {
+  void it('completes Tasks through Home-first locks with same-transaction outbox', async () => {
     const source = await readFile(path.join(dir, 'complete-task.ts'), 'utf8');
     assert.match(source, /decideTaskComplete/);
     assert.match(source, /lockHomeAndExactMemberships/);
@@ -65,6 +65,8 @@ void describe('tasks application boundary', () => {
     assert.match(source, /completeOpenTask/);
     assert.match(source, /runInReadCommittedTransaction/);
     assert.match(source, /TaskAlreadyCompletedError/);
+    assert.match(source, /createTaskCompletedV1Event/);
+    assert.match(source, /outbox\.append/);
     assert.match(source, /userId/);
     assert.doesNotMatch(source, /decideHomeRead/);
     assert.doesNotMatch(source, /decideTaskList/);
@@ -80,14 +82,17 @@ void describe('tasks application boundary', () => {
     assert.doesNotMatch(source, /from ['"]pg['"]/);
     assert.doesNotMatch(source, /Date\.now/);
     assert.doesNotMatch(source, /new Date\(/);
-    assert.doesNotMatch(source, /outbox/);
-    assert.doesNotMatch(source, /task\.completed\.v1/);
+    assert.doesNotMatch(source, /payload:[\s\S]*title/);
+    assert.doesNotMatch(source, /payload:[\s\S]*assignedMembershipId/);
+    assert.doesNotMatch(source, /payload:[\s\S]*completedByMembershipId/);
     assert.doesNotMatch(source, /SERIALIZABLE/);
     assert.doesNotMatch(source, /pg_advisory/i);
     assert.doesNotMatch(source, /user_id/);
     assert.doesNotMatch(source, /task_definitions/);
     assert.doesNotMatch(source, /reopenedAt/);
-    assert.doesNotMatch(source, /completedBy/);
+    assert.doesNotMatch(source, /activity\/repository/);
+    assert.doesNotMatch(source, /insertHomeVisibleActivity/);
+    assert.match(source, /completedByMembershipId: actor\.membershipId/);
   });
 
   void it('creates recurring TaskDefinitions through locked Home timezone without instances or outbox', async () => {

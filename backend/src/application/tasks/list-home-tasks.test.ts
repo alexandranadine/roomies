@@ -26,6 +26,7 @@ function task(overrides: Partial<TaskInstance> = {}): TaskInstance {
     scheduledFor: null,
     assignedMembershipId: null,
     completedAt: null,
+    completedByMembershipId: null,
     createdAt: CREATED,
     updatedAt: CREATED,
     ...overrides,

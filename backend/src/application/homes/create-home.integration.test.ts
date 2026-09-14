@@ -49,9 +49,34 @@ async function cleanup(
     await pool.query('DELETE FROM outbox_events WHERE home_id = ANY($1)', [
       input.homeIds,
     ]);
-    await pool.query('DELETE FROM memberships WHERE home_id = ANY($1)', [
-      input.homeIds,
-    ]);
+    await pool.query(
+      'DELETE FROM membership_role_transitions WHERE home_id = ANY($1::uuid[])',
+      [input.homeIds],
+    );
+    await pool.query(
+      `UPDATE memberships
+       SET ended_by_membership_id = id
+       WHERE home_id = ANY($1::uuid[]) AND ended_at IS NOT NULL`,
+      [input.homeIds],
+    );
+    await pool.query(
+      `DELETE FROM memberships
+       WHERE home_id = ANY($1::uuid[]) AND ended_at IS NULL`,
+      [input.homeIds],
+    );
+    const remainingMemberships = await pool.query<{ id: string }>(
+      'SELECT id FROM memberships WHERE home_id = ANY($1::uuid[])',
+      [input.homeIds],
+    );
+    for (const row of remainingMemberships.rows) {
+      await pool.query(
+        `UPDATE memberships
+         SET ended_at = NULL, ended_by_membership_id = NULL
+         WHERE id = $1`,
+        [row.id],
+      );
+      await pool.query('DELETE FROM memberships WHERE id = $1', [row.id]);
+    }
     await pool.query('DELETE FROM homes WHERE id = ANY($1)', [input.homeIds]);
   }
   if (input.userIds.length > 0) {
@@ -90,7 +115,7 @@ void describe('createCreateHome PostgreSQL', () => {
   );
 
   void it(
-    'persists Home + founding ADMIN Membership without Owner fields or events',
+    'persists Home + founding ADMIN Membership and one started event',
     { skip: skipWithoutDatabase, timeout: 60_000 },
     async () => {
       const database = createDatabasePool(
@@ -186,11 +211,46 @@ void describe('createCreateHome PostgreSQL', () => {
         assert.ok(userMemberships.rows.every((row) => row.role === 'ADMIN'));
         assert.ok(userMemberships.rows.every((row) => row.ended_at === null));
 
-        const events = await database.pool.query<{ count: string }>(
-          `SELECT count(*)::text AS count FROM outbox_events WHERE home_id = ANY($1)`,
+        const events = await database.pool.query<{
+          home_id: string;
+          event_type: string;
+          occurred_at: Date;
+          payload: { membershipId: string };
+        }>(
+          `SELECT home_id, event_type, occurred_at, payload
+           FROM outbox_events
+           WHERE home_id = ANY($1)
+           ORDER BY home_id`,
           [homeIds],
         );
-        assert.equal(events.rows[0]?.count, '0');
+        assert.equal(events.rowCount, 2);
+        assert.ok(
+          events.rows.every(
+            (row) => row.event_type === 'membership.started.v1',
+          ),
+        );
+        const firstEvent = events.rows.find(
+          (row) => row.home_id === first.home.id,
+        );
+        const secondEvent = events.rows.find(
+          (row) => row.home_id === second.home.id,
+        );
+        assert.ok(firstEvent);
+        assert.ok(secondEvent);
+        assert.deepEqual(Object.keys(firstEvent.payload), ['membershipId']);
+        assert.deepEqual(firstEvent.payload, {
+          membershipId: first.membership.id,
+        });
+        assert.deepEqual(secondEvent.payload, {
+          membershipId: second.membership.id,
+        });
+        assert.equal(
+          firstEvent.occurred_at.getTime(),
+          memberships.rows[0]?.joined_at.getTime(),
+        );
+        assert.equal(JSON.stringify(events.rows).includes(userId), false);
+        assert.equal(JSON.stringify(events.rows).includes('ADMIN'), false);
+        assert.equal(JSON.stringify(events.rows).includes('email'), false);
 
         const homeColumns = await database.pool.query<{ column_name: string }>(
           `SELECT column_name FROM information_schema.columns
@@ -251,6 +311,11 @@ void describe('createCreateHome PostgreSQL', () => {
         insertHome,
         insertMembership: () =>
           Promise.reject(new TransactionInfrastructureError()),
+        outbox: {
+          append() {
+            throw new Error('outbox should not run after membership failure');
+          },
+        },
         clock: { now: () => OCCURRED_AT },
         ids: {
           next() {

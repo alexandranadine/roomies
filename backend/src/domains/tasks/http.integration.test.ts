@@ -88,14 +88,15 @@ async function insertMembership(
   },
 ): Promise<void> {
   await pool.query(
-    `INSERT INTO memberships (id, home_id, user_id, role, ended_at)
-     VALUES ($1, $2, $3, $4, $5)`,
+    `INSERT INTO memberships (id, home_id, user_id, role, ended_at, ended_by_membership_id)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
     [
       input.id,
       input.homeId,
       input.userId,
       input.role,
       input.ended === true ? new Date() : null,
+      input.ended === true ? input.id : null,
     ],
   );
 }

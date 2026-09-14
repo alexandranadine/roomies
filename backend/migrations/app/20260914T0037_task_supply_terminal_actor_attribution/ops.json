@@ -1,0 +1,332 @@
+[
+  {
+    "id": "column.public.supply_entries.obtained_by_membership_id",
+    "label": "Add column \"obtained_by_membership_id\" to \"supply_entries\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "obtained_by_membership_id",
+        "table": "supply_entries"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"obtained_by_membership_id\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "supply_entries",
+          "obtained_by_membership_id"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"obtained_by_membership_id\"",
+        "sql": "ALTER TABLE \"public\".\"supply_entries\" ADD COLUMN \"obtained_by_membership_id\" uuid"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"obtained_by_membership_id\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "supply_entries",
+          "obtained_by_membership_id"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.task_instances.completed_by_membership_id",
+    "label": "Add column \"completed_by_membership_id\" to \"task_instances\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "completed_by_membership_id",
+        "table": "task_instances"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"completed_by_membership_id\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "task_instances",
+          "completed_by_membership_id"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"completed_by_membership_id\"",
+        "sql": "ALTER TABLE \"public\".\"task_instances\" ADD COLUMN \"completed_by_membership_id\" uuid"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"completed_by_membership_id\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "task_instances",
+          "completed_by_membership_id"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "checkConstraint.supply_entries.supply_entries_obtain_actor_check",
+    "label": "Add check constraint \"supply_entries_obtain_actor_check\" on \"supply_entries\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "checkConstraint",
+        "name": "supply_entries_obtain_actor_check",
+        "table": "supply_entries"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"supply_entries_obtain_actor_check\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "supply_entries_obtain_actor_check",
+          "public",
+          "\"public\".\"supply_entries\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add check constraint \"supply_entries_obtain_actor_check\"",
+        "sql": "ALTER TABLE \"public\".\"supply_entries\" ADD CONSTRAINT \"supply_entries_obtain_actor_check\" CHECK (((obtained_at IS NULL) = (obtained_by_membership_id IS NULL)))"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"supply_entries_obtain_actor_check\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "supply_entries_obtain_actor_check",
+          "public",
+          "\"public\".\"supply_entries\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "checkConstraint.task_instances.task_instances_completion_actor_check",
+    "label": "Add check constraint \"task_instances_completion_actor_check\" on \"task_instances\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "checkConstraint",
+        "name": "task_instances_completion_actor_check",
+        "table": "task_instances"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"task_instances_completion_actor_check\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "task_instances_completion_actor_check",
+          "public",
+          "\"public\".\"task_instances\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add check constraint \"task_instances_completion_actor_check\"",
+        "sql": "ALTER TABLE \"public\".\"task_instances\" ADD CONSTRAINT \"task_instances_completion_actor_check\" CHECK (((completed_at IS NULL) = (completed_by_membership_id IS NULL)))"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"task_instances_completion_actor_check\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "task_instances_completion_actor_check",
+          "public",
+          "\"public\".\"task_instances\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.supply_entries.supply_entries_home_id_obtained_by_membership_id_idx_d353905d",
+    "label": "Create index \"supply_entries_home_id_obtained_by_membership_id_idx_d353905d\" on \"supply_entries\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "supply_entries_home_id_obtained_by_membership_id_idx_d353905d",
+        "table": "supply_entries"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"supply_entries_home_id_obtained_by_membership_id_idx_d353905d\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"supply_entries_home_id_obtained_by_membership_id_idx_d353905d\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"supply_entries_home_id_obtained_by_membership_id_idx_d353905d\"",
+        "sql": "CREATE INDEX \"supply_entries_home_id_obtained_by_membership_id_idx_d353905d\" ON \"public\".\"supply_entries\" (\"home_id\", \"obtained_by_membership_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"supply_entries_home_id_obtained_by_membership_id_idx_d353905d\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"supply_entries_home_id_obtained_by_membership_id_idx_d353905d\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.task_instances.task_instances_home_id_completed_by_membership_id_idx_746c7e3c",
+    "label": "Create index \"task_instances_home_id_completed_by_membership_id_idx_746c7e3c\" on \"task_instances\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "task_instances_home_id_completed_by_membership_id_idx_746c7e3c",
+        "table": "task_instances"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"task_instances_home_id_completed_by_membership_id_idx_746c7e3c\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_instances_home_id_completed_by_membership_id_idx_746c7e3c\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"task_instances_home_id_completed_by_membership_id_idx_746c7e3c\"",
+        "sql": "CREATE INDEX \"task_instances_home_id_completed_by_membership_id_idx_746c7e3c\" ON \"public\".\"task_instances\" (\"home_id\", \"completed_by_membership_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"task_instances_home_id_completed_by_membership_id_idx_746c7e3c\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"task_instances_home_id_completed_by_membership_id_idx_746c7e3c\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.supply_entries.supply_entries_obtained_by_home_membership_fkey",
+    "label": "Add foreign key \"supply_entries_obtained_by_home_membership_fkey\" on \"supply_entries\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "supply_entries_obtained_by_home_membership_fkey",
+        "table": "supply_entries"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"supply_entries_obtained_by_home_membership_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "supply_entries_obtained_by_home_membership_fkey",
+          "public",
+          "\"public\".\"supply_entries\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"supply_entries_obtained_by_home_membership_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"supply_entries\"\nADD CONSTRAINT \"supply_entries_obtained_by_home_membership_fkey\"\nFOREIGN KEY (\"home_id\", \"obtained_by_membership_id\")\nREFERENCES \"public\".\"memberships\" (\"home_id\", \"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"supply_entries_obtained_by_home_membership_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "supply_entries_obtained_by_home_membership_fkey",
+          "public",
+          "\"public\".\"supply_entries\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.task_instances.task_instances_completed_by_home_membership_fkey",
+    "label": "Add foreign key \"task_instances_completed_by_home_membership_fkey\" on \"task_instances\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "task_instances_completed_by_home_membership_fkey",
+        "table": "task_instances"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"task_instances_completed_by_home_membership_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "task_instances_completed_by_home_membership_fkey",
+          "public",
+          "\"public\".\"task_instances\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"task_instances_completed_by_home_membership_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"task_instances\"\nADD CONSTRAINT \"task_instances_completed_by_home_membership_fkey\"\nFOREIGN KEY (\"home_id\", \"completed_by_membership_id\")\nREFERENCES \"public\".\"memberships\" (\"home_id\", \"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"task_instances_completed_by_home_membership_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "task_instances_completed_by_home_membership_fkey",
+          "public",
+          "\"public\".\"task_instances\""
+        ]
+      }
+    ]
+  }
+]

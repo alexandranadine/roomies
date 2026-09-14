@@ -34,9 +34,17 @@ function fakeTx(
 void describe('update active membership ended_at', () => {
   void it('scopes the UPDATE to exact id, home, and active tenure', () => {
     assert.match(UPDATE_ACTIVE_MEMBERSHIP_ENDED_AT_SQL, /SET ended_at = \$1/);
-    assert.match(UPDATE_ACTIVE_MEMBERSHIP_ENDED_AT_SQL, /WHERE id = \$2/);
-    assert.match(UPDATE_ACTIVE_MEMBERSHIP_ENDED_AT_SQL, /AND home_id = \$3/);
+    assert.match(
+      UPDATE_ACTIVE_MEMBERSHIP_ENDED_AT_SQL,
+      /ended_by_membership_id = \$2/,
+    );
+    assert.match(UPDATE_ACTIVE_MEMBERSHIP_ENDED_AT_SQL, /WHERE id = \$3/);
+    assert.match(UPDATE_ACTIVE_MEMBERSHIP_ENDED_AT_SQL, /AND home_id = \$4/);
     assert.match(UPDATE_ACTIVE_MEMBERSHIP_ENDED_AT_SQL, /AND ended_at IS NULL/);
+    assert.match(
+      UPDATE_ACTIVE_MEMBERSHIP_ENDED_AT_SQL,
+      /AND ended_by_membership_id IS NULL/,
+    );
     assert.doesNotMatch(UPDATE_ACTIVE_MEMBERSHIP_ENDED_AT_SQL, /user_id/);
     assert.doesNotMatch(UPDATE_ACTIVE_MEMBERSHIP_ENDED_AT_SQL, /DELETE/i);
     assert.doesNotMatch(UPDATE_ACTIVE_MEMBERSHIP_ENDED_AT_SQL, /SET role/i);
@@ -53,12 +61,18 @@ void describe('update active membership ended_at', () => {
       membershipId: MEMBERSHIP,
       homeId: HOME,
       endedAt: ENDED_AT,
+      endedByMembershipId: MEMBERSHIP,
     });
 
     assert.equal(updated, 1);
     assert.equal(calls.length, 1);
     assert.equal(calls[0]?.sql, UPDATE_ACTIVE_MEMBERSHIP_ENDED_AT_SQL);
-    assert.deepEqual(calls[0]?.values, [ENDED_AT, MEMBERSHIP, HOME]);
+    assert.deepEqual(calls[0]?.values, [
+      ENDED_AT,
+      MEMBERSHIP,
+      MEMBERSHIP,
+      HOME,
+    ]);
   });
 
   void it('returns zero when the driver reports no row', async () => {
@@ -69,6 +83,7 @@ void describe('update active membership ended_at', () => {
         membershipId: MEMBERSHIP,
         homeId: HOME,
         endedAt: ENDED_AT,
+        endedByMembershipId: MEMBERSHIP,
       },
     );
     assert.equal(updated, 0);
@@ -84,6 +99,7 @@ void describe('update active membership ended_at', () => {
             membershipId: MEMBERSHIP,
             homeId: HOME,
             endedAt: ENDED_AT,
+            endedByMembershipId: MEMBERSHIP,
           },
         ),
       (error: unknown) => {

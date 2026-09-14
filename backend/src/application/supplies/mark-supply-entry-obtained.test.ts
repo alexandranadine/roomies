@@ -5,6 +5,7 @@ import {
   SupplyNotOpenError,
   SupplyPersistenceError,
 } from '../../domains/supplies/errors.js';
+import { SUPPLY_OBTAINED_V1 } from '../../domains/supplies/events.js';
 import type {
   ReleaseActiveClaimForEntryTerminalization,
   TerminalizeSupplyEntryAsObtained,
@@ -15,6 +16,10 @@ import type {
 } from '../../domains/supplies/supply.js';
 import type { ActiveHomeActor } from '../../platform/authz/context.js';
 import { ConcealedNotFoundError } from '../../platform/authz/errors.js';
+import type {
+  JsonObject,
+  OutboxEventInput,
+} from '../../platform/events/outbox-types.js';
 import type { TransactionContext } from '../../platform/persistence/transaction.js';
 import {
   createMarkSupplyEntryObtained,
@@ -31,6 +36,7 @@ const OTHER_MEMBERSHIP = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 const OLD_MEMBERSHIP = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 const ENTRY = '018f1e2c-7e3a-7000-8000-1234567890ab';
 const CLAIM = '018f1e2c-7e3a-7000-8000-1234567890ad';
+const EVENT = '018f1e2c-7e3a-7000-8000-1234567890ae';
 const OCCURRED_AT = new Date('2026-09-12T19:00:00.000Z');
 const CREATED_AT = new Date('2026-09-12T18:00:00.000Z');
 const TX: TransactionContext = {
@@ -66,6 +72,7 @@ function openEntry(overrides: Partial<SupplyEntry> = {}): SupplyEntry {
     status: 'OPEN',
     createdByMembershipId: MEMBERSHIP,
     obtainedAt: null,
+    obtainedByMembershipId: null,
     canceledAt: null,
     createdAt: CREATED_AT,
     updatedAt: CREATED_AT,
@@ -77,6 +84,7 @@ function obtainedEntry(): SupplyEntry {
   return openEntry({
     status: 'OBTAINED',
     obtainedAt: OCCURRED_AT,
+    obtainedByMembershipId: MEMBERSHIP,
     updatedAt: OCCURRED_AT,
   });
 }
@@ -128,8 +136,10 @@ function harness(options: HarnessOptions = {}) {
   const lockCalls: { homeId: string; membershipIds: readonly string[] }[] = [];
   const entryLocks: { homeId: string; supplyEntryId: string }[] = [];
   const claimLocks: { homeId: string; supplyEntryId: string }[] = [];
+  const appended: OutboxEventInput<string, JsonObject>[] = [];
   let committed = false;
   let clockCalls = 0;
+  let uuidCalls = 0;
   const lockedEntry =
     options.lockedEntry === undefined ? openEntry() : options.lockedEntry;
   const lockedClaim =
@@ -203,10 +213,22 @@ function harness(options: HarnessOptions = {}) {
         return Promise.resolve(options.terminalizeResult ?? obtainedEntry());
       },
     },
+    outbox: {
+      append(_tx, event) {
+        appended.push(event);
+        return Promise.resolve();
+      },
+    },
     clock: {
       now() {
         clockCalls += 1;
         return OCCURRED_AT;
+      },
+    },
+    ids: {
+      next() {
+        uuidCalls += 1;
+        return EVENT;
       },
     },
   };
@@ -215,22 +237,27 @@ function harness(options: HarnessOptions = {}) {
     obtain: createMarkSupplyEntryObtained(deps),
     releases,
     terminalizes,
+    appended,
     lockCalls,
     entryLocks,
     claimLocks,
     clockCalls: () => clockCalls,
+    uuidCalls: () => uuidCalls,
     isCommitted: () => committed,
   };
 }
 
 void describe('createMarkSupplyEntryObtained', () => {
   void it('lets an active Roommate obtain an OPEN entry and release any claim', async () => {
-    const { obtain, releases, terminalizes, clockCalls } = harness();
+    const { obtain, releases, terminalizes, appended, clockCalls, uuidCalls } =
+      harness();
     const updated = await obtain(input());
     assert.equal(updated.status, 'OBTAINED');
     assert.equal(updated.obtainedAt, OCCURRED_AT);
+    assert.equal(updated.obtainedByMembershipId, MEMBERSHIP);
     assert.equal(updated.canceledAt, null);
     assert.equal(clockCalls(), 1);
+    assert.equal(uuidCalls(), 1);
     assert.deepEqual(releases[0], {
       claimId: CLAIM,
       homeId: HOME,
@@ -242,7 +269,28 @@ void describe('createMarkSupplyEntryObtained', () => {
       supplyEntryId: ENTRY,
       homeId: HOME,
       obtainedAt: OCCURRED_AT,
+      obtainedByMembershipId: MEMBERSHIP,
     });
+    assert.equal(appended.length, 1);
+    assert.equal(appended[0]?.eventType, SUPPLY_OBTAINED_V1);
+    assert.equal(appended[0]?.eventId, EVENT);
+    assert.equal(appended[0]?.occurredAt, OCCURRED_AT);
+    assert.equal(appended[0]?.homeId, HOME);
+    assert.deepEqual(appended[0]?.payload, { supplyEntryId: ENTRY });
+    assert.deepEqual(Object.keys(appended[0]?.payload ?? {}), [
+      'supplyEntryId',
+    ]);
+    assert.equal('title' in (appended[0]?.payload ?? {}), false);
+    assert.equal('userId' in (appended[0]?.payload ?? {}), false);
+    assert.equal(
+      'obtainedByMembershipId' in (appended[0]?.payload ?? {}),
+      false,
+    );
+    assert.equal('claimantMembershipId' in (appended[0]?.payload ?? {}), false);
+    assert.equal(
+      'createdByMembershipId' in (appended[0]?.payload ?? {}),
+      false,
+    );
   });
 
   void it('lets a Home Admin obtain through ordinary capability', async () => {
@@ -255,24 +303,32 @@ void describe('createMarkSupplyEntryObtained', () => {
   });
 
   void it('lets a noncreator and a nonclaimant obtain equivalently', async () => {
-    const { obtain, releases } = harness({
+    const { obtain, releases, appended } = harness({
       lockedEntry: openEntry({ createdByMembershipId: OTHER_MEMBERSHIP }),
       lockedClaim: activeClaim({ claimantMembershipId: OTHER_MEMBERSHIP }),
     });
     const updated = await obtain(input());
     assert.equal(updated.status, 'OBTAINED');
+    assert.equal(updated.obtainedByMembershipId, MEMBERSHIP);
+    assert.notEqual(updated.obtainedByMembershipId, OTHER_MEMBERSHIP);
     assert.equal(releases[0]?.reason, 'ENTRY_OBTAINED');
+    assert.equal(appended.length, 1);
+    assert.deepEqual(appended[0]?.payload, { supplyEntryId: ENTRY });
   });
 
   void it('succeeds when there is no active claim', async () => {
-    const { obtain, releases, claimLocks, clockCalls } = harness({
-      lockedClaim: null,
-    });
+    const { obtain, releases, appended, claimLocks, clockCalls, uuidCalls } =
+      harness({
+        lockedClaim: null,
+      });
     const updated = await obtain(input());
     assert.equal(updated.status, 'OBTAINED');
     assert.deepEqual(releases, []);
     assert.equal(claimLocks.length, 1);
     assert.equal(clockCalls(), 1);
+    assert.equal(uuidCalls(), 1);
+    assert.equal(appended.length, 1);
+    assert.equal(appended[0]?.eventType, SUPPLY_OBTAINED_V1);
   });
 
   void it('does not call Clock or mutate before OPEN and auth checks', async () => {
@@ -280,12 +336,15 @@ void describe('createMarkSupplyEntryObtained', () => {
       lockedEntry: openEntry({
         status: 'OBTAINED',
         obtainedAt: OCCURRED_AT,
+        obtainedByMembershipId: MEMBERSHIP,
       }),
     });
     await assert.rejects(() => obtained.obtain(input()), SupplyNotOpenError);
     assert.equal(obtained.clockCalls(), 0);
+    assert.equal(obtained.uuidCalls(), 0);
     assert.deepEqual(obtained.releases, []);
     assert.deepEqual(obtained.terminalizes, []);
+    assert.deepEqual(obtained.appended, []);
     assert.deepEqual(obtained.claimLocks, []);
 
     const canceled = harness({
@@ -300,18 +359,31 @@ void describe('createMarkSupplyEntryObtained', () => {
   });
 
   void it('treats a locked-claim zero-row release as persistence failure', async () => {
-    const { obtain, isCommitted, clockCalls, terminalizes } = harness({
+    const {
+      obtain,
+      isCommitted,
+      clockCalls,
+      uuidCalls,
+      terminalizes,
+      appended,
+    } = harness({
       releaseResult: null,
     });
     await assert.rejects(() => obtain(input()), SupplyPersistenceError);
     assert.equal(clockCalls(), 1);
+    assert.equal(uuidCalls(), 0);
     assert.deepEqual(terminalizes, []);
+    assert.deepEqual(appended, []);
     assert.equal(isCommitted(), false);
   });
 
   void it('treats a zero-row entry terminalization as persistence failure', async () => {
-    const { obtain, isCommitted } = harness({ terminalizeResult: null });
+    const { obtain, appended, uuidCalls, isCommitted } = harness({
+      terminalizeResult: null,
+    });
     await assert.rejects(() => obtain(input()), SupplyPersistenceError);
+    assert.deepEqual(appended, []);
+    assert.equal(uuidCalls(), 0);
     assert.equal(isCommitted(), false);
   });
 
@@ -320,6 +392,7 @@ void describe('createMarkSupplyEntryObtained', () => {
     await assert.rejects(() => missing.obtain(input()), ConcealedNotFoundError);
     assert.equal(missing.clockCalls(), 0);
     assert.deepEqual(missing.claimLocks, []);
+    assert.deepEqual(missing.appended, []);
 
     const ended = harness({
       memberships: [lockedMembership({ endedAt: OCCURRED_AT })],
@@ -338,7 +411,7 @@ void describe('createMarkSupplyEntryObtained', () => {
   });
 
   void it('does not let an old tenure inherit obtain authority after rejoin', async () => {
-    const { obtain, terminalizes } = harness({
+    const { obtain, terminalizes, appended } = harness({
       memberships: [
         lockedMembership({
           id: OLD_MEMBERSHIP,
@@ -360,21 +433,25 @@ void describe('createMarkSupplyEntryObtained', () => {
       ConcealedNotFoundError,
     );
     assert.deepEqual(terminalizes, []);
+    assert.deepEqual(appended, []);
   });
 
   void it('rejects an actor whose userId no longer matches the locked tenure', async () => {
-    const { obtain, terminalizes } = harness({
+    const { obtain, terminalizes, appended } = harness({
       memberships: [lockedMembership({ userId: OTHER_USER })],
     });
     await assert.rejects(() => obtain(input()), ConcealedNotFoundError);
     assert.deepEqual(terminalizes, []);
+    assert.deepEqual(appended, []);
   });
 
   void it('rolls back when claim release fails', async () => {
-    const { obtain, isCommitted } = harness({
+    const { obtain, appended, uuidCalls, isCommitted } = harness({
       releaseError: new Error('release failed'),
     });
     await assert.rejects(() => obtain(input()), /release failed/);
+    assert.deepEqual(appended, []);
+    assert.equal(uuidCalls(), 0);
     assert.equal(isCommitted(), false);
   });
 });

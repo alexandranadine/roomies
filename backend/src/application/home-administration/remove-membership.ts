@@ -111,6 +111,7 @@ export function createRemoveMembership(
         homeId: locked.home.id,
         membershipId: target.id,
         endedAt,
+        endedByMembershipId: locked.actor.membershipId,
         cause: 'ADMIN_REMOVAL',
       });
     });

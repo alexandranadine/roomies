@@ -17,6 +17,7 @@ export type TaskInstance = Readonly<{
   scheduledFor: string | null;
   assignedMembershipId: string | null;
   completedAt: Date | null;
+  completedByMembershipId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }>;

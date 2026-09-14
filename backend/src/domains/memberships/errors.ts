@@ -24,3 +24,15 @@ export class LastRoommateRequiresArchiveError extends Error {
     super('Last roommate requires archive');
   }
 }
+
+/**
+ * Canonical Membership Activity source could not be read safely.
+ * Messages never include user identifiers, names, email, or roles.
+ */
+export class MembershipActivitySourceIntegrityError extends Error {
+  override readonly name = 'MembershipActivitySourceIntegrityError';
+
+  constructor() {
+    super('Membership activity source integrity failure');
+  }
+}

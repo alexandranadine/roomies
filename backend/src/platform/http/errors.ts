@@ -25,6 +25,10 @@ import {
   LastRoommateRequiresArchiveError,
 } from '../../domains/memberships/errors.js';
 import {
+  ActivityPersistenceError,
+  InvalidActivityRequestError,
+} from '../../domains/activity/errors.js';
+import {
   InvalidMaintenanceRequestError,
   MaintenanceNotOpenError,
   MaintenancePersistenceError,
@@ -154,7 +158,8 @@ export function errorHandler(
 
   if (
     err instanceof InvalidRequestError ||
-    err instanceof InvalidMaintenanceRequestError
+    err instanceof InvalidMaintenanceRequestError ||
+    err instanceof InvalidActivityRequestError
   ) {
     sendApiError(res, 400, 'INVALID_REQUEST', 'Invalid request', requestId);
     return;
@@ -324,6 +329,7 @@ export function errorHandler(
     err instanceof TaskPersistenceError ||
     err instanceof SupplyPersistenceError ||
     err instanceof MaintenancePersistenceError ||
+    err instanceof ActivityPersistenceError ||
     err instanceof TransactionInfrastructureError ||
     err instanceof AuthInfrastructureError
   ) {

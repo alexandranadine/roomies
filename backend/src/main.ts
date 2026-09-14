@@ -9,6 +9,7 @@ import { createLeaveMembershipFromPool } from './application/home-administration
 import { createRemoveMembershipFromPool } from './application/home-administration/remove-membership.js';
 import { createListActiveHomeMembershipsFromPool } from './application/memberships/list-active-home-memberships.js';
 import { createCreateMaintenanceEntryFromPool } from './application/maintenance/create-maintenance-entry.js';
+import { createListHomeActivityFromPool } from './application/activity/list-home-activity.js';
 import { createListHomeMaintenanceFromPool } from './application/maintenance/list-home-maintenance.js';
 import { createReadMaintenanceEntryFromPool } from './application/maintenance/read-maintenance-entry.js';
 import { createResolveMaintenanceEntryFromPool } from './application/maintenance/resolve-maintenance-entry.js';
@@ -54,7 +55,7 @@ import {
 import { startProcess } from './platform/runtime/start-process.js';
 import type { ClosableResource } from './platform/server/start-http-server.js';
 import { startHttpServer } from './platform/server/start-http-server.js';
-import { createRecurrenceWorkerFromPool } from './platform/workers/create-recurrence-worker-from-pool.js';
+import { createProcessWorkerFromPool } from './platform/workers/create-process-worker-from-pool.js';
 import { createDb } from './prisma/db.js';
 
 type RuntimeConfig = AppConfig & ProcessRuntimeConfig;
@@ -145,6 +146,9 @@ function createWebHttpRuntime(
           databasePool.pool,
         ),
       },
+      activity: {
+        listHomeActivity: createListHomeActivityFromPool(databasePool.pool),
+      },
     }),
   });
 
@@ -162,7 +166,7 @@ function createWebHttpRuntime(
  * Startup sequence:
  * 1. load validated config once, including PROCESS_MODE
  * 2. create the process-owned PostgreSQL pool
- * 3. start HTTP and/or the recurrence worker from that same pool
+ * 3. start HTTP and/or the process worker from that same pool
  * 4. own SIGTERM/SIGINT and close the pool exactly once after collaborators stop
  *
  * DB connectivity is not required to bind the HTTP port. Transient DB
@@ -191,7 +195,7 @@ async function main(): Promise<void> {
         : undefined,
       createWorker: startsRecurrenceWorker(config.processMode)
         ? () =>
-            createRecurrenceWorkerFromPool(databasePool.pool, {
+            createProcessWorkerFromPool(databasePool.pool, {
               pollIntervalMs: config.recurrencePollIntervalMs,
               isInfrastructureClosed: () => poolClosed,
             })

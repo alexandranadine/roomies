@@ -107,6 +107,7 @@ function harness(
         homeId: HOME,
         membershipId: MEMBERSHIP,
         endedAt: NOW,
+        endedByMembershipId: MEMBERSHIP,
         cause: 'HOME_ARCHIVED',
       });
       if (options.failAt === 'membership') {
@@ -196,7 +197,7 @@ void describe('archive final member Home orchestration', () => {
           eventType: 'membership.ended.v1',
           occurredAt: NOW,
           homeId: HOME,
-          payload: { membershipId: MEMBERSHIP, cause: 'HOME_ARCHIVED' },
+          payload: { membershipId: MEMBERSHIP },
         },
         {
           eventId: EVENT_TWO,

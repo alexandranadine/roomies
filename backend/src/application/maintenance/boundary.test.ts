@@ -37,6 +37,8 @@ void describe('maintenance application boundary', () => {
     assert.match(source, /normalizeMaintenanceDetails/);
     assert.match(source, /createdByMembershipId: actor\.membershipId/);
     assert.match(source, /status: 'OPEN'/);
+    assert.match(source, /createMaintenanceCreatedV1Event/);
+    assert.match(source, /outbox\.append/);
     assert.match(
       source,
       /membershipIds: Object\.freeze\(\[input\.actor\.membershipId\]\)/,
@@ -54,8 +56,9 @@ void describe('maintenance application boundary', () => {
     assert.doesNotMatch(source, /from ['"]pg['"]/);
     assert.doesNotMatch(source, /Date\.now/);
     assert.doesNotMatch(source, /new Date\(/);
-    assert.doesNotMatch(source, /outbox/);
-    assert.doesNotMatch(source, /maintenance\.created/);
+    assert.doesNotMatch(source, /payload:[\s\S]*title/);
+    assert.doesNotMatch(source, /payload:[\s\S]*details/);
+    assert.doesNotMatch(source, /payload:[\s\S]*audienceMembershipIds/);
     assert.doesNotMatch(source, /SERIALIZABLE/);
     assert.doesNotMatch(source, /pg_advisory/i);
     assert.doesNotMatch(source, /user_id/);
@@ -64,6 +67,9 @@ void describe('maintenance application boundary', () => {
     assert.doesNotMatch(source, /insertAudience|addAudience|updateAudience/);
     assert.doesNotMatch(source, /router\./);
     assert.doesNotMatch(source, /createMaintenanceRouter/);
+    assert.doesNotMatch(source, /activity\/repository/);
+    assert.doesNotMatch(source, /insertHomeVisibleActivity/);
+    assert.doesNotMatch(source, /insertSourceAuthorizedActivity/);
   });
 
   void it('does not import repository internals, Express, or sibling writers', async () => {
@@ -114,6 +120,8 @@ void describe('maintenance application boundary', () => {
     assert.match(source, /MaintenanceNotOpenError/);
     assert.match(source, /MaintenancePersistenceError/);
     assert.match(source, /ConcealedNotFoundError/);
+    assert.match(source, /createMaintenanceResolvedV1Event/);
+    assert.match(source, /outbox\.append/);
     assert.match(
       source,
       /membershipIds: Object\.freeze\(\[input\.actor\.membershipId\]\)/,
@@ -131,8 +139,6 @@ void describe('maintenance application boundary', () => {
     assert.doesNotMatch(source, /from ['"]pg['"]/);
     assert.doesNotMatch(source, /Date\.now/);
     assert.doesNotMatch(source, /new Date\(/);
-    assert.doesNotMatch(source, /outbox/);
-    assert.doesNotMatch(source, /maintenance\.resolved/);
     assert.doesNotMatch(source, /maintenance\.resolve_private/);
     assert.doesNotMatch(source, /maintenance\.resolve_admin/);
     assert.doesNotMatch(source, /isHomeAdmin/);
@@ -144,6 +150,9 @@ void describe('maintenance application boundary', () => {
     assert.doesNotMatch(source, /pg_advisory/i);
     assert.doesNotMatch(source, /router\./);
     assert.doesNotMatch(source, /createMaintenanceRouter/);
+    assert.doesNotMatch(source, /activity\/repository/);
+    assert.doesNotMatch(source, /insertHomeVisibleActivity/);
+    assert.doesNotMatch(source, /insertSourceAuthorizedActivity/);
   });
 
   void it('lists and reads through public repository visibility without app filtering', async () => {

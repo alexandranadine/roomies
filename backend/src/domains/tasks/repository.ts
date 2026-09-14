@@ -24,6 +24,7 @@ title,
 scheduled_for::text AS scheduled_for,
 assigned_membership_id,
 completed_at,
+completed_by_membership_id,
 created_at,
 updated_at
 `;
@@ -55,6 +56,7 @@ INSERT INTO task_instances (
   assigned_membership_id,
   task_definition_id,
   completed_at,
+  completed_by_membership_id,
   created_at,
   updated_at
 )
@@ -66,6 +68,7 @@ VALUES (
   $3,
   $4::date,
   $5::uuid,
+  NULL,
   NULL,
   NULL,
   $6::timestamptz,
@@ -119,6 +122,7 @@ INSERT INTO task_instances (
   assigned_membership_id,
   task_definition_id,
   completed_at,
+  completed_by_membership_id,
   created_at,
   updated_at
 )
@@ -131,6 +135,7 @@ VALUES (
   $4::date,
   $5::uuid,
   $6::uuid,
+  NULL,
   NULL,
   $7::timestamptz,
   $7::timestamptz
@@ -198,11 +203,13 @@ UPDATE task_instances
 SET
   status = 'COMPLETED',
   completed_at = $3::timestamptz,
-  updated_at = $4::timestamptz
+  completed_by_membership_id = $4::uuid,
+  updated_at = $5::timestamptz
 WHERE home_id = $1::uuid
   AND id = $2::uuid
   AND status = 'OPEN'
   AND completed_at IS NULL
+  AND completed_by_membership_id IS NULL
 RETURNING ${TASK_INSTANCE_COLUMNS}
 `;
 
@@ -316,6 +323,7 @@ export type CompleteOpenTaskInstance = Readonly<{
   homeId: string;
   taskId: string;
   completedAt: Date;
+  completedByMembershipId: string;
   updatedAt: Date;
 }>;
 
@@ -438,6 +446,7 @@ type TaskInstanceRow = {
   scheduled_for: unknown;
   assigned_membership_id: unknown;
   completed_at: unknown;
+  completed_by_membership_id: unknown;
   created_at: unknown;
   updated_at: unknown;
 };
@@ -500,11 +509,20 @@ function parseTaskInstanceRow(
   const scheduledFor = parseScheduledFor(row.scheduled_for);
   const assignedMembershipId = parseOptionalUuid(row.assigned_membership_id);
   const completedAt = parseCompletedAt(row.completed_at);
+  const completedByMembershipId = parseOptionalUuid(
+    row.completed_by_membership_id,
+  );
 
-  if (row.status === 'OPEN' && completedAt !== null) {
+  if (
+    row.status === 'OPEN' &&
+    (completedAt !== null || completedByMembershipId !== null)
+  ) {
     throw new TaskPersistenceError();
   }
-  if (row.status === 'COMPLETED' && completedAt === null) {
+  if (
+    row.status === 'COMPLETED' &&
+    (completedAt === null || completedByMembershipId === null)
+  ) {
     throw new TaskPersistenceError();
   }
 
@@ -517,6 +535,7 @@ function parseTaskInstanceRow(
     scheduledFor,
     assignedMembershipId,
     completedAt,
+    completedByMembershipId,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   });
@@ -753,6 +772,7 @@ export function createTaskRepository(pool: Pool): TaskRepository {
             input.homeId,
             input.taskId,
             input.completedAt,
+            input.completedByMembershipId,
             input.updatedAt,
           ])
         ).rows;

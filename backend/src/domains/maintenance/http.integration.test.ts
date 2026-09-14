@@ -100,16 +100,47 @@ async function insertMembership(
   },
 ): Promise<void> {
   await pool.query(
-    `INSERT INTO memberships (id, home_id, user_id, role, ended_at)
-     VALUES ($1, $2, $3, $4, $5)`,
+    `INSERT INTO memberships (id, home_id, user_id, role, ended_at, ended_by_membership_id)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
     [
       input.id,
       input.homeId,
       input.userId,
       input.role,
       input.ended === true ? new Date() : null,
+      input.ended === true ? input.id : null,
     ],
   );
+}
+
+async function cleanupMaintenanceHomeRows(
+  pool: Pool,
+  homeIds: string[],
+): Promise<void> {
+  if (homeIds.length === 0) {
+    return;
+  }
+  await pool.query(
+    'DELETE FROM activity_recipients WHERE home_id = ANY($1::uuid[])',
+    [homeIds],
+  );
+  await pool.query('DELETE FROM activities WHERE home_id = ANY($1::uuid[])', [
+    homeIds,
+  ]);
+  await pool.query(
+    'DELETE FROM maintenance_audiences WHERE home_id = ANY($1)',
+    [homeIds],
+  );
+  await pool.query('DELETE FROM maintenance_entries WHERE home_id = ANY($1)', [
+    homeIds,
+  ]);
+  await pool.query('DELETE FROM outbox_events WHERE home_id = ANY($1)', [
+    homeIds,
+  ]);
+  await pool.query('DELETE FROM memberships WHERE home_id = ANY($1)', [
+    homeIds,
+  ]);
+  await pool.query('DELETE FROM homes WHERE id = ANY($1)', [homeIds]);
 }
 
 async function entryCount(pool: Pool, homeId: string): Promise<number> {
@@ -700,23 +731,7 @@ void describe('Maintenance HTTP PostgreSQL', () => {
         });
       } finally {
         console.error = originalError;
-        if (homeIds.length > 0) {
-          await database.pool.query(
-            'DELETE FROM maintenance_audiences WHERE home_id = ANY($1)',
-            [homeIds],
-          );
-          await database.pool.query(
-            'DELETE FROM maintenance_entries WHERE home_id = ANY($1)',
-            [homeIds],
-          );
-          await database.pool.query(
-            'DELETE FROM memberships WHERE home_id = ANY($1)',
-            [homeIds],
-          );
-          await database.pool.query('DELETE FROM homes WHERE id = ANY($1)', [
-            homeIds,
-          ]);
-        }
+        await cleanupMaintenanceHomeRows(database.pool, homeIds);
         for (const id of identityIds) {
           await database.pool.query(
             'DELETE FROM auth_sessions WHERE user_id = $1',
@@ -1316,7 +1331,7 @@ void describe('Maintenance HTTP PostgreSQL', () => {
           assert.equal(tenureDetailBefore.status, 200);
 
           await database.pool.query(
-            'UPDATE memberships SET ended_at = NOW() WHERE id = $1',
+            'UPDATE memberships SET ended_at = NOW(), ended_by_membership_id = $1 WHERE id = $1',
             [tenureA],
           );
           const endedActorList = await request({
@@ -1510,23 +1525,7 @@ void describe('Maintenance HTTP PostgreSQL', () => {
         });
       } finally {
         console.error = originalError;
-        if (homeIds.length > 0) {
-          await database.pool.query(
-            'DELETE FROM maintenance_audiences WHERE home_id = ANY($1)',
-            [homeIds],
-          );
-          await database.pool.query(
-            'DELETE FROM maintenance_entries WHERE home_id = ANY($1)',
-            [homeIds],
-          );
-          await database.pool.query(
-            'DELETE FROM memberships WHERE home_id = ANY($1)',
-            [homeIds],
-          );
-          await database.pool.query('DELETE FROM homes WHERE id = ANY($1)', [
-            homeIds,
-          ]);
-        }
+        await cleanupMaintenanceHomeRows(database.pool, homeIds);
         for (const id of identityIds) {
           await database.pool.query(
             'DELETE FROM auth_sessions WHERE user_id = $1',
@@ -2028,23 +2027,7 @@ void describe('Maintenance HTTP PostgreSQL', () => {
         });
       } finally {
         console.error = originalError;
-        if (homeIds.length > 0) {
-          await database.pool.query(
-            'DELETE FROM maintenance_audiences WHERE home_id = ANY($1)',
-            [homeIds],
-          );
-          await database.pool.query(
-            'DELETE FROM maintenance_entries WHERE home_id = ANY($1)',
-            [homeIds],
-          );
-          await database.pool.query(
-            'DELETE FROM memberships WHERE home_id = ANY($1)',
-            [homeIds],
-          );
-          await database.pool.query('DELETE FROM homes WHERE id = ANY($1)', [
-            homeIds,
-          ]);
-        }
+        await cleanupMaintenanceHomeRows(database.pool, homeIds);
         for (const id of identityIds) {
           await database.pool.query(
             'DELETE FROM auth_sessions WHERE user_id = $1',

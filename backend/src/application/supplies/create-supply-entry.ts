@@ -141,6 +141,7 @@ export function createCreateSupplyEntry(
         status: 'OPEN',
         createdByMembershipId: actor.membershipId,
         obtainedAt: null,
+        obtainedByMembershipId: null,
         canceledAt: null,
         createdAt: occurredAt,
         updatedAt: occurredAt,

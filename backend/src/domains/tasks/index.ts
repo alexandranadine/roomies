@@ -20,10 +20,31 @@ export {
   InvalidHomeLocalDateError,
   InvalidRecurrenceConfigurationError,
   InvalidTaskTitleError,
+  TaskActivitySourceIntegrityError,
   TaskAlreadyCompletedError,
   TaskDefinitionAlreadyDeactivatedError,
   TaskPersistenceError,
 } from './errors.js';
+export {
+  TASK_COMPLETED_V1,
+  createTaskCompletedV1Event,
+  type TaskCompletedV1Payload,
+} from './events.js';
+export {
+  FIND_TASK_ACTIVITY_DISPLAYS_SQL,
+  findTaskActivityDisplays,
+  type FindTaskActivityDisplays,
+  type FindTaskActivityDisplaysInput,
+  type TaskActivityDisplay,
+  type TaskActivityDisplayQueryable,
+} from './find-task-activity-display.js';
+export {
+  FIND_TASK_ACTIVITY_SOURCE_SQL,
+  findTaskActivitySource,
+  type FindTaskActivitySource,
+  type FindTaskActivitySourceInput,
+  type TaskActivitySource,
+} from './find-task-activity-source.js';
 export {
   HOME_LOCAL_DATE_PATTERN,
   parseHomeLocalDate,

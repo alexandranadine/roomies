@@ -55,3 +55,15 @@ export class TaskDefinitionAlreadyDeactivatedError extends Error {
     super('Task definition already deactivated');
   }
 }
+
+/**
+ * Canonical Task Activity source could not be read safely.
+ * Messages never include title, assignee, Home, or Membership IDs.
+ */
+export class TaskActivitySourceIntegrityError extends Error {
+  override readonly name = 'TaskActivitySourceIntegrityError';
+
+  constructor() {
+    super('Task activity source integrity failure');
+  }
+}

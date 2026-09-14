@@ -58,6 +58,20 @@ enum MaintenanceStatus {
   RESOLVED
 }
 
+enum ActivitySourceEntityType {
+  @@type("pg/text@1")
+  MEMBERSHIP
+  TASK
+  SUPPLY
+  MAINTENANCE
+}
+
+enum ActivityVisibilityClass {
+  @@type("pg/text@1")
+  HOME_VISIBLE
+  SOURCE_AUTHORIZED
+}
+
 model User {
   id          Uuid                 @id @default(uuid(7))
   createdAt   temporal.createdAt() @map("created_at")
@@ -83,6 +97,9 @@ model Home {
   supplyClaims          SupplyClaim[]
   maintenanceEntries    MaintenanceEntry[]
   maintenanceAudiences  MaintenanceAudience[]
+  activities                 Activity[]
+  activityRecipients         ActivityRecipient[]
+  membershipRoleTransitions  MembershipRoleTransition[]
 
   @@map("homes")
 }
@@ -94,27 +111,60 @@ model Membership {
   role     MembershipRole
   joinedAt Timestamptz     @default(now()) @map("joined_at")
   endedAt  Timestamptz?    @map("ended_at")
+  endedByMembershipId Uuid? @map("ended_by_membership_id")
 
   home Home @relation(fields: [homeId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "memberships_home_id_fkey")
   user User @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "memberships_user_id_fkey")
+  endedByMembership Membership? @relation("MembershipEndedByMembership", fields: [homeId, endedByMembershipId], references: [homeId, id], onDelete: Restrict, onUpdate: Restrict, map: "memberships_ended_by_home_membership_fkey")
+  endedMemberships Membership[] @relation("MembershipEndedByMembership")
   createdInvitations       Invitation[]      @relation("InvitationCreatorMembership")
   acceptedInvitations      Invitation[]      @relation("InvitationAcceptedMembership")
   assignedTaskInstances    TaskInstance[]    @relation("TaskInstanceAssignedMembership")
+  completedTaskInstances   TaskInstance[]    @relation("TaskInstanceCompletedByMembership")
   assignedTaskDefinitions  TaskDefinition[]  @relation("TaskDefinitionAssignedMembership")
   createdTaskDefinitions   TaskDefinition[]  @relation("TaskDefinitionCreatorMembership")
   createdSupplyEntries          SupplyEntry[]           @relation("SupplyEntryCreatorMembership")
+  obtainedSupplyEntries         SupplyEntry[]           @relation("SupplyEntryObtainedByMembership")
   supplyClaims                  SupplyClaim[]           @relation("SupplyClaimClaimantMembership")
   createdMaintenanceEntries     MaintenanceEntry[]      @relation("MaintenanceEntryCreatorMembership")
   resolvedMaintenanceEntries    MaintenanceEntry[]      @relation("MaintenanceEntryResolverMembership")
   maintenanceAudiences          MaintenanceAudience[]   @relation("MaintenanceAudienceMembership")
+  actedActivities               Activity[]              @relation("ActivityActorMembership")
+  activityRecipients            ActivityRecipient[]     @relation("ActivityRecipientMembership")
+  subjectRoleTransitions MembershipRoleTransition[] @relation("MembershipRoleTransitionSubject")
+  actorRoleTransitions   MembershipRoleTransition[] @relation("MembershipRoleTransitionActor")
 
   // At most one active tenure per (home, user). Ended rows may coexist so
   // leave-and-rejoin creates a new Membership id rather than reopening one.
+  // Active and ended tenures couple ended_at with the exact actor Membership
+  // id: both null or both non-null. Never a userId actor.
+  @@check(
+    expression: "((ended_at IS NULL) = (ended_by_membership_id IS NULL))",
+    map: "memberships_end_actor_check"
+  )
   @@index([homeId, userId], unique: true, where: "(ended_at IS NULL)", name: "memberships_one_active_per_home_user")
   @@index([homeId, id], unique: true, name: "memberships_home_id_id_key")
   @@index([homeId], name: "memberships_home_id")
   @@index([userId], name: "memberships_user_id")
   @@map("memberships")
+}
+
+// Immutable historical Membership role transitions. Application generates
+// the UUIDv7 primary key. No oldRole/newRole snapshots, userId, or display.
+// Same-home composite FKs retain history when a tenure later ends (Restrict).
+model MembershipRoleTransition {
+  id                Uuid        @id
+  homeId            Uuid        @map("home_id")
+  membershipId      Uuid        @map("membership_id")
+  actorMembershipId Uuid        @map("actor_membership_id")
+  changedAt         Timestamptz @map("changed_at")
+  createdAt         Timestamptz @map("created_at")
+
+  home Home @relation(fields: [homeId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "membership_role_transitions_home_id_fkey")
+  membership Membership @relation("MembershipRoleTransitionSubject", fields: [homeId, membershipId], references: [homeId, id], onDelete: Restrict, onUpdate: Restrict, map: "membership_role_transitions_subject_home_membership_fkey")
+  actorMembership Membership @relation("MembershipRoleTransitionActor", fields: [homeId, actorMembershipId], references: [homeId, id], onDelete: Restrict, onUpdate: Restrict, map: "membership_role_transitions_actor_home_membership_fkey")
+
+  @@map("membership_role_transitions")
 }
 
 // Better Auth 1.7.4 persistence. Authentication identity/profile data stays
@@ -372,11 +422,13 @@ model TaskInstance {
   assignedMembershipId Uuid?        @map("assigned_membership_id")
   taskDefinitionId     Uuid?        @map("task_definition_id")
   completedAt          Timestamptz? @map("completed_at")
+  completedByMembershipId Uuid?     @map("completed_by_membership_id")
   createdAt            temporal.createdAt() @map("created_at")
   updatedAt            temporal.updatedAt() @map("updated_at")
 
   home Home @relation(fields: [homeId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "task_instances_home_id_fkey")
   assignedMembership Membership? @relation("TaskInstanceAssignedMembership", fields: [homeId, assignedMembershipId], references: [homeId, id], onDelete: Restrict, onUpdate: Restrict, map: "task_instances_assigned_home_membership_fkey")
+  completedByMembership Membership? @relation("TaskInstanceCompletedByMembership", fields: [homeId, completedByMembershipId], references: [homeId, id], onDelete: Restrict, onUpdate: Restrict, map: "task_instances_completed_by_home_membership_fkey")
   taskDefinition TaskDefinition? @relation("TaskInstanceDefinition", fields: [homeId, taskDefinitionId], references: [homeId, id], onDelete: Restrict, onUpdate: Restrict, map: "task_instances_definition_home_fkey")
 
   @@check(
@@ -386,6 +438,10 @@ model TaskInstance {
   @@check(
     expression: "(((status = 'OPEN'::text) AND (completed_at IS NULL)) OR ((status = 'COMPLETED'::text) AND (completed_at IS NOT NULL)))",
     map: "task_instances_completion_state_check"
+  )
+  @@check(
+    expression: "((completed_at IS NULL) = (completed_by_membership_id IS NULL))",
+    map: "task_instances_completion_actor_check"
   )
   @@check(
     expression: "((completed_at IS NULL) OR (completed_at >= created_at))",
@@ -409,17 +465,23 @@ model SupplyEntry {
   status                  SupplyEntryStatus @default(OPEN)
   createdByMembershipId   Uuid              @map("created_by_membership_id")
   obtainedAt              Timestamptz?      @map("obtained_at")
+  obtainedByMembershipId  Uuid?             @map("obtained_by_membership_id")
   canceledAt              Timestamptz?      @map("canceled_at")
   createdAt               temporal.createdAt() @map("created_at")
   updatedAt               temporal.updatedAt() @map("updated_at")
 
   home Home @relation(fields: [homeId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "supply_entries_home_id_fkey")
   createdByMembership Membership @relation("SupplyEntryCreatorMembership", fields: [homeId, createdByMembershipId], references: [homeId, id], onDelete: Restrict, onUpdate: Restrict, map: "supply_entries_creator_home_membership_fkey")
+  obtainedByMembership Membership? @relation("SupplyEntryObtainedByMembership", fields: [homeId, obtainedByMembershipId], references: [homeId, id], onDelete: Restrict, onUpdate: Restrict, map: "supply_entries_obtained_by_home_membership_fkey")
   claims SupplyClaim[]
 
   @@check(
     expression: "(((status = 'OPEN'::text) AND (obtained_at IS NULL) AND (canceled_at IS NULL)) OR ((status = 'OBTAINED'::text) AND (obtained_at IS NOT NULL) AND (canceled_at IS NULL)) OR ((status = 'CANCELED'::text) AND (obtained_at IS NULL) AND (canceled_at IS NOT NULL)))",
     map: "supply_entries_lifecycle_check"
+  )
+  @@check(
+    expression: "((obtained_at IS NULL) = (obtained_by_membership_id IS NULL))",
+    map: "supply_entries_obtain_actor_check"
   )
   @@check(
     expression: "(((obtained_at IS NULL) OR (obtained_at >= created_at)) AND ((canceled_at IS NULL) OR (canceled_at >= created_at)))",
@@ -524,4 +586,60 @@ model MaintenanceAudience {
   @@id([homeId, maintenanceEntryId, membershipId], map: "maintenance_audiences_pkey")
   @@index([homeId, membershipId, maintenanceEntryId], name: "maintenance_audiences_home_membership_entry_idx")
   @@map("maintenance_audiences")
+}
+
+// Activity persistence. HOME_VISIBLE zero-recipient and SOURCE_AUTHORIZED
+// at-least-one-recipient cardinality are cross-row transactional invariants
+// for the later outbox-consumer slice: insert Activity then the complete
+// recipient set in one transaction. No trigger. Direct arbitrary SQL can
+// violate that cardinality. Canonical visibility never includes an
+// Admin/role or userId branch. No display snapshots. No source-domain FKs.
+//
+// Recipient PK (home_id, activity_id, membership_id) is activity-centric:
+// prefix (home_id, activity_id) lists one Activity's recipients and supports
+// the exact EXISTS used by SOURCE_AUTHORIZED visibility. It cannot
+// efficiently list a Membership's recipient rows across activities because
+// membership_id is last. The additional (home_id, membership_id, activity_id)
+// index is membership-centric for actor lookup.
+model Activity {
+  id                  Uuid                     @id @default(uuid(7))
+  homeId              Uuid                     @map("home_id")
+  sourceOutboxEventId Uuid                     @map("source_outbox_event_id")
+  sourceEntityType    ActivitySourceEntityType @map("source_entity_type")
+  sourceEntityId      Uuid                     @map("source_entity_id")
+  eventType           VarChar(200)             @map("event_type")
+  visibilityClass     ActivityVisibilityClass  @map("visibility_class")
+  actorMembershipId   Uuid?                    @map("actor_membership_id")
+  occurredAt          Timestamptz              @map("occurred_at")
+  createdAt           Timestamptz              @map("created_at")
+
+  home Home @relation(fields: [homeId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "activities_home_id_fkey")
+  actorMembership Membership? @relation("ActivityActorMembership", fields: [homeId, actorMembershipId], references: [homeId, id], onDelete: Restrict, onUpdate: Restrict, map: "activities_actor_home_membership_fkey")
+  recipients ActivityRecipient[]
+
+  @@check(
+    expression: "((char_length((event_type)::text) >= 1) AND (char_length((event_type)::text) <= 200))",
+    map: "activities_event_type_length_check"
+  )
+  @@index([homeId, id], unique: true, name: "activities_home_id_id_key")
+  @@index([sourceOutboxEventId], unique: true, name: "activities_source_outbox_event_id_key")
+  // PostgreSQL can scan this ascending btree backward for DESC feed order.
+  @@index([homeId, occurredAt, id], name: "activities_home_feed_idx")
+  @@index([sourceEntityType, sourceEntityId], name: "activities_source_entity_idx")
+  @@map("activities")
+}
+
+model ActivityRecipient {
+  homeId       Uuid        @map("home_id")
+  activityId   Uuid        @map("activity_id")
+  membershipId Uuid        @map("membership_id")
+  createdAt    Timestamptz @map("created_at")
+
+  home Home @relation(fields: [homeId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "activity_recipients_home_id_fkey")
+  activity Activity @relation(fields: [homeId, activityId], references: [homeId, id], onDelete: Restrict, onUpdate: Restrict, map: "activity_recipients_activity_home_fkey")
+  membership Membership @relation("ActivityRecipientMembership", fields: [homeId, membershipId], references: [homeId, id], onDelete: Restrict, onUpdate: Restrict, map: "activity_recipients_home_membership_fkey")
+
+  @@id([homeId, activityId, membershipId], map: "activity_recipients_pkey")
+  @@index([homeId, membershipId, activityId], name: "activity_recipients_home_membership_activity_idx")
+  @@map("activity_recipients")
 }

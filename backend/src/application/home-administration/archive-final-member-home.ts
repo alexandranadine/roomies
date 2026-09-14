@@ -99,6 +99,7 @@ export function createArchiveFinalMemberHome(
         homeId: locked.home.id,
         membershipId: locked.actor.membershipId,
         endedAt: archivedAt,
+        endedByMembershipId: locked.actor.membershipId,
         cause: 'HOME_ARCHIVED',
       });
 
@@ -116,7 +117,6 @@ export function createArchiveFinalMemberHome(
           eventId: deps.ids.next(),
           occurredAt: archivedAt,
           membershipId: locked.actor.membershipId,
-          cause: 'HOME_ARCHIVED',
           homeId: locked.home.id,
         }),
       );

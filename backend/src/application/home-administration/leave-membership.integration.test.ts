@@ -93,14 +93,15 @@ async function insertMembership(
   },
 ): Promise<void> {
   await pool.query(
-    `INSERT INTO memberships (id, home_id, user_id, role, ended_at)
-     VALUES ($1, $2, $3, $4, $5)`,
+    `INSERT INTO memberships (id, home_id, user_id, role, ended_at, ended_by_membership_id)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
     [
       input.id,
       input.homeId,
       input.userId,
       input.role,
       input.ended === true ? new Date() : null,
+      input.ended === true ? input.id : null,
     ],
   );
 }
@@ -113,9 +114,34 @@ async function cleanup(
     'DELETE FROM outbox_events WHERE home_id = ANY($1::uuid[])',
     [input.homeIds],
   );
-  await pool.query('DELETE FROM memberships WHERE home_id = ANY($1::uuid[])', [
-    input.homeIds,
-  ]);
+  await pool.query(
+    'DELETE FROM membership_role_transitions WHERE home_id = ANY($1::uuid[])',
+    [input.homeIds],
+  );
+  await pool.query(
+    `UPDATE memberships
+     SET ended_by_membership_id = id
+     WHERE home_id = ANY($1::uuid[]) AND ended_at IS NOT NULL`,
+    [input.homeIds],
+  );
+  await pool.query(
+    `DELETE FROM memberships
+     WHERE home_id = ANY($1::uuid[]) AND ended_at IS NULL`,
+    [input.homeIds],
+  );
+  const remainingMemberships = await pool.query<{ id: string }>(
+    'SELECT id FROM memberships WHERE home_id = ANY($1::uuid[])',
+    [input.homeIds],
+  );
+  for (const row of remainingMemberships.rows) {
+    await pool.query(
+      `UPDATE memberships
+       SET ended_at = NULL, ended_by_membership_id = NULL
+       WHERE id = $1`,
+      [row.id],
+    );
+    await pool.query('DELETE FROM memberships WHERE id = $1', [row.id]);
+  }
   await pool.query('DELETE FROM homes WHERE id = ANY($1::uuid[])', [
     input.homeIds,
   ]);
@@ -154,13 +180,21 @@ function createCommand(
 async function activeMemberships(
   pool: Pool,
   homeId: string,
-): Promise<readonly { id: string; role: string; ended_at: Date | null }[]> {
+): Promise<
+  readonly {
+    id: string;
+    role: string;
+    ended_at: Date | null;
+    ended_by_membership_id: string | null;
+  }[]
+> {
   const result = await pool.query<{
     id: string;
     role: string;
     ended_at: Date | null;
+    ended_by_membership_id: string | null;
   }>(
-    `SELECT id, role, ended_at
+    `SELECT id, role, ended_at, ended_by_membership_id
      FROM memberships
      WHERE home_id = $1
      ORDER BY id`,
@@ -172,9 +206,9 @@ async function activeMemberships(
 async function endedEvents(
   pool: Pool,
   homeId: string,
-): Promise<readonly { membershipId: string; cause: string }[]> {
+): Promise<readonly { membershipId: string }[]> {
   const result = await pool.query<{
-    payload: { membershipId: string; cause: string };
+    payload: { membershipId: string };
   }>(
     `SELECT payload
      FROM outbox_events
@@ -253,9 +287,11 @@ void describe('leaveMembership PostgreSQL', () => {
         assert.equal(admin?.ended_at, null);
         assert.equal(roommate?.role, 'ROOMMATE');
         assert.ok(roommate?.ended_at instanceof Date);
+        assert.equal(roommate?.ended_by_membership_id, membershipB);
+        assert.equal(admin?.ended_by_membership_id, null);
         assert.equal(await archivedAt(database.pool, homeId), null);
         assert.deepEqual(await endedEvents(database.pool, homeId), [
-          { membershipId: membershipB, cause: 'VOLUNTARY_LEAVE' },
+          { membershipId: membershipB },
         ]);
       } finally {
         await cleanup(database.pool, {
@@ -315,12 +351,16 @@ void describe('leaveMembership PostgreSQL', () => {
           true,
         );
         assert.equal(
+          rows.find((row) => row.id === membershipA)?.ended_by_membership_id,
+          membershipA,
+        );
+        assert.equal(
           rows.find((row) => row.id === membershipB)?.ended_at,
           null,
         );
         assert.equal(rows.find((row) => row.id === membershipB)?.role, 'ADMIN');
         assert.deepEqual(await endedEvents(database.pool, homeId), [
-          { membershipId: membershipA, cause: 'VOLUNTARY_LEAVE' },
+          { membershipId: membershipA },
         ]);
       } finally {
         await cleanup(database.pool, {
@@ -648,7 +688,7 @@ void describe('leaveMembership PostgreSQL', () => {
         );
         assert.equal(await archivedAt(database.pool, homeId), null);
         assert.deepEqual(await endedEvents(database.pool, homeId), [
-          { membershipId: membershipB, cause: 'VOLUNTARY_LEAVE' },
+          { membershipId: membershipB },
         ]);
       } finally {
         await cleanup(database.pool, {
@@ -925,6 +965,10 @@ void describe('leaveMembership PostgreSQL', () => {
           rows.find((row) => row.id === membershipB)?.ended_at,
           null,
         );
+        assert.equal(
+          rows.find((row) => row.id === membershipB)?.ended_by_membership_id,
+          null,
+        );
         assert.deepEqual(await endedEvents(database.pool, homeId), []);
       } finally {
         await cleanup(database.pool, {
@@ -1022,6 +1066,10 @@ void describe('leaveMembership PostgreSQL', () => {
           rows.find((row) => row.id === membershipB)?.ended_at,
           null,
         );
+        assert.equal(
+          rows.find((row) => row.id === membershipB)?.ended_by_membership_id,
+          null,
+        );
         assert.deepEqual(await endedEvents(database.pool, homeId), []);
       } finally {
         await cleanup(database.pool, {
@@ -1105,7 +1153,79 @@ void describe('leaveMembership PostgreSQL', () => {
           rows.find((row) => row.id === membershipB)?.ended_at,
           null,
         );
+        assert.equal(
+          rows.find((row) => row.id === membershipB)?.ended_by_membership_id,
+          null,
+        );
         assert.deepEqual(await endedEvents(database.pool, homeId), []);
+      } finally {
+        await cleanup(database.pool, {
+          homeIds: [homeId],
+          userIds: [userA, userB],
+        });
+        await database.close();
+      }
+    },
+  );
+
+  void it(
+    'keeps the exact ended tenure actor after the same User rejoins',
+    { skip: skipWithoutDatabase },
+    async () => {
+      const database = createDatabasePool(
+        testConfig(dedicatedTestDatabaseUrl()),
+      );
+      const userA = randomUUID();
+      const userB = randomUUID();
+      const homeId = randomUUID();
+      const membershipA = randomUUID();
+      const membershipOld = randomUUID();
+      const membershipNew = randomUUID();
+
+      try {
+        await insertUser(database.pool, userA);
+        await insertUser(database.pool, userB);
+        await insertHome(database.pool, { id: homeId, name: 'Leave Rejoin' });
+        await insertMembership(database.pool, {
+          id: membershipA,
+          homeId,
+          userId: userA,
+          role: 'ADMIN',
+        });
+        await insertMembership(database.pool, {
+          id: membershipOld,
+          homeId,
+          userId: userB,
+          role: 'ROOMMATE',
+        });
+
+        const leave = createCommand(database.pool);
+        await leave({
+          actor: actor({
+            userId: userB,
+            membershipId: membershipOld,
+            homeId,
+            role: 'ROOMMATE',
+          }),
+          homeId,
+          membershipId: membershipOld,
+        });
+
+        await insertMembership(database.pool, {
+          id: membershipNew,
+          homeId,
+          userId: userB,
+          role: 'ROOMMATE',
+        });
+
+        const rows = await activeMemberships(database.pool, homeId);
+        const ended = rows.find((row) => row.id === membershipOld);
+        const rejoined = rows.find((row) => row.id === membershipNew);
+        assert.ok(ended?.ended_at instanceof Date);
+        assert.equal(ended?.ended_by_membership_id, membershipOld);
+        assert.equal(rejoined?.ended_at, null);
+        assert.equal(rejoined?.ended_by_membership_id, null);
+        assert.notEqual(membershipOld, membershipNew);
       } finally {
         await cleanup(database.pool, {
           homeIds: [homeId],

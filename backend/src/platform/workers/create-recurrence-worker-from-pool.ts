@@ -17,7 +17,7 @@ export function createRecurrenceWorkerFromPool(
   },
 ): RecurrenceWorkerRuntime {
   return createRecurrenceWorker({
-    process: createProcessDueRecurringTasksFromPool(pool),
+    process: () => createProcessDueRecurringTasksFromPool(pool)(),
     pollIntervalMs: options.pollIntervalMs,
     isInfrastructureClosed: options.isInfrastructureClosed,
   });

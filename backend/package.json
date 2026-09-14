@@ -17,7 +17,9 @@
     "db:test:migrate": "tsx scripts/verify-fresh-migrations.ts",
     "db:test:auth-persistence": "tsx scripts/verify-auth-persistence.ts",
     "db:test:supply-persistence": "tsx scripts/verify-supply-schema.ts",
-    "db:test:maintenance-persistence": "tsx scripts/verify-maintenance-schema.ts"
+    "db:test:maintenance-persistence": "tsx scripts/verify-maintenance-schema.ts",
+    "db:test:activity-persistence": "tsx scripts/verify-activity-schema.ts",
+    "db:test:membership-persistence": "tsx scripts/verify-membership-schema.ts"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

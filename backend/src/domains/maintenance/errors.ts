@@ -32,6 +32,18 @@ export class MaintenancePersistenceError extends Error {
 }
 
 /**
+ * Canonical Maintenance Activity source could not be read safely.
+ * Messages never include title, details, audience, Home, or Membership IDs.
+ */
+export class MaintenanceActivitySourceIntegrityError extends Error {
+  override readonly name = 'MaintenanceActivitySourceIntegrityError';
+
+  constructor() {
+    super('Maintenance activity source integrity failure');
+  }
+}
+
+/**
  * Visible state conflict: resolve is allowed only while the entry is OPEN.
  * Returned only after the entry is proven visible.
  */

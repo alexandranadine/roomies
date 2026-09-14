@@ -92,6 +92,7 @@ void describe('supplies application boundary', () => {
     assert.match(source, /createdByMembershipId: actor\.membershipId/);
     assert.match(source, /status: 'OPEN'/);
     assert.match(source, /obtainedAt: null/);
+    assert.match(source, /obtainedByMembershipId: null/);
     assert.match(source, /canceledAt: null/);
     assert.match(source, /userId/);
     assert.doesNotMatch(source, /decideHomeRead/);
@@ -205,6 +206,9 @@ void describe('supplies application boundary', () => {
     assert.match(source, /terminalizeSupplyEntryAsObtained/);
     assert.match(source, /runInReadCommittedTransaction/);
     assert.match(source, /reason: 'ENTRY_OBTAINED'/);
+    assert.match(source, /createSupplyObtainedV1Event/);
+    assert.match(source, /outbox\.append/);
+    assert.match(source, /obtainedByMembershipId: actor\.membershipId/);
     assert.doesNotMatch(source, /decideSupplyReleaseClaim/);
     assert.doesNotMatch(source, /isHomeAdmin/);
     assert.doesNotMatch(source, /memberships\/repository/);
@@ -213,11 +217,15 @@ void describe('supplies application boundary', () => {
     assert.doesNotMatch(source, /from ['"]pg['"]/);
     assert.doesNotMatch(source, /Date\.now/);
     assert.doesNotMatch(source, /new Date\(/);
-    assert.doesNotMatch(source, /outbox/);
-    assert.doesNotMatch(source, /supply\.obtained/);
+    assert.doesNotMatch(source, /payload:[\s\S]*title/);
+    assert.doesNotMatch(source, /payload:[\s\S]*obtainedByMembershipId/);
+    assert.doesNotMatch(source, /payload:[\s\S]*claimantMembershipId/);
+    assert.doesNotMatch(source, /payload:[\s\S]*createdByMembershipId/);
     assert.doesNotMatch(source, /SERIALIZABLE/);
     assert.doesNotMatch(source, /pg_advisory/i);
     assert.doesNotMatch(source, /Idempotency-Key/);
+    assert.doesNotMatch(source, /activity\/repository/);
+    assert.doesNotMatch(source, /insertHomeVisibleActivity/);
   });
 
   void it('cancels through ordinary policy without claim ownership', async () => {

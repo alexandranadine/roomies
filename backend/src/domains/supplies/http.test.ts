@@ -58,6 +58,7 @@ function entry(overrides: Partial<SupplyEntry> = {}): SupplyEntry {
     status: 'OPEN',
     createdByMembershipId: MEMBERSHIP_ID,
     obtainedAt: null,
+    obtainedByMembershipId: null,
     canceledAt: null,
     createdAt: CREATED,
     updatedAt: CREATED,

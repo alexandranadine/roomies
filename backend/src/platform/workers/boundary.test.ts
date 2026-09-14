@@ -48,6 +48,17 @@ void describe('recurrence worker boundary', () => {
     assert.doesNotMatch(composition, /from ['"]pg['"]/);
     assert.doesNotMatch(composition, /pool\.end/);
     assert.doesNotMatch(composition, /outbox/);
+
+    const combined = await readFile(
+      path.join(workersDir, 'create-process-worker-from-pool.ts'),
+      'utf8',
+    );
+    assert.match(combined, /createProcessDueRecurringTasksFromPool/);
+    assert.match(combined, /createOutboxConsumerFromPool/);
+    assert.match(combined, /createCombinedWorkerProcess/);
+    assert.doesNotMatch(combined, /from ['"]pg['"]/);
+    assert.doesNotMatch(combined, /pool\.end/);
+    assert.doesNotMatch(combined, /from ['"].*\/domains\//);
   });
 
   void it('does not log household or Maintenance content', async () => {

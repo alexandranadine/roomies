@@ -5,6 +5,7 @@ import {
   MaintenanceNotOpenError,
   MaintenancePersistenceError,
 } from '../../domains/maintenance/errors.js';
+import { MAINTENANCE_RESOLVED_V1 } from '../../domains/maintenance/events.js';
 import type {
   MaintenanceDetailProjection,
   MaintenanceEntry,
@@ -12,6 +13,10 @@ import type {
 import type { ResolveOpenMaintenanceEntry } from '../../domains/maintenance/repository.js';
 import type { ActiveHomeActor } from '../../platform/authz/context.js';
 import { ConcealedNotFoundError } from '../../platform/authz/errors.js';
+import type {
+  JsonObject,
+  OutboxEventInput,
+} from '../../platform/events/outbox-types.js';
 import type { TransactionContext } from '../../platform/persistence/transaction.js';
 import {
   createResolveMaintenanceEntry,
@@ -27,6 +32,7 @@ const MEMBERSHIP = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const OTHER_MEMBERSHIP = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 const OLD_MEMBERSHIP = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 const ENTRY = '018f1e2c-7e3a-7000-8000-1234567890ab';
+const EVENT = '018f1e2c-7e3a-7000-8000-1234567890ad';
 const FOREIGN = '018f1e2c-7e3a-7000-8000-1234567890ff';
 const CREATED_AT = new Date('2026-09-13T17:00:00.000Z');
 const OCCURRED_AT = new Date('2026-09-13T18:00:00.000Z');
@@ -122,8 +128,10 @@ function harness(options: HarnessOptions = {}) {
   }[] = [];
   let committed = false;
   let clockCalls = 0;
+  let uuidCalls = 0;
   const lockedEntry =
     options.lockedEntry === undefined ? openProjection() : options.lockedEntry;
+  const appended: OutboxEventInput<string, JsonObject>[] = [];
 
   const deps: ResolveMaintenanceEntryDependencies = {
     runTransaction: async (work) => {
@@ -177,10 +185,22 @@ function harness(options: HarnessOptions = {}) {
         return Promise.resolve(options.resolveResult ?? resolvedEntry(write));
       },
     },
+    outbox: {
+      append(_tx, event) {
+        appended.push(event);
+        return Promise.resolve();
+      },
+    },
     clock: {
       now() {
         clockCalls += 1;
         return OCCURRED_AT;
+      },
+    },
+    ids: {
+      next() {
+        uuidCalls += 1;
+        return EVENT;
       },
     },
   };
@@ -188,16 +208,26 @@ function harness(options: HarnessOptions = {}) {
   return {
     resolve: createResolveMaintenanceEntry(deps),
     writes,
+    appended,
     lockCalls,
     visibleLocks,
     clockCalls: () => clockCalls,
+    uuidCalls: () => uuidCalls,
     isCommitted: () => committed,
   };
 }
 
 void describe('createResolveMaintenanceEntry', () => {
   void it('lets an active Roommate resolve a visible OPEN entry', async () => {
-    const { resolve, writes, lockCalls, visibleLocks, clockCalls } = harness();
+    const {
+      resolve,
+      writes,
+      appended,
+      lockCalls,
+      visibleLocks,
+      clockCalls,
+      uuidCalls,
+    } = harness();
     const updated = await resolve(input());
     assert.equal(updated.status, 'RESOLVED');
     assert.equal(updated.resolvedByMembershipId, MEMBERSHIP);
@@ -211,6 +241,16 @@ void describe('createResolveMaintenanceEntry', () => {
     assert.equal('homeId' in updated, false);
     assert.equal('audienceMembershipIds' in updated, false);
     assert.equal(clockCalls(), 1);
+    assert.equal(uuidCalls(), 1);
+    assert.equal(appended.length, 1);
+    assert.equal(appended[0]?.eventType, MAINTENANCE_RESOLVED_V1);
+    assert.equal(appended[0]?.eventId, EVENT);
+    assert.equal(appended[0]?.occurredAt, OCCURRED_AT);
+    assert.equal(appended[0]?.homeId, HOME);
+    assert.deepEqual(appended[0]?.payload, { maintenanceEntryId: ENTRY });
+    assert.deepEqual(Object.keys(appended[0]?.payload ?? {}), [
+      'maintenanceEntryId',
+    ]);
     assert.deepEqual(lockCalls, [
       { homeId: HOME, membershipIds: [MEMBERSHIP] },
     ]);
@@ -281,7 +321,7 @@ void describe('createResolveMaintenanceEntry', () => {
   });
 
   void it('conflicts on a visible already-RESOLVED entry without Clock', async () => {
-    const { resolve, writes, clockCalls, isCommitted } = harness({
+    const { resolve, writes, appended, clockCalls, isCommitted } = harness({
       lockedEntry: openProjection({
         status: 'RESOLVED',
         resolvedByMembershipId: OTHER_MEMBERSHIP,
@@ -292,15 +332,18 @@ void describe('createResolveMaintenanceEntry', () => {
     await assert.rejects(() => resolve(input()), MaintenanceNotOpenError);
     assert.equal(clockCalls(), 0);
     assert.deepEqual(writes, []);
+    assert.deepEqual(appended, []);
     assert.equal(isCommitted(), false);
   });
 
   void it('treats a post-lock zero-row resolve write as persistence failure', async () => {
-    const { resolve, isCommitted, clockCalls } = harness({
+    const { resolve, appended, isCommitted, clockCalls, uuidCalls } = harness({
       resolveResult: null,
     });
     await assert.rejects(() => resolve(input()), MaintenancePersistenceError);
     assert.equal(clockCalls(), 1);
+    assert.equal(uuidCalls(), 0);
+    assert.deepEqual(appended, []);
     assert.equal(isCommitted(), false);
   });
 
@@ -386,11 +429,12 @@ void describe('createResolveMaintenanceEntry', () => {
   });
 
   void it('rolls back when the resolve write fails', async () => {
-    const { resolve, isCommitted, clockCalls } = harness({
+    const { resolve, appended, isCommitted, clockCalls } = harness({
       resolveError: new Error('resolve failed'),
     });
     await assert.rejects(() => resolve(input()), /resolve failed/);
     assert.equal(isCommitted(), false);
+    assert.deepEqual(appended, []);
     assert.equal(clockCalls(), 1);
   });
 });

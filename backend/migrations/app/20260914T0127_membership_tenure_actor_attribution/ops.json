@@ -1,0 +1,449 @@
+[
+  {
+    "id": "table.membership_role_transitions",
+    "label": "Create table \"membership_role_transitions\"",
+    "summary": "Creates table \"membership_role_transitions\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "membership_role_transitions"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"membership_role_transitions\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"membership_role_transitions\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"membership_role_transitions\"",
+        "sql": "CREATE TABLE \"public\".\"membership_role_transitions\" (\n  \"actor_membership_id\" uuid NOT NULL,\n  \"changed_at\" timestamptz NOT NULL,\n  \"created_at\" timestamptz NOT NULL,\n  \"home_id\" uuid NOT NULL,\n  \"id\" uuid NOT NULL,\n  \"membership_id\" uuid NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"membership_role_transitions\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"membership_role_transitions\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.memberships.ended_by_membership_id",
+    "label": "Add column \"ended_by_membership_id\" to \"memberships\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "ended_by_membership_id",
+        "table": "memberships"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"ended_by_membership_id\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "memberships",
+          "ended_by_membership_id"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"ended_by_membership_id\"",
+        "sql": "ALTER TABLE \"public\".\"memberships\" ADD COLUMN \"ended_by_membership_id\" uuid"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"ended_by_membership_id\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "memberships",
+          "ended_by_membership_id"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "checkConstraint.memberships.memberships_end_actor_check",
+    "label": "Add check constraint \"memberships_end_actor_check\" on \"memberships\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "checkConstraint",
+        "name": "memberships_end_actor_check",
+        "table": "memberships"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"memberships_end_actor_check\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "memberships_end_actor_check",
+          "public",
+          "\"public\".\"memberships\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add check constraint \"memberships_end_actor_check\"",
+        "sql": "ALTER TABLE \"public\".\"memberships\" ADD CONSTRAINT \"memberships_end_actor_check\" CHECK (((ended_at IS NULL) = (ended_by_membership_id IS NULL)))"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"memberships_end_actor_check\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "memberships_end_actor_check",
+          "public",
+          "\"public\".\"memberships\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.membership_role_transitions.membership_role_transitions_home_id_actor_membership_i_59ee34c2",
+    "label": "Create index \"membership_role_transitions_home_id_actor_membership_i_59ee34c2\" on \"membership_role_transitions\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "membership_role_transitions_home_id_actor_membership_i_59ee34c2",
+        "table": "membership_role_transitions"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"membership_role_transitions_home_id_actor_membership_i_59ee34c2\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"membership_role_transitions_home_id_actor_membership_i_59ee34c2\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"membership_role_transitions_home_id_actor_membership_i_59ee34c2\"",
+        "sql": "CREATE INDEX \"membership_role_transitions_home_id_actor_membership_i_59ee34c2\" ON \"public\".\"membership_role_transitions\" (\"home_id\", \"actor_membership_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"membership_role_transitions_home_id_actor_membership_i_59ee34c2\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"membership_role_transitions_home_id_actor_membership_i_59ee34c2\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.membership_role_transitions.membership_role_transitions_home_id_idx_f881d5c1",
+    "label": "Create index \"membership_role_transitions_home_id_idx_f881d5c1\" on \"membership_role_transitions\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "membership_role_transitions_home_id_idx_f881d5c1",
+        "table": "membership_role_transitions"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"membership_role_transitions_home_id_idx_f881d5c1\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"membership_role_transitions_home_id_idx_f881d5c1\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"membership_role_transitions_home_id_idx_f881d5c1\"",
+        "sql": "CREATE INDEX \"membership_role_transitions_home_id_idx_f881d5c1\" ON \"public\".\"membership_role_transitions\" (\"home_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"membership_role_transitions_home_id_idx_f881d5c1\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"membership_role_transitions_home_id_idx_f881d5c1\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.membership_role_transitions.membership_role_transitions_home_id_membership_id_idx_3d66ba27",
+    "label": "Create index \"membership_role_transitions_home_id_membership_id_idx_3d66ba27\" on \"membership_role_transitions\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "membership_role_transitions_home_id_membership_id_idx_3d66ba27",
+        "table": "membership_role_transitions"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"membership_role_transitions_home_id_membership_id_idx_3d66ba27\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"membership_role_transitions_home_id_membership_id_idx_3d66ba27\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"membership_role_transitions_home_id_membership_id_idx_3d66ba27\"",
+        "sql": "CREATE INDEX \"membership_role_transitions_home_id_membership_id_idx_3d66ba27\" ON \"public\".\"membership_role_transitions\" (\"home_id\", \"membership_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"membership_role_transitions_home_id_membership_id_idx_3d66ba27\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"membership_role_transitions_home_id_membership_id_idx_3d66ba27\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.memberships.memberships_home_id_ended_by_membership_id_idx_82a6b407",
+    "label": "Create index \"memberships_home_id_ended_by_membership_id_idx_82a6b407\" on \"memberships\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "memberships_home_id_ended_by_membership_id_idx_82a6b407",
+        "table": "memberships"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"memberships_home_id_ended_by_membership_id_idx_82a6b407\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"memberships_home_id_ended_by_membership_id_idx_82a6b407\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"memberships_home_id_ended_by_membership_id_idx_82a6b407\"",
+        "sql": "CREATE INDEX \"memberships_home_id_ended_by_membership_id_idx_82a6b407\" ON \"public\".\"memberships\" (\"home_id\", \"ended_by_membership_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"memberships_home_id_ended_by_membership_id_idx_82a6b407\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"memberships_home_id_ended_by_membership_id_idx_82a6b407\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.membership_role_transitions.membership_role_transitions_home_id_fkey",
+    "label": "Add foreign key \"membership_role_transitions_home_id_fkey\" on \"membership_role_transitions\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "membership_role_transitions_home_id_fkey",
+        "table": "membership_role_transitions"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"membership_role_transitions_home_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "membership_role_transitions_home_id_fkey",
+          "public",
+          "\"public\".\"membership_role_transitions\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"membership_role_transitions_home_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"membership_role_transitions\"\nADD CONSTRAINT \"membership_role_transitions_home_id_fkey\"\nFOREIGN KEY (\"home_id\")\nREFERENCES \"public\".\"homes\" (\"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"membership_role_transitions_home_id_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "membership_role_transitions_home_id_fkey",
+          "public",
+          "\"public\".\"membership_role_transitions\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.membership_role_transitions.membership_role_transitions_subject_home_membership_fkey",
+    "label": "Add foreign key \"membership_role_transitions_subject_home_membership_fkey\" on \"membership_role_transitions\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "membership_role_transitions_subject_home_membership_fkey",
+        "table": "membership_role_transitions"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"membership_role_transitions_subject_home_membership_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "membership_role_transitions_subject_home_membership_fkey",
+          "public",
+          "\"public\".\"membership_role_transitions\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"membership_role_transitions_subject_home_membership_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"membership_role_transitions\"\nADD CONSTRAINT \"membership_role_transitions_subject_home_membership_fkey\"\nFOREIGN KEY (\"home_id\", \"membership_id\")\nREFERENCES \"public\".\"memberships\" (\"home_id\", \"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"membership_role_transitions_subject_home_membership_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "membership_role_transitions_subject_home_membership_fkey",
+          "public",
+          "\"public\".\"membership_role_transitions\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.membership_role_transitions.membership_role_transitions_actor_home_membership_fkey",
+    "label": "Add foreign key \"membership_role_transitions_actor_home_membership_fkey\" on \"membership_role_transitions\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "membership_role_transitions_actor_home_membership_fkey",
+        "table": "membership_role_transitions"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"membership_role_transitions_actor_home_membership_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "membership_role_transitions_actor_home_membership_fkey",
+          "public",
+          "\"public\".\"membership_role_transitions\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"membership_role_transitions_actor_home_membership_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"membership_role_transitions\"\nADD CONSTRAINT \"membership_role_transitions_actor_home_membership_fkey\"\nFOREIGN KEY (\"home_id\", \"actor_membership_id\")\nREFERENCES \"public\".\"memberships\" (\"home_id\", \"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"membership_role_transitions_actor_home_membership_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "membership_role_transitions_actor_home_membership_fkey",
+          "public",
+          "\"public\".\"membership_role_transitions\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.memberships.memberships_ended_by_home_membership_fkey",
+    "label": "Add foreign key \"memberships_ended_by_home_membership_fkey\" on \"memberships\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "memberships_ended_by_home_membership_fkey",
+        "table": "memberships"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"memberships_ended_by_home_membership_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "memberships_ended_by_home_membership_fkey",
+          "public",
+          "\"public\".\"memberships\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"memberships_ended_by_home_membership_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"memberships\"\nADD CONSTRAINT \"memberships_ended_by_home_membership_fkey\"\nFOREIGN KEY (\"home_id\", \"ended_by_membership_id\")\nREFERENCES \"public\".\"memberships\" (\"home_id\", \"id\")\nON DELETE RESTRICT\nON UPDATE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"memberships_ended_by_home_membership_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "memberships_ended_by_home_membership_fkey",
+          "public",
+          "\"public\".\"memberships\""
+        ]
+      }
+    ]
+  }
+]

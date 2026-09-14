@@ -118,8 +118,8 @@ async function insertFixture(
   );
   for (let index = 0; index < memberCount; index += 1) {
     await pool.query(
-      `INSERT INTO memberships (id, home_id, user_id, role, ended_at)
-       VALUES ($1, $2, $3, $4, NULL)`,
+      `INSERT INTO memberships (id, home_id, user_id, role, ended_at, ended_by_membership_id)
+       VALUES ($1, $2, $3, $4, NULL, NULL)`,
       [
         membershipIds[index],
         homeId,

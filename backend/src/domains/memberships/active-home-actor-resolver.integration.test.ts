@@ -55,14 +55,15 @@ async function insertMembership(
   },
 ): Promise<void> {
   await pool.query(
-    `INSERT INTO memberships (id, home_id, user_id, role, ended_at)
-     VALUES ($1, $2, $3, $4, $5)`,
+    `INSERT INTO memberships (id, home_id, user_id, role, ended_at, ended_by_membership_id)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
     [
       input.id,
       input.homeId,
       input.userId,
       input.role,
       input.ended === true ? new Date() : null,
+      input.ended === true ? input.id : null,
     ],
   );
 }
@@ -88,7 +89,7 @@ void describe('ActiveHomeActorResolver PostgreSQL', () => {
           role: 'ROOMMATE',
         });
         await database.pool.query(
-          'UPDATE memberships SET ended_at = NOW() WHERE id = $1',
+          'UPDATE memberships SET ended_at = NOW(), ended_by_membership_id = $1 WHERE id = $1',
           [oldMembershipId],
         );
         await insertMembership(database.pool, {
@@ -111,9 +112,27 @@ void describe('ActiveHomeActorResolver PostgreSQL', () => {
         assert.equal(actor.role, 'ADMIN');
       } finally {
         await database.pool.query(
-          'DELETE FROM memberships WHERE id = ANY($1)',
+          `UPDATE memberships
+           SET ended_by_membership_id = id
+           WHERE id = ANY($1) AND ended_at IS NOT NULL`,
           [[oldMembershipId, newMembershipId]],
         );
+        await database.pool.query(
+          `DELETE FROM memberships
+           WHERE id = ANY($1) AND ended_at IS NULL`,
+          [[oldMembershipId, newMembershipId]],
+        );
+        for (const membershipId of [oldMembershipId, newMembershipId]) {
+          await database.pool.query(
+            `UPDATE memberships
+             SET ended_at = NULL, ended_by_membership_id = NULL
+             WHERE id = $1`,
+            [membershipId],
+          );
+          await database.pool.query('DELETE FROM memberships WHERE id = $1', [
+            membershipId,
+          ]);
+        }
         await database.pool.query('DELETE FROM homes WHERE id = $1', [homeId]);
         await database.pool.query('DELETE FROM users WHERE id = $1', [userId]);
         await database.close();
@@ -167,9 +186,27 @@ void describe('ActiveHomeActorResolver PostgreSQL', () => {
         assert.equal(unknown, null);
       } finally {
         await database.pool.query(
-          'DELETE FROM memberships WHERE id = ANY($1)',
+          `UPDATE memberships
+           SET ended_by_membership_id = id
+           WHERE id = ANY($1) AND ended_at IS NOT NULL`,
           [[endedMembershipId, archivedMembershipId]],
         );
+        await database.pool.query(
+          `DELETE FROM memberships
+           WHERE id = ANY($1) AND ended_at IS NULL`,
+          [[endedMembershipId, archivedMembershipId]],
+        );
+        for (const membershipId of [endedMembershipId, archivedMembershipId]) {
+          await database.pool.query(
+            `UPDATE memberships
+             SET ended_at = NULL, ended_by_membership_id = NULL
+             WHERE id = $1`,
+            [membershipId],
+          );
+          await database.pool.query('DELETE FROM memberships WHERE id = $1', [
+            membershipId,
+          ]);
+        }
         await database.pool.query('DELETE FROM homes WHERE id = ANY($1)', [
           [endedHomeId, archivedHomeId],
         ]);

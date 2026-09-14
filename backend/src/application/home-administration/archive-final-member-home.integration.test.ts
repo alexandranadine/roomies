@@ -9,6 +9,7 @@ import { StructuralIntegrityError } from '../../domains/homes/structure-errors.j
 import { createActiveHomeActorResolver } from '../../domains/memberships/active-home-actor-resolver.js';
 import { LastRoommateRequiresArchiveError } from '../../domains/memberships/errors.js';
 import { createMembershipEndingWriter } from '../../domains/memberships/update-active-membership-ended-at.js';
+import { createMembershipRoleTransitionWriter } from '../../domains/memberships/insert-membership-role-transition.js';
 import { createMembershipRoleWriter } from '../../domains/memberships/update-active-membership-role.js';
 import type { ActiveHomeActor } from '../../platform/authz/context.js';
 import {
@@ -105,8 +106,8 @@ async function insertFixture(
     [homeId, input.name, input.timezone ?? 'America/Los_Angeles'],
   );
   await pool.query(
-    `INSERT INTO memberships (id, home_id, user_id, role, ended_at)
-     VALUES ($1, $2, $3, $4, NULL)`,
+    `INSERT INTO memberships (id, home_id, user_id, role, ended_at, ended_by_membership_id)
+     VALUES ($1, $2, $3, $4, NULL, NULL)`,
     [membershipId, homeId, userId, input.role ?? 'ADMIN'],
   );
   if (input.secondAdmin === true) {
@@ -116,8 +117,8 @@ async function insertFixture(
       secondUserId,
     ]);
     await pool.query(
-      `INSERT INTO memberships (id, home_id, user_id, role, ended_at)
-       VALUES ($1, $2, $3, 'ADMIN', NULL)`,
+      `INSERT INTO memberships (id, home_id, user_id, role, ended_at, ended_by_membership_id)
+       VALUES ($1, $2, $3, 'ADMIN', NULL, NULL)`,
       [randomUUID(), homeId, secondUserId],
     );
   }
@@ -132,9 +133,34 @@ async function cleanup(
     'DELETE FROM outbox_events WHERE home_id = ANY($1::uuid[])',
     [input.homeIds],
   );
-  await pool.query('DELETE FROM memberships WHERE home_id = ANY($1::uuid[])', [
-    input.homeIds,
-  ]);
+  await pool.query(
+    'DELETE FROM membership_role_transitions WHERE home_id = ANY($1::uuid[])',
+    [input.homeIds],
+  );
+  await pool.query(
+    `UPDATE memberships
+     SET ended_by_membership_id = id
+     WHERE home_id = ANY($1::uuid[]) AND ended_at IS NOT NULL`,
+    [input.homeIds],
+  );
+  await pool.query(
+    `DELETE FROM memberships
+     WHERE home_id = ANY($1::uuid[]) AND ended_at IS NULL`,
+    [input.homeIds],
+  );
+  const remainingMemberships = await pool.query<{ id: string }>(
+    'SELECT id FROM memberships WHERE home_id = ANY($1::uuid[])',
+    [input.homeIds],
+  );
+  for (const row of remainingMemberships.rows) {
+    await pool.query(
+      `UPDATE memberships
+       SET ended_at = NULL, ended_by_membership_id = NULL
+       WHERE id = $1`,
+      [row.id],
+    );
+    await pool.query('DELETE FROM memberships WHERE id = $1', [row.id]);
+  }
   await pool.query('DELETE FROM homes WHERE id = ANY($1::uuid[])', [
     input.homeIds,
   ]);
@@ -293,8 +319,9 @@ void describe('archiveFinalMemberHome PostgreSQL', () => {
           role: string;
           joined_at: Date;
           ended_at: Date;
+          ended_by_membership_id: string;
         }>(
-          `SELECT home_id, user_id, role, joined_at, ended_at
+          `SELECT home_id, user_id, role, joined_at, ended_at, ended_by_membership_id
            FROM memberships WHERE id = $1`,
           [fixture.membershipId],
         );
@@ -315,6 +342,10 @@ void describe('archiveFinalMemberHome PostgreSQL', () => {
         assert.equal(
           membership.rows[0]?.ended_at.getTime(),
           ARCHIVED_AT.getTime(),
+        );
+        assert.equal(
+          membership.rows[0]?.ended_by_membership_id,
+          fixture.membershipId,
         );
 
         const events = await database.pool.query<{
@@ -343,7 +374,6 @@ void describe('archiveFinalMemberHome PostgreSQL', () => {
               occurredAt: ARCHIVED_AT.getTime(),
               payload: {
                 membershipId: fixture.membershipId,
-                cause: 'HOME_ARCHIVED',
               },
             },
           ],
@@ -435,6 +465,7 @@ void describe('archiveFinalMemberHome PostgreSQL', () => {
         outbox: createOutboxWriter(),
         clock: { now: () => ARCHIVED_AT },
         ids: { next: nextEventId },
+        roleTransitions: createMembershipRoleTransitionWriter(),
         roleWriter: {
           async updateActiveRole(tx, input) {
             writerReached();

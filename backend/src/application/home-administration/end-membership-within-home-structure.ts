@@ -31,6 +31,7 @@ export type EndMembershipWithinHomeStructureInput = Readonly<{
   homeId: string;
   membershipId: string;
   endedAt: Date;
+  endedByMembershipId: string;
   cause: MembershipEndedCause;
 }>;
 
@@ -63,7 +64,8 @@ export type ApplyMembershipEndingWithinHomeStructure =
  * Internal no-event mutation primitive for callers that must sequence another
  * structural write before appending membership.ended.v1.
  *
- * Order: Task cleanup → Supply cleanup → exact Membership ended_at.
+ * Order: Task cleanup → Supply cleanup → exact Membership
+ * ended_at + ended_by_membership_id.
  */
 export function createApplyMembershipEndingWithinHomeStructure(
   deps: ApplyMembershipEndingWithinHomeStructureDependencies,
@@ -87,6 +89,7 @@ export function createApplyMembershipEndingWithinHomeStructure(
       membershipId: input.membershipId,
       homeId: input.homeId,
       endedAt: input.endedAt,
+      endedByMembershipId: input.endedByMembershipId,
     });
     if (updated !== 1) {
       throw new StructuralIntegrityError();
@@ -101,7 +104,8 @@ export function createApplyMembershipEndingWithinHomeStructure(
  * structural transaction. Does not begin, commit, or roll back; does not
  * lock Home; does not decide whether leave/remove/archive is permitted.
  *
- * Order: Task cleanup → Supply cleanup → Membership ended_at → outbox.
+ * Order: Task cleanup → Supply cleanup → Membership ended_at +
+ * ended_by_membership_id → outbox.
  */
 export function createEndMembershipWithinHomeStructure(
   deps: EndMembershipWithinHomeStructureDependencies,
@@ -118,7 +122,6 @@ export function createEndMembershipWithinHomeStructure(
         eventId: deps.ids.next(),
         occurredAt: input.endedAt,
         membershipId: input.membershipId,
-        cause: input.cause,
         homeId: input.homeId,
       }),
     );

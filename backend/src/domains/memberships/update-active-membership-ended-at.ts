@@ -2,15 +2,18 @@ import { TransactionInfrastructureError } from '../../platform/persistence/error
 import type { TransactionContext } from '../../platform/persistence/transaction.js';
 
 /**
- * Defensively scoped tenure UPDATE. ended_at only; same membershipId / home /
- * joined_at / role. Callers treat unexpected zero rows as integrity failure.
+ * Defensively scoped tenure UPDATE. ended_at and ended_by_membership_id
+ * together; same membershipId / home / joined_at / role. Never a userId.
+ * Callers treat unexpected zero rows as integrity failure.
  */
 export const UPDATE_ACTIVE_MEMBERSHIP_ENDED_AT_SQL = `
 UPDATE memberships
-SET ended_at = $1
-WHERE id = $2
-  AND home_id = $3
+SET ended_at = $1,
+    ended_by_membership_id = $2
+WHERE id = $3
+  AND home_id = $4
   AND ended_at IS NULL
+  AND ended_by_membership_id IS NULL
 `;
 
 export type MembershipEndingWriter = {
@@ -20,6 +23,7 @@ export type MembershipEndingWriter = {
       membershipId: string;
       homeId: string;
       endedAt: Date;
+      endedByMembershipId: string;
     },
   ): Promise<number>;
 };
@@ -31,6 +35,7 @@ export function createMembershipEndingWriter(): MembershipEndingWriter {
       try {
         result = await tx.query(UPDATE_ACTIVE_MEMBERSHIP_ENDED_AT_SQL, [
           input.endedAt,
+          input.endedByMembershipId,
           input.membershipId,
           input.homeId,
         ]);

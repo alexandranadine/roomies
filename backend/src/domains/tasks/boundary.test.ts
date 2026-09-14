@@ -85,6 +85,8 @@ void describe('tasks domain boundary', () => {
       /ON CONFLICT \(task_definition_id, scheduled_for\)[\s\S]*DO NOTHING/,
     );
     assert.match(source, /completed_at IS NULL/);
+    assert.match(source, /completed_by_membership_id IS NULL/);
+    assert.match(source, /completed_by_membership_id = \$4::uuid/);
     assert.match(source, /UNASSIGN_OPEN_TASK_INSTANCES_FOR_MEMBERSHIP_SQL/);
     assert.match(source, /UNASSIGN_ACTIVE_TASK_DEFINITIONS_FOR_MEMBERSHIP_SQL/);
     assert.match(source, /home_id = \$1::uuid/);
@@ -100,6 +102,38 @@ void describe('tasks domain boundary', () => {
     assert.doesNotMatch(source, /better-auth/);
     assert.doesNotMatch(source, /user_id/);
     assert.doesNotMatch(source, /home-administration/);
+  });
+
+  void it('keeps Activity source lookup free of title, assignee, and names', async () => {
+    const source = await readFile(
+      path.join(tasksDir, 'find-task-activity-source.ts'),
+      'utf8',
+    );
+    assert.match(source, /FIND_TASK_ACTIVITY_SOURCE_SQL/);
+    assert.match(source, /expectedHomeId/);
+    assert.doesNotMatch(source, /t\.title/);
+    assert.doesNotMatch(source, /assigned_membership_id/);
+    assert.doesNotMatch(source, /user_id/);
+    assert.doesNotMatch(source, /email/);
+    assert.doesNotMatch(source, /\brole\b/);
+    assert.doesNotMatch(source, /isHomeAdmin/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /activity\/repository/);
+    assert.doesNotMatch(source, /insertHomeVisibleActivity/);
+    assert.doesNotMatch(source, /from ['"]\.\/repository/);
+  });
+
+  void it('keeps Task Activity event contracts free of titles and names', async () => {
+    const source = await readFile(path.join(tasksDir, 'events.ts'), 'utf8');
+    assert.match(source, /import type \{ OutboxEventInput \}/);
+    assert.match(source, /TASK_COMPLETED_V1/);
+    assert.match(source, /taskInstanceId/);
+    assert.doesNotMatch(source, /createOutboxWriter/);
+    assert.doesNotMatch(source, /title/);
+    assert.doesNotMatch(source, /assignedMembershipId/);
+    assert.doesNotMatch(source, /completedByMembershipId/);
+    assert.doesNotMatch(source, /userId/);
+    assert.doesNotMatch(source, /from ['"]\.\/repository/);
   });
 
   void it('keeps Task policies free of Home-read authz and Admin bypass', async () => {

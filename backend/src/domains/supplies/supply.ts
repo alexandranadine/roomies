@@ -18,6 +18,7 @@ export type SupplyEntry = Readonly<{
   status: SupplyEntryStatus;
   createdByMembershipId: string;
   obtainedAt: Date | null;
+  obtainedByMembershipId: string | null;
   canceledAt: Date | null;
   createdAt: Date;
   updatedAt: Date;

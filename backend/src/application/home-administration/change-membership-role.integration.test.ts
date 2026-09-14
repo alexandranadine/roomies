@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 import type { Pool } from 'pg';
 import { LastAdminRequiredError } from '../../domains/memberships/errors.js';
 import { lockHomeStructure } from '../../domains/homes/lock-home-structure.js';
+import { createMembershipRoleTransitionWriter } from '../../domains/memberships/insert-membership-role-transition.js';
 import { createMembershipRoleWriter } from '../../domains/memberships/update-active-membership-role.js';
 import type { ActiveHomeActor } from '../../platform/authz/context.js';
 import {
@@ -78,14 +79,15 @@ async function insertMembership(
   },
 ): Promise<void> {
   await pool.query(
-    `INSERT INTO memberships (id, home_id, user_id, role, ended_at)
-     VALUES ($1, $2, $3, $4, $5)`,
+    `INSERT INTO memberships (id, home_id, user_id, role, ended_at, ended_by_membership_id)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
     [
       input.id,
       input.homeId,
       input.userId,
       input.role,
       input.ended === true ? new Date() : null,
+      input.ended === true ? input.id : null,
     ],
   );
 }
@@ -98,9 +100,34 @@ async function cleanup(
     'DELETE FROM outbox_events WHERE home_id = ANY($1::uuid[])',
     [input.homeIds],
   );
-  await pool.query('DELETE FROM memberships WHERE home_id = ANY($1::uuid[])', [
-    input.homeIds,
-  ]);
+  await pool.query(
+    'DELETE FROM membership_role_transitions WHERE home_id = ANY($1::uuid[])',
+    [input.homeIds],
+  );
+  await pool.query(
+    `UPDATE memberships
+     SET ended_by_membership_id = id
+     WHERE home_id = ANY($1::uuid[]) AND ended_at IS NOT NULL`,
+    [input.homeIds],
+  );
+  await pool.query(
+    `DELETE FROM memberships
+     WHERE home_id = ANY($1::uuid[]) AND ended_at IS NULL`,
+    [input.homeIds],
+  );
+  const remainingMemberships = await pool.query<{ id: string }>(
+    'SELECT id FROM memberships WHERE home_id = ANY($1::uuid[])',
+    [input.homeIds],
+  );
+  for (const row of remainingMemberships.rows) {
+    await pool.query(
+      `UPDATE memberships
+       SET ended_at = NULL, ended_by_membership_id = NULL
+       WHERE id = $1`,
+      [row.id],
+    );
+    await pool.query('DELETE FROM memberships WHERE id = $1', [row.id]);
+  }
   await pool.query('DELETE FROM homes WHERE id = ANY($1::uuid[])', [
     input.homeIds,
   ]);
@@ -130,6 +157,7 @@ function createCommand(
       },
     },
     roleWriter: createMembershipRoleWriter(),
+    roleTransitions: createMembershipRoleTransitionWriter(),
     ...overrides,
   });
 }
@@ -206,23 +234,57 @@ void describe('changeMembershipRole PostgreSQL', () => {
 
         const events = await database.pool.query<{
           event_type: string;
+          occurred_at: Date;
           payload: {
             membershipId: string;
-            previousRole: string;
-            newRole: string;
+            roleTransitionId: string;
           };
         }>(
-          `SELECT event_type, payload
+          `SELECT event_type, occurred_at, payload
            FROM outbox_events
            WHERE home_id = $1 AND event_type = 'membership.role_changed.v1'`,
           [homeId],
         );
         assert.equal(events.rows.length, 1);
-        assert.deepEqual(events.rows[0]?.payload, {
-          membershipId: membershipB,
-          previousRole: 'ROOMMATE',
-          newRole: 'ADMIN',
-        });
+        assert.deepEqual(Object.keys(events.rows[0]?.payload ?? {}).sort(), [
+          'membershipId',
+          'roleTransitionId',
+        ]);
+        assert.equal(events.rows[0]?.payload.membershipId, membershipB);
+        assert.equal('previousRole' in (events.rows[0]?.payload ?? {}), false);
+        assert.equal('newRole' in (events.rows[0]?.payload ?? {}), false);
+
+        const transitions = await database.pool.query<{
+          id: string;
+          membership_id: string;
+          actor_membership_id: string;
+          changed_at: Date;
+          created_at: Date;
+        }>(
+          `SELECT id, membership_id, actor_membership_id, changed_at, created_at
+           FROM membership_role_transitions
+           WHERE home_id = $1`,
+          [homeId],
+        );
+        assert.equal(transitions.rows.length, 1);
+        assert.equal(transitions.rows[0]?.membership_id, membershipB);
+        assert.equal(transitions.rows[0]?.actor_membership_id, membershipA);
+        assert.equal(
+          events.rows[0]?.payload.roleTransitionId,
+          transitions.rows[0]?.id,
+        );
+        assert.equal(
+          events.rows[0]?.occurred_at.getTime(),
+          transitions.rows[0]?.changed_at.getTime(),
+        );
+        assert.notEqual(
+          transitions.rows[0]?.actor_membership_id,
+          transitions.rows[0]?.membership_id,
+        );
+        assert.equal(
+          transitions.rows[0]?.changed_at.getTime(),
+          transitions.rows[0]?.created_at.getTime(),
+        );
       } finally {
         await cleanup(database.pool, {
           homeIds: [homeId],
@@ -299,6 +361,11 @@ void describe('changeMembershipRole PostgreSQL', () => {
           [homeId],
         );
         assert.equal(events.rows.length, 0);
+        const transitions = await database.pool.query<{ id: string }>(
+          'SELECT id FROM membership_role_transitions WHERE home_id = $1',
+          [homeId],
+        );
+        assert.equal(transitions.rows.length, 0);
       } finally {
         await cleanup(database.pool, {
           homeIds: [homeId],
@@ -371,6 +438,11 @@ void describe('changeMembershipRole PostgreSQL', () => {
           [homeId],
         );
         assert.equal(events.rows.length, 0);
+        const transitions = await database.pool.query<{ id: string }>(
+          'SELECT id FROM membership_role_transitions WHERE home_id = $1',
+          [homeId],
+        );
+        assert.equal(transitions.rows.length, 0);
       } finally {
         await cleanup(database.pool, {
           homeIds: [homeId],
@@ -444,6 +516,11 @@ void describe('changeMembershipRole PostgreSQL', () => {
           [homeId],
         );
         assert.equal(events.rows.length, 0);
+        const transitions = await database.pool.query<{ id: string }>(
+          'SELECT id FROM membership_role_transitions WHERE home_id = $1',
+          [homeId],
+        );
+        assert.equal(transitions.rows.length, 0);
       } finally {
         await cleanup(database.pool, {
           homeIds: [homeId],
@@ -546,6 +623,160 @@ void describe('changeMembershipRole PostgreSQL', () => {
           [homeId],
         );
         assert.equal(events.rows.length, 1);
+        const transitions = await database.pool.query<{ id: string }>(
+          'SELECT id FROM membership_role_transitions WHERE home_id = $1',
+          [homeId],
+        );
+        assert.equal(transitions.rows.length, 1);
+      } finally {
+        await cleanup(database.pool, {
+          homeIds: [homeId],
+          userIds: [userA, userB],
+        });
+        await database.close();
+      }
+    },
+  );
+
+  void it(
+    'records two successive distinct transitions including the same frozen timestamp',
+    { skip: skipWithoutDatabase },
+    async () => {
+      const database = createDatabasePool(
+        testConfig(dedicatedTestDatabaseUrl()),
+      );
+      const userA = randomUUID();
+      const userB = randomUUID();
+      const homeId = randomUUID();
+      const membershipA = randomUUID();
+      const membershipB = randomUUID();
+      const occurredAt = new Date('2026-03-15T12:34:56.789Z');
+
+      try {
+        await insertUser(database.pool, userA);
+        await insertUser(database.pool, userB);
+        await insertHome(database.pool, {
+          id: homeId,
+          name: 'Successive Transitions',
+        });
+        await insertMembership(database.pool, {
+          id: membershipA,
+          homeId,
+          userId: userA,
+          role: 'ADMIN',
+        });
+        await insertMembership(database.pool, {
+          id: membershipB,
+          homeId,
+          userId: userB,
+          role: 'ROOMMATE',
+        });
+
+        const change = createCommand(database.pool, {
+          clock: { now: () => occurredAt },
+        });
+        const first = await change({
+          actor: actor({
+            userId: userA,
+            membershipId: membershipA,
+            homeId,
+            role: 'ADMIN',
+          }),
+          homeId,
+          membershipId: membershipB,
+          role: 'ADMIN',
+        });
+        const second = await change({
+          actor: actor({
+            userId: userA,
+            membershipId: membershipA,
+            homeId,
+            role: 'ADMIN',
+          }),
+          homeId,
+          membershipId: membershipB,
+          role: 'ROOMMATE',
+        });
+        assert.equal(first.changed, true);
+        assert.equal(second.changed, true);
+
+        const transitions = await database.pool.query<{
+          id: string;
+          membership_id: string;
+          actor_membership_id: string;
+          changed_at: Date;
+        }>(
+          `SELECT id, membership_id, actor_membership_id, changed_at
+           FROM membership_role_transitions
+           WHERE home_id = $1
+           ORDER BY id`,
+          [homeId],
+        );
+        assert.equal(transitions.rows.length, 2);
+        assert.notEqual(transitions.rows[0]?.id, transitions.rows[1]?.id);
+        assert.equal(
+          transitions.rows[0]?.changed_at.getTime(),
+          occurredAt.getTime(),
+        );
+        assert.equal(
+          transitions.rows[1]?.changed_at.getTime(),
+          occurredAt.getTime(),
+        );
+        assert.deepEqual(
+          new Set(transitions.rows.map((row) => row.membership_id)),
+          new Set([membershipB]),
+        );
+        assert.deepEqual(
+          new Set(transitions.rows.map((row) => row.actor_membership_id)),
+          new Set([membershipA]),
+        );
+        const earlierTransition = transitions.rows[0];
+        assert.ok(earlierTransition);
+        const afterLaterMutation = await database.pool.query<{
+          id: string;
+          membership_id: string;
+          actor_membership_id: string;
+          changed_at: Date;
+        }>(
+          `SELECT id, membership_id, actor_membership_id, changed_at
+           FROM membership_role_transitions
+           WHERE id = $1`,
+          [earlierTransition.id],
+        );
+        assert.equal(afterLaterMutation.rows[0]?.id, earlierTransition.id);
+        assert.equal(
+          afterLaterMutation.rows[0]?.membership_id,
+          earlierTransition.membership_id,
+        );
+        assert.equal(
+          afterLaterMutation.rows[0]?.actor_membership_id,
+          earlierTransition.actor_membership_id,
+        );
+        assert.equal(
+          afterLaterMutation.rows[0]?.changed_at.getTime(),
+          earlierTransition.changed_at.getTime(),
+        );
+
+        const events = await database.pool.query<{
+          payload: { membershipId: string; roleTransitionId: string };
+        }>(
+          `SELECT payload FROM outbox_events
+           WHERE home_id = $1 AND event_type = 'membership.role_changed.v1'
+           ORDER BY event_id`,
+          [homeId],
+        );
+        assert.equal(events.rows.length, 2);
+        const eventTransitionIds = events.rows.map(
+          (row) => row.payload.roleTransitionId,
+        );
+        assert.deepEqual(
+          new Set(eventTransitionIds),
+          new Set(transitions.rows.map((row) => row.id)),
+        );
+        assert.notEqual(eventTransitionIds[0], eventTransitionIds[1]);
+        assert.ok(
+          events.rows.every((row) => row.payload.membershipId === membershipB),
+        );
       } finally {
         await cleanup(database.pool, {
           homeIds: [homeId],
@@ -616,6 +847,111 @@ void describe('changeMembershipRole PostgreSQL', () => {
           [membershipNew],
         );
         assert.equal(current.rows[0]?.role, 'ROOMMATE');
+      } finally {
+        await cleanup(database.pool, {
+          homeIds: [homeId],
+          userIds: [userA, userB],
+        });
+        await database.close();
+      }
+    },
+  );
+
+  void it(
+    'keeps earlier role transition history after the subject ends and rejoins',
+    { skip: skipWithoutDatabase },
+    async () => {
+      const database = createDatabasePool(
+        testConfig(dedicatedTestDatabaseUrl()),
+      );
+      const userA = randomUUID();
+      const userB = randomUUID();
+      const homeId = randomUUID();
+      const membershipA = randomUUID();
+      const membershipOld = randomUUID();
+      const membershipNew = randomUUID();
+
+      try {
+        await insertUser(database.pool, userA);
+        await insertUser(database.pool, userB);
+        await insertHome(database.pool, {
+          id: homeId,
+          name: 'Transition Rejoin',
+        });
+        await insertMembership(database.pool, {
+          id: membershipA,
+          homeId,
+          userId: userA,
+          role: 'ADMIN',
+        });
+        await insertMembership(database.pool, {
+          id: membershipOld,
+          homeId,
+          userId: userB,
+          role: 'ROOMMATE',
+        });
+
+        const change = createCommand(database.pool);
+        await change({
+          actor: actor({
+            userId: userA,
+            membershipId: membershipA,
+            homeId,
+            role: 'ADMIN',
+          }),
+          homeId,
+          membershipId: membershipOld,
+          role: 'ADMIN',
+        });
+
+        const beforeEnd = await database.pool.query<{
+          id: string;
+          membership_id: string;
+          actor_membership_id: string;
+          changed_at: Date;
+        }>(
+          `SELECT id, membership_id, actor_membership_id, changed_at
+           FROM membership_role_transitions
+           WHERE home_id = $1`,
+          [homeId],
+        );
+        assert.equal(beforeEnd.rows.length, 1);
+        const historical = beforeEnd.rows[0];
+        assert.ok(historical);
+
+        await database.pool.query(
+          `UPDATE memberships
+           SET ended_at = NOW(), ended_by_membership_id = $1
+           WHERE id = $1`,
+          [membershipOld],
+        );
+        await insertMembership(database.pool, {
+          id: membershipNew,
+          homeId,
+          userId: userB,
+          role: 'ROOMMATE',
+        });
+
+        const afterRejoin = await database.pool.query<{
+          id: string;
+          membership_id: string;
+          actor_membership_id: string;
+          changed_at: Date;
+        }>(
+          `SELECT id, membership_id, actor_membership_id, changed_at
+           FROM membership_role_transitions
+           WHERE home_id = $1`,
+          [homeId],
+        );
+        assert.equal(afterRejoin.rows.length, 1);
+        assert.equal(afterRejoin.rows[0]?.id, historical.id);
+        assert.equal(afterRejoin.rows[0]?.membership_id, membershipOld);
+        assert.equal(afterRejoin.rows[0]?.actor_membership_id, membershipA);
+        assert.equal(
+          afterRejoin.rows[0]?.changed_at.getTime(),
+          historical.changed_at.getTime(),
+        );
+        assert.notEqual(afterRejoin.rows[0]?.membership_id, membershipNew);
       } finally {
         await cleanup(database.pool, {
           homeIds: [homeId],

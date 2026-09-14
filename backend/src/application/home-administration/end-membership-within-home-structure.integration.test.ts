@@ -92,14 +92,15 @@ async function insertMembership(
   },
 ): Promise<void> {
   await pool.query(
-    `INSERT INTO memberships (id, home_id, user_id, role, ended_at)
-     VALUES ($1, $2, $3, $4, $5)`,
+    `INSERT INTO memberships (id, home_id, user_id, role, ended_at, ended_by_membership_id)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
     [
       input.id,
       input.homeId,
       input.userId,
       input.role,
       input.endedAt === undefined ? null : input.endedAt,
+      input.endedAt ? input.id : null,
     ],
   );
 }
@@ -112,9 +113,34 @@ async function cleanup(
     'DELETE FROM outbox_events WHERE home_id = ANY($1::uuid[])',
     [input.homeIds],
   );
-  await pool.query('DELETE FROM memberships WHERE home_id = ANY($1::uuid[])', [
-    input.homeIds,
-  ]);
+  await pool.query(
+    'DELETE FROM membership_role_transitions WHERE home_id = ANY($1::uuid[])',
+    [input.homeIds],
+  );
+  await pool.query(
+    `UPDATE memberships
+     SET ended_by_membership_id = id
+     WHERE home_id = ANY($1::uuid[]) AND ended_at IS NOT NULL`,
+    [input.homeIds],
+  );
+  await pool.query(
+    `DELETE FROM memberships
+     WHERE home_id = ANY($1::uuid[]) AND ended_at IS NULL`,
+    [input.homeIds],
+  );
+  const remainingMemberships = await pool.query<{ id: string }>(
+    'SELECT id FROM memberships WHERE home_id = ANY($1::uuid[])',
+    [input.homeIds],
+  );
+  for (const row of remainingMemberships.rows) {
+    await pool.query(
+      `UPDATE memberships
+       SET ended_at = NULL, ended_by_membership_id = NULL
+       WHERE id = $1`,
+      [row.id],
+    );
+    await pool.query('DELETE FROM memberships WHERE id = $1', [row.id]);
+  }
   await pool.query('DELETE FROM homes WHERE id = ANY($1::uuid[])', [
     input.homeIds,
   ]);
@@ -264,6 +290,7 @@ void describe('endMembershipWithinHomeStructure PostgreSQL', () => {
               homeId: locked.home.id,
               membershipId: target.id,
               endedAt: ENDED_AT,
+              endedByMembershipId: target.id,
               cause: 'VOLUNTARY_LEAVE',
             });
           },
@@ -286,8 +313,9 @@ void describe('endMembershipWithinHomeStructure PostgreSQL', () => {
           role: string;
           joined_at: Date;
           ended_at: Date | null;
+          ended_by_membership_id: string | null;
         }>(
-          `SELECT id, role, joined_at, ended_at
+          `SELECT id, role, joined_at, ended_at, ended_by_membership_id
            FROM memberships
            WHERE id = $1`,
           [membershipB],
@@ -296,6 +324,7 @@ void describe('endMembershipWithinHomeStructure PostgreSQL', () => {
         assert.equal(after.rows[0]?.joined_at.getTime(), joinedAt.getTime());
         assert.ok(after.rows[0]?.ended_at instanceof Date);
         assert.equal(after.rows[0]?.ended_at?.getTime(), ENDED_AT.getTime());
+        assert.equal(after.rows[0]?.ended_by_membership_id, membershipB);
 
         const remaining = await database.pool.query<{ ended_at: Date | null }>(
           'SELECT ended_at FROM memberships WHERE id = $1',
@@ -308,7 +337,7 @@ void describe('endMembershipWithinHomeStructure PostgreSQL', () => {
           event_type: string;
           occurred_at: Date;
           home_id: string;
-          payload: { membershipId: string; cause: string };
+          payload: { membershipId: string };
         }>(
           `SELECT event_id, event_type, occurred_at, home_id, payload
            FROM outbox_events
@@ -325,8 +354,8 @@ void describe('endMembershipWithinHomeStructure PostgreSQL', () => {
         assert.equal(events.rows[0]?.occurred_at.getTime(), ENDED_AT.getTime());
         assert.deepEqual(events.rows[0]?.payload, {
           membershipId: membershipB,
-          cause: 'VOLUNTARY_LEAVE',
         });
+        assert.equal('cause' in (events.rows[0]?.payload ?? {}), false);
       } finally {
         await cleanup(database.pool, {
           homeIds: [homeId],
@@ -386,6 +415,7 @@ void describe('endMembershipWithinHomeStructure PostgreSQL', () => {
                 homeId,
                 membershipId: membershipB,
                 endedAt: ENDED_AT,
+                endedByMembershipId: membershipB,
                 cause: 'VOLUNTARY_LEAVE',
               });
             }),
@@ -397,8 +427,13 @@ void describe('endMembershipWithinHomeStructure PostgreSQL', () => {
 
         const membership = await database.pool.query<{
           ended_at: Date | null;
-        }>('SELECT ended_at FROM memberships WHERE id = $1', [membershipB]);
+          ended_by_membership_id: string | null;
+        }>(
+          'SELECT ended_at, ended_by_membership_id FROM memberships WHERE id = $1',
+          [membershipB],
+        );
         assert.equal(membership.rows[0]?.ended_at, null);
+        assert.equal(membership.rows[0]?.ended_by_membership_id, null);
 
         const events = await database.pool.query<{ event_id: string }>(
           `SELECT event_id FROM outbox_events
@@ -476,6 +511,7 @@ void describe('endMembershipWithinHomeStructure PostgreSQL', () => {
                 homeId,
                 membershipId: membershipB,
                 endedAt: ENDED_AT,
+                endedByMembershipId: membershipA,
                 cause: 'ADMIN_REMOVAL',
               });
             }),
@@ -487,8 +523,13 @@ void describe('endMembershipWithinHomeStructure PostgreSQL', () => {
 
         const membership = await database.pool.query<{
           ended_at: Date | null;
-        }>('SELECT ended_at FROM memberships WHERE id = $1', [membershipB]);
+          ended_by_membership_id: string | null;
+        }>(
+          'SELECT ended_at, ended_by_membership_id FROM memberships WHERE id = $1',
+          [membershipB],
+        );
         assert.equal(membership.rows[0]?.ended_at, null);
+        assert.equal(membership.rows[0]?.ended_by_membership_id, null);
 
         const home = await database.pool.query<{ updated_at: Date }>(
           'SELECT updated_at FROM homes WHERE id = $1',
@@ -578,6 +619,7 @@ void describe('endMembershipWithinHomeStructure PostgreSQL', () => {
                 homeId,
                 membershipId: membershipB,
                 endedAt: ENDED_AT,
+                endedByMembershipId: membershipB,
                 cause: 'VOLUNTARY_LEAVE',
               });
             }),
@@ -589,8 +631,13 @@ void describe('endMembershipWithinHomeStructure PostgreSQL', () => {
 
         const membership = await database.pool.query<{
           ended_at: Date | null;
-        }>('SELECT ended_at FROM memberships WHERE id = $1', [membershipB]);
+          ended_by_membership_id: string | null;
+        }>(
+          'SELECT ended_at, ended_by_membership_id FROM memberships WHERE id = $1',
+          [membershipB],
+        );
         assert.equal(membership.rows[0]?.ended_at, null);
+        assert.equal(membership.rows[0]?.ended_by_membership_id, null);
 
         const home = await database.pool.query<{ updated_at: Date }>(
           'SELECT updated_at FROM homes WHERE id = $1',
@@ -676,6 +723,7 @@ void describe('endMembershipWithinHomeStructure PostgreSQL', () => {
                 homeId,
                 membershipId: membershipB,
                 endedAt: ENDED_AT,
+                endedByMembershipId: membershipB,
                 cause: 'VOLUNTARY_LEAVE',
               });
             }),
@@ -684,8 +732,13 @@ void describe('endMembershipWithinHomeStructure PostgreSQL', () => {
 
         const membership = await database.pool.query<{
           ended_at: Date | null;
-        }>('SELECT ended_at FROM memberships WHERE id = $1', [membershipB]);
+          ended_by_membership_id: string | null;
+        }>(
+          'SELECT ended_at, ended_by_membership_id FROM memberships WHERE id = $1',
+          [membershipB],
+        );
         assert.equal(membership.rows[0]?.ended_at, null);
+        assert.equal(membership.rows[0]?.ended_by_membership_id, null);
 
         const home = await database.pool.query<{ updated_at: Date }>(
           'SELECT updated_at FROM homes WHERE id = $1',
@@ -775,6 +828,7 @@ void describe('endMembershipWithinHomeStructure PostgreSQL', () => {
             homeId: locked.home.id,
             membershipId: target.id,
             endedAt: ENDED_AT,
+            endedByMembershipId: target.id,
             cause: 'VOLUNTARY_LEAVE',
           });
         });
@@ -782,14 +836,30 @@ void describe('endMembershipWithinHomeStructure PostgreSQL', () => {
         const rows = await database.pool.query<{
           id: string;
           ended_at: Date | null;
-        }>('SELECT id, ended_at FROM memberships WHERE id = ANY($1::uuid[])', [
-          [membershipOld, membershipNew],
-        ]);
-        const byId = new Map(
-          rows.rows.map((row) => [row.id, row.ended_at] as const),
+          ended_by_membership_id: string | null;
+        }>(
+          `SELECT id, ended_at, ended_by_membership_id
+           FROM memberships
+           WHERE id = ANY($1::uuid[])`,
+          [[membershipOld, membershipNew]],
         );
-        assert.equal(byId.get(membershipOld)?.getTime(), oldEndedAt.getTime());
-        assert.equal(byId.get(membershipNew)?.getTime(), ENDED_AT.getTime());
+        const byId = new Map(rows.rows.map((row) => [row.id, row] as const));
+        assert.equal(
+          byId.get(membershipOld)?.ended_at?.getTime(),
+          oldEndedAt.getTime(),
+        );
+        assert.equal(
+          byId.get(membershipOld)?.ended_by_membership_id,
+          membershipOld,
+        );
+        assert.equal(
+          byId.get(membershipNew)?.ended_at?.getTime(),
+          ENDED_AT.getTime(),
+        );
+        assert.equal(
+          byId.get(membershipNew)?.ended_by_membership_id,
+          membershipNew,
+        );
 
         const endedEvents = await database.pool.query<{
           payload: { membershipId: string };
@@ -818,6 +888,7 @@ void describe('endMembershipWithinHomeStructure PostgreSQL', () => {
                 homeId,
                 membershipId: membershipOld,
                 endedAt: new Date('2026-04-01T00:00:00.000Z'),
+                endedByMembershipId: membershipOld,
                 cause: 'VOLUNTARY_LEAVE',
               });
             }),
@@ -910,6 +981,7 @@ void describe('endMembershipWithinHomeStructure PostgreSQL', () => {
             homeId,
             membershipId: membershipB,
             endedAt: ENDED_AT,
+            endedByMembershipId: membershipB,
             cause: 'HOME_ARCHIVED',
           });
           const cleanupSql = queries.slice(beforeCleanup);

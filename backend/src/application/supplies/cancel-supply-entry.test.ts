@@ -66,6 +66,7 @@ function openEntry(overrides: Partial<SupplyEntry> = {}): SupplyEntry {
     status: 'OPEN',
     createdByMembershipId: MEMBERSHIP,
     obtainedAt: null,
+    obtainedByMembershipId: null,
     canceledAt: null,
     createdAt: CREATED_AT,
     updatedAt: CREATED_AT,
@@ -230,6 +231,7 @@ void describe('createCancelSupplyEntry', () => {
     assert.equal(updated.status, 'CANCELED');
     assert.equal(updated.canceledAt, OCCURRED_AT);
     assert.equal(updated.obtainedAt, null);
+    assert.equal(updated.obtainedByMembershipId, null);
     assert.equal(clockCalls(), 1);
     assert.deepEqual(releases[0], {
       claimId: CLAIM,

@@ -11,8 +11,8 @@ export type NewActiveMembership = Readonly<{
 }>;
 
 export const INSERT_ACTIVE_MEMBERSHIP_SQL = `
-INSERT INTO memberships (id, home_id, user_id, role, joined_at, ended_at)
-VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5::timestamptz, NULL)
+INSERT INTO memberships (id, home_id, user_id, role, joined_at, ended_at, ended_by_membership_id)
+VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5::timestamptz, NULL, NULL)
 `;
 
 /**

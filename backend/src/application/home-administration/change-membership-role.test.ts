@@ -23,7 +23,8 @@ const MEMBERSHIP_A = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const MEMBERSHIP_B = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 const MEMBERSHIP_OLD = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 const OTHER_HOME_MEMBERSHIP = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
-const EVENT_ID = '018f1e2c-7e3a-7000-8000-1234567890ab';
+const TRANSITION_ID = '018f1e2c-7e3a-7000-8000-1234567890ab';
+const EVENT_ID = '018f1e2c-7e3a-7001-8000-1234567890ab';
 const OCCURRED_AT = new Date('2026-03-15T12:34:56.789Z');
 
 function actor(overrides: Partial<ActiveHomeActor> = {}): ActiveHomeActor {
@@ -70,10 +71,13 @@ function adminRoommateHome(): LockedHomeStructure {
 function commandOf(options: {
   locked: LockedHomeStructure;
   updateRows?: number;
+  transitionRows?: number;
   outboxError?: Error;
 }) {
   const updates: unknown[] = [];
+  const transitions: unknown[] = [];
   const events: OutboxEventInput<string, JsonObject>[] = [];
+  const ids = [TRANSITION_ID, EVENT_ID];
   const change = createChangeMembershipRole({
     runTransaction: async (work) => work({} as TransactionContext),
     lockHomeStructure: () => Promise.resolve(options.locked),
@@ -87,15 +91,21 @@ function commandOf(options: {
       },
     },
     clock: { now: () => OCCURRED_AT },
-    ids: { next: () => EVENT_ID },
+    ids: { next: () => ids.shift() ?? 'unexpected-id' },
     roleWriter: {
       updateActiveRole(_tx, input) {
         updates.push(input);
         return Promise.resolve(options.updateRows ?? 1);
       },
     },
+    roleTransitions: {
+      insertTransition(_tx, input) {
+        transitions.push(input);
+        return Promise.resolve(options.transitionRows ?? 1);
+      },
+    },
   });
-  return { change, updates, events };
+  return { change, updates, transitions, events };
 }
 
 function input(
@@ -137,6 +147,33 @@ void describe('changeMembershipRole application orchestration', () => {
     assert.deepEqual(events, []);
   });
 
+  void it('does not insert a role transition on authorization failure', async () => {
+    const { change, updates, transitions, events } = commandOf({
+      locked: structure(
+        [
+          { id: MEMBERSHIP_A, userId: USER_A, homeId: HOME, role: 'ROOMMATE' },
+          { id: MEMBERSHIP_B, userId: USER_B, homeId: HOME, role: 'ADMIN' },
+        ],
+        actor({ role: 'ROOMMATE' }),
+      ),
+    });
+
+    await assert.rejects(
+      () =>
+        change(
+          input({
+            actor: actor({ role: 'ADMIN' }),
+            membershipId: MEMBERSHIP_B,
+            role: 'ROOMMATE',
+          }),
+        ),
+      ForbiddenError,
+    );
+    assert.deepEqual(updates, []);
+    assert.deepEqual(transitions, []);
+    assert.deepEqual(events, []);
+  });
+
   void it('treats a current zero-Admin snapshot as structural integrity, not LAST_ADMIN', async () => {
     const { change, updates, events } = commandOf({
       locked: structure([
@@ -165,7 +202,7 @@ void describe('changeMembershipRole application orchestration', () => {
   });
 
   void it('returns a successful no-op after authorization when the role already matches', async () => {
-    const { change, updates, events } = commandOf({
+    const { change, updates, transitions, events } = commandOf({
       locked: adminRoommateHome(),
     });
 
@@ -175,11 +212,12 @@ void describe('changeMembershipRole application orchestration', () => {
 
     assert.deepEqual(result, { changed: false });
     assert.deepEqual(updates, []);
+    assert.deepEqual(transitions, []);
     assert.deepEqual(events, []);
   });
 
   void it('rejects last-Admin demotion without mutating', async () => {
-    const { change, updates, events } = commandOf({
+    const { change, updates, transitions, events } = commandOf({
       locked: adminRoommateHome(),
     });
 
@@ -188,11 +226,12 @@ void describe('changeMembershipRole application orchestration', () => {
       LastAdminRequiredError,
     );
     assert.deepEqual(updates, []);
+    assert.deepEqual(transitions, []);
     assert.deepEqual(events, []);
   });
 
   void it('updates and appends one role_changed event on an actual transition', async () => {
-    const { change, updates, events } = commandOf({
+    const { change, updates, transitions, events } = commandOf({
       locked: adminRoommateHome(),
     });
 
@@ -213,6 +252,17 @@ void describe('changeMembershipRole application orchestration', () => {
         newRole: 'ADMIN',
       },
     ]);
+    assert.deepEqual(transitions, [
+      {
+        id: TRANSITION_ID,
+        homeId: HOME,
+        membershipId: MEMBERSHIP_B,
+        actorMembershipId: MEMBERSHIP_A,
+        changedAt: OCCURRED_AT,
+        createdAt: OCCURRED_AT,
+      },
+    ]);
+    assert.notEqual(MEMBERSHIP_A, MEMBERSHIP_B);
     assert.equal(events.length, 1);
     assert.equal(events[0]?.eventType, 'membership.role_changed.v1');
     assert.equal(events[0]?.eventId, EVENT_ID);
@@ -220,9 +270,15 @@ void describe('changeMembershipRole application orchestration', () => {
     assert.equal(events[0]?.homeId, HOME);
     assert.deepEqual(events[0]?.payload, {
       membershipId: MEMBERSHIP_B,
-      previousRole: 'ROOMMATE',
-      newRole: 'ADMIN',
+      roleTransitionId: TRANSITION_ID,
     });
+    assert.equal(
+      (transitions[0] as { id: string } | undefined)?.id,
+      TRANSITION_ID,
+    );
+    assert.equal('previousRole' in (events[0]?.payload ?? {}), false);
+    assert.equal('newRole' in (events[0]?.payload ?? {}), false);
+    assert.equal('userId' in (events[0]?.payload ?? {}), false);
   });
 
   void it('treats a post-lock zero-row UPDATE as structural integrity', async () => {

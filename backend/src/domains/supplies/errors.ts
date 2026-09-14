@@ -51,3 +51,15 @@ export class SupplyClaimNotActiveError extends Error {
     super('Supply claim is not active');
   }
 }
+
+/**
+ * Canonical Supply Activity source could not be read safely.
+ * Messages never include title, claimant, creator, Home, or Membership IDs.
+ */
+export class SupplyActivitySourceIntegrityError extends Error {
+  override readonly name = 'SupplyActivitySourceIntegrityError';
+
+  constructor() {
+    super('Supply activity source integrity failure');
+  }
+}

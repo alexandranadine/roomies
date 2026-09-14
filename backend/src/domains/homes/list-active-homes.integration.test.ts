@@ -60,14 +60,15 @@ async function insertMembership(
   },
 ): Promise<void> {
   await pool.query(
-    `INSERT INTO memberships (id, home_id, user_id, role, ended_at)
-     VALUES ($1, $2, $3, $4, $5)`,
+    `INSERT INTO memberships (id, home_id, user_id, role, ended_at, ended_by_membership_id)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
     [
       input.id,
       input.homeId,
       input.userId,
       input.role,
       input.ended === true ? new Date() : null,
+      input.ended === true ? input.id : null,
     ],
   );
 }
@@ -267,9 +268,27 @@ void describe('listActiveHomesForUser PostgreSQL', () => {
         );
       } finally {
         await database.pool.query(
-          'DELETE FROM memberships WHERE id = ANY($1)',
+          `UPDATE memberships
+           SET ended_by_membership_id = id
+           WHERE id = ANY($1) AND ended_at IS NOT NULL`,
           [membershipIds],
         );
+        await database.pool.query(
+          `DELETE FROM memberships
+           WHERE id = ANY($1) AND ended_at IS NULL`,
+          [membershipIds],
+        );
+        for (const membershipId of membershipIds) {
+          await database.pool.query(
+            `UPDATE memberships
+             SET ended_at = NULL, ended_by_membership_id = NULL
+             WHERE id = $1`,
+            [membershipId],
+          );
+          await database.pool.query('DELETE FROM memberships WHERE id = $1', [
+            membershipId,
+          ]);
+        }
         await database.pool.query('DELETE FROM homes WHERE id = ANY($1)', [
           homeIds,
         ]);

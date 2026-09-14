@@ -12,7 +12,7 @@ import { toSupplyEntryDto } from '../../domains/supplies/supply-entry-dto.js';
 import type { ActiveHomeActor } from '../../platform/authz/context.js';
 import { ConcealedNotFoundError } from '../../platform/authz/errors.js';
 import type { AppConfig } from '../../platform/config/types.js';
-import { createUuidV7 } from '../../platform/ids/uuid-v7.js';
+import { createUuidV7, systemUuidV7 } from '../../platform/ids/uuid-v7.js';
 import { createDatabasePool } from '../../platform/persistence/pool.js';
 import {
   parseDatabaseUrl,
@@ -24,7 +24,10 @@ import { createCancelSupplyEntry } from './cancel-supply-entry.js';
 import { createClaimSupplyEntryFromPool } from './claim-supply-entry.js';
 import { createCreateSupplyEntryFromPool } from './create-supply-entry.js';
 import { createListHomeSuppliesFromPool } from './list-home-supplies.js';
-import { createMarkSupplyEntryObtained } from './mark-supply-entry-obtained.js';
+import {
+  createMarkSupplyEntryObtained,
+  createMarkSupplyEntryObtainedFromPool,
+} from './mark-supply-entry-obtained.js';
 import { createMembershipEndingSupplyCleanupFromPool } from './membership-ending-supply-cleanup.js';
 import { createReleaseSupplyClaimFromPool } from './release-supply-claim.js';
 
@@ -83,14 +86,15 @@ async function insertMembership(
   },
 ): Promise<void> {
   await pool.query(
-    `INSERT INTO memberships (id, home_id, user_id, role, ended_at)
-     VALUES ($1, $2, $3, $4, $5)`,
+    `INSERT INTO memberships (id, home_id, user_id, role, ended_at, ended_by_membership_id)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
     [
       input.id,
       input.homeId,
       input.userId,
       input.role,
       input.ended === true ? new Date() : null,
+      input.ended === true ? input.id : null,
     ],
   );
 }
@@ -109,9 +113,34 @@ async function cleanup(
     await pool.query('DELETE FROM outbox_events WHERE home_id = ANY($1)', [
       input.homeIds,
     ]);
-    await pool.query('DELETE FROM memberships WHERE home_id = ANY($1)', [
-      input.homeIds,
-    ]);
+    await pool.query(
+      'DELETE FROM membership_role_transitions WHERE home_id = ANY($1::uuid[])',
+      [input.homeIds],
+    );
+    await pool.query(
+      `UPDATE memberships
+       SET ended_by_membership_id = id
+       WHERE home_id = ANY($1::uuid[]) AND ended_at IS NOT NULL`,
+      [input.homeIds],
+    );
+    await pool.query(
+      `DELETE FROM memberships
+       WHERE home_id = ANY($1::uuid[]) AND ended_at IS NULL`,
+      [input.homeIds],
+    );
+    const remainingMemberships = await pool.query<{ id: string }>(
+      'SELECT id FROM memberships WHERE home_id = ANY($1::uuid[])',
+      [input.homeIds],
+    );
+    for (const row of remainingMemberships.rows) {
+      await pool.query(
+        `UPDATE memberships
+         SET ended_at = NULL, ended_by_membership_id = NULL
+         WHERE id = $1`,
+        [row.id],
+      );
+      await pool.query('DELETE FROM memberships WHERE id = $1', [row.id]);
+    }
     await pool.query('DELETE FROM homes WHERE id = ANY($1)', [input.homeIds]);
   }
   if (input.userIds.length > 0) {
@@ -171,6 +200,7 @@ async function entryRow(
   status: string;
   createdByMembershipId: string;
   obtainedAt: Date | null;
+  obtainedByMembershipId: string | null;
   canceledAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -179,12 +209,13 @@ async function entryRow(
     status: string;
     created_by_membership_id: string;
     obtained_at: Date | null;
+    obtained_by_membership_id: string | null;
     canceled_at: Date | null;
     created_at: Date;
     updated_at: Date;
   }>(
-    `SELECT status, created_by_membership_id, obtained_at, canceled_at,
-            created_at, updated_at
+    `SELECT status, created_by_membership_id, obtained_at,
+            obtained_by_membership_id, canceled_at, created_at, updated_at
      FROM supply_entries WHERE id = $1`,
     [entryId],
   );
@@ -196,6 +227,7 @@ async function entryRow(
     status: row.status,
     createdByMembershipId: row.created_by_membership_id,
     obtainedAt: row.obtained_at,
+    obtainedByMembershipId: row.obtained_by_membership_id,
     canceledAt: row.canceled_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -227,7 +259,7 @@ void describe('SupplyEntry terminalization PostgreSQL', () => {
   );
 
   void it(
-    'covers obtain/cancel lifecycle, attribution, concealment, clock, and no outbox',
+    'covers obtain/cancel lifecycle, attribution, concealment, and clock',
     { skip: skipWithoutDatabase, timeout: 60_000 },
     async () => {
       const database = createDatabasePool(
@@ -255,12 +287,18 @@ void describe('SupplyEntry terminalization PostgreSQL', () => {
             runInReadCommittedTransaction(database.pool, work),
           lockHomeAndExactMemberships,
           supplies,
+          outbox: {
+            append() {
+              return Promise.resolve();
+            },
+          },
           clock: {
             now() {
               clock.calls += 1;
               return OCCURRED;
             },
           },
+          ids: systemUuidV7,
         });
       }
 
@@ -352,10 +390,13 @@ void describe('SupplyEntry terminalization PostgreSQL', () => {
           );
           if (action.status === 'OBTAINED') {
             assert.equal(updated.obtainedAt?.getTime(), OCCURRED.getTime());
+            assert.equal(updated.obtainedByMembershipId, membershipA);
+            assert.notEqual(updated.obtainedByMembershipId, membershipAdmin);
             assert.equal(updated.canceledAt, null);
           } else {
             assert.equal(updated.canceledAt?.getTime(), OCCURRED.getTime());
             assert.equal(updated.obtainedAt, null);
+            assert.equal(updated.obtainedByMembershipId, null);
           }
           assert.equal(updated.updatedAt.getTime(), OCCURRED.getTime());
           const dto = toSupplyEntryDto(updated);
@@ -419,6 +460,17 @@ void describe('SupplyEntry terminalization PostgreSQL', () => {
           assert.equal(emptyClock.calls, 1);
           assert.equal(emptyUpdated.status, action.status);
           assert.equal(emptyUpdated.createdByMembershipId, membershipAdmin);
+          if (action.status === 'OBTAINED') {
+            assert.equal(emptyUpdated.obtainedByMembershipId, membershipA);
+            assert.notEqual(
+              emptyUpdated.obtainedByMembershipId,
+              membershipAdmin,
+            );
+            assert.ok(emptyUpdated.obtainedAt);
+          } else {
+            assert.equal(emptyUpdated.obtainedByMembershipId, null);
+            assert.equal(emptyUpdated.obtainedAt, null);
+          }
 
           const oppositeEntry = await create({
             actor: actor(homeA, membershipA, userA),
@@ -483,7 +535,7 @@ void describe('SupplyEntry terminalization PostgreSQL', () => {
         assert.equal(concealClock.calls, 0);
 
         await database.pool.query(
-          'UPDATE memberships SET ended_at = $2 WHERE id = $1',
+          'UPDATE memberships SET ended_at = $2, ended_by_membership_id = $1 WHERE id = $1',
           [membershipA, OCCURRED],
         );
         const rejoined = createUuidV7();
@@ -618,6 +670,7 @@ void describe('SupplyEntry terminalization PostgreSQL', () => {
           status: 'CANCELED',
           createdByMembershipId: membershipAdmin,
           obtainedAt: null,
+          obtainedByMembershipId: null,
           canceledAt: olderCanceled,
           createdAt: olderCreated,
           updatedAt: olderCanceled,
@@ -629,6 +682,7 @@ void describe('SupplyEntry terminalization PostgreSQL', () => {
           status: 'OPEN',
           createdByMembershipId: membershipAdmin,
           obtainedAt: null,
+          obtainedByMembershipId: null,
           canceledAt: null,
           createdAt: olderCreated,
           updatedAt: olderCreated,
@@ -689,6 +743,7 @@ void describe('SupplyEntry terminalization PostgreSQL', () => {
           status: 'OBTAINED',
           createdByMembershipId: membershipId,
           obtainedAt: PRIOR,
+          obtainedByMembershipId: membershipId,
           canceledAt: null,
           createdAt: PRIOR,
           updatedAt: PRIOR,
@@ -721,6 +776,12 @@ void describe('SupplyEntry terminalization PostgreSQL', () => {
                   supplies.terminalizeSupplyEntryAsObtained(tx, input),
               },
               clock: { now: () => OCCURRED },
+              outbox: {
+                append() {
+                  return Promise.resolve();
+                },
+              },
+              ids: systemUuidV7,
             })({
               actor: actor(homeId, membershipId, userId),
               homeId,
@@ -734,6 +795,7 @@ void describe('SupplyEntry terminalization PostgreSQL', () => {
         assert.equal(claim.releaseReason, null);
         const entry = await entryRow(database.pool, entryId);
         assert.equal(entry.status, 'OBTAINED');
+        assert.equal(entry.obtainedByMembershipId, membershipId);
         assert.equal(entry.obtainedAt?.getTime(), PRIOR.getTime());
       } finally {
         await cleanup(database.pool, {
@@ -800,6 +862,12 @@ void describe('SupplyEntry terminalization PostgreSQL', () => {
                   ),
               },
               clock: { now: () => OCCURRED },
+              outbox: {
+                append() {
+                  return Promise.resolve();
+                },
+              },
+              ids: systemUuidV7,
             })({
               actor: actor(homeId, membershipId, userId),
               homeId,
@@ -812,6 +880,7 @@ void describe('SupplyEntry terminalization PostgreSQL', () => {
         const afterClaim = await claimRow(database.pool, claimed.id);
         assert.equal(afterEntry.status, 'OPEN');
         assert.equal(afterEntry.obtainedAt, null);
+        assert.equal(afterEntry.obtainedByMembershipId, null);
         assert.equal(afterEntry.canceledAt, null);
         assert.equal(
           afterEntry.updatedAt.getTime(),
@@ -905,6 +974,89 @@ void describe('SupplyEntry terminalization PostgreSQL', () => {
       } finally {
         await cleanup(database.pool, {
           userIds: [userId],
+          homeIds: [homeId],
+        });
+        await database.close();
+      }
+    },
+  );
+
+  void it(
+    'keeps historical obtainer tenure after that Membership ends and the User rejoins',
+    { skip: skipWithoutDatabase, timeout: 60_000 },
+    async () => {
+      const database = createDatabasePool(
+        testConfig(resolveSafeDedicatedTestDatabaseUrl()),
+      );
+      const create = createCreateSupplyEntryFromPool(database.pool);
+      const obtain = createMarkSupplyEntryObtainedFromPool(database.pool);
+      const userId = randomUUID();
+      const claimantId = randomUUID();
+      const homeId = createUuidV7();
+      const tenureA = createUuidV7();
+      const tenureB = createUuidV7();
+      const claimantMembership = createUuidV7();
+
+      try {
+        await insertUser(database.pool, userId);
+        await insertUser(database.pool, claimantId);
+        await insertHome(database.pool, {
+          id: homeId,
+          name: 'Rejoin obtainer',
+        });
+        await insertMembership(database.pool, {
+          id: tenureA,
+          homeId,
+          userId,
+          role: 'ROOMMATE',
+        });
+        await insertMembership(database.pool, {
+          id: claimantMembership,
+          homeId,
+          userId: claimantId,
+          role: 'ROOMMATE',
+        });
+        const created = await create({
+          actor: actor(homeId, claimantMembership, claimantId),
+          homeId,
+          title: 'Obtained by first tenure',
+        });
+        await createClaimSupplyEntryFromPool(database.pool)({
+          actor: actor(homeId, claimantMembership, claimantId),
+          homeId,
+          supplyEntryId: created.id,
+        });
+        const obtained = await obtain({
+          actor: actor(homeId, tenureA, userId),
+          homeId,
+          supplyEntryId: created.id,
+        });
+        assert.equal(obtained.obtainedByMembershipId, tenureA);
+        assert.notEqual(obtained.obtainedByMembershipId, claimantMembership);
+        assert.notEqual(
+          obtained.obtainedByMembershipId,
+          created.createdByMembershipId,
+        );
+
+        await database.pool.query(
+          `UPDATE memberships SET ended_at = $2, ended_by_membership_id = $1 WHERE id = $1`,
+          [tenureA, OCCURRED],
+        );
+        await insertMembership(database.pool, {
+          id: tenureB,
+          homeId,
+          userId,
+          role: 'ROOMMATE',
+        });
+
+        const row = await entryRow(database.pool, created.id);
+        assert.equal(row.status, 'OBTAINED');
+        assert.equal(row.obtainedByMembershipId, tenureA);
+        assert.notEqual(row.obtainedByMembershipId, tenureB);
+        assert.notEqual(row.obtainedByMembershipId, claimantMembership);
+      } finally {
+        await cleanup(database.pool, {
+          userIds: [userId, claimantId],
           homeIds: [homeId],
         });
         await database.close();

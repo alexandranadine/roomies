@@ -151,8 +151,8 @@ async function insertHome(pool: Pool, name: string) {
     [homeId, name],
   );
   await pool.query(
-    `INSERT INTO memberships (id, home_id, user_id, role, ended_at)
-     VALUES ($1, $2, $3, 'ADMIN', NULL)`,
+    `INSERT INTO memberships (id, home_id, user_id, role, ended_at, ended_by_membership_id)
+     VALUES ($1, $2, $3, 'ADMIN', NULL, NULL)`,
     [membershipId, homeId, userId],
   );
   return { homeId, userId, membershipId };
@@ -169,9 +169,34 @@ async function cleanup(
   await pool.query('DELETE FROM invitations WHERE home_id = ANY($1::uuid[])', [
     input.homeIds,
   ]);
-  await pool.query('DELETE FROM memberships WHERE home_id = ANY($1::uuid[])', [
-    input.homeIds,
-  ]);
+  await pool.query(
+    'DELETE FROM membership_role_transitions WHERE home_id = ANY($1::uuid[])',
+    [input.homeIds],
+  );
+  await pool.query(
+    `UPDATE memberships
+     SET ended_by_membership_id = id
+     WHERE home_id = ANY($1::uuid[]) AND ended_at IS NOT NULL`,
+    [input.homeIds],
+  );
+  await pool.query(
+    `DELETE FROM memberships
+     WHERE home_id = ANY($1::uuid[]) AND ended_at IS NULL`,
+    [input.homeIds],
+  );
+  const remainingMemberships = await pool.query<{ id: string }>(
+    'SELECT id FROM memberships WHERE home_id = ANY($1::uuid[])',
+    [input.homeIds],
+  );
+  for (const row of remainingMemberships.rows) {
+    await pool.query(
+      `UPDATE memberships
+       SET ended_at = NULL, ended_by_membership_id = NULL
+       WHERE id = $1`,
+      [row.id],
+    );
+    await pool.query('DELETE FROM memberships WHERE id = $1', [row.id]);
+  }
   await pool.query('DELETE FROM homes WHERE id = ANY($1::uuid[])', [
     input.homeIds,
   ]);
@@ -240,8 +265,8 @@ async function seedMixedInvitations(pool: Pool, name: string) {
       endedUserId,
     ]);
     await pool.query(
-      `INSERT INTO memberships (id, home_id, user_id, role, ended_at)
-       VALUES ($1, $2, $3, 'ROOMMATE', $4)`,
+      `INSERT INTO memberships (id, home_id, user_id, role, ended_at, ended_by_membership_id)
+       VALUES ($1, $2, $3, 'ROOMMATE', $4, $1)`,
       [endedMembershipId, home.homeId, endedUserId, PRIOR_AT],
     );
 

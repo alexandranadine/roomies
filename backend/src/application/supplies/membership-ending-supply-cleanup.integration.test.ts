@@ -91,14 +91,15 @@ async function insertMembership(
   },
 ): Promise<void> {
   await pool.query(
-    `INSERT INTO memberships (id, home_id, user_id, role, ended_at)
-     VALUES ($1, $2, $3, $4, $5)`,
+    `INSERT INTO memberships (id, home_id, user_id, role, ended_at, ended_by_membership_id)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
     [
       input.id,
       input.homeId,
       input.userId,
       input.role,
       input.endedAt === undefined ? null : input.endedAt,
+      input.endedAt ? input.id : null,
     ],
   );
 }
@@ -136,6 +137,7 @@ function openEntry(input: {
     status: 'OPEN',
     createdByMembershipId: input.createdByMembershipId,
     obtainedAt: null,
+    obtainedByMembershipId: null,
     canceledAt: null,
     createdAt: CREATED_AT,
     updatedAt: CREATED_AT,
@@ -204,9 +206,34 @@ async function cleanup(
     await pool.query('DELETE FROM outbox_events WHERE home_id = ANY($1)', [
       input.homeIds,
     ]);
-    await pool.query('DELETE FROM memberships WHERE home_id = ANY($1)', [
-      input.homeIds,
-    ]);
+    await pool.query(
+      'DELETE FROM membership_role_transitions WHERE home_id = ANY($1::uuid[])',
+      [input.homeIds],
+    );
+    await pool.query(
+      `UPDATE memberships
+       SET ended_by_membership_id = id
+       WHERE home_id = ANY($1::uuid[]) AND ended_at IS NOT NULL`,
+      [input.homeIds],
+    );
+    await pool.query(
+      `DELETE FROM memberships
+       WHERE home_id = ANY($1::uuid[]) AND ended_at IS NULL`,
+      [input.homeIds],
+    );
+    const remainingMemberships = await pool.query<{ id: string }>(
+      'SELECT id FROM memberships WHERE home_id = ANY($1::uuid[])',
+      [input.homeIds],
+    );
+    for (const row of remainingMemberships.rows) {
+      await pool.query(
+        `UPDATE memberships
+         SET ended_at = NULL, ended_by_membership_id = NULL
+         WHERE id = $1`,
+        [row.id],
+      );
+      await pool.query('DELETE FROM memberships WHERE id = $1', [row.id]);
+    }
     await pool.query('DELETE FROM homes WHERE id = ANY($1)', [input.homeIds]);
   }
   if (input.userIds.length > 0) {
@@ -1169,12 +1196,19 @@ void describe('Membership-ending Supply cleanup PostgreSQL', () => {
           await membershipEndedAt(database.pool, targetMembership),
           ENDED_AT,
         );
-        const events = await database.pool.query<{ cause: string }>(
-          `SELECT payload->>'cause' AS cause FROM outbox_events
+        const events = await database.pool.query<{
+          membership_id: string;
+          payload: Record<string, unknown>;
+        }>(
+          `SELECT payload->>'membershipId' AS membership_id, payload
+           FROM outbox_events
            WHERE home_id = $1 AND event_type = 'membership.ended.v1'`,
           [homeId],
         );
-        assert.equal(events.rows[0]?.cause, 'ADMIN_REMOVAL');
+        assert.equal(events.rows[0]?.membership_id, targetMembership);
+        assert.deepEqual(events.rows[0]?.payload, {
+          membershipId: targetMembership,
+        });
         assert.equal((await entryState(database.pool, entryId)).status, 'OPEN');
       } finally {
         await cleanup(database.pool, {
@@ -1428,6 +1462,7 @@ void describe('Membership-ending Supply cleanup PostgreSQL', () => {
                 homeId,
                 membershipId: leavingMembership,
                 endedAt: ENDED_AT,
+                endedByMembershipId: leavingMembership,
                 cause: 'VOLUNTARY_LEAVE',
               });
             }),
@@ -1546,6 +1581,7 @@ void describe('Membership-ending Supply cleanup PostgreSQL', () => {
                 homeId,
                 membershipId: leavingMembership,
                 endedAt: ENDED_AT,
+                endedByMembershipId: leavingMembership,
                 cause: 'VOLUNTARY_LEAVE',
               });
             }),

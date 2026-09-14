@@ -1,7 +1,3 @@
-import {
-  isMembershipRole,
-  type MembershipRole,
-} from '../../platform/authz/context.js';
 import type { OutboxEventInput } from '../../platform/events/outbox-types.js';
 
 export const MEMBERSHIP_ENDED_V1 = 'membership.ended.v1';
@@ -18,19 +14,15 @@ export type MembershipEndedCause = (typeof MEMBERSHIP_ENDED_CAUSES)[number];
 
 export type MembershipEndedV1Payload = Readonly<{
   membershipId: string;
-  cause: MembershipEndedCause;
 }>;
 
 export type MembershipRoleChangedV1Payload = Readonly<{
   membershipId: string;
-  previousRole: MembershipRole;
-  newRole: MembershipRole;
+  roleTransitionId: string;
 }>;
 
 export type MembershipStartedV1Payload = Readonly<{
   membershipId: string;
-  cause: 'INVITATION_ACCEPTED';
-  invitationId: string;
 }>;
 
 export function isMembershipEndedCause(
@@ -48,14 +40,9 @@ export function createMembershipEndedV1Event(
     eventId: string;
     occurredAt: Date;
     membershipId: string;
-    cause: MembershipEndedCause;
     homeId?: string;
   }>,
 ): OutboxEventInput<typeof MEMBERSHIP_ENDED_V1, MembershipEndedV1Payload> {
-  if (!isMembershipEndedCause(input.cause)) {
-    throw new Error('Invalid membership ended cause');
-  }
-
   return Object.freeze({
     eventId: input.eventId,
     eventType: MEMBERSHIP_ENDED_V1,
@@ -63,7 +50,6 @@ export function createMembershipEndedV1Event(
     ...(input.homeId === undefined ? {} : { homeId: input.homeId }),
     payload: Object.freeze({
       membershipId: input.membershipId,
-      cause: input.cause,
     }),
   });
 }
@@ -73,21 +59,13 @@ export function createMembershipRoleChangedV1Event(
     eventId: string;
     occurredAt: Date;
     membershipId: string;
-    previousRole: MembershipRole;
-    newRole: MembershipRole;
+    roleTransitionId: string;
     homeId?: string;
   }>,
 ): OutboxEventInput<
   typeof MEMBERSHIP_ROLE_CHANGED_V1,
   MembershipRoleChangedV1Payload
 > {
-  if (
-    !isMembershipRole(input.previousRole) ||
-    !isMembershipRole(input.newRole)
-  ) {
-    throw new Error('Invalid membership role');
-  }
-
   return Object.freeze({
     eventId: input.eventId,
     eventType: MEMBERSHIP_ROLE_CHANGED_V1,
@@ -95,8 +73,7 @@ export function createMembershipRoleChangedV1Event(
     ...(input.homeId === undefined ? {} : { homeId: input.homeId }),
     payload: Object.freeze({
       membershipId: input.membershipId,
-      previousRole: input.previousRole,
-      newRole: input.newRole,
+      roleTransitionId: input.roleTransitionId,
     }),
   });
 }
@@ -107,7 +84,6 @@ export function createMembershipStartedV1Event(
     occurredAt: Date;
     homeId: string;
     membershipId: string;
-    invitationId: string;
   }>,
 ): OutboxEventInput<typeof MEMBERSHIP_STARTED_V1, MembershipStartedV1Payload> {
   return Object.freeze({
@@ -117,8 +93,6 @@ export function createMembershipStartedV1Event(
     homeId: input.homeId,
     payload: Object.freeze({
       membershipId: input.membershipId,
-      cause: 'INVITATION_ACCEPTED',
-      invitationId: input.invitationId,
     }),
   });
 }

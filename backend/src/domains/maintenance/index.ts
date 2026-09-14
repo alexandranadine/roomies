@@ -22,9 +22,34 @@ export {
   InvalidMaintenanceDetailsError,
   InvalidMaintenanceRequestError,
   InvalidMaintenanceTitleError,
+  MaintenanceActivitySourceIntegrityError,
   MaintenanceNotOpenError,
   MaintenancePersistenceError,
 } from './errors.js';
+export {
+  MAINTENANCE_CREATED_V1,
+  MAINTENANCE_RESOLVED_V1,
+  createMaintenanceCreatedV1Event,
+  createMaintenanceResolvedV1Event,
+  type MaintenanceCreatedV1Payload,
+  type MaintenanceResolvedV1Payload,
+} from './events.js';
+export {
+  FIND_MAINTENANCE_ACTIVITY_DISPLAYS_SQL,
+  findMaintenanceActivityDisplays,
+  type FindMaintenanceActivityDisplays,
+  type FindMaintenanceActivityDisplaysInput,
+  type MaintenanceActivityDisplay,
+  type MaintenanceActivityDisplayQueryable,
+} from './find-maintenance-activity-display.js';
+export {
+  FIND_MAINTENANCE_ACTIVITY_SOURCE_AUDIENCE_SQL,
+  FIND_MAINTENANCE_ACTIVITY_SOURCE_SQL,
+  findMaintenanceActivitySource,
+  type FindMaintenanceActivitySource,
+  type FindMaintenanceActivitySourceInput,
+  type MaintenanceActivitySource,
+} from './find-maintenance-activity-source.js';
 export {
   decideMaintenanceList,
   isMaintenanceListCapableRole,

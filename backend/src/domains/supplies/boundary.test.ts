@@ -28,7 +28,17 @@ void describe('supplies domain boundary', () => {
       assert.doesNotMatch(source, /domains\/tasks/, relative);
       assert.doesNotMatch(source, /home-administration/, relative);
       assert.doesNotMatch(source, /platform\/runtime/, relative);
-      assert.doesNotMatch(source, /outbox/, relative);
+      if (relative.endsWith('/events.ts')) {
+        assert.match(source, /import type \{ OutboxEventInput \}/);
+        assert.doesNotMatch(source, /createOutboxWriter/);
+        assert.doesNotMatch(source, /title/);
+        assert.doesNotMatch(source, /claimantMembershipId/);
+        assert.doesNotMatch(source, /createdByMembershipId/);
+        assert.doesNotMatch(source, /obtainedByMembershipId/);
+        assert.doesNotMatch(source, /userId/);
+      } else {
+        assert.doesNotMatch(source, /outbox/, relative);
+      }
       assert.doesNotMatch(source, /user_id/, relative);
     }
   });
@@ -80,6 +90,26 @@ void describe('supplies domain boundary', () => {
     assert.doesNotMatch(source, /claimed_by_membership_id/);
     assert.doesNotMatch(source, /quantity|price|reimbursement/i);
     assert.doesNotMatch(source, /findActiveClaimByEntry\([\s\S]*FOR UPDATE/i);
+  });
+
+  void it('keeps Activity source lookup free of title, claimant, and creator', async () => {
+    const source = await readFile(
+      path.join(suppliesDir, 'find-supply-activity-source.ts'),
+      'utf8',
+    );
+    assert.match(source, /FIND_SUPPLY_ACTIVITY_SOURCE_SQL/);
+    assert.match(source, /expectedHomeId/);
+    assert.doesNotMatch(source, /e\.title/);
+    assert.doesNotMatch(source, /created_by_membership_id/);
+    assert.doesNotMatch(source, /claimant/);
+    assert.doesNotMatch(source, /user_id/);
+    assert.doesNotMatch(source, /email/);
+    assert.doesNotMatch(source, /\brole\b/);
+    assert.doesNotMatch(source, /isHomeAdmin/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /activity\/repository/);
+    assert.doesNotMatch(source, /insertHomeVisibleActivity/);
+    assert.doesNotMatch(source, /from ['"]\.\/repository/);
   });
 
   void it('keeps title rules free of persistence, HTTP, and JS Date', async () => {

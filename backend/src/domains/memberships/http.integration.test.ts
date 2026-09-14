@@ -81,14 +81,15 @@ async function insertMembership(
   },
 ): Promise<void> {
   await pool.query(
-    `INSERT INTO memberships (id, home_id, user_id, role, ended_at)
-     VALUES ($1, $2, $3, $4, $5)`,
+    `INSERT INTO memberships (id, home_id, user_id, role, ended_at, ended_by_membership_id)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
     [
       input.id,
       input.homeId,
       input.userId,
       input.role,
       input.ended === true ? new Date() : null,
+      input.ended === true ? input.id : null,
     ],
   );
 }
@@ -393,6 +394,12 @@ void describe('PATCH membership role HTTP PostgreSQL', () => {
           );
           assert.equal(roleAfterHostile.rows[0]?.role, 'ROOMMATE');
 
+          const beforeSameRole = await database.pool.query<{ count: string }>(
+            `SELECT count(*)::text AS count FROM outbox_events
+             WHERE home_id = $1 AND event_type = 'membership.role_changed.v1'
+               AND payload->>'membershipId' = $2`,
+            [homeA, membershipRoommateA],
+          );
           const sameRole = await patchRole({
             cookie: admin.cookie,
             homeId: homeA,
@@ -401,15 +408,17 @@ void describe('PATCH membership role HTTP PostgreSQL', () => {
           });
           assert.equal(sameRole.status, 204);
           const sameRoleEvents = await database.pool.query<{
-            event_id: string;
+            count: string;
           }>(
-            `SELECT event_id FROM outbox_events
-             WHERE home_id = $1 AND payload->>'membershipId' = $2
-               AND payload->>'previousRole' = 'ROOMMATE'
-               AND payload->>'newRole' = 'ROOMMATE'`,
+            `SELECT count(*)::text AS count FROM outbox_events
+             WHERE home_id = $1 AND event_type = 'membership.role_changed.v1'
+               AND payload->>'membershipId' = $2`,
             [homeA, membershipRoommateA],
           );
-          assert.equal(sameRoleEvents.rows.length, 0);
+          assert.equal(
+            sameRoleEvents.rows[0]?.count,
+            beforeSameRole.rows[0]?.count,
+          );
 
           const roommateAttempt = await patchRole({
             cookie: roommate.cookie,
@@ -498,9 +507,35 @@ void describe('PATCH membership role HTTP PostgreSQL', () => {
           [homeIds],
         );
         await database.pool.query(
-          'DELETE FROM memberships WHERE home_id = ANY($1::uuid[])',
+          'DELETE FROM membership_role_transitions WHERE home_id = ANY($1::uuid[])',
           [homeIds],
         );
+        await database.pool.query(
+          `UPDATE memberships
+           SET ended_by_membership_id = id
+           WHERE home_id = ANY($1::uuid[]) AND ended_at IS NOT NULL`,
+          [homeIds],
+        );
+        await database.pool.query(
+          `DELETE FROM memberships
+           WHERE home_id = ANY($1::uuid[]) AND ended_at IS NULL`,
+          [homeIds],
+        );
+        const remainingMemberships = await database.pool.query<{ id: string }>(
+          'SELECT id FROM memberships WHERE home_id = ANY($1::uuid[])',
+          [homeIds],
+        );
+        for (const row of remainingMemberships.rows) {
+          await database.pool.query(
+            `UPDATE memberships
+             SET ended_at = NULL, ended_by_membership_id = NULL
+             WHERE id = $1`,
+            [row.id],
+          );
+          await database.pool.query('DELETE FROM memberships WHERE id = $1', [
+            row.id,
+          ]);
+        }
         await database.pool.query(
           'DELETE FROM homes WHERE id = ANY($1::uuid[])',
           [homeIds],

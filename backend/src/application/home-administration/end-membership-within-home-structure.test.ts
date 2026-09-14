@@ -121,6 +121,7 @@ void describe('endMembershipWithinHomeStructure application orchestration', () =
       homeId: HOME,
       membershipId: MEMBERSHIP,
       endedAt: ENDED_AT,
+      endedByMembershipId: MEMBERSHIP,
       cause: 'HOME_ARCHIVED',
     });
     assert.deepEqual(steps, ['task', 'supply', 'membership']);
@@ -143,6 +144,7 @@ void describe('endMembershipWithinHomeStructure application orchestration', () =
       homeId: HOME,
       membershipId: MEMBERSHIP,
       endedAt: ENDED_AT,
+      endedByMembershipId: MEMBERSHIP,
       cause: 'VOLUNTARY_LEAVE',
     });
 
@@ -167,6 +169,7 @@ void describe('endMembershipWithinHomeStructure application orchestration', () =
         membershipId: MEMBERSHIP,
         homeId: HOME,
         endedAt: ENDED_AT,
+        endedByMembershipId: MEMBERSHIP,
       },
     ]);
     assert.equal(events.length, 1);
@@ -176,21 +179,23 @@ void describe('endMembershipWithinHomeStructure application orchestration', () =
     assert.equal(events[0]?.homeId, HOME);
     assert.deepEqual(events[0]?.payload, {
       membershipId: MEMBERSHIP,
-      cause: 'VOLUNTARY_LEAVE',
     });
+    assert.equal('cause' in (events[0]?.payload ?? {}), false);
     assert.equal('userId' in (events[0]?.payload ?? {}), false);
   });
 
-  void it('constructs membership.ended.v1 for each frozen cause', async () => {
+  void it('emits the same ended payload for each frozen cause', async () => {
     for (const cause of MEMBERSHIP_ENDED_CAUSES) {
       const { tx, endMembership, events } = commandOf({});
       await endMembership(tx, {
         homeId: HOME,
         membershipId: MEMBERSHIP,
         endedAt: ENDED_AT,
+        endedByMembershipId: MEMBERSHIP,
         cause,
       });
-      assert.equal(events[0]?.payload.cause, cause);
+      assert.deepEqual(events[0]?.payload, { membershipId: MEMBERSHIP });
+      assert.equal('cause' in (events[0]?.payload ?? {}), false);
     }
   });
 
@@ -205,6 +210,7 @@ void describe('endMembershipWithinHomeStructure application orchestration', () =
           homeId: HOME,
           membershipId: MEMBERSHIP,
           endedAt: ENDED_AT,
+          endedByMembershipId: MEMBERSHIP,
           cause: 'VOLUNTARY_LEAVE',
         }),
       /injected task cleanup failure/,
@@ -225,6 +231,7 @@ void describe('endMembershipWithinHomeStructure application orchestration', () =
           homeId: HOME,
           membershipId: MEMBERSHIP,
           endedAt: ENDED_AT,
+          endedByMembershipId: MEMBERSHIP,
           cause: 'ADMIN_REMOVAL',
         }),
       /injected supply cleanup failure/,
@@ -243,6 +250,7 @@ void describe('endMembershipWithinHomeStructure application orchestration', () =
           homeId: HOME,
           membershipId: MEMBERSHIP,
           endedAt: ENDED_AT,
+          endedByMembershipId: MEMBERSHIP,
           cause: 'HOME_ARCHIVED',
         }),
       StructuralIntegrityError,
@@ -262,6 +270,7 @@ void describe('endMembershipWithinHomeStructure application orchestration', () =
           homeId: HOME,
           membershipId: MEMBERSHIP,
           endedAt: ENDED_AT,
+          endedByMembershipId: MEMBERSHIP,
           cause: 'VOLUNTARY_LEAVE',
         }),
       /injected outbox failure/,
@@ -272,6 +281,7 @@ void describe('endMembershipWithinHomeStructure application orchestration', () =
         membershipId: MEMBERSHIP,
         homeId: HOME,
         endedAt: ENDED_AT,
+        endedByMembershipId: MEMBERSHIP,
       },
     ]);
     assert.deepEqual(events, []);
@@ -284,6 +294,7 @@ void describe('endMembershipWithinHomeStructure application orchestration', () =
       homeId: HOME,
       membershipId: MEMBERSHIP,
       endedAt: ENDED_AT,
+      endedByMembershipId: MEMBERSHIP,
       cause: 'VOLUNTARY_LEAVE',
     });
 
@@ -305,6 +316,7 @@ void describe('endMembershipWithinHomeStructure application orchestration', () =
           homeId: HOME,
           membershipId: MEMBERSHIP,
           endedAt: ENDED_AT,
+          endedByMembershipId: MEMBERSHIP,
           cause: 'because they left' as 'VOLUNTARY_LEAVE',
         }),
       /Invalid membership ended cause/,

@@ -41,6 +41,7 @@ const UNIQUE_VIOLATION = '23505';
 
 const INSTANCE_CHECKS = [
   'task_instances_completed_time_check',
+  'task_instances_completion_actor_check',
   'task_instances_completion_state_check',
   'task_instances_source_definition_check',
 ] as const;
@@ -192,6 +193,7 @@ async function verifyCatalog(client: PoolClient): Promise<void> {
     [
       'assigned_membership_id',
       'completed_at',
+      'completed_by_membership_id',
       'created_at',
       'home_id',
       'id',
@@ -228,6 +230,18 @@ async function verifyCatalog(client: PoolClient): Promise<void> {
   assert.equal(instanceColumns.get('task_definition_id')?.is_nullable, 'YES');
   assert.equal(instanceColumns.get('completed_at')?.udt_name, 'timestamptz');
   assert.equal(instanceColumns.get('completed_at')?.is_nullable, 'YES');
+  assert.equal(
+    instanceColumns.get('completed_by_membership_id')?.udt_name,
+    'uuid',
+  );
+  assert.equal(
+    instanceColumns.get('completed_by_membership_id')?.is_nullable,
+    'YES',
+  );
+  assert.equal(
+    instanceColumns.get('completed_by_membership_id')?.column_default,
+    null,
+  );
   assert.equal(instanceColumns.get('created_at')?.udt_name, 'timestamptz');
   assert.equal(instanceColumns.get('created_at')?.is_nullable, 'NO');
   assert.equal(instanceColumns.get('created_at')?.column_default, 'now()');
@@ -235,7 +249,8 @@ async function verifyCatalog(client: PoolClient): Promise<void> {
   assert.equal(instanceColumns.get('updated_at')?.is_nullable, 'NO');
   assert.equal(instanceColumns.has('description'), false);
   assert.equal(instanceColumns.has('creator_membership_id'), false);
-  assert.equal(instanceColumns.has('completed_by_membership_id'), false);
+  assert.equal(instanceColumns.has('completed_by_user_id'), false);
+  assert.equal(instanceColumns.has('completed_by_userid'), false);
 
   const definitionColumns = await tableColumns(client, 'task_definitions');
   assert.deepEqual(
@@ -323,6 +338,20 @@ async function verifyCatalog(client: PoolClient): Promise<void> {
       ?.definition ?? '',
     /status = 'OPEN'.*completed_at IS NULL.*status = 'COMPLETED'.*completed_at IS NOT NULL/s,
   );
+  assert.doesNotMatch(
+    instanceConstraints.get('task_instances_completion_state_check')
+      ?.definition ?? '',
+    /completed_by_membership_id/,
+  );
+  assert.equal(
+    instanceConstraints.get('task_instances_completion_actor_check')?.contype,
+    'c',
+  );
+  assert.match(
+    instanceConstraints.get('task_instances_completion_actor_check')
+      ?.definition ?? '',
+    /\(completed_at IS NULL\) = \(completed_by_membership_id IS NULL\)/,
+  );
   assert.match(
     instanceConstraints.get('task_instances_completed_time_check')
       ?.definition ?? '',
@@ -336,6 +365,11 @@ async function verifyCatalog(client: PoolClient): Promise<void> {
     instanceConstraints.get('task_instances_assigned_home_membership_fkey')
       ?.definition ?? '',
     /FOREIGN KEY \(home_id, assigned_membership_id\).*memberships\(home_id, id\).*ON UPDATE RESTRICT ON DELETE RESTRICT/i,
+  );
+  assert.match(
+    instanceConstraints.get('task_instances_completed_by_home_membership_fkey')
+      ?.definition ?? '',
+    /FOREIGN KEY \(home_id, completed_by_membership_id\).*memberships\(home_id, id\).*ON UPDATE RESTRICT ON DELETE RESTRICT/i,
   );
   assert.match(
     instanceConstraints.get('task_instances_definition_home_fkey')
@@ -472,11 +506,11 @@ const INSERT_INSTANCE_SQL = `
   INSERT INTO task_instances (
     id, home_id, source, status, title, scheduled_for,
     assigned_membership_id, task_definition_id, completed_at,
-    created_at, updated_at
+    completed_by_membership_id, created_at, updated_at
   ) VALUES (
     $1::uuid, $2::uuid, $3, $4, $5, $6::date,
     $7::uuid, $8::uuid, $9::timestamptz,
-    $10::timestamptz, $11::timestamptz
+    $10::uuid, $11::timestamptz, $12::timestamptz
   )
 `;
 
@@ -515,6 +549,7 @@ type InstanceInput = {
   assignedMembershipId?: string | null;
   taskDefinitionId?: string | null;
   completedAt?: Date | null;
+  completedByMembershipId?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 };
@@ -559,6 +594,7 @@ async function insertInstance(
     input.assignedMembershipId ?? null,
     input.taskDefinitionId ?? null,
     input.completedAt ?? null,
+    input.completedByMembershipId ?? null,
     input.createdAt ?? CREATED,
     input.updatedAt ?? CREATED,
   ]);
@@ -627,12 +663,12 @@ async function createFixture(
     [home, otherHome, orphanHome],
   );
   await client.query(
-    `INSERT INTO memberships (id, home_id, user_id, role, ended_at)
-     VALUES ($1, $2, $3, 'ADMIN', NULL),
-            ($4, $2, $5, 'ROOMMATE', NULL),
-            ($6, $2, $5, 'ROOMMATE', TIMESTAMPTZ '2026-09-01T00:00:00Z'),
-            ($7, $8, $5, 'ADMIN', NULL),
-            ($9, $10, $3, 'ADMIN', NULL)`,
+    `INSERT INTO memberships (id, home_id, user_id, role, ended_at, ended_by_membership_id)
+     VALUES ($1, $2, $3, 'ADMIN', NULL, NULL),
+            ($4, $2, $5, 'ROOMMATE', NULL, NULL),
+            ($6, $2, $5, 'ROOMMATE', TIMESTAMPTZ '2026-09-01T00:00:00Z', $6),
+            ($7, $8, $5, 'ADMIN', NULL, NULL),
+            ($9, $10, $3, 'ADMIN', NULL, NULL)`,
     [
       creator,
       home,
@@ -732,6 +768,7 @@ async function verifyBehavior(client: PoolClient): Promise<void> {
       status: 'COMPLETED',
       title: 'Finished chore',
       completedAt: COMPLETED,
+      completedByMembershipId: fixture.creator,
     });
     await insertDefinition(client, {
       id: nextId(),
@@ -859,6 +896,7 @@ async function verifyBehavior(client: PoolClient): Promise<void> {
       title: 'Historical ended assignee',
       assignedMembershipId: fixture.ended,
       completedAt: COMPLETED,
+      completedByMembershipId: fixture.creator,
     });
 
     await expectSqlFailure(
@@ -871,6 +909,7 @@ async function verifyBehavior(client: PoolClient): Promise<void> {
         'MANUAL',
         'OPEN',
         'Missing home',
+        null,
         null,
         null,
         null,
@@ -892,6 +931,7 @@ async function verifyBehavior(client: PoolClient): Promise<void> {
         'Cross assignee',
         null,
         fixture.otherMembership,
+        null,
         null,
         null,
         CREATED,
@@ -964,6 +1004,7 @@ async function verifyBehavior(client: PoolClient): Promise<void> {
         null,
         otherDaily,
         null,
+        null,
         CREATED,
         CREATED,
       ],
@@ -983,6 +1024,7 @@ async function verifyBehavior(client: PoolClient): Promise<void> {
         null,
         dailyId,
         null,
+        null,
         CREATED,
         CREATED,
       ],
@@ -999,6 +1041,7 @@ async function verifyBehavior(client: PoolClient): Promise<void> {
         'OPEN',
         'Recurring bare',
         '2026-09-13',
+        null,
         null,
         null,
         null,
@@ -1021,6 +1064,7 @@ async function verifyBehavior(client: PoolClient): Promise<void> {
         null,
         dailyId,
         null,
+        null,
         CREATED,
         CREATED,
       ],
@@ -1040,6 +1084,27 @@ async function verifyBehavior(client: PoolClient): Promise<void> {
         null,
         null,
         COMPLETED,
+        null,
+        CREATED,
+        CREATED,
+      ],
+      CHECK_VIOLATION,
+    );
+    await expectSqlFailure(
+      client,
+      'open_with_completer',
+      INSERT_INSTANCE_SQL,
+      [
+        nextId(),
+        fixture.home,
+        'MANUAL',
+        'OPEN',
+        'Open completer',
+        null,
+        null,
+        null,
+        null,
+        fixture.creator,
         CREATED,
         CREATED,
       ],
@@ -1055,6 +1120,7 @@ async function verifyBehavior(client: PoolClient): Promise<void> {
         'MANUAL',
         'COMPLETED',
         'Completed missing',
+        null,
         null,
         null,
         null,
@@ -1078,10 +1144,51 @@ async function verifyBehavior(client: PoolClient): Promise<void> {
         null,
         null,
         new Date('2026-09-12T17:00:00.000Z'),
+        fixture.creator,
         CREATED,
         CREATED,
       ],
       CHECK_VIOLATION,
+    );
+    await expectSqlFailure(
+      client,
+      'completed_without_completer',
+      INSERT_INSTANCE_SQL,
+      [
+        nextId(),
+        fixture.home,
+        'MANUAL',
+        'COMPLETED',
+        'Completed missing actor',
+        null,
+        null,
+        null,
+        COMPLETED,
+        null,
+        CREATED,
+        CREATED,
+      ],
+      CHECK_VIOLATION,
+    );
+    await expectSqlFailure(
+      client,
+      'cross_home_completer',
+      INSERT_INSTANCE_SQL,
+      [
+        nextId(),
+        fixture.home,
+        'MANUAL',
+        'COMPLETED',
+        'Cross completer',
+        null,
+        null,
+        null,
+        COMPLETED,
+        fixture.otherMembership,
+        CREATED,
+        CREATED,
+      ],
+      FOREIGN_KEY_VIOLATION,
     );
     await insertInstance(client, {
       id: nextId(),
@@ -1104,6 +1211,7 @@ async function verifyBehavior(client: PoolClient): Promise<void> {
         '2026-09-20',
         null,
         weeklyId,
+        null,
         null,
         CREATED,
         CREATED,
@@ -1281,7 +1389,7 @@ async function verifyConcurrentOccurrence(pool: Pool): Promise<void> {
   const setup = await pool.connect();
   const first = await pool.connect();
   const second = await pool.connect();
-  const suffix = '02';
+  const suffix = '90';
   let fixture: Fixture | undefined;
   let definitionId: string | undefined;
   try {

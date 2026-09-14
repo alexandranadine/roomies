@@ -64,9 +64,15 @@ async function insertFixture(
     [homeId, input.name, input.timezone ?? 'UTC', input.archivedAt ?? null],
   );
   await pool.query(
-    `INSERT INTO memberships (id, home_id, user_id, role, ended_at)
-     VALUES ($1, $2, $3, 'ADMIN', $4)`,
-    [membershipId, homeId, userId, input.endedAt ?? null],
+    `INSERT INTO memberships (id, home_id, user_id, role, ended_at, ended_by_membership_id)
+     VALUES ($1, $2, $3, 'ADMIN', $4, $5)`,
+    [
+      membershipId,
+      homeId,
+      userId,
+      input.endedAt ?? null,
+      input.endedAt ? membershipId : null,
+    ],
   );
   return { userId, homeId, membershipId };
 }

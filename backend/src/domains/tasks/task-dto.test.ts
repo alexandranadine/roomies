@@ -15,6 +15,7 @@ function task(overrides: Partial<TaskInstance> = {}): TaskInstance {
     scheduledFor: '2026-09-15',
     assignedMembershipId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
     completedAt: null,
+    completedByMembershipId: null,
     createdAt: CREATED,
     updatedAt: CREATED,
     ...overrides,
@@ -50,6 +51,7 @@ void describe('toTaskDto', () => {
     const leaked = task({
       homeId: 'home-secret',
       completedAt: new Date('2026-09-13T00:00:00.000Z'),
+      completedByMembershipId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
     }) as TaskInstance & {
       taskDefinitionId: string;
       userId: string;
@@ -64,6 +66,7 @@ void describe('toTaskDto', () => {
     assert.equal(serialized.includes('user-secret'), false);
     assert.equal(serialized.includes('DAILY'), false);
     assert.equal(serialized.includes('completedAt'), false);
+    assert.equal(serialized.includes('completedByMembershipId'), false);
     assert.equal(serialized.includes('homeId'), false);
     assert.equal(serialized.includes('taskDefinitionId'), false);
     assert.equal(serialized.includes('userId'), false);

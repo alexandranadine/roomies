@@ -160,6 +160,7 @@ void describe('createCreateSupplyEntry', () => {
     assert.equal(created.id, ENTRY_A);
     assert.equal(created.createdByMembershipId, MEMBERSHIP);
     assert.equal(created.obtainedAt, null);
+    assert.equal(created.obtainedByMembershipId, null);
     assert.equal(created.canceledAt, null);
     assert.equal(created.createdAt, OCCURRED_AT);
     assert.equal(created.updatedAt, OCCURRED_AT);
@@ -171,6 +172,7 @@ void describe('createCreateSupplyEntry', () => {
       status: 'OPEN',
       createdByMembershipId: MEMBERSHIP,
       obtainedAt: null,
+      obtainedByMembershipId: null,
       canceledAt: null,
       createdAt: OCCURRED_AT,
       updatedAt: OCCURRED_AT,

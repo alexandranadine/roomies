@@ -19,11 +19,32 @@ export {
 } from './create-policy.js';
 export {
   InvalidSupplyTitleError,
+  SupplyActivitySourceIntegrityError,
   SupplyAlreadyClaimedError,
   SupplyClaimNotActiveError,
   SupplyNotOpenError,
   SupplyPersistenceError,
 } from './errors.js';
+export {
+  SUPPLY_OBTAINED_V1,
+  createSupplyObtainedV1Event,
+  type SupplyObtainedV1Payload,
+} from './events.js';
+export {
+  FIND_SUPPLY_ACTIVITY_DISPLAYS_SQL,
+  findSupplyActivityDisplays,
+  type FindSupplyActivityDisplays,
+  type FindSupplyActivityDisplaysInput,
+  type SupplyActivityDisplay,
+  type SupplyActivityDisplayQueryable,
+} from './find-supply-activity-display.js';
+export {
+  FIND_SUPPLY_ACTIVITY_SOURCE_SQL,
+  findSupplyActivitySource,
+  type FindSupplyActivitySource,
+  type FindSupplyActivitySourceInput,
+  type SupplyActivitySource,
+} from './find-supply-activity-source.js';
 export {
   createSuppliesRouter,
   type CancelSupplyEntryCommand,

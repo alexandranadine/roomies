@@ -138,7 +138,6 @@ void describe('OutboxWriter PostgreSQL atomicity', () => {
               eventId,
               occurredAt,
               membershipId,
-              cause: 'VOLUNTARY_LEAVE',
               homeId,
             }),
           );
@@ -166,7 +165,6 @@ void describe('OutboxWriter PostgreSQL atomicity', () => {
         assert.equal(row.home_id, homeId);
         assert.deepEqual(row.payload, {
           membershipId,
-          cause: 'VOLUNTARY_LEAVE',
         });
         assert.ok(row.created_at instanceof Date);
         assert.ok(row.available_at instanceof Date);
@@ -211,7 +209,6 @@ void describe('OutboxWriter PostgreSQL atomicity', () => {
               eventId: existingEventId,
               occurredAt,
               membershipId: randomUUID(),
-              cause: 'ADMIN_REMOVAL',
             }),
           );
         });
@@ -225,8 +222,7 @@ void describe('OutboxWriter PostgreSQL atomicity', () => {
                 eventId: existingEventId,
                 occurredAt: new Date('2026-04-02T00:00:00.000Z'),
                 membershipId: randomUUID(),
-                previousRole: 'ROOMMATE',
-                newRole: 'ADMIN',
+                roleTransitionId: randomUUID(),
                 homeId,
               }),
             );
@@ -277,7 +273,6 @@ void describe('OutboxWriter PostgreSQL atomicity', () => {
                   eventId,
                   occurredAt: new Date('2026-05-01T00:00:00.000Z'),
                   membershipId: randomUUID(),
-                  cause: 'HOME_ARCHIVED',
                 }),
               );
               await insertHome(tx, { id: homeId, name: 'Later Fail Home' });
@@ -327,7 +322,6 @@ void describe('OutboxWriter PostgreSQL atomicity', () => {
               eventId,
               occurredAt: firstOccurredAt,
               membershipId: firstMembershipId,
-              cause: 'VOLUNTARY_LEAVE',
             }),
           );
         });
@@ -340,8 +334,7 @@ void describe('OutboxWriter PostgreSQL atomicity', () => {
                 eventId,
                 occurredAt: new Date('2026-06-02T08:00:00.000Z'),
                 membershipId: randomUUID(),
-                previousRole: 'ADMIN',
-                newRole: 'ROOMMATE',
+                roleTransitionId: randomUUID(),
               }),
             );
           }),
@@ -360,7 +353,6 @@ void describe('OutboxWriter PostgreSQL atomicity', () => {
         );
         assert.deepEqual(row.payload, {
           membershipId: firstMembershipId,
-          cause: 'VOLUNTARY_LEAVE',
         });
         assert.equal(row.attempt_count, 0);
         assert.equal(row.processed_at, null);
@@ -395,7 +387,6 @@ void describe('OutboxWriter PostgreSQL atomicity', () => {
               eventId,
               occurredAt,
               membershipId,
-              cause: 'VOLUNTARY_LEAVE',
               homeId,
             }),
           );
@@ -412,10 +403,8 @@ void describe('OutboxWriter PostgreSQL atomicity', () => {
         assert.equal(row.home_id, homeId);
         assert.deepEqual(row.payload, {
           membershipId,
-          cause: 'VOLUNTARY_LEAVE',
         });
         assert.deepEqual(Object.keys(row.payload as object).sort(), [
-          'cause',
           'membershipId',
         ]);
         assert.equal(JSON.stringify(row.payload).includes('email'), false);

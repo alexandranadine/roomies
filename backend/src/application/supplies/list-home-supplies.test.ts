@@ -24,6 +24,7 @@ function entry(overrides: Partial<ListedSupplyEntry> = {}): ListedSupplyEntry {
     status: 'OPEN',
     createdByMembershipId: actor.membershipId,
     obtainedAt: null,
+    obtainedByMembershipId: null,
     canceledAt: null,
     createdAt: CREATED,
     updatedAt: CREATED,

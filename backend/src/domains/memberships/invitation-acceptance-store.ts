@@ -107,8 +107,8 @@ export async function insertInvitationMembership(
 ): Promise<void> {
   try {
     const result = await tx.query(
-      `INSERT INTO memberships (id, home_id, user_id, role, joined_at, ended_at)
-       VALUES ($1::uuid, $2::uuid, $3::uuid, 'ROOMMATE', $4::timestamptz, NULL)`,
+      `INSERT INTO memberships (id, home_id, user_id, role, joined_at, ended_at, ended_by_membership_id)
+       VALUES ($1::uuid, $2::uuid, $3::uuid, 'ROOMMATE', $4::timestamptz, NULL, NULL)`,
       [
         membership.id,
         membership.homeId,

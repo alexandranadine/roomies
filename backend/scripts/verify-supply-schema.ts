@@ -180,6 +180,7 @@ async function verifyCatalog(client: PoolClient): Promise<void> {
       'home_id',
       'id',
       'obtained_at',
+      'obtained_by_membership_id',
       'status',
       'title',
       'updated_at',
@@ -191,7 +192,10 @@ async function verifyCatalog(client: PoolClient): Promise<void> {
   assertColumn(entries, 'status', 'text', 'NO', "'OPEN'::text");
   assertColumn(entries, 'created_by_membership_id', 'uuid', 'NO', null);
   assertColumn(entries, 'obtained_at', 'timestamptz', 'YES', null);
+  assertColumn(entries, 'obtained_by_membership_id', 'uuid', 'YES', null);
   assertColumn(entries, 'canceled_at', 'timestamptz', 'YES', null);
+  assert.equal(entries.has('obtained_by_user_id'), false);
+  assert.equal(entries.has('completed_by_user_id'), false);
   assertColumn(entries, 'created_at', 'timestamptz', 'NO', 'now()');
   assertColumn(entries, 'updated_at', 'timestamptz', 'NO', null);
 
@@ -227,6 +231,8 @@ async function verifyCatalog(client: PoolClient): Promise<void> {
       'supply_entries_creator_home_membership_fkey',
       'supply_entries_home_id_fkey',
       'supply_entries_lifecycle_check',
+      'supply_entries_obtain_actor_check',
+      'supply_entries_obtained_by_home_membership_fkey',
       'supply_entries_pkey',
       'supply_entries_status_check_cbe78413',
       'supply_entries_terminal_time_check',
@@ -239,6 +245,18 @@ async function verifyCatalog(client: PoolClient): Promise<void> {
   assert.match(
     entryConstraints.get('supply_entries_lifecycle_check')?.definition ?? '',
     /status = 'OPEN'.*obtained_at IS NULL.*canceled_at IS NULL.*status = 'OBTAINED'.*obtained_at IS NOT NULL.*canceled_at IS NULL.*status = 'CANCELED'.*obtained_at IS NULL.*canceled_at IS NOT NULL/s,
+  );
+  assert.doesNotMatch(
+    entryConstraints.get('supply_entries_lifecycle_check')?.definition ?? '',
+    /obtained_by_membership_id/,
+  );
+  assert.equal(
+    entryConstraints.get('supply_entries_obtain_actor_check')?.contype,
+    'c',
+  );
+  assert.match(
+    entryConstraints.get('supply_entries_obtain_actor_check')?.definition ?? '',
+    /\(obtained_at IS NULL\) = \(obtained_by_membership_id IS NULL\)/,
   );
   assert.equal(
     entryConstraints.get('supply_entries_status_check_cbe78413')?.contype,
@@ -267,6 +285,11 @@ async function verifyCatalog(client: PoolClient): Promise<void> {
     entryConstraints,
     'supply_entries_creator_home_membership_fkey',
     /FOREIGN KEY \(home_id, created_by_membership_id\).*memberships\(home_id, id\)/i,
+  );
+  assertRestrictForeignKey(
+    entryConstraints,
+    'supply_entries_obtained_by_home_membership_fkey',
+    /FOREIGN KEY \(home_id, obtained_by_membership_id\).*memberships\(home_id, id\)/i,
   );
 
   const claimConstraints = await constraintMap(client, 'supply_claims');
@@ -333,6 +356,7 @@ async function verifyCatalog(client: PoolClient): Promise<void> {
       'supply_entries_home_id_created_by_membership_id_idx_889ed7bc',
       'supply_entries_home_id_id_key_2f2cccd8',
       'supply_entries_home_id_idx_f881d5c1',
+      'supply_entries_home_id_obtained_by_membership_id_idx_d353905d',
       'supply_entries_home_open_idx_9cfca592',
       'supply_entries_pkey',
     ],
@@ -423,11 +447,11 @@ async function createFixture(
     [...fixture.homes],
   );
   await client.query(
-    `INSERT INTO memberships (id, home_id, user_id, role, ended_at)
-     VALUES ($1, $5, $6, 'ADMIN', NULL),
-            ($2, $5, $7, 'ROOMMATE', TIMESTAMPTZ '2026-09-12T00:00:00Z'),
-            ($3, $5, $7, 'ROOMMATE', NULL),
-            ($4, $8, $9, 'ADMIN', NULL)`,
+    `INSERT INTO memberships (id, home_id, user_id, role, ended_at, ended_by_membership_id)
+     VALUES ($1, $5, $6, 'ADMIN', NULL, NULL),
+            ($2, $5, $7, 'ROOMMATE', TIMESTAMPTZ '2026-09-12T00:00:00Z', $2),
+            ($3, $5, $7, 'ROOMMATE', NULL, NULL),
+            ($4, $8, $9, 'ADMIN', NULL, NULL)`,
     [
       ...fixture.memberships,
       fixture.homes[0],
@@ -484,6 +508,7 @@ function entryParams(
   fixture: Fixture,
   status = 'OPEN',
   obtainedAt: Date | null = null,
+  obtainedByMembershipId: string | null = null,
   canceledAt: Date | null = null,
   createdAt = CREATED,
 ): unknown[] {
@@ -494,6 +519,7 @@ function entryParams(
     status,
     fixture.memberships[0],
     obtainedAt,
+    obtainedByMembershipId,
     canceledAt,
     createdAt,
     createdAt,
@@ -570,9 +596,25 @@ async function verifyBehavior(pool: Pool): Promise<void> {
     );
     await client.query(
       `UPDATE supply_entries
-       SET status = 'OBTAINED', obtained_at = $2, updated_at = $2
+       SET status = 'OBTAINED',
+           obtained_at = $2,
+           obtained_by_membership_id = $3,
+           updated_at = $2
        WHERE id = $1`,
-      [historyEntry, TERMINAL],
+      [historyEntry, TERMINAL, fixture.memberships[0]],
+    );
+    const obtainedAttribution = await client.query<{
+      obtained_by_membership_id: string | null;
+    }>('SELECT obtained_by_membership_id FROM supply_entries WHERE id = $1', [
+      historyEntry,
+    ]);
+    assert.equal(
+      obtainedAttribution.rows[0]?.obtained_by_membership_id,
+      fixture.memberships[0],
+    );
+    assert.notEqual(
+      obtainedAttribution.rows[0]?.obtained_by_membership_id,
+      fixture.memberships[2],
     );
 
     const canceledEntry = nextEntryId();
@@ -691,6 +733,7 @@ async function verifyBehavior(pool: Pool): Promise<void> {
         status: 'OPEN',
         createdByMembershipId: fixture.memberships[0],
         obtainedAt: null,
+        obtainedByMembershipId: null,
         canceledAt: null,
         createdAt: CREATED,
         updatedAt: CREATED,
@@ -704,6 +747,7 @@ async function verifyBehavior(pool: Pool): Promise<void> {
       'status',
       'createdByMembershipId',
       'obtainedAt',
+      'obtainedByMembershipId',
       'canceledAt',
       'createdAt',
       'updatedAt',
@@ -748,22 +792,51 @@ async function verifyBehavior(pool: Pool): Promise<void> {
     );
     const early = new Date('2026-09-13T04:00:00.000Z');
     const entryCorruptions: ReadonlyArray<
-      readonly [string, string, Date | null, Date | null, Date?]
+      readonly [string, string, Date | null, string | null, Date | null, Date?]
     > = [
-      ['entry_invalid_status', 'LOST', null, null],
-      ['open_with_obtained_at', 'OPEN', TERMINAL, null],
-      ['open_with_canceled_at', 'OPEN', null, TERMINAL],
-      ['obtained_without_time', 'OBTAINED', null, null],
-      ['obtained_with_canceled_at', 'OBTAINED', TERMINAL, TERMINAL],
-      ['canceled_without_time', 'CANCELED', null, null],
-      ['canceled_with_obtained_at', 'CANCELED', TERMINAL, TERMINAL],
-      ['obtained_before_created', 'OBTAINED', early, null, CREATED],
-      ['canceled_before_created', 'CANCELED', null, early, CREATED],
+      ['entry_invalid_status', 'LOST', null, null, null],
+      ['open_with_obtained_at', 'OPEN', TERMINAL, null, null],
+      ['open_with_obtainer', 'OPEN', null, fixture.memberships[0], null],
+      ['open_with_canceled_at', 'OPEN', null, null, TERMINAL],
+      ['obtained_without_time', 'OBTAINED', null, fixture.memberships[0], null],
+      ['obtained_without_obtainer', 'OBTAINED', TERMINAL, null, null],
+      [
+        'obtained_with_canceled_at',
+        'OBTAINED',
+        TERMINAL,
+        fixture.memberships[0],
+        TERMINAL,
+      ],
+      ['canceled_without_time', 'CANCELED', null, null, null],
+      [
+        'canceled_with_obtained_at',
+        'CANCELED',
+        TERMINAL,
+        fixture.memberships[0],
+        TERMINAL,
+      ],
+      [
+        'canceled_with_obtainer',
+        'CANCELED',
+        null,
+        fixture.memberships[0],
+        TERMINAL,
+      ],
+      [
+        'obtained_before_created',
+        'OBTAINED',
+        early,
+        fixture.memberships[0],
+        null,
+        CREATED,
+      ],
+      ['canceled_before_created', 'CANCELED', null, null, early, CREATED],
     ];
     for (const [
       name,
       status,
       obtainedAt,
+      obtainedByMembershipId,
       canceledAt,
       createdAt,
     ] of entryCorruptions) {
@@ -776,6 +849,7 @@ async function verifyBehavior(pool: Pool): Promise<void> {
           fixture,
           status,
           obtainedAt,
+          obtainedByMembershipId,
           canceledAt,
           createdAt,
         ),
@@ -815,7 +889,7 @@ async function verifyBehavior(pool: Pool): Promise<void> {
         CHECK_VIOLATION,
       );
     }
-    assert.equal(entryCorruptions.length + claimCorruptions.length, 14);
+    assert.equal(entryCorruptions.length + claimCorruptions.length, 17);
 
     await expectSqlFailure(
       client,
@@ -828,6 +902,25 @@ async function verifyBehavior(pool: Pool): Promise<void> {
         'OPEN',
         fixture.memberships[3],
         null,
+        null,
+        null,
+        CREATED,
+        CREATED,
+      ],
+      FOREIGN_KEY_VIOLATION,
+    );
+    await expectSqlFailure(
+      client,
+      'entry_cross_home_obtainer',
+      INSERT_SUPPLY_ENTRY_SQL,
+      [
+        nextEntryId(),
+        fixture.homes[0],
+        'Cross-home obtainer',
+        'OBTAINED',
+        fixture.memberships[0],
+        TERMINAL,
+        fixture.memberships[3],
         null,
         CREATED,
         CREATED,

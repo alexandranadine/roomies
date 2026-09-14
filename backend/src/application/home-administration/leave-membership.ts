@@ -95,6 +95,7 @@ export function createLeaveMembership(
         homeId: locked.home.id,
         membershipId: locked.actor.membershipId,
         endedAt,
+        endedByMembershipId: locked.actor.membershipId,
         cause: 'VOLUNTARY_LEAVE',
       });
     });

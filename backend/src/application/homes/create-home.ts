@@ -6,11 +6,14 @@ import {
 import { insertHome, type NewHome } from '../../domains/homes/insert-home.js';
 import { StructuralIntegrityError } from '../../domains/homes/structure-errors.js';
 import { evaluateHomeStructureInvariant } from '../../domains/homes/structure-invariant.js';
+import { createMembershipStartedV1Event } from '../../domains/memberships/events.js';
 import {
   insertActiveMembership,
   type NewActiveMembership,
 } from '../../domains/memberships/insert-active-membership.js';
 import { InvalidRequestError } from '../../platform/authz/errors.js';
+import type { OutboxWriter } from '../../platform/events/outbox-writer.js';
+import { outboxWriter } from '../../platform/events/outbox-writer.js';
 import type { UuidV7Generator } from '../../platform/ids/uuid-v7.js';
 import { systemUuidV7 } from '../../platform/ids/uuid-v7.js';
 import {
@@ -48,6 +51,7 @@ export type CreateHomeDependencies = Readonly<{
     tx: TransactionContext,
     membership: NewActiveMembership,
   ) => Promise<void>;
+  outbox: Pick<OutboxWriter, 'append'>;
   clock: Clock;
   ids: UuidV7Generator;
 }>;
@@ -73,8 +77,8 @@ function validatedCreateInput(input: CreateHomeInput): {
 }
 
 /**
- * Atomically creates a Home and the creator's first active ADMIN Membership.
- * Does not write a domain event — no frozen Home-creation or start-cause exists.
+ * Atomically creates a Home, the creator's first active ADMIN Membership,
+ * and membership.started.v1 for that exact new tenure.
  */
 export function createCreateHome(
   deps: CreateHomeDependencies,
@@ -108,6 +112,15 @@ export function createCreateHome(
         role: 'ADMIN',
         joinedAt: occurredAt,
       });
+      await deps.outbox.append(
+        tx,
+        createMembershipStartedV1Event({
+          eventId: deps.ids.next(),
+          occurredAt,
+          homeId,
+          membershipId,
+        }),
+      );
 
       return Object.freeze({
         home: Object.freeze({
@@ -131,6 +144,7 @@ export function createCreateHomeFromPool(
     runTransaction: (work) => runInReadCommittedTransaction(pool, work),
     insertHome,
     insertMembership: insertActiveMembership,
+    outbox: outboxWriter,
     clock: systemClock,
     ids: systemUuidV7,
   });

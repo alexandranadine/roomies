@@ -2,6 +2,7 @@ import {
   lockHomeAndExactMemberships,
   type LockedHomeAndExactMemberships,
 } from '../../domains/homes/lock-home-and-exact-memberships.js';
+import { createMaintenanceResolvedV1Event } from '../../domains/maintenance/events.js';
 import {
   MaintenanceNotOpenError,
   MaintenancePersistenceError,
@@ -21,7 +22,11 @@ import {
   ConcealedNotFoundError,
   InvalidRequestError,
 } from '../../platform/authz/errors.js';
+import type { OutboxWriter } from '../../platform/events/outbox-writer.js';
+import { outboxWriter } from '../../platform/events/outbox-writer.js';
 import { pathUuidSchema } from '../../platform/http/path-id.js';
+import type { UuidV7Generator } from '../../platform/ids/uuid-v7.js';
+import { systemUuidV7 } from '../../platform/ids/uuid-v7.js';
 import {
   runInReadCommittedTransaction,
   type TransactionContext,
@@ -46,7 +51,9 @@ export type ResolveMaintenanceEntryDependencies = Readonly<{
     MaintenanceRepository,
     'lockVisibleForResolve' | 'resolveOpenEntry'
   >;
+  outbox: Pick<OutboxWriter, 'append'>;
   clock: Clock;
+  ids: UuidV7Generator;
 }>;
 
 function requiredUuid(value: string): string {
@@ -111,7 +118,8 @@ function toDetailProjection(
  * Home FOR UPDATE → exact actor Membership FOR UPDATE → revalidate Home →
  * revalidate exact actor tenure/user/home/current DB role → authorize
  * maintenance.resolve → visible MaintenanceEntry FOR UPDATE → require OPEN →
- * one Clock.now() → conditional resolve write.
+ * one Clock.now() → conditional resolve write → same-transaction
+ * maintenance.resolved.v1.
  */
 export function createResolveMaintenanceEntry(
   deps: ResolveMaintenanceEntryDependencies,
@@ -162,6 +170,15 @@ export function createResolveMaintenanceEntry(
       if (updated === null) {
         throw new MaintenancePersistenceError();
       }
+      await deps.outbox.append(
+        tx,
+        createMaintenanceResolvedV1Event({
+          eventId: deps.ids.next(),
+          occurredAt,
+          homeId: locked.home.id,
+          maintenanceEntryId: updated.id,
+        }),
+      );
       return toDetailProjection(updated);
     });
   };
@@ -176,6 +193,8 @@ export function createResolveMaintenanceEntryFromPool(
     maintenance: createMaintenanceRepository(
       pool as Parameters<typeof createMaintenanceRepository>[0],
     ),
+    outbox: outboxWriter,
     clock: systemClock,
+    ids: systemUuidV7,
   });
 }

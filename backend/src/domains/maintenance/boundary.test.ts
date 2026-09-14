@@ -29,9 +29,20 @@ void describe('maintenance domain boundary', () => {
       assert.doesNotMatch(source, /domains\/supplies/, relative);
       assert.doesNotMatch(source, /home-administration/, relative);
       assert.doesNotMatch(source, /platform\/runtime/, relative);
-      assert.doesNotMatch(source, /outbox/, relative);
       assert.doesNotMatch(source, /better-auth/, relative);
       assert.doesNotMatch(source, /user_id/, relative);
+      if (!relative.endsWith('/http.ts') && !relative.endsWith('/events.ts')) {
+        assert.doesNotMatch(source, /outbox/, relative);
+      }
+      if (relative.endsWith('/events.ts')) {
+        assert.match(source, /import type \{ OutboxEventInput \}/);
+        assert.doesNotMatch(source, /createOutboxWriter/);
+        assert.doesNotMatch(source, /title/);
+        assert.doesNotMatch(source, /details/);
+        assert.doesNotMatch(source, /audienceMembershipIds/);
+        assert.doesNotMatch(source, /userId/);
+        assert.doesNotMatch(source, /visibility/);
+      }
       if (!relative.endsWith('/http.ts')) {
         assert.doesNotMatch(source, /from ['"]express['"]/, relative);
       }
@@ -68,6 +79,40 @@ void describe('maintenance domain boundary', () => {
     assert.doesNotMatch(source, /console\.log/);
     assert.doesNotMatch(source, /maintenance\.created/);
     assert.doesNotMatch(source, /outbox/);
+  });
+
+  void it('keeps Activity source lookup free of title, details, and names', async () => {
+    const source = await readFile(
+      path.join(maintenanceDir, 'find-maintenance-activity-source.ts'),
+      'utf8',
+    );
+    assert.match(source, /FIND_MAINTENANCE_ACTIVITY_SOURCE_SQL/);
+    assert.match(source, /FIND_MAINTENANCE_ACTIVITY_SOURCE_AUDIENCE_SQL/);
+    assert.match(source, /expectedHomeId/);
+    assert.doesNotMatch(source, /e\.title/);
+    assert.doesNotMatch(source, /e\.details/);
+    assert.doesNotMatch(source, /user_id/);
+    assert.doesNotMatch(source, /email/);
+    assert.doesNotMatch(source, /\brole\b/);
+    assert.doesNotMatch(source, /isHomeAdmin/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /activity\/repository/);
+    assert.doesNotMatch(source, /insertHomeVisibleActivity/);
+  });
+
+  void it('keeps Activity list display free of PRIVATE title, details, and audience', async () => {
+    const source = await readFile(
+      path.join(maintenanceDir, 'find-maintenance-activity-display.ts'),
+      'utf8',
+    );
+    assert.match(source, /FIND_MAINTENANCE_ACTIVITY_DISPLAYS_SQL/);
+    assert.match(source, /WHEN e\.visibility = 'HOUSEHOLD' THEN e\.title/);
+    assert.doesNotMatch(source, /e\.details/);
+    assert.doesNotMatch(source, /audience/);
+    assert.doesNotMatch(source, /user_id/);
+    assert.doesNotMatch(source, /isHomeAdmin/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /activity\/repository/);
   });
 
   void it('keeps title and details free of persistence, HTTP, and JS Date', async () => {

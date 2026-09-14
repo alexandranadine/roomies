@@ -2,10 +2,15 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { ExactLockedMembership } from '../../domains/homes/lock-home-and-exact-memberships.js';
 import { TaskAlreadyCompletedError } from '../../domains/tasks/errors.js';
+import { TASK_COMPLETED_V1 } from '../../domains/tasks/events.js';
 import type { CompleteOpenTaskInstance } from '../../domains/tasks/repository.js';
 import type { TaskInstance } from '../../domains/tasks/task.js';
 import type { ActiveHomeActor } from '../../platform/authz/context.js';
 import { ConcealedNotFoundError } from '../../platform/authz/errors.js';
+import type {
+  JsonObject,
+  OutboxEventInput,
+} from '../../platform/events/outbox-types.js';
 import type { TransactionContext } from '../../platform/persistence/transaction.js';
 import {
   createCompleteTask,
@@ -22,6 +27,7 @@ const ASSIGNEE = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 const OLD_MEMBERSHIP = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 const TASK_A = '018f1e2c-7e3a-7000-8000-1234567890ab';
 const TASK_B = '018f1e2c-7e3a-7000-8000-1234567890ac';
+const EVENT = '018f1e2c-7e3a-7000-8000-1234567890ad';
 const CREATED_AT = new Date('2026-09-12T17:00:00.000Z');
 const OCCURRED_AT = new Date('2026-09-12T18:00:00.000Z');
 const PRIOR_COMPLETED_AT = new Date('2026-09-12T17:30:00.000Z');
@@ -58,6 +64,7 @@ function openTask(overrides: Partial<TaskInstance> = {}): TaskInstance {
     scheduledFor: '2026-09-15',
     assignedMembershipId: ASSIGNEE,
     completedAt: null,
+    completedByMembershipId: null,
     createdAt: CREATED_AT,
     updatedAt: CREATED_AT,
     ...overrides,
@@ -72,6 +79,7 @@ function completedFrom(
     ...locked,
     status: 'COMPLETED',
     completedAt: write.completedAt,
+    completedByMembershipId: write.completedByMembershipId,
     updatedAt: write.updatedAt,
   });
 }
@@ -103,7 +111,9 @@ function harness(options: HarnessOptions = {}) {
   const completes: CompleteOpenTaskInstance[] = [];
   const lockCalls: { homeId: string; membershipIds: readonly string[] }[] = [];
   const taskLocks: { homeId: string; taskId: string }[] = [];
+  const appended: OutboxEventInput<string, JsonObject>[] = [];
   let committed = false;
+  let uuidCalls = 0;
   const lockedTask =
     options.lockedTask === undefined ? openTask() : options.lockedTask;
 
@@ -157,9 +167,21 @@ function harness(options: HarnessOptions = {}) {
         return Promise.resolve(completedFrom(lockedTask, write));
       },
     },
+    outbox: {
+      append(_tx, event) {
+        appended.push(event);
+        return Promise.resolve();
+      },
+    },
     clock: {
       now() {
         return OCCURRED_AT;
+      },
+    },
+    ids: {
+      next() {
+        uuidCalls += 1;
+        return EVENT;
       },
     },
   };
@@ -167,32 +189,55 @@ function harness(options: HarnessOptions = {}) {
   return {
     complete: createCompleteTask(deps),
     completes,
+    appended,
     lockCalls,
     taskLocks,
+    uuidCalls: () => uuidCalls,
     isCommitted: () => committed,
   };
 }
 
 void describe('createCompleteTask', () => {
   void it('lets an active Roommate complete an OPEN manual Task', async () => {
-    const { complete, completes, lockCalls, taskLocks } = harness();
+    const { complete, completes, appended, lockCalls, taskLocks, uuidCalls } =
+      harness();
     const result = await complete(input());
     assert.equal(result.status, 'COMPLETED');
     assert.equal(result.completedAt, OCCURRED_AT);
+    assert.equal(result.completedByMembershipId, MEMBERSHIP);
     assert.equal(result.updatedAt, OCCURRED_AT);
     assert.equal(result.title, 'Take out trash');
     assert.equal(result.source, 'MANUAL');
     assert.equal(result.scheduledFor, '2026-09-15');
     assert.equal(result.assignedMembershipId, ASSIGNEE);
+    assert.notEqual(result.completedByMembershipId, ASSIGNEE);
     assert.equal(result.createdAt, CREATED_AT);
     assert.deepEqual(completes, [
       {
         homeId: HOME,
         taskId: TASK_A,
         completedAt: OCCURRED_AT,
+        completedByMembershipId: MEMBERSHIP,
         updatedAt: OCCURRED_AT,
       },
     ]);
+    assert.equal(uuidCalls(), 1);
+    assert.equal(appended.length, 1);
+    assert.equal(appended[0]?.eventType, TASK_COMPLETED_V1);
+    assert.equal(appended[0]?.eventId, EVENT);
+    assert.equal(appended[0]?.occurredAt, OCCURRED_AT);
+    assert.equal(appended[0]?.homeId, HOME);
+    assert.deepEqual(appended[0]?.payload, { taskInstanceId: TASK_A });
+    assert.deepEqual(Object.keys(appended[0]?.payload ?? {}), [
+      'taskInstanceId',
+    ]);
+    assert.equal('title' in (appended[0]?.payload ?? {}), false);
+    assert.equal('userId' in (appended[0]?.payload ?? {}), false);
+    assert.equal(
+      'completedByMembershipId' in (appended[0]?.payload ?? {}),
+      false,
+    );
+    assert.equal('assignedMembershipId' in (appended[0]?.payload ?? {}), false);
     assert.deepEqual(lockCalls, [
       { homeId: HOME, membershipIds: [MEMBERSHIP] },
     ]);
@@ -246,43 +291,52 @@ void describe('createCompleteTask', () => {
     const { complete, completes } = harness();
     const result = await complete(input());
     assert.equal(result.completedAt?.getTime(), OCCURRED_AT.getTime());
+    assert.equal(result.completedByMembershipId, MEMBERSHIP);
     assert.equal(result.updatedAt.getTime(), OCCURRED_AT.getTime());
     assert.equal(completes[0]?.completedAt, OCCURRED_AT);
+    assert.equal(completes[0]?.completedByMembershipId, MEMBERSHIP);
     assert.equal(completes[0]?.updatedAt, OCCURRED_AT);
   });
 
   void it('rejects an already COMPLETED Task without writing again', async () => {
-    const { complete, completes, isCommitted } = harness({
+    const { complete, completes, appended, uuidCalls, isCommitted } = harness({
       lockedTask: openTask({
         status: 'COMPLETED',
         completedAt: PRIOR_COMPLETED_AT,
+        completedByMembershipId: ASSIGNEE,
         updatedAt: PRIOR_COMPLETED_AT,
       }),
     });
     await assert.rejects(() => complete(input()), TaskAlreadyCompletedError);
     assert.deepEqual(completes, []);
+    assert.deepEqual(appended, []);
+    assert.equal(uuidCalls(), 0);
     assert.equal(isCommitted(), false);
   });
 
   void it('maps a defensive zero-row complete to the same state conflict', async () => {
-    const { complete, isCommitted } = harness({
+    const { complete, appended, uuidCalls, isCommitted } = harness({
       completeResult: null,
     });
     await assert.rejects(() => complete(input()), TaskAlreadyCompletedError);
+    assert.deepEqual(appended, []);
+    assert.equal(uuidCalls(), 0);
     assert.equal(isCommitted(), false);
   });
 
   void it('conceals an unknown Task without writing', async () => {
-    const { complete, completes, isCommitted } = harness({
+    const { complete, completes, appended, uuidCalls, isCommitted } = harness({
       lockedTask: null,
     });
     await assert.rejects(() => complete(input()), ConcealedNotFoundError);
     assert.deepEqual(completes, []);
+    assert.deepEqual(appended, []);
+    assert.equal(uuidCalls(), 0);
     assert.equal(isCommitted(), false);
   });
 
   void it('conceals a Task locked under another Home id as missing', async () => {
-    const { complete, completes } = harness({
+    const { complete, completes, appended } = harness({
       lockedTask: null,
     });
     await assert.rejects(
@@ -290,6 +344,7 @@ void describe('createCompleteTask', () => {
       ConcealedNotFoundError,
     );
     assert.deepEqual(completes, []);
+    assert.deepEqual(appended, []);
   });
 
   void it('rejects a stale or ended actor without completing', async () => {
@@ -307,10 +362,12 @@ void describe('createCompleteTask', () => {
     assert.equal(missing.isCommitted(), false);
     assert.deepEqual(ended.completes, []);
     assert.deepEqual(missing.completes, []);
+    assert.deepEqual(ended.appended, []);
+    assert.deepEqual(missing.appended, []);
   });
 
   void it('does not let an old tenure inherit authority after rejoin', async () => {
-    const { complete, completes } = harness({
+    const { complete, completes, appended } = harness({
       memberships: [
         lockedMembership({
           id: OLD_MEMBERSHIP,
@@ -332,48 +389,57 @@ void describe('createCompleteTask', () => {
       ConcealedNotFoundError,
     );
     assert.deepEqual(completes, []);
+    assert.deepEqual(appended, []);
   });
 
   void it('rejects an actor whose userId no longer matches the locked tenure', async () => {
-    const { complete, completes } = harness({
+    const { complete, completes, appended } = harness({
       memberships: [lockedMembership({ userId: OTHER_USER })],
     });
     await assert.rejects(() => complete(input()), ConcealedNotFoundError);
     assert.deepEqual(completes, []);
+    assert.deepEqual(appended, []);
   });
 
   void it('conceals an archived Home observed inside the protected transaction', async () => {
-    const { complete, completes, taskLocks } = harness({ homeArchived: true });
+    const { complete, completes, appended, taskLocks } = harness({
+      homeArchived: true,
+    });
     await assert.rejects(() => complete(input()), ConcealedNotFoundError);
     assert.deepEqual(completes, []);
+    assert.deepEqual(appended, []);
     assert.deepEqual(taskLocks, []);
   });
 
   void it('conceals a Home-scope mismatch without locking', async () => {
-    const { complete, completes, lockCalls, taskLocks } = harness();
+    const { complete, completes, appended, lockCalls, taskLocks } = harness();
     await assert.rejects(
       () => complete(input({ homeId: OTHER_HOME })),
       ConcealedNotFoundError,
     );
     assert.deepEqual(completes, []);
+    assert.deepEqual(appended, []);
     assert.deepEqual(lockCalls, []);
     assert.deepEqual(taskLocks, []);
   });
 
   void it('leaves the Task OPEN when the complete write fails', async () => {
-    const { complete, isCommitted } = harness({
+    const { complete, appended, uuidCalls, isCommitted } = harness({
       completeError: new Error('complete failed'),
     });
     await assert.rejects(() => complete(input()), /complete failed/);
+    assert.deepEqual(appended, []);
+    assert.equal(uuidCalls(), 0);
     assert.equal(isCommitted(), false);
   });
 
   void it('leaves the Task OPEN when protected revalidation fails', async () => {
-    const { complete, completes, isCommitted } = harness({
+    const { complete, completes, appended, isCommitted } = harness({
       lockError: new ConcealedNotFoundError(),
     });
     await assert.rejects(() => complete(input()), ConcealedNotFoundError);
     assert.equal(isCommitted(), false);
     assert.deepEqual(completes, []);
+    assert.deepEqual(appended, []);
   });
 });

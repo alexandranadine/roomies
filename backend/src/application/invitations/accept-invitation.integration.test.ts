@@ -96,7 +96,34 @@ async function cleanup(
   await pool.query('DELETE FROM invitations WHERE id = $1', [
     seed.invitationId,
   ]);
-  await pool.query('DELETE FROM memberships WHERE home_id = $1', [seed.homeId]);
+  await pool.query(
+    'DELETE FROM membership_role_transitions WHERE home_id = $1',
+    [seed.homeId],
+  );
+  await pool.query(
+    `UPDATE memberships
+     SET ended_by_membership_id = id
+     WHERE home_id = $1 AND ended_at IS NOT NULL`,
+    [seed.homeId],
+  );
+  await pool.query(
+    `DELETE FROM memberships
+     WHERE home_id = $1 AND ended_at IS NULL`,
+    [seed.homeId],
+  );
+  const remainingMemberships = await pool.query<{ id: string }>(
+    'SELECT id FROM memberships WHERE home_id = $1',
+    [seed.homeId],
+  );
+  for (const row of remainingMemberships.rows) {
+    await pool.query(
+      `UPDATE memberships
+       SET ended_at = NULL, ended_by_membership_id = NULL
+       WHERE id = $1`,
+      [row.id],
+    );
+    await pool.query('DELETE FROM memberships WHERE id = $1', [row.id]);
+  }
   await pool.query('DELETE FROM homes WHERE id = $1', [seed.homeId]);
   await pool.query('DELETE FROM auth_identities WHERE id = $1', [seed.userId]);
   await pool.query('DELETE FROM users WHERE id = ANY($1::uuid[])', [
@@ -194,8 +221,6 @@ void describe('invitation acceptance PostgreSQL concurrency', () => {
           occurred_at: Date;
           payload: {
             membershipId: string;
-            cause: string;
-            invitationId: string;
           };
         }>(
           `SELECT occurred_at, payload
@@ -204,14 +229,103 @@ void describe('invitation acceptance PostgreSQL concurrency', () => {
           [seed.homeId],
         );
         assert.equal(events.rowCount, 1);
+        assert.deepEqual(Object.keys(events.rows[0]?.payload ?? {}), [
+          'membershipId',
+        ]);
         assert.deepEqual(events.rows[0]?.payload, {
           membershipId: result.membershipId,
-          cause: 'INVITATION_ACCEPTED',
-          invitationId: seed.invitationId,
         });
+        assert.equal(
+          JSON.stringify(events.rows[0]?.payload).includes('cause'),
+          false,
+        );
+        assert.equal(
+          JSON.stringify(events.rows[0]?.payload).includes('invitationId'),
+          false,
+        );
+        assert.equal(
+          JSON.stringify(events.rows[0]?.payload).includes(seed.userId),
+          false,
+        );
+        assert.equal(
+          JSON.stringify(events.rows[0]?.payload).includes('email'),
+          false,
+        );
         assert.equal(
           events.rows[0]?.occurred_at.getTime(),
           membership.rows[0]?.joined_at.getTime(),
+        );
+      } finally {
+        await cleanup(pool, seed);
+        await pool.end();
+      }
+    },
+  );
+
+  void it(
+    'rejoins as a new Membership B and emits started only for B',
+    { skip: skipWithoutDatabase, timeout: 30_000 },
+    async () => {
+      const pool = new Pool({
+        connectionString: resolveSafeDedicatedTestDatabaseUrl(),
+        max: 4,
+      });
+      const seed = await seedAcceptance(pool, randomUUID());
+      const priorMembershipId = randomUUID();
+      try {
+        await pool.query(
+          `INSERT INTO users (id, updated_at) VALUES ($1, now())
+           ON CONFLICT (id) DO NOTHING`,
+          [seed.userId],
+        );
+        await pool.query(
+          `INSERT INTO memberships (
+             id, home_id, user_id, role, joined_at, ended_at, ended_by_membership_id
+           ) VALUES (
+             $1, $2, $3, 'ADMIN', now() - interval '3 days',
+             now() - interval '2 days', $1
+           )`,
+          [priorMembershipId, seed.homeId, seed.userId],
+        );
+
+        const command = createAcceptInvitationFromPool(pool);
+        const result = await command({
+          invitationId: seed.invitationId,
+          userId: seed.userId,
+          secret: seed.secret.encoded,
+        });
+
+        assert.notEqual(result.membershipId, priorMembershipId);
+
+        const tenures = await pool.query<{
+          id: string;
+          ended_at: Date | null;
+        }>(
+          `SELECT id, ended_at FROM memberships
+           WHERE home_id = $1 AND user_id = $2
+           ORDER BY joined_at`,
+          [seed.homeId, seed.userId],
+        );
+        assert.equal(tenures.rowCount, 2);
+        assert.equal(tenures.rows[0]?.id, priorMembershipId);
+        assert.ok(tenures.rows[0]?.ended_at instanceof Date);
+        assert.equal(tenures.rows[1]?.id, result.membershipId);
+        assert.equal(tenures.rows[1]?.ended_at, null);
+
+        const events = await pool.query<{
+          payload: { membershipId: string };
+        }>(
+          `SELECT payload FROM outbox_events
+           WHERE home_id = $1 AND event_type = 'membership.started.v1'`,
+          [seed.homeId],
+        );
+        assert.equal(events.rowCount, 1);
+        assert.deepEqual(events.rows[0]?.payload, {
+          membershipId: result.membershipId,
+        });
+        assert.notEqual(
+          events.rows[0]?.payload.membershipId,
+          priorMembershipId,
         );
       } finally {
         await cleanup(pool, seed);
@@ -623,7 +737,7 @@ void describe('invitation acceptance PostgreSQL concurrency', () => {
               homeId: seed.homeId,
             });
             return tx.query(
-              `UPDATE memberships SET ended_at = now()
+              `UPDATE memberships SET ended_at = now(), ended_by_membership_id = id
                WHERE id = $1 AND home_id = $2 AND ended_at IS NULL`,
               [priorMembershipId, seed.homeId],
             );

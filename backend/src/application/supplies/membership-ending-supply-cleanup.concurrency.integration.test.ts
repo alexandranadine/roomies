@@ -136,8 +136,8 @@ async function insertMembership(
   },
 ): Promise<void> {
   await pool.query(
-    `INSERT INTO memberships (id, home_id, user_id, role, ended_at)
-     VALUES ($1, $2, $3, $4, NULL)`,
+    `INSERT INTO memberships (id, home_id, user_id, role, ended_at, ended_by_membership_id)
+     VALUES ($1, $2, $3, $4, NULL, NULL)`,
     [input.id, input.homeId, input.userId, input.role],
   );
 }
@@ -155,6 +155,7 @@ function openEntry(input: {
     status: 'OPEN',
     createdByMembershipId: input.createdByMembershipId,
     obtainedAt: null,
+    obtainedByMembershipId: null,
     canceledAt: null,
     createdAt: CREATED,
     updatedAt: CREATED,
@@ -223,9 +224,34 @@ async function cleanup(
     await pool.query('DELETE FROM outbox_events WHERE home_id = ANY($1)', [
       input.homeIds,
     ]);
-    await pool.query('DELETE FROM memberships WHERE home_id = ANY($1)', [
-      input.homeIds,
-    ]);
+    await pool.query(
+      'DELETE FROM membership_role_transitions WHERE home_id = ANY($1::uuid[])',
+      [input.homeIds],
+    );
+    await pool.query(
+      `UPDATE memberships
+       SET ended_by_membership_id = id
+       WHERE home_id = ANY($1::uuid[]) AND ended_at IS NOT NULL`,
+      [input.homeIds],
+    );
+    await pool.query(
+      `DELETE FROM memberships
+       WHERE home_id = ANY($1::uuid[]) AND ended_at IS NULL`,
+      [input.homeIds],
+    );
+    const remainingMemberships = await pool.query<{ id: string }>(
+      'SELECT id FROM memberships WHERE home_id = ANY($1::uuid[])',
+      [input.homeIds],
+    );
+    for (const row of remainingMemberships.rows) {
+      await pool.query(
+        `UPDATE memberships
+         SET ended_at = NULL, ended_by_membership_id = NULL
+         WHERE id = $1`,
+        [row.id],
+      );
+      await pool.query('DELETE FROM memberships WHERE id = $1', [row.id]);
+    }
     await pool.query('DELETE FROM homes WHERE id = ANY($1)', [input.homeIds]);
   }
   if (input.userIds.length > 0) {
@@ -338,16 +364,12 @@ async function membershipEndedAt(
 async function endedEvents(
   pool: Pool,
   homeId: string,
-): Promise<
-  readonly { membershipId: string; cause: string; occurredAt: Date }[]
-> {
+): Promise<readonly { membershipId: string; occurredAt: Date }[]> {
   const result = await pool.query<{
     membership_id: string;
-    cause: string;
     occurred_at: Date;
   }>(
     `SELECT payload->>'membershipId' AS membership_id,
-            payload->>'cause' AS cause,
             occurred_at
      FROM outbox_events
      WHERE home_id = $1 AND event_type = 'membership.ended.v1'
@@ -356,7 +378,6 @@ async function endedEvents(
   );
   return result.rows.map((row) => ({
     membershipId: row.membership_id,
-    cause: row.cause,
     occurredAt: row.occurred_at,
   }));
 }
@@ -875,10 +896,6 @@ void describe('Membership-ending Supply cleanup concurrency PostgreSQL', () => {
         );
         assert.equal(events.length, 1);
         assert.equal(events[0]?.membershipId, leavingMembership);
-        assert.ok(
-          events[0]?.cause === 'VOLUNTARY_LEAVE' ||
-            events[0]?.cause === 'ADMIN_REMOVAL',
-        );
         assert.deepEqual(events[0]?.occurredAt, ENDING_AT);
         assert.equal(
           await membershipEndedAt(database.pool, adminMembership),

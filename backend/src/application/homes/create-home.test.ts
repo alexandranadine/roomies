@@ -13,6 +13,7 @@ import {
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 const HOME_ID = '018f1e2c-7e3a-7000-8000-1234567890ab';
 const MEMBERSHIP_ID = '018f1e2c-7e3a-7000-8000-1234567890ac';
+const EVENT_ID = '018f1e2c-7e3a-7000-8000-1234567890ad';
 const OCCURRED_AT = new Date('2026-09-12T18:00:00.000Z');
 const UUID_V7 =
   /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -23,16 +24,18 @@ const TX: TransactionContext = {
 type HarnessOptions = {
   membershipError?: Error;
   homeError?: Error;
+  outboxError?: Error;
 };
 
 function harness(options: HarnessOptions = {}) {
   const order: string[] = [];
   const homes: NewHome[] = [];
   const memberships: NewActiveMembership[] = [];
+  const events: unknown[] = [];
   let committed = false;
   let clockCalls = 0;
   let idIndex = 0;
-  const ids = [HOME_ID, MEMBERSHIP_ID];
+  const ids = [HOME_ID, MEMBERSHIP_ID, EVENT_ID];
 
   const deps: CreateHomeDependencies = {
     runTransaction: async (work) => {
@@ -63,6 +66,16 @@ function harness(options: HarnessOptions = {}) {
       memberships.push(membership);
       return Promise.resolve();
     },
+    outbox: {
+      append(_tx, event) {
+        order.push('outbox');
+        if (options.outboxError) {
+          return Promise.reject(options.outboxError);
+        }
+        events.push(event);
+        return Promise.resolve();
+      },
+    },
     clock: {
       now() {
         clockCalls += 1;
@@ -85,6 +98,7 @@ function harness(options: HarnessOptions = {}) {
     order,
     homes,
     memberships,
+    events,
     get committed() {
       return committed;
     },
@@ -110,8 +124,21 @@ void describe('createCreateHome', () => {
       'begin',
       'home-insert',
       'membership-insert',
+      'outbox',
       'commit',
     ]);
+    assert.deepEqual(run.events, [
+      {
+        eventId: EVENT_ID,
+        eventType: 'membership.started.v1',
+        occurredAt: OCCURRED_AT,
+        homeId: HOME_ID,
+        payload: { membershipId: MEMBERSHIP_ID },
+      },
+    ]);
+    assert.equal(JSON.stringify(run.events).includes(USER_ID), false);
+    assert.equal(JSON.stringify(run.events).includes('ADMIN'), false);
+    assert.equal(JSON.stringify(run.events).includes('email'), false);
     assert.match(result.home.id, UUID_V7);
     assert.match(result.membership.id, UUID_V7);
     assert.equal(result.home.id, HOME_ID);
@@ -146,14 +173,16 @@ void describe('createCreateHome', () => {
   void it('allows a second Home for the same User', async () => {
     const first = harness();
     const secondIds = [
-      '018f1e2c-7e3a-7000-8000-1234567890ad',
       '018f1e2c-7e3a-7000-8000-1234567890ae',
+      '018f1e2c-7e3a-7000-8000-1234567890af',
+      '018f1e2c-7e3a-7000-8000-1234567890b0',
     ];
     let idIndex = 0;
     const second = createCreateHome({
       runTransaction: async (work) => work(TX),
       insertHome: () => Promise.resolve(),
       insertMembership: () => Promise.resolve(),
+      outbox: { append: () => Promise.resolve() },
       clock: { now: () => OCCURRED_AT },
       ids: {
         next() {
@@ -224,6 +253,31 @@ void describe('createCreateHome', () => {
     ]);
     assert.equal(homes.length, 1);
     assert.equal(memberships.length, 0);
+  });
+
+  void it('rolls back Home and Membership when the started event fails', async () => {
+    const { create, homes, memberships, events, order, committed } = harness({
+      outboxError: new TransactionInfrastructureError(),
+    });
+    await assert.rejects(
+      create({
+        userId: USER_ID,
+        name: 'Oak Street',
+        timezone: 'UTC',
+      }),
+      TransactionInfrastructureError,
+    );
+    assert.equal(committed, false);
+    assert.deepEqual(order, [
+      'begin',
+      'home-insert',
+      'membership-insert',
+      'outbox',
+      'rollback',
+    ]);
+    assert.equal(homes.length, 1);
+    assert.equal(memberships.length, 1);
+    assert.equal(events.length, 0);
   });
 
   void it('does not insert a Membership when Home insert fails', async () => {

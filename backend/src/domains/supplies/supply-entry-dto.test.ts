@@ -14,6 +14,7 @@ function entry(overrides: Partial<SupplyEntry> = {}): SupplyEntry {
     status: 'OPEN',
     createdByMembershipId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
     obtainedAt: null,
+    obtainedByMembershipId: null,
     canceledAt: null,
     createdAt: CREATED,
     updatedAt: CREATED,
@@ -84,6 +85,7 @@ void describe('toSupplyEntryDto', () => {
     assert.equal(serialized.includes('claimant-secret'), false);
     assert.equal(serialized.includes('user-secret'), false);
     assert.equal(serialized.includes('homeId'), false);
+    assert.equal(serialized.includes('obtainedByMembershipId'), false);
     assert.equal(serialized.includes('claimedBy'), false);
     assert.equal(serialized.includes('canClaim'), false);
     assert.equal(serialized.includes('userId'), false);

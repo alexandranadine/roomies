@@ -5,6 +5,7 @@ import type { Pool } from 'pg';
 import { lockHomeStructure } from '../../domains/homes/lock-home-structure.js';
 import { LastAdminRequiredError } from '../../domains/memberships/errors.js';
 import { createMembershipEndingWriter } from '../../domains/memberships/update-active-membership-ended-at.js';
+import { createMembershipRoleTransitionWriter } from '../../domains/memberships/insert-membership-role-transition.js';
 import { createMembershipRoleWriter } from '../../domains/memberships/update-active-membership-role.js';
 import type { ActiveHomeActor } from '../../platform/authz/context.js';
 import {
@@ -92,14 +93,15 @@ async function insertMembership(
   },
 ): Promise<void> {
   await pool.query(
-    `INSERT INTO memberships (id, home_id, user_id, role, ended_at)
-     VALUES ($1, $2, $3, $4, $5)`,
+    `INSERT INTO memberships (id, home_id, user_id, role, ended_at, ended_by_membership_id)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
     [
       input.id,
       input.homeId,
       input.userId,
       input.role,
       input.ended === true ? new Date() : null,
+      input.ended === true ? input.id : null,
     ],
   );
 }
@@ -112,9 +114,34 @@ async function cleanup(
     'DELETE FROM outbox_events WHERE home_id = ANY($1::uuid[])',
     [input.homeIds],
   );
-  await pool.query('DELETE FROM memberships WHERE home_id = ANY($1::uuid[])', [
-    input.homeIds,
-  ]);
+  await pool.query(
+    'DELETE FROM membership_role_transitions WHERE home_id = ANY($1::uuid[])',
+    [input.homeIds],
+  );
+  await pool.query(
+    `UPDATE memberships
+     SET ended_by_membership_id = id
+     WHERE home_id = ANY($1::uuid[]) AND ended_at IS NOT NULL`,
+    [input.homeIds],
+  );
+  await pool.query(
+    `DELETE FROM memberships
+     WHERE home_id = ANY($1::uuid[]) AND ended_at IS NULL`,
+    [input.homeIds],
+  );
+  const remainingMemberships = await pool.query<{ id: string }>(
+    'SELECT id FROM memberships WHERE home_id = ANY($1::uuid[])',
+    [input.homeIds],
+  );
+  for (const row of remainingMemberships.rows) {
+    await pool.query(
+      `UPDATE memberships
+       SET ended_at = NULL, ended_by_membership_id = NULL
+       WHERE id = $1`,
+      [row.id],
+    );
+    await pool.query('DELETE FROM memberships WHERE id = $1', [row.id]);
+  }
   await pool.query('DELETE FROM homes WHERE id = ANY($1::uuid[])', [
     input.homeIds,
   ]);
@@ -158,19 +185,28 @@ function createRoleChange(pool: Pool) {
     clock: { now: () => new Date('2026-03-15T12:34:56.789Z') },
     ids: { next: nextEventId },
     roleWriter: createMembershipRoleWriter(),
+    roleTransitions: createMembershipRoleTransitionWriter(),
   });
 }
 
 async function membershipRows(
   pool: Pool,
   homeId: string,
-): Promise<readonly { id: string; role: string; ended_at: Date | null }[]> {
+): Promise<
+  readonly {
+    id: string;
+    role: string;
+    ended_at: Date | null;
+    ended_by_membership_id: string | null;
+  }[]
+> {
   const result = await pool.query<{
     id: string;
     role: string;
     ended_at: Date | null;
+    ended_by_membership_id: string | null;
   }>(
-    `SELECT id, role, ended_at
+    `SELECT id, role, ended_at, ended_by_membership_id
      FROM memberships
      WHERE home_id = $1
      ORDER BY id`,
@@ -182,9 +218,9 @@ async function membershipRows(
 async function endedEvents(
   pool: Pool,
   homeId: string,
-): Promise<readonly { membershipId: string; cause: string }[]> {
+): Promise<readonly { membershipId: string }[]> {
   const result = await pool.query<{
-    payload: { membershipId: string; cause: string };
+    payload: { membershipId: string };
   }>(
     `SELECT payload
      FROM outbox_events
@@ -266,9 +302,12 @@ void describe('removeMembership PostgreSQL', () => {
         assert.equal(admin?.ended_at, null);
         assert.equal(roommate?.role, 'ROOMMATE');
         assert.ok(roommate?.ended_at instanceof Date);
+        assert.equal(roommate?.ended_by_membership_id, membershipA);
+        assert.notEqual(roommate?.ended_by_membership_id, membershipB);
+        assert.equal(admin?.ended_by_membership_id, null);
         assert.equal(await archivedAt(database.pool, homeId), null);
         assert.deepEqual(await endedEvents(database.pool, homeId), [
-          { membershipId: membershipB, cause: 'ADMIN_REMOVAL' },
+          { membershipId: membershipB },
         ]);
       } finally {
         await cleanup(database.pool, {
@@ -333,7 +372,7 @@ void describe('removeMembership PostgreSQL', () => {
         );
         assert.equal(rows.find((row) => row.id === membershipB)?.role, 'ADMIN');
         assert.deepEqual(await endedEvents(database.pool, homeId), [
-          { membershipId: membershipB, cause: 'ADMIN_REMOVAL' },
+          { membershipId: membershipB },
         ]);
       } finally {
         await cleanup(database.pool, {
@@ -624,7 +663,7 @@ void describe('removeMembership PostgreSQL', () => {
         }>('SELECT ended_at FROM memberships WHERE id = $1', [membershipNew]);
         assert.ok(endedNew.rows[0]?.ended_at instanceof Date);
         assert.deepEqual(await endedEvents(database.pool, homeX), [
-          { membershipId: membershipNew, cause: 'ADMIN_REMOVAL' },
+          { membershipId: membershipNew },
         ]);
       } finally {
         await cleanup(database.pool, {
@@ -903,7 +942,7 @@ void describe('removeMembership PostgreSQL', () => {
           null,
         );
         assert.deepEqual(await endedEvents(database.pool, homeId), [
-          { membershipId: membershipC, cause: 'ADMIN_REMOVAL' },
+          { membershipId: membershipC },
         ]);
       } finally {
         await cleanup(database.pool, {

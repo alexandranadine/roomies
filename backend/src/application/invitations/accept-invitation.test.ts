@@ -230,8 +230,6 @@ void describe('acceptInvitation', () => {
         homeId: HOME_ID,
         payload: {
           membershipId: NEW_MEMBERSHIP_ID,
-          cause: 'INVITATION_ACCEPTED',
-          invitationId: INVITATION_ID,
         },
       },
     ]);
@@ -266,6 +264,14 @@ void describe('acceptInvitation', () => {
     assert.deepEqual(oldTenure, snapshot);
     assert.notEqual(test.inserted[0]?.id, oldTenure.id);
     assert.equal('role' in (test.inserted[0] ?? {}), false);
+    assert.equal(test.events.length, 1);
+    assert.deepEqual(test.events[0]?.payload, {
+      membershipId: NEW_MEMBERSHIP_ID,
+    });
+    assert.notEqual(
+      (test.events[0]?.payload as { membershipId?: string }).membershipId,
+      oldTenure.id,
+    );
   });
 
   void it('rejects unverified and mismatched current canonical email', async () => {
@@ -292,6 +298,7 @@ void describe('acceptInvitation', () => {
     const test = harness({ home: lockedHome([ADMIN_ID, USER_ID]) });
     await rejectsWith(test.run(), AlreadyHomeMemberError);
     assert.deepEqual(test.inserted, []);
+    assert.deepEqual(test.events, []);
     assert.equal(test.order.includes('invitation-accept'), false);
   });
 

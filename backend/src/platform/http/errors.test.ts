@@ -23,6 +23,10 @@ import {
   LastRoommateRequiresArchiveError,
 } from '../../domains/memberships/errors.js';
 import {
+  ActivityPersistenceError,
+  InvalidActivityRequestError,
+} from '../../domains/activity/errors.js';
+import {
   InvalidMaintenanceRequestError,
   MaintenanceNotOpenError,
   MaintenancePersistenceError,
@@ -75,6 +79,17 @@ void describe('HTTP known-error mappings', () => {
     const res = await appRequest(appThatThrows(new InvalidRequestError()), {
       path: '/throw',
     });
+    assert.equal(res.status, 400);
+    const body = res.json() as ApiErrorBody;
+    assert.equal(body.error.code, 'INVALID_REQUEST');
+    assert.equal(body.error.message, 'Invalid request');
+  });
+
+  void it('maps InvalidActivityRequestError to 400 INVALID_REQUEST', async () => {
+    const res = await appRequest(
+      appThatThrows(new InvalidActivityRequestError()),
+      { path: '/throw' },
+    );
     assert.equal(res.status, 400);
     const body = res.json() as ApiErrorBody;
     assert.equal(body.error.code, 'INVALID_REQUEST');
@@ -302,6 +317,20 @@ void describe('HTTP known-error mappings', () => {
     assert.equal(body.error.code, 'INTERNAL_ERROR');
     assert.equal(body.error.message, 'An unexpected error occurred');
     assert.equal(res.text.includes('Supply persistence failure'), false);
+  });
+
+  void it('maps ActivityPersistenceError to a safe 500', async () => {
+    const res = await appRequest(
+      appThatThrows(new ActivityPersistenceError()),
+      {
+        path: '/throw',
+      },
+    );
+    assert.equal(res.status, 500);
+    const body = res.json() as ApiErrorBody;
+    assert.equal(body.error.code, 'INTERNAL_ERROR');
+    assert.equal(body.error.message, 'An unexpected error occurred');
+    assert.equal(res.text.includes('Activity persistence failure'), false);
   });
 
   void it('maps MaintenancePersistenceError to a safe 500', async () => {

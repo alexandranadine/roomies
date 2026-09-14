@@ -42,7 +42,7 @@ void describe('process runtime boundary', () => {
   void it('wires process modes from the composition root', async () => {
     const source = await readFile(path.join(backendSrc, 'main.ts'), 'utf8');
     assert.match(source, /config\.processMode/);
-    assert.match(source, /createRecurrenceWorkerFromPool/);
+    assert.match(source, /createProcessWorkerFromPool/);
     assert.match(source, /startsHttpServer/);
     assert.match(source, /startsRecurrenceWorker/);
     assert.match(source, /startProcess/);

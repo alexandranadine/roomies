@@ -8,7 +8,7 @@ import { createTaskRepository } from '../../domains/tasks/repository.js';
 import type { ActiveHomeActor } from '../../platform/authz/context.js';
 import { ConcealedNotFoundError } from '../../platform/authz/errors.js';
 import type { AppConfig } from '../../platform/config/types.js';
-import { createUuidV7 } from '../../platform/ids/uuid-v7.js';
+import { createUuidV7, systemUuidV7 } from '../../platform/ids/uuid-v7.js';
 import { createDatabasePool } from '../../platform/persistence/pool.js';
 import {
   parseDatabaseUrl,
@@ -77,14 +77,15 @@ async function insertMembership(
   },
 ): Promise<void> {
   await pool.query(
-    `INSERT INTO memberships (id, home_id, user_id, role, ended_at)
-     VALUES ($1, $2, $3, $4, $5)`,
+    `INSERT INTO memberships (id, home_id, user_id, role, ended_at, ended_by_membership_id)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
     [
       input.id,
       input.homeId,
       input.userId,
       input.role,
       input.ended === true ? new Date() : null,
+      input.ended === true ? input.id : null,
     ],
   );
 }
@@ -135,9 +136,34 @@ async function cleanup(
     await pool.query('DELETE FROM outbox_events WHERE home_id = ANY($1)', [
       input.homeIds,
     ]);
-    await pool.query('DELETE FROM memberships WHERE home_id = ANY($1)', [
-      input.homeIds,
-    ]);
+    await pool.query(
+      'DELETE FROM membership_role_transitions WHERE home_id = ANY($1::uuid[])',
+      [input.homeIds],
+    );
+    await pool.query(
+      `UPDATE memberships
+       SET ended_by_membership_id = id
+       WHERE home_id = ANY($1::uuid[]) AND ended_at IS NOT NULL`,
+      [input.homeIds],
+    );
+    await pool.query(
+      `DELETE FROM memberships
+       WHERE home_id = ANY($1::uuid[]) AND ended_at IS NULL`,
+      [input.homeIds],
+    );
+    const remainingMemberships = await pool.query<{ id: string }>(
+      'SELECT id FROM memberships WHERE home_id = ANY($1::uuid[])',
+      [input.homeIds],
+    );
+    for (const row of remainingMemberships.rows) {
+      await pool.query(
+        `UPDATE memberships
+         SET ended_at = NULL, ended_by_membership_id = NULL
+         WHERE id = $1`,
+        [row.id],
+      );
+      await pool.query('DELETE FROM memberships WHERE id = $1', [row.id]);
+    }
     await pool.query('DELETE FROM homes WHERE id = ANY($1)', [input.homeIds]);
   }
   if (input.userIds.length > 0) {
@@ -150,11 +176,17 @@ function completeCommand(pool: Pool) {
     runTransaction: (work) => runInReadCommittedTransaction(pool, work),
     lockHomeAndExactMemberships,
     tasks: createTaskRepository(pool),
+    outbox: {
+      append() {
+        return Promise.resolve();
+      },
+    },
     clock: {
       now() {
         return OCCURRED;
       },
     },
+    ids: systemUuidV7,
   });
 }
 
@@ -316,6 +348,8 @@ void describe('Task completion PostgreSQL', () => {
         assert.equal(completed.title, 'Dated chore');
         assert.equal(completed.scheduledFor, '2026-09-15');
         assert.equal(completed.assignedMembershipId, membershipA);
+        assert.equal(completed.completedByMembershipId, membershipA);
+        assert.notEqual(completed.completedByMembershipId, endedAssignee);
         assert.equal(completed.completedAt?.getTime(), OCCURRED.getTime());
         assert.equal(completed.updatedAt.getTime(), OCCURRED.getTime());
         assert.equal(completed.createdAt.getTime(), CREATED.getTime());
@@ -328,11 +362,12 @@ void describe('Task completion PostgreSQL', () => {
           assigned_membership_id: string | null;
           task_definition_id: string | null;
           completed_at: Date | null;
+          completed_by_membership_id: string | null;
           updated_at: Date;
         }>(
           `SELECT status, source, title, scheduled_for::text AS scheduled_for,
                   assigned_membership_id, task_definition_id, completed_at,
-                  updated_at
+                  completed_by_membership_id, updated_at
            FROM task_instances WHERE id = $1 AND home_id = $2`,
           [datedId, homeA],
         );
@@ -342,6 +377,7 @@ void describe('Task completion PostgreSQL', () => {
         assert.equal(datedRow.rows[0]?.scheduled_for, '2026-09-15');
         assert.equal(datedRow.rows[0]?.assigned_membership_id, membershipA);
         assert.equal(datedRow.rows[0]?.task_definition_id, null);
+        assert.equal(datedRow.rows[0]?.completed_by_membership_id, membershipA);
         assert.equal(
           datedRow.rows[0]?.completed_at?.getTime(),
           OCCURRED.getTime(),
@@ -361,6 +397,7 @@ void describe('Task completion PostgreSQL', () => {
           `SELECT (
              status = 'COMPLETED'
              AND completed_at IS NOT NULL
+             AND completed_by_membership_id IS NOT NULL
              AND completed_at >= created_at
            ) AS ok
            FROM task_instances WHERE id = $1`,
@@ -375,6 +412,8 @@ void describe('Task completion PostgreSQL', () => {
         });
         assert.equal(assignedEnded.status, 'COMPLETED');
         assert.equal(assignedEnded.assignedMembershipId, endedAssignee);
+        assert.equal(assignedEnded.completedByMembershipId, membershipA);
+        assert.notEqual(assignedEnded.completedByMembershipId, endedAssignee);
 
         const adminCompleted = await complete({
           actor: actorAdmin,
@@ -399,14 +438,23 @@ void describe('Task completion PostgreSQL', () => {
         );
         const secondAttempt = await database.pool.query<{
           completed_at: Date;
+          completed_by_membership_id: string;
           updated_at: Date;
         }>(
-          'SELECT completed_at, updated_at FROM task_instances WHERE id = $1',
+          'SELECT completed_at, completed_by_membership_id, updated_at FROM task_instances WHERE id = $1',
           [alreadyId],
         );
         assert.equal(
           secondAttempt.rows[0]?.completed_at.getTime(),
           OCCURRED.getTime(),
+        );
+        assert.equal(
+          secondAttempt.rows[0]?.completed_by_membership_id,
+          membershipA,
+        );
+        assert.notEqual(
+          secondAttempt.rows[0]?.completed_by_membership_id,
+          membershipB,
         );
         assert.equal(
           secondAttempt.rows[0]?.updated_at.getTime(),
@@ -616,6 +664,7 @@ void describe('Task completion PostgreSQL', () => {
                 homeId,
                 taskId,
                 completedAt: OCCURRED,
+                completedByMembershipId: membershipId,
                 updatedAt: OCCURRED,
               });
               assert.equal(completed?.status, 'COMPLETED');
@@ -627,11 +676,14 @@ void describe('Task completion PostgreSQL', () => {
         const leftover = await database.pool.query<{
           status: string;
           completed_at: Date | null;
-        }>('SELECT status, completed_at FROM task_instances WHERE id = $1', [
-          taskId,
-        ]);
+          completed_by_membership_id: string | null;
+        }>(
+          'SELECT status, completed_at, completed_by_membership_id FROM task_instances WHERE id = $1',
+          [taskId],
+        );
         assert.equal(leftover.rows[0]?.status, 'OPEN');
         assert.equal(leftover.rows[0]?.completed_at, null);
+        assert.equal(leftover.rows[0]?.completed_by_membership_id, null);
 
         const complete = completeCommand(database.pool);
         await assert.rejects(
@@ -653,6 +705,12 @@ void describe('Task completion PostgreSQL', () => {
                   return OCCURRED;
                 },
               },
+              outbox: {
+                append() {
+                  return Promise.resolve();
+                },
+              },
+              ids: systemUuidV7,
             })({
               actor: actor({
                 userId,
@@ -669,11 +727,14 @@ void describe('Task completion PostgreSQL', () => {
         const afterApp = await database.pool.query<{
           status: string;
           completed_at: Date | null;
-        }>('SELECT status, completed_at FROM task_instances WHERE id = $1', [
-          taskId,
-        ]);
+          completed_by_membership_id: string | null;
+        }>(
+          'SELECT status, completed_at, completed_by_membership_id FROM task_instances WHERE id = $1',
+          [taskId],
+        );
         assert.equal(afterApp.rows[0]?.status, 'OPEN');
         assert.equal(afterApp.rows[0]?.completed_at, null);
+        assert.equal(afterApp.rows[0]?.completed_by_membership_id, null);
 
         const recovered = await complete({
           actor: actor({
@@ -686,6 +747,7 @@ void describe('Task completion PostgreSQL', () => {
           taskId,
         });
         assert.equal(recovered.status, 'COMPLETED');
+        assert.equal(recovered.completedByMembershipId, membershipId);
       } finally {
         await cleanup(database.pool, {
           userIds: [userId],
@@ -765,9 +827,83 @@ void describe('Task completion PostgreSQL', () => {
         assert.equal(second.status, 'COMPLETED');
         assert.equal(first.id, taskA);
         assert.equal(second.id, taskB);
+        assert.equal(first.completedByMembershipId, membershipA);
+        assert.equal(second.completedByMembershipId, membershipB);
       } finally {
         await cleanup(database.pool, {
           userIds: [userA, userB],
+          homeIds: [homeId],
+        });
+        await database.close();
+      }
+    },
+  );
+
+  void it(
+    'keeps historical completer tenure after that Membership ends and the User rejoins',
+    { skip: skipWithoutDatabase },
+    async () => {
+      const database = createDatabasePool(
+        testConfig(resolveSafeDedicatedTestDatabaseUrl()),
+      );
+      const userId = randomUUID();
+      const homeId = randomUUID();
+      const tenureA = randomUUID();
+      const tenureB = randomUUID();
+      const taskId = createUuidV7();
+      const complete = completeCommand(database.pool);
+
+      try {
+        await insertUser(database.pool, userId);
+        await insertHome(database.pool, {
+          id: homeId,
+          name: 'Rejoin completer',
+        });
+        await insertMembership(database.pool, {
+          id: tenureA,
+          homeId,
+          userId,
+          role: 'ROOMMATE',
+        });
+        await insertOpenManualTask(database.pool, {
+          id: taskId,
+          homeId,
+          title: 'Completed by first tenure',
+        });
+        const completed = await complete({
+          actor: actor({
+            userId,
+            membershipId: tenureA,
+            homeId,
+            role: 'ROOMMATE',
+          }),
+          homeId,
+          taskId,
+        });
+        assert.equal(completed.completedByMembershipId, tenureA);
+
+        await database.pool.query(
+          `UPDATE memberships SET ended_at = $2, ended_by_membership_id = $1 WHERE id = $1`,
+          [tenureA, OCCURRED],
+        );
+        await insertMembership(database.pool, {
+          id: tenureB,
+          homeId,
+          userId,
+          role: 'ROOMMATE',
+        });
+
+        const row = await database.pool.query<{
+          completed_by_membership_id: string;
+        }>(
+          'SELECT completed_by_membership_id FROM task_instances WHERE id = $1',
+          [taskId],
+        );
+        assert.equal(row.rows[0]?.completed_by_membership_id, tenureA);
+        assert.notEqual(row.rows[0]?.completed_by_membership_id, tenureB);
+      } finally {
+        await cleanup(database.pool, {
+          userIds: [userId],
           homeIds: [homeId],
         });
         await database.close();

@@ -14,6 +14,7 @@ import type {
 import { isMaintenanceVisibility } from '../../domains/maintenance/maintenance.js';
 import { normalizeMaintenanceDetails } from '../../domains/maintenance/maintenance-details.js';
 import { normalizeMaintenanceTitle } from '../../domains/maintenance/maintenance-title.js';
+import { createMaintenanceCreatedV1Event } from '../../domains/maintenance/events.js';
 import {
   createMaintenanceRepository,
   type InsertMaintenanceEntryWithAudience,
@@ -29,6 +30,8 @@ import {
   ConcealedNotFoundError,
   InvalidRequestError,
 } from '../../platform/authz/errors.js';
+import type { OutboxWriter } from '../../platform/events/outbox-writer.js';
+import { outboxWriter } from '../../platform/events/outbox-writer.js';
 import { pathUuidSchema } from '../../platform/http/path-id.js';
 import type { UuidV7Generator } from '../../platform/ids/uuid-v7.js';
 import { systemUuidV7 } from '../../platform/ids/uuid-v7.js';
@@ -64,6 +67,7 @@ export type CreateMaintenanceEntryDependencies = Readonly<{
   lockHomeAndExactMemberships: LockHomeAndExactMemberships;
   findActiveExactMembershipIdsInHome: FindActiveExactMembershipIdsInHome;
   maintenance: Pick<MaintenanceRepository, 'insertEntryWithAudience'>;
+  outbox: Pick<OutboxWriter, 'append'>;
   clock: Clock;
   ids: UuidV7Generator;
 }>;
@@ -224,8 +228,8 @@ function validatedCreateShape(input: CreateMaintenanceEntryInput): Readonly<{
  * Home FOR UPDATE → exact actor Membership FOR UPDATE → revalidate Home →
  * revalidate exact actor tenure/user/home/current DB role → authorize
  * maintenance.create → validate/normalize input → PRIVATE audience
- * validation under the held Home lock → one Clock.now() + one UUIDv7 →
- * insertEntryWithAudience.
+ * validation under the held Home lock → one Clock.now() + entry UUIDv7 →
+ * insertEntryWithAudience → same-transaction maintenance.created.v1.
  */
 export function createCreateMaintenanceEntry(
   deps: CreateMaintenanceEntryDependencies,
@@ -294,6 +298,15 @@ export function createCreateMaintenanceEntry(
         tx,
         insert,
       );
+      await deps.outbox.append(
+        tx,
+        createMaintenanceCreatedV1Event({
+          eventId: deps.ids.next(),
+          occurredAt,
+          homeId: locked.home.id,
+          maintenanceEntryId: created.id,
+        }),
+      );
       return toCreateProjection(created);
     });
   };
@@ -309,6 +322,7 @@ export function createCreateMaintenanceEntryFromPool(
     maintenance: createMaintenanceRepository(
       pool as Parameters<typeof createMaintenanceRepository>[0],
     ),
+    outbox: outboxWriter,
     clock: systemClock,
     ids: systemUuidV7,
   });

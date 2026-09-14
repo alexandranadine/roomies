@@ -6,6 +6,7 @@ import {
   SupplyNotOpenError,
   SupplyPersistenceError,
 } from '../../domains/supplies/errors.js';
+import { createSupplyObtainedV1Event } from '../../domains/supplies/events.js';
 import { decideSupplyMarkObtained } from '../../domains/supplies/obtain-policy.js';
 import {
   createSupplyRepository,
@@ -16,6 +17,10 @@ import {
 import type { SupplyEntry } from '../../domains/supplies/supply.js';
 import type { ActiveHomeActor } from '../../platform/authz/context.js';
 import { ConcealedNotFoundError } from '../../platform/authz/errors.js';
+import type { OutboxWriter } from '../../platform/events/outbox-writer.js';
+import { outboxWriter } from '../../platform/events/outbox-writer.js';
+import type { UuidV7Generator } from '../../platform/ids/uuid-v7.js';
+import { systemUuidV7 } from '../../platform/ids/uuid-v7.js';
 import {
   runInReadCommittedTransaction,
   type TransactionContext,
@@ -43,7 +48,9 @@ export type MarkSupplyEntryObtainedDependencies = Readonly<{
     | 'releaseActiveClaimForEntryTerminalization'
     | 'terminalizeSupplyEntryAsObtained'
   >;
+  outbox: Pick<OutboxWriter, 'append'>;
   clock: Clock;
+  ids: UuidV7Generator;
 }>;
 
 function revalidatedActor(
@@ -92,7 +99,8 @@ function isCompleteOpenMatrix(entry: SupplyEntry): boolean {
  * revalidate exact actor tenure/user/home/current DB role → authorize
  * supply.mark_obtained → SupplyEntry FOR UPDATE → complete OPEN matrix →
  * active SupplyClaim FOR UPDATE → one Clock.now() → optional ENTRY_OBTAINED
- * release → conditional OBTAINED terminalization.
+ * release → conditional OBTAINED terminalization → same-transaction
+ * supply.obtained.v1.
  */
 export function createMarkSupplyEntryObtained(
   deps: MarkSupplyEntryObtainedDependencies,
@@ -167,6 +175,7 @@ export function createMarkSupplyEntryObtained(
         supplyEntryId: entry.id,
         homeId: locked.home.id,
         obtainedAt: occurredAt,
+        obtainedByMembershipId: actor.membershipId,
       });
       const updated = await deps.supplies.terminalizeSupplyEntryAsObtained(
         tx,
@@ -175,6 +184,15 @@ export function createMarkSupplyEntryObtained(
       if (updated === null) {
         throw new SupplyPersistenceError();
       }
+      await deps.outbox.append(
+        tx,
+        createSupplyObtainedV1Event({
+          eventId: deps.ids.next(),
+          occurredAt,
+          homeId: locked.home.id,
+          supplyEntryId: updated.id,
+        }),
+      );
       return updated;
     });
   };
@@ -189,6 +207,8 @@ export function createMarkSupplyEntryObtainedFromPool(
     supplies: createSupplyRepository(
       pool as Parameters<typeof createSupplyRepository>[0],
     ),
+    outbox: outboxWriter,
     clock: systemClock,
+    ids: systemUuidV7,
   });
 }

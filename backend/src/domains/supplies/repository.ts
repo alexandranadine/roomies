@@ -24,6 +24,7 @@ title,
 status,
 created_by_membership_id,
 obtained_at,
+obtained_by_membership_id,
 canceled_at,
 created_at,
 updated_at
@@ -49,6 +50,7 @@ INSERT INTO supply_entries (
   status,
   created_by_membership_id,
   obtained_at,
+  obtained_by_membership_id,
   canceled_at,
   created_at,
   updated_at
@@ -60,9 +62,10 @@ VALUES (
   $4,
   $5::uuid,
   $6::timestamptz,
-  $7::timestamptz,
+  $7::uuid,
   $8::timestamptz,
-  $9::timestamptz
+  $9::timestamptz,
+  $10::timestamptz
 )
 RETURNING ${SUPPLY_ENTRY_COLUMNS}
 `;
@@ -117,6 +120,7 @@ e.title,
 e.status,
 e.created_by_membership_id,
 e.obtained_at,
+e.obtained_by_membership_id,
 e.canceled_at,
 e.created_at,
 e.updated_at,
@@ -225,12 +229,14 @@ UPDATE supply_entries
 SET
   status = 'OBTAINED',
   obtained_at = $3::timestamptz,
+  obtained_by_membership_id = $4::uuid,
   canceled_at = NULL,
   updated_at = $3::timestamptz
 WHERE id = $1::uuid
   AND home_id = $2::uuid
   AND status = 'OPEN'
   AND obtained_at IS NULL
+  AND obtained_by_membership_id IS NULL
   AND canceled_at IS NULL
 RETURNING ${SUPPLY_ENTRY_COLUMNS}
 `;
@@ -241,11 +247,13 @@ SET
   status = 'CANCELED',
   canceled_at = $3::timestamptz,
   obtained_at = NULL,
+  obtained_by_membership_id = NULL,
   updated_at = $3::timestamptz
 WHERE id = $1::uuid
   AND home_id = $2::uuid
   AND status = 'OPEN'
   AND obtained_at IS NULL
+  AND obtained_by_membership_id IS NULL
   AND canceled_at IS NULL
 RETURNING ${SUPPLY_ENTRY_COLUMNS}
 `;
@@ -273,6 +281,7 @@ export type NewSupplyEntry = Readonly<{
   status: SupplyEntryStatus;
   createdByMembershipId: string;
   obtainedAt: Date | null;
+  obtainedByMembershipId: string | null;
   canceledAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -321,6 +330,7 @@ export type TerminalizeSupplyEntryAsObtained = Readonly<{
   supplyEntryId: string;
   homeId: string;
   obtainedAt: Date;
+  obtainedByMembershipId: string;
 }>;
 
 export type TerminalizeSupplyEntryAsCanceled = Readonly<{
@@ -393,6 +403,7 @@ type SupplyEntryRow = {
   status: unknown;
   created_by_membership_id: unknown;
   obtained_at: unknown;
+  obtained_by_membership_id: unknown;
   canceled_at: unknown;
   created_at: unknown;
   updated_at: unknown;
@@ -444,6 +455,16 @@ function optionalDate(value: unknown): Date | null {
   throw new SupplyPersistenceError();
 }
 
+function optionalUuid(value: unknown): string | null {
+  if (value === null) {
+    return null;
+  }
+  if (isUuid(value)) {
+    return value;
+  }
+  throw new SupplyPersistenceError();
+}
+
 function parseSupplyEntryRow(row: SupplyEntryRow, homeId: string): SupplyEntry {
   if (
     !isUuid(row.id) ||
@@ -459,11 +480,21 @@ function parseSupplyEntryRow(row: SupplyEntryRow, homeId: string): SupplyEntry {
   }
 
   const obtainedAt = optionalDate(row.obtained_at);
+  const obtainedByMembershipId = optionalUuid(row.obtained_by_membership_id);
   const canceledAt = optionalDate(row.canceled_at);
   const validLifecycle =
-    (row.status === 'OPEN' && obtainedAt === null && canceledAt === null) ||
-    (row.status === 'OBTAINED' && obtainedAt !== null && canceledAt === null) ||
-    (row.status === 'CANCELED' && obtainedAt === null && canceledAt !== null);
+    (row.status === 'OPEN' &&
+      obtainedAt === null &&
+      obtainedByMembershipId === null &&
+      canceledAt === null) ||
+    (row.status === 'OBTAINED' &&
+      obtainedAt !== null &&
+      obtainedByMembershipId !== null &&
+      canceledAt === null) ||
+    (row.status === 'CANCELED' &&
+      obtainedAt === null &&
+      obtainedByMembershipId === null &&
+      canceledAt !== null);
   if (!validLifecycle) {
     throw new SupplyPersistenceError();
   }
@@ -475,6 +506,7 @@ function parseSupplyEntryRow(row: SupplyEntryRow, homeId: string): SupplyEntry {
     status: row.status,
     createdByMembershipId: row.created_by_membership_id,
     obtainedAt,
+    obtainedByMembershipId,
     canceledAt,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -578,6 +610,7 @@ export function createSupplyRepository(pool: Pool): SupplyRepository {
           entry.status,
           entry.createdByMembershipId,
           entry.obtainedAt,
+          entry.obtainedByMembershipId,
           entry.canceledAt,
           entry.createdAt,
           entry.updatedAt,
@@ -802,7 +835,12 @@ export function createSupplyRepository(pool: Pool): SupplyRepository {
       try {
         const result = await tx.query<SupplyEntryRow>(
           TERMINALIZE_SUPPLY_ENTRY_AS_OBTAINED_SQL,
-          [input.supplyEntryId, input.homeId, input.obtainedAt],
+          [
+            input.supplyEntryId,
+            input.homeId,
+            input.obtainedAt,
+            input.obtainedByMembershipId,
+          ],
         );
         if (result.rows.length === 0) {
           return null;

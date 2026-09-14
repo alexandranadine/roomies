@@ -65,6 +65,14 @@ void describe('Supply terminalization SQL', () => {
     );
     assert.match(
       TERMINALIZE_SUPPLY_ENTRY_AS_OBTAINED_SQL,
+      /obtained_by_membership_id = \$4::uuid/,
+    );
+    assert.match(
+      TERMINALIZE_SUPPLY_ENTRY_AS_OBTAINED_SQL,
+      /obtained_by_membership_id IS NULL/,
+    );
+    assert.match(
+      TERMINALIZE_SUPPLY_ENTRY_AS_OBTAINED_SQL,
       /canceled_at = NULL/,
     );
     assert.match(TERMINALIZE_SUPPLY_ENTRY_AS_OBTAINED_SQL, /id = \$1::uuid/);
@@ -101,6 +109,14 @@ void describe('Supply terminalization SQL', () => {
     assert.match(
       TERMINALIZE_SUPPLY_ENTRY_AS_CANCELED_SQL,
       /obtained_at = NULL/,
+    );
+    assert.match(
+      TERMINALIZE_SUPPLY_ENTRY_AS_CANCELED_SQL,
+      /obtained_by_membership_id = NULL/,
+    );
+    assert.match(
+      TERMINALIZE_SUPPLY_ENTRY_AS_CANCELED_SQL,
+      /obtained_by_membership_id IS NULL/,
     );
     assert.match(TERMINALIZE_SUPPLY_ENTRY_AS_CANCELED_SQL, /id = \$1::uuid/);
     assert.match(

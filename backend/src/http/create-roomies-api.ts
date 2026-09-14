@@ -17,6 +17,10 @@ import {
   type RemoveMembershipCommand,
 } from '../domains/memberships/http.js';
 import {
+  createActivityRouter,
+  type ListHomeActivityCommand,
+} from '../domains/activity/http.js';
+import {
   createMaintenanceRouter,
   type CreateMaintenanceEntryCommand,
   type ListHomeMaintenanceCommand,
@@ -97,6 +101,9 @@ export type CreateRoomiesApiRouterOptions = {
     listHomeMaintenance: ListHomeMaintenanceCommand;
     readMaintenanceEntry: ReadMaintenanceEntryCommand;
     resolveMaintenanceEntry: ResolveMaintenanceEntryCommand;
+  };
+  activity?: {
+    listHomeActivity: ListHomeActivityCommand;
   };
 };
 
@@ -190,6 +197,16 @@ export function createRoomiesApiRouter(
         listHomeMaintenance: options.maintenance.listHomeMaintenance,
         readMaintenanceEntry: options.maintenance.readMaintenanceEntry,
         resolveMaintenanceEntry: options.maintenance.resolveMaintenanceEntry,
+      }),
+    );
+  }
+  if (options.activity !== undefined) {
+    router.use(
+      '/homes',
+      createActivityRouter({
+        principalResolver: options.principalResolver,
+        activeHomeActorResolver: options.activeHomeActorResolver,
+        listHomeActivity: options.activity.listHomeActivity,
       }),
     );
   }

@@ -98,12 +98,13 @@ void describe('memberships domain boundary', () => {
     assert.doesNotMatch(source, /from ['"]express['"]/);
     assert.doesNotMatch(source, /createOutboxWriter/);
     assert.doesNotMatch(source, /email/);
-    assert.match(source, /MembershipRole/);
     assert.match(source, /VOLUNTARY_LEAVE/);
     assert.match(source, /ADMIN_REMOVAL/);
     assert.match(source, /HOME_ARCHIVED/);
-    assert.match(source, /previousRole/);
-    assert.match(source, /newRole/);
+    assert.match(source, /roleTransitionId/);
+    assert.doesNotMatch(source, /previousRole/);
+    assert.doesNotMatch(source, /newRole/);
+    assert.doesNotMatch(source, /actorMembershipId/);
     assert.doesNotMatch(source, /payload: Object.freeze\(\{[^}]*\brole:/);
   });
 
@@ -170,9 +171,11 @@ void describe('memberships domain boundary', () => {
       'utf8',
     );
     assert.match(source, /SET ended_at = \$1/);
-    assert.match(source, /WHERE id = \$2/);
-    assert.match(source, /AND home_id = \$3/);
+    assert.match(source, /ended_by_membership_id = \$2/);
+    assert.match(source, /WHERE id = \$3/);
+    assert.match(source, /AND home_id = \$4/);
     assert.match(source, /AND ended_at IS NULL/);
+    assert.match(source, /AND ended_by_membership_id IS NULL/);
     assert.doesNotMatch(source, /user_id/);
     assert.doesNotMatch(source, /DELETE/i);
     assert.doesNotMatch(source, /SET role/i);
@@ -251,5 +254,46 @@ void describe('memberships domain boundary', () => {
     assert.doesNotMatch(source, /memberships\/repository/);
     assert.doesNotMatch(source, /homes\/repository/);
     assert.doesNotMatch(source, /domains\/maintenance/);
+  });
+
+  void it('keeps Activity source lookups free of user, role, and display fields', async () => {
+    const source = await readFile(
+      path.join(membershipsDir, 'find-membership-activity-source.ts'),
+      'utf8',
+    );
+    assert.match(source, /FIND_MEMBERSHIP_STARTED_ACTIVITY_SOURCE_SQL/);
+    assert.match(source, /FIND_MEMBERSHIP_ENDED_ACTIVITY_SOURCE_SQL/);
+    assert.match(source, /FIND_MEMBERSHIP_ROLE_TRANSITION_ACTIVITY_SOURCE_SQL/);
+    assert.match(source, /expectedHomeId/);
+    assert.doesNotMatch(source, /user_id/);
+    assert.doesNotMatch(source, /userId/);
+    assert.doesNotMatch(source, /m\.role/);
+    assert.doesNotMatch(source, /previousRole/);
+    assert.doesNotMatch(source, /newRole/);
+    assert.doesNotMatch(source, /\bemail\b/);
+    assert.doesNotMatch(source, /\bname\b/);
+    assert.doesNotMatch(source, /isHomeAdmin/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /activity\/repository/);
+    assert.doesNotMatch(source, /insertHomeVisibleActivity/);
+    assert.doesNotMatch(source, /from ['"]\.\/repository/);
+  });
+
+  void it('keeps historical Membership display free of email, role, and userId', async () => {
+    const source = await readFile(
+      path.join(membershipsDir, 'find-historical-membership-display.ts'),
+      'utf8',
+    );
+    assert.match(source, /FIND_HISTORICAL_MEMBERSHIP_DISPLAYS_SQL/);
+    assert.match(source, /LEFT JOIN auth_identities/);
+    assert.match(source, /m\.home_id = \$1::uuid/);
+    assert.doesNotMatch(source, /ended_at IS NULL/);
+    assert.doesNotMatch(source, /i\.email/);
+    assert.doesNotMatch(source, /m\.role/);
+    assert.doesNotMatch(source, /userId/);
+    assert.doesNotMatch(source, /isHomeAdmin/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /activity\/repository/);
+    assert.doesNotMatch(source, /from ['"]\.\/repository/);
   });
 });

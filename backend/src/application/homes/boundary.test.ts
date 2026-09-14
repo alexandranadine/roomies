@@ -23,13 +23,15 @@ async function walkProduction(root: string): Promise<string[]> {
 }
 
 void describe('homes application boundary', () => {
-  void it('creates Home + ADMIN Membership through public writers without events', async () => {
+  void it('creates Home + ADMIN Membership through public writers and started outbox', async () => {
     const source = await readFile(path.join(dir, 'create-home.ts'), 'utf8');
     assert.match(source, /insertHome/);
     assert.match(source, /insertActiveMembership|insertMembership/);
     assert.match(source, /evaluateHomeStructureInvariant/);
     assert.match(source, /runInReadCommittedTransaction/);
     assert.match(source, /role: 'ADMIN'/);
+    assert.match(source, /createMembershipStartedV1Event/);
+    assert.match(source, /outboxWriter/);
     assert.doesNotMatch(source, /memberships\/repository/);
     assert.doesNotMatch(source, /homes\/repository/);
     assert.doesNotMatch(source, /home-repository/);
@@ -38,12 +40,7 @@ void describe('homes application boundary', () => {
     assert.doesNotMatch(source, /better-auth/);
     assert.doesNotMatch(source, /from ['"]pg['"]/);
     assert.doesNotMatch(source, /Date\.now/);
-    assert.doesNotMatch(
-      source,
-      /outboxWriter|createOutboxWriter|outbox_events/,
-    );
     assert.doesNotMatch(source, /home\.created/);
-    assert.doesNotMatch(source, /membership\.started/);
     assert.doesNotMatch(source, /owner|primaryAdmin|createdByUserId|founder/i);
     assert.doesNotMatch(source, /SERIALIZABLE/);
     assert.doesNotMatch(source, /pg_advisory/i);

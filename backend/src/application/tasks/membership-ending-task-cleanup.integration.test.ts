@@ -78,14 +78,15 @@ async function insertMembership(
   },
 ): Promise<void> {
   await pool.query(
-    `INSERT INTO memberships (id, home_id, user_id, role, ended_at)
-     VALUES ($1, $2, $3, $4, $5)`,
+    `INSERT INTO memberships (id, home_id, user_id, role, ended_at, ended_by_membership_id)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
     [
       input.id,
       input.homeId,
       input.userId,
       input.role,
       input.endedAt === undefined ? null : input.endedAt,
+      input.endedAt ? input.id : null,
     ],
   );
 }
@@ -99,17 +100,23 @@ async function insertManualTask(
     assignedMembershipId: string | null;
     status?: 'OPEN' | 'COMPLETED';
     completedAt?: Date | null;
+    completedByMembershipId?: string | null;
   },
 ): Promise<void> {
   const status = input.status ?? 'OPEN';
+  const completedByMembershipId =
+    status === 'COMPLETED' ? (input.completedByMembershipId ?? null) : null;
+  if (status === 'COMPLETED' && completedByMembershipId === null) {
+    throw new Error('COMPLETED fixture requires completedByMembershipId');
+  }
   await pool.query(
     `INSERT INTO task_instances (
        id, home_id, source, status, title, scheduled_for,
        assigned_membership_id, task_definition_id, completed_at,
-       created_at, updated_at
+       completed_by_membership_id, created_at, updated_at
      ) VALUES (
        $1::uuid, $2::uuid, 'MANUAL', $3, $4, NULL, $5::uuid, NULL, $6::timestamptz,
-       $7::timestamptz, $7::timestamptz
+       $7::uuid, $8::timestamptz, $8::timestamptz
      )`,
     [
       input.id,
@@ -118,6 +125,7 @@ async function insertManualTask(
       input.title,
       input.assignedMembershipId,
       status === 'COMPLETED' ? (input.completedAt ?? CREATED_AT) : null,
+      completedByMembershipId,
       CREATED_AT,
     ],
   );
@@ -172,17 +180,23 @@ async function insertRecurringTask(
     definitionId: string;
     assignedMembershipId: string | null;
     status?: 'OPEN' | 'COMPLETED';
+    completedByMembershipId?: string | null;
   },
 ): Promise<void> {
   const status = input.status ?? 'OPEN';
+  const completedByMembershipId =
+    status === 'COMPLETED' ? (input.completedByMembershipId ?? null) : null;
+  if (status === 'COMPLETED' && completedByMembershipId === null) {
+    throw new Error('COMPLETED fixture requires completedByMembershipId');
+  }
   await pool.query(
     `INSERT INTO task_instances (
        id, home_id, source, status, title, scheduled_for,
        assigned_membership_id, task_definition_id, completed_at,
-       created_at, updated_at
+       completed_by_membership_id, created_at, updated_at
      ) VALUES (
        $1::uuid, $2::uuid, 'RECURRING', $3, 'Recurring chore', DATE '2026-03-14',
-       $4::uuid, $5::uuid, $6::timestamptz, $7::timestamptz, $7::timestamptz
+       $4::uuid, $5::uuid, $6::timestamptz, $7::uuid, $8::timestamptz, $8::timestamptz
      )`,
     [
       input.id,
@@ -191,6 +205,7 @@ async function insertRecurringTask(
       input.assignedMembershipId,
       input.definitionId,
       status === 'COMPLETED' ? CREATED_AT : null,
+      completedByMembershipId,
       CREATED_AT,
     ],
   );
@@ -213,9 +228,34 @@ async function cleanup(
     await pool.query('DELETE FROM outbox_events WHERE home_id = ANY($1)', [
       input.homeIds,
     ]);
-    await pool.query('DELETE FROM memberships WHERE home_id = ANY($1)', [
-      input.homeIds,
-    ]);
+    await pool.query(
+      'DELETE FROM membership_role_transitions WHERE home_id = ANY($1::uuid[])',
+      [input.homeIds],
+    );
+    await pool.query(
+      `UPDATE memberships
+       SET ended_by_membership_id = id
+       WHERE home_id = ANY($1::uuid[]) AND ended_at IS NOT NULL`,
+      [input.homeIds],
+    );
+    await pool.query(
+      `DELETE FROM memberships
+       WHERE home_id = ANY($1::uuid[]) AND ended_at IS NULL`,
+      [input.homeIds],
+    );
+    const remainingMemberships = await pool.query<{ id: string }>(
+      'SELECT id FROM memberships WHERE home_id = ANY($1::uuid[])',
+      [input.homeIds],
+    );
+    for (const row of remainingMemberships.rows) {
+      await pool.query(
+        `UPDATE memberships
+         SET ended_at = NULL, ended_by_membership_id = NULL
+         WHERE id = $1`,
+        [row.id],
+      );
+      await pool.query('DELETE FROM memberships WHERE id = $1', [row.id]);
+    }
     await pool.query('DELETE FROM homes WHERE id = ANY($1)', [input.homeIds]);
   }
   if (input.userIds.length > 0) {
@@ -245,13 +285,15 @@ async function taskAssignment(
   assignedMembershipId: string | null;
   status: string;
   updatedAt: Date;
+  completedByMembershipId: string | null;
 }> {
   const result = await pool.query<{
     assigned_membership_id: string | null;
     status: string;
     updated_at: Date;
+    completed_by_membership_id: string | null;
   }>(
-    `SELECT assigned_membership_id, status, updated_at
+    `SELECT assigned_membership_id, status, updated_at, completed_by_membership_id
      FROM task_instances WHERE id = $1`,
     [taskId],
   );
@@ -261,6 +303,7 @@ async function taskAssignment(
     assignedMembershipId: row.assigned_membership_id,
     status: row.status,
     updatedAt: row.updated_at,
+    completedByMembershipId: row.completed_by_membership_id,
   };
 }
 
@@ -441,6 +484,7 @@ void describe('Membership-ending Task cleanup PostgreSQL', () => {
           title: 'Completed manual',
           assignedMembershipId: leavingMembership,
           status: 'COMPLETED',
+          completedByMembershipId: leavingMembership,
         });
         await insertRecurringTask(database.pool, {
           id: openRecurring,
@@ -454,6 +498,7 @@ void describe('Membership-ending Task cleanup PostgreSQL', () => {
           definitionId: completedRecurringDef,
           assignedMembershipId: leavingMembership,
           status: 'COMPLETED',
+          completedByMembershipId: leavingMembership,
         });
         await insertManualTask(database.pool, {
           id: otherHomeOpen,
@@ -484,6 +529,7 @@ void describe('Membership-ending Task cleanup PostgreSQL', () => {
         );
         assert.equal(completedAfter.assignedMembershipId, leavingMembership);
         assert.equal(completedAfter.status, 'COMPLETED');
+        assert.equal(completedAfter.completedByMembershipId, leavingMembership);
         assert.equal(completedAfter.updatedAt.getTime(), CREATED_AT.getTime());
 
         const openRecurringAfter = await taskAssignment(
@@ -499,6 +545,10 @@ void describe('Membership-ending Task cleanup PostgreSQL', () => {
         );
         assert.equal(
           completedRecurringAfter.assignedMembershipId,
+          leavingMembership,
+        );
+        assert.equal(
+          completedRecurringAfter.completedByMembershipId,
           leavingMembership,
         );
 
@@ -791,6 +841,7 @@ void describe('Membership-ending Task cleanup PostgreSQL', () => {
                 homeId,
                 membershipId: leavingMembership,
                 endedAt: ENDED_AT,
+                endedByMembershipId: leavingMembership,
                 cause: 'VOLUNTARY_LEAVE',
               });
             }),
@@ -862,6 +913,7 @@ void describe('Membership-ending Task cleanup PostgreSQL', () => {
           title: 'Archive completed',
           assignedMembershipId: membershipId,
           status: 'COMPLETED',
+          completedByMembershipId: membershipId,
         });
         await insertDefinition(database.pool, {
           id: activeDef,
@@ -898,6 +950,11 @@ void describe('Membership-ending Task cleanup PostgreSQL', () => {
         assert.equal(
           (await taskAssignment(database.pool, completedId))
             .assignedMembershipId,
+          membershipId,
+        );
+        assert.equal(
+          (await taskAssignment(database.pool, completedId))
+            .completedByMembershipId,
           membershipId,
         );
         const active = await definitionRow(database.pool, activeDef);

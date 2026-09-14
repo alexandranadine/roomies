@@ -128,8 +128,8 @@ async function insertMembership(
   },
 ): Promise<void> {
   await pool.query(
-    `INSERT INTO memberships (id, home_id, user_id, role, ended_at)
-     VALUES ($1, $2, $3, $4, NULL)`,
+    `INSERT INTO memberships (id, home_id, user_id, role, ended_at, ended_by_membership_id)
+     VALUES ($1, $2, $3, $4, NULL, NULL)`,
     [input.id, input.homeId, input.userId, input.role],
   );
 }
@@ -165,9 +165,34 @@ async function cleanup(
     await pool.query('DELETE FROM outbox_events WHERE home_id = ANY($1)', [
       input.homeIds,
     ]);
-    await pool.query('DELETE FROM memberships WHERE home_id = ANY($1)', [
-      input.homeIds,
-    ]);
+    await pool.query(
+      'DELETE FROM membership_role_transitions WHERE home_id = ANY($1::uuid[])',
+      [input.homeIds],
+    );
+    await pool.query(
+      `UPDATE memberships
+       SET ended_by_membership_id = id
+       WHERE home_id = ANY($1::uuid[]) AND ended_at IS NOT NULL`,
+      [input.homeIds],
+    );
+    await pool.query(
+      `DELETE FROM memberships
+       WHERE home_id = ANY($1::uuid[]) AND ended_at IS NULL`,
+      [input.homeIds],
+    );
+    const remainingMemberships = await pool.query<{ id: string }>(
+      'SELECT id FROM memberships WHERE home_id = ANY($1::uuid[])',
+      [input.homeIds],
+    );
+    for (const row of remainingMemberships.rows) {
+      await pool.query(
+        `UPDATE memberships
+         SET ended_at = NULL, ended_by_membership_id = NULL
+         WHERE id = $1`,
+        [row.id],
+      );
+      await pool.query('DELETE FROM memberships WHERE id = $1', [row.id]);
+    }
     await pool.query('DELETE FROM homes WHERE id = ANY($1)', [input.homeIds]);
   }
   if (input.userIds.length > 0) {
@@ -195,7 +220,9 @@ function completeCommand(
       return locked;
     },
     tasks: createTaskRepository(pool),
+    outbox: outboxWriter,
     clock: systemClock,
+    ids: systemUuidV7,
   });
 }
 
@@ -255,14 +282,23 @@ function leaveCommand(
 async function taskStatus(
   pool: Pool,
   taskId: string,
-): Promise<{ status: string; completedAt: Date | null }> {
+): Promise<{
+  status: string;
+  completedAt: Date | null;
+  completedByMembershipId: string | null;
+}> {
   const result = await pool.query<{
     status: string;
     completed_at: Date | null;
-  }>('SELECT status, completed_at FROM task_instances WHERE id = $1', [taskId]);
+    completed_by_membership_id: string | null;
+  }>(
+    'SELECT status, completed_at, completed_by_membership_id FROM task_instances WHERE id = $1',
+    [taskId],
+  );
   return {
     status: result.rows[0]?.status ?? 'missing',
     completedAt: result.rows[0]?.completed_at ?? null,
+    completedByMembershipId: result.rows[0]?.completed_by_membership_id ?? null,
   };
 }
 
@@ -384,12 +420,16 @@ void describe('Task completion concurrency PostgreSQL', () => {
         firstMayFinish.resolve();
         const winner = await firstRun;
         assert.equal(winner.status, 'COMPLETED');
+        assert.equal(winner.completedByMembershipId, membershipA);
+        assert.notEqual(winner.completedByMembershipId, membershipB);
         const loser = await secondRun;
         assert.equal(loser.status, 'rejected');
         assert.ok(loser.reason instanceof TaskAlreadyCompletedError);
         const final = await taskStatus(database.pool, taskId);
         assert.equal(final.status, 'COMPLETED');
         assert.ok(final.completedAt);
+        assert.equal(final.completedByMembershipId, membershipA);
+        assert.notEqual(final.completedByMembershipId, membershipB);
       } finally {
         await cleanup(database.pool, {
           homeIds: [homeId],
@@ -476,6 +516,16 @@ void describe('Task completion concurrency PostgreSQL', () => {
           const final = await taskStatus(database.pool, taskId);
           assert.equal(final.status, 'COMPLETED');
           assert.ok(final.completedAt);
+          assert.ok(
+            final.completedByMembershipId === membershipA ||
+              final.completedByMembershipId === membershipB,
+          );
+          const winnerActor =
+            wins[0] !== undefined && wins[0].status === 'fulfilled'
+              ? wins[0].value.completedByMembershipId
+              : null;
+          assert.equal(final.completedByMembershipId, winnerActor);
+          assert.notEqual(final.completedByMembershipId, null);
         }
       } finally {
         await cleanup(database.pool, { homeIds, userIds });

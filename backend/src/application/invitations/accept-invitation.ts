@@ -234,7 +234,6 @@ export function createAcceptInvitation(
           occurredAt: acceptedAt,
           homeId,
           membershipId,
-          invitationId: invitation.id,
         }),
       );
 

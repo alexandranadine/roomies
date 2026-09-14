@@ -9,6 +9,10 @@ import {
   decideProposedAdminInvariant,
 } from '../../domains/memberships/role-policy.js';
 import {
+  createMembershipRoleTransitionWriter,
+  type MembershipRoleTransitionWriter,
+} from '../../domains/memberships/insert-membership-role-transition.js';
+import {
   createMembershipRoleWriter,
   type MembershipRoleWriter,
 } from '../../domains/memberships/update-active-membership-role.js';
@@ -56,6 +60,7 @@ export type ChangeMembershipRoleDependencies = {
   clock: Clock;
   ids: UuidV7Generator;
   roleWriter: MembershipRoleWriter;
+  roleTransitions: MembershipRoleTransitionWriter;
 };
 
 export function createChangeMembershipRole(
@@ -121,14 +126,26 @@ export function createChangeMembershipRole(
         throw new StructuralIntegrityError();
       }
 
+      const roleTransitionId = deps.ids.next();
+      const inserted = await deps.roleTransitions.insertTransition(tx, {
+        id: roleTransitionId,
+        homeId: locked.home.id,
+        membershipId: target.id,
+        actorMembershipId: locked.actor.membershipId,
+        changedAt: occurredAt,
+        createdAt: occurredAt,
+      });
+      if (inserted !== 1) {
+        throw new StructuralIntegrityError();
+      }
+
       await deps.outbox.append(
         tx,
         createMembershipRoleChangedV1Event({
           eventId: deps.ids.next(),
           occurredAt,
           membershipId: target.id,
-          previousRole: target.role,
-          newRole: input.role,
+          roleTransitionId,
           homeId: locked.home.id,
         }),
       );
@@ -152,5 +169,6 @@ export function createChangeMembershipRoleFromPool(
     clock: systemClock,
     ids: systemUuidV7,
     roleWriter: createMembershipRoleWriter(),
+    roleTransitions: createMembershipRoleTransitionWriter(),
   });
 }

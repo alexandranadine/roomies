@@ -139,6 +139,7 @@ void describe('leaveMembership application orchestration', () => {
         homeId: HOME,
         membershipId: MEMBERSHIP_B,
         endedAt: ENDED_AT,
+        endedByMembershipId: MEMBERSHIP_B,
         cause: 'VOLUNTARY_LEAVE',
       },
     ]);
@@ -162,6 +163,7 @@ void describe('leaveMembership application orchestration', () => {
         homeId: HOME,
         membershipId: MEMBERSHIP_A,
         endedAt: ENDED_AT,
+        endedByMembershipId: MEMBERSHIP_A,
         cause: 'VOLUNTARY_LEAVE',
       },
     ]);
@@ -242,6 +244,7 @@ void describe('leaveMembership application orchestration', () => {
         homeId: HOME,
         membershipId: MEMBERSHIP_A,
         endedAt: ENDED_AT,
+        endedByMembershipId: MEMBERSHIP_A,
         cause: 'VOLUNTARY_LEAVE',
       },
     ]);

@@ -10,6 +10,7 @@ import {
   MAINTENANCE_TITLE_MAX_LENGTH,
   normalizeMaintenanceTitle,
 } from '../../domains/maintenance/maintenance-title.js';
+import { MAINTENANCE_CREATED_V1 } from '../../domains/maintenance/events.js';
 import type {
   InsertMaintenanceEntryWithAudience,
   NewMaintenanceEntry,
@@ -19,6 +20,10 @@ import {
   ConcealedNotFoundError,
   InvalidRequestError,
 } from '../../platform/authz/errors.js';
+import type {
+  JsonObject,
+  OutboxEventInput,
+} from '../../platform/events/outbox-types.js';
 import type { TransactionContext } from '../../platform/persistence/transaction.js';
 import {
   createCreateMaintenanceEntry,
@@ -37,6 +42,7 @@ const OLD_MEMBERSHIP = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 const FOREIGN = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
 const ENTRY_A = '018f1e2c-7e3a-7000-8000-1234567890ab';
 const ENTRY_B = '018f1e2c-7e3a-7000-8000-1234567890ac';
+const EVENT_A = '018f1e2c-7e3a-7000-8000-1234567890ad';
 const OCCURRED_AT = new Date('2026-09-13T18:00:00.000Z');
 const TX: TransactionContext = {
   query: () => Promise.reject(new Error('unexpected direct query')),
@@ -115,7 +121,8 @@ function harness(options: HarnessOptions = {}) {
   let idIndex = 0;
   let clockCalls = 0;
   let uuidCalls = 0;
-  const ids = options.ids ?? [ENTRY_A];
+  const ids = options.ids ?? [ENTRY_A, EVENT_A];
+  const appended: OutboxEventInput<string, JsonObject>[] = [];
 
   const deps: CreateMaintenanceEntryDependencies = {
     runTransaction: async (work) => {
@@ -167,6 +174,12 @@ function harness(options: HarnessOptions = {}) {
         return Promise.resolve(persisted(input.entry));
       },
     },
+    outbox: {
+      append(_tx, event) {
+        appended.push(event);
+        return Promise.resolve();
+      },
+    },
     clock: {
       now() {
         clockCalls += 1;
@@ -189,6 +202,7 @@ function harness(options: HarnessOptions = {}) {
   return {
     create: createCreateMaintenanceEntry(deps),
     inserts,
+    appended,
     lockCalls,
     seamCalls,
     clockCalls: () => clockCalls,
@@ -199,8 +213,15 @@ function harness(options: HarnessOptions = {}) {
 
 void describe('createCreateMaintenanceEntry', () => {
   void it('lets an active Roommate create HOUSEHOLD Maintenance', async () => {
-    const { create, inserts, lockCalls, seamCalls, clockCalls, uuidCalls } =
-      harness();
+    const {
+      create,
+      inserts,
+      appended,
+      lockCalls,
+      seamCalls,
+      clockCalls,
+      uuidCalls,
+    } = harness();
     const created = await create(householdInput());
     assert.equal(created.id, ENTRY_A);
     assert.equal(created.title, 'Leaky faucet');
@@ -215,7 +236,16 @@ void describe('createCreateMaintenanceEntry', () => {
     assert.equal('homeId' in created, false);
     assert.equal('audienceMembershipIds' in created, false);
     assert.equal(clockCalls(), 1);
-    assert.equal(uuidCalls(), 1);
+    assert.equal(uuidCalls(), 2);
+    assert.equal(appended.length, 1);
+    assert.equal(appended[0]?.eventType, MAINTENANCE_CREATED_V1);
+    assert.equal(appended[0]?.eventId, EVENT_A);
+    assert.equal(appended[0]?.occurredAt, OCCURRED_AT);
+    assert.equal(appended[0]?.homeId, HOME);
+    assert.deepEqual(appended[0]?.payload, { maintenanceEntryId: ENTRY_A });
+    assert.deepEqual(Object.keys(appended[0]?.payload ?? {}), [
+      'maintenanceEntryId',
+    ]);
     assert.deepEqual(lockCalls, [
       { homeId: HOME, membershipIds: [MEMBERSHIP] },
     ]);
@@ -251,12 +281,17 @@ void describe('createCreateMaintenanceEntry', () => {
   });
 
   void it('creates PRIVATE creator-only Maintenance from an empty audience list', async () => {
-    const { create, inserts, seamCalls, clockCalls } = harness();
+    const { create, inserts, appended, seamCalls, clockCalls, uuidCalls } =
+      harness();
     const created = await create(privateInput());
     assert.equal(created.visibility, 'PRIVATE');
     assert.equal(created.createdByMembershipId, MEMBERSHIP);
     assert.equal('audienceMembershipIds' in created, false);
     assert.equal(clockCalls(), 1);
+    assert.equal(uuidCalls(), 2);
+    assert.equal(appended.length, 1);
+    assert.equal(appended[0]?.eventType, MAINTENANCE_CREATED_V1);
+    assert.deepEqual(appended[0]?.payload, { maintenanceEntryId: ENTRY_A });
     assert.deepEqual(seamCalls, [
       { homeId: HOME, membershipIds: [MEMBERSHIP] },
     ]);
@@ -443,14 +478,16 @@ void describe('createCreateMaintenanceEntry', () => {
   });
 
   void it('conceals a PRIVATE audience mismatch as NOT_FOUND without Clock', async () => {
-    const { create, inserts, clockCalls, uuidCalls, isCommitted } = harness({
-      activeMembershipIds: [MEMBERSHIP],
-    });
+    const { create, inserts, appended, clockCalls, uuidCalls, isCommitted } =
+      harness({
+        activeMembershipIds: [MEMBERSHIP],
+      });
     await assert.rejects(
       () => create(privateInput({ audienceMembershipIds: [FOREIGN] })),
       ConcealedNotFoundError,
     );
     assert.deepEqual(inserts, []);
+    assert.deepEqual(appended, []);
     assert.equal(clockCalls(), 0);
     assert.equal(uuidCalls(), 0);
     assert.equal(isCommitted(), false);
@@ -556,16 +593,18 @@ void describe('createCreateMaintenanceEntry', () => {
   });
 
   void it('leaves no partial row when atomic insert fails', async () => {
-    const { create, isCommitted, clockCalls } = harness({
+    const { create, appended, isCommitted, clockCalls, uuidCalls } = harness({
       insertError: new Error('insert failed'),
     });
     await assert.rejects(() => create(householdInput()), /insert failed/);
     assert.equal(isCommitted(), false);
+    assert.deepEqual(appended, []);
     assert.equal(clockCalls(), 1);
+    assert.equal(uuidCalls(), 1);
   });
 
   void it('leaves no MaintenanceEntry when protected revalidation fails', async () => {
-    const { create, inserts, isCommitted, clockCalls } = harness({
+    const { create, inserts, appended, isCommitted, clockCalls } = harness({
       lockError: new ConcealedNotFoundError(),
     });
     await assert.rejects(
@@ -574,6 +613,7 @@ void describe('createCreateMaintenanceEntry', () => {
     );
     assert.equal(isCommitted(), false);
     assert.deepEqual(inserts, []);
+    assert.deepEqual(appended, []);
     assert.equal(clockCalls(), 0);
   });
 });

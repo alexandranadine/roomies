@@ -71,14 +71,15 @@ async function insertMembership(
   },
 ): Promise<void> {
   await pool.query(
-    `INSERT INTO memberships (id, home_id, user_id, role, ended_at)
-     VALUES ($1, $2, $3, $4, $5)`,
+    `INSERT INTO memberships (id, home_id, user_id, role, ended_at, ended_by_membership_id)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
     [
       input.id,
       input.homeId,
       input.userId,
       input.role,
       input.ended === true ? new Date() : null,
+      input.ended === true ? input.id : null,
     ],
   );
 }
@@ -176,9 +177,34 @@ async function cleanup(
   await pool.query('DELETE FROM invitations WHERE home_id = ANY($1::uuid[])', [
     input.homeIds,
   ]);
-  await pool.query('DELETE FROM memberships WHERE home_id = ANY($1::uuid[])', [
-    input.homeIds,
-  ]);
+  await pool.query(
+    'DELETE FROM membership_role_transitions WHERE home_id = ANY($1::uuid[])',
+    [input.homeIds],
+  );
+  await pool.query(
+    `UPDATE memberships
+     SET ended_by_membership_id = id
+     WHERE home_id = ANY($1::uuid[]) AND ended_at IS NOT NULL`,
+    [input.homeIds],
+  );
+  await pool.query(
+    `DELETE FROM memberships
+     WHERE home_id = ANY($1::uuid[]) AND ended_at IS NULL`,
+    [input.homeIds],
+  );
+  const remainingMemberships = await pool.query<{ id: string }>(
+    'SELECT id FROM memberships WHERE home_id = ANY($1::uuid[])',
+    [input.homeIds],
+  );
+  for (const row of remainingMemberships.rows) {
+    await pool.query(
+      `UPDATE memberships
+       SET ended_at = NULL, ended_by_membership_id = NULL
+       WHERE id = $1`,
+      [row.id],
+    );
+    await pool.query('DELETE FROM memberships WHERE id = $1', [row.id]);
+  }
   await pool.query('DELETE FROM homes WHERE id = ANY($1::uuid[])', [
     input.homeIds,
   ]);
@@ -771,7 +797,7 @@ void describe('revokeInvitation PostgreSQL concurrency', () => {
               [seed.homeId, seed.userId],
             );
             const events = await pool.query<{
-              payload: { invitationId: string };
+              payload: { membershipId: string };
             }>(
               `SELECT payload FROM outbox_events
                WHERE home_id = $1 AND event_type = 'membership.started.v1'`,
@@ -800,9 +826,12 @@ void describe('revokeInvitation PostgreSQL concurrency', () => {
                 memberships.rows[0]?.id,
               );
               assert.equal(
-                events.rows[0]?.payload.invitationId,
-                seed.invitationId,
+                events.rows[0]?.payload.membershipId,
+                memberships.rows[0]?.id,
               );
+              assert.deepEqual(events.rows[0]?.payload, {
+                membershipId: memberships.rows[0]?.id,
+              });
               outcomes.accepted += 1;
             } else {
               assert.equal(settled[1]?.status, 'fulfilled');

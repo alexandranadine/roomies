@@ -120,6 +120,7 @@ void describe('removeMembership application orchestration', () => {
         homeId: HOME,
         membershipId: MEMBERSHIP_B,
         endedAt: ENDED_AT,
+        endedByMembershipId: MEMBERSHIP_A,
         cause: 'ADMIN_REMOVAL',
       },
     ]);
@@ -143,6 +144,7 @@ void describe('removeMembership application orchestration', () => {
         homeId: HOME,
         membershipId: MEMBERSHIP_B,
         endedAt: ENDED_AT,
+        endedByMembershipId: MEMBERSHIP_A,
         cause: 'ADMIN_REMOVAL',
       },
     ]);
