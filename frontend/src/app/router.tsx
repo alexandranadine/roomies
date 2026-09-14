@@ -1,4 +1,5 @@
 import { createBrowserRouter, type RouteObject } from 'react-router';
+import { ActivityListPage } from '../activity/activity-list-page.js';
 import { HomeDiscoveryPage } from '../homes/home-discovery-page.js';
 import { HomeOverviewPage } from '../homes/home-overview-page.js';
 import { HomeShellPage } from '../homes/home-shell-page.js';
@@ -64,6 +65,10 @@ export function buildAppChildRoutes(includeDevRoutes: boolean): RouteObject[] {
         {
           index: true,
           element: <HomeOverviewPage />,
+        },
+        {
+          path: 'activity',
+          element: <ActivityListPage />,
         },
         {
           path: 'maintenance',
