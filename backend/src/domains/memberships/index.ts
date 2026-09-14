@@ -27,6 +27,7 @@ export {
   LastAdminRequiredError,
   LastRoommateRequiresArchiveError,
   MembershipActivitySourceIntegrityError,
+  MembershipNotificationSourceIntegrityError,
 } from './errors.js';
 export {
   FIND_ACTIVE_EXACT_MEMBERSHIP_IDS_IN_HOME_SQL,
@@ -79,6 +80,12 @@ export {
   type MembershipRoleTransitionActivitySource,
   type MembershipStartedActivitySource,
 } from './find-membership-activity-source.js';
+export {
+  FIND_MEMBERSHIP_ROLE_TRANSITION_NOTIFICATION_SOURCE_SQL,
+  findMembershipRoleTransitionNotificationSource,
+  type FindMembershipRoleTransitionNotificationSource,
+  type MembershipRoleTransitionNotificationSource,
+} from './find-membership-notification-source.js';
 export {
   createMembershipsRouter,
   type ChangeMembershipRoleCommand,

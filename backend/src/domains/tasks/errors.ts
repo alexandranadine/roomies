@@ -67,3 +67,15 @@ export class TaskActivitySourceIntegrityError extends Error {
     super('Task activity source integrity failure');
   }
 }
+
+/**
+ * Canonical Task Notification source could not be read safely.
+ * Messages never include title, assignee, Home, or Membership IDs.
+ */
+export class TaskNotificationSourceIntegrityError extends Error {
+  override readonly name = 'TaskNotificationSourceIntegrityError';
+
+  constructor() {
+    super('Task notification source integrity failure');
+  }
+}

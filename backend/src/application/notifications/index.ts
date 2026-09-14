@@ -17,6 +17,13 @@ export {
   type NotificationPersistence,
 } from './notification-persistence.js';
 export {
+  createNotificationOutboxHandler,
+  createNotificationOutboxHandlerFromPool,
+  NOTIFICATIONS_OUTBOX_EVENT_TYPES,
+  NOTIFICATIONS_OUTBOX_HANDLER_ID,
+  type NotificationOutboxHandlerDependencies,
+} from './outbox-handler.js';
+export {
   createPruneExpiredNotifications,
   createPruneExpiredNotificationsFromPool,
   notificationRetentionCutoff,

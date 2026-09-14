@@ -56,6 +56,12 @@ void describe('recurrence worker boundary', () => {
     assert.match(combined, /createProcessDueRecurringTasksFromPool/);
     assert.match(combined, /createOutboxConsumerFromPool/);
     assert.match(combined, /createCombinedWorkerProcess/);
+    assert.match(combined, /createActivityOutboxHandlerFromPool/);
+    assert.match(combined, /createNotificationOutboxHandlerFromPool/);
+    assert.match(
+      combined,
+      /createOutboxHandlerRegistry\(\[\s*createActivityOutboxHandlerFromPool\(pool\),\s*createNotificationOutboxHandlerFromPool\(pool\),\s*\]\)/,
+    );
     assert.doesNotMatch(combined, /from ['"]pg['"]/);
     assert.doesNotMatch(combined, /pool\.end/);
     assert.doesNotMatch(combined, /from ['"].*\/domains\//);

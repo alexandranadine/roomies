@@ -101,4 +101,22 @@ void describe('notifications application boundary', () => {
       assert.doesNotMatch(source, /title|details|audience/, rel);
     }
   });
+
+  void it('uses the global dispatcher, exact-tenure locks, and content-free persistence', async () => {
+    const source = await readFile(path.join(dir, 'outbox-handler.ts'), 'utf8');
+    assert.match(source, /NOTIFICATIONS_OUTBOX_HANDLER_ID = 'notifications'/);
+    assert.match(source, /MEMBERSHIP_ROLE_CHANGED_V1/);
+    assert.match(source, /TASK_COMPLETED_V1/);
+    assert.match(source, /SUPPLY_OBTAINED_V1/);
+    assert.match(source, /MAINTENANCE_CREATED_V1/);
+    assert.match(source, /MAINTENANCE_RESOLVED_V1/);
+    assert.match(source, /lockHomeAndExactMemberships/);
+    assert.match(source, /recipientMembershipId/);
+    assert.match(source, /sourceOutboxEventId/);
+    assert.doesNotMatch(source, /runInReadCommittedTransaction|BEGIN|COMMIT/);
+    assert.doesNotMatch(source, /userId|user_id/);
+    assert.doesNotMatch(source, /title|details|audience|email|name/);
+    assert.doesNotMatch(source, /isHomeAdmin|\brole\b/);
+    assert.doesNotMatch(source, /console\./);
+  });
 });

@@ -1,4 +1,5 @@
 import { createActivityOutboxHandlerFromPool } from '../../application/activity/outbox-handler.js';
+import { createNotificationOutboxHandlerFromPool } from '../../application/notifications/outbox-handler.js';
 import { createProcessDueRecurringTasksFromPool } from '../../application/tasks/process-due-recurring-tasks.js';
 import {
   createOutboxConsumerFromPool,
@@ -15,7 +16,7 @@ import {
 /**
  * Compose recurrence processing and generic outbox drain onto the
  * process-owned pool. The worker never creates or closes that pool.
- * Production registers the Activity outbox handler on this dispatcher.
+ * Production registers Activity and Notifications on this dispatcher.
  */
 export function createProcessWorkerFromPool(
   pool: TransactionPool,
@@ -27,7 +28,10 @@ export function createProcessWorkerFromPool(
 ): RecurrenceWorkerRuntime {
   const registry =
     options.outboxRegistry ??
-    createOutboxHandlerRegistry([createActivityOutboxHandlerFromPool(pool)]);
+    createOutboxHandlerRegistry([
+      createActivityOutboxHandlerFromPool(pool),
+      createNotificationOutboxHandlerFromPool(pool),
+    ]);
   const outbox = createOutboxConsumerFromPool(pool, { registry });
 
   return createRecurrenceWorker({

@@ -279,6 +279,25 @@ void describe('memberships domain boundary', () => {
     assert.doesNotMatch(source, /from ['"]\.\/repository/);
   });
 
+  void it('exposes immutable role-transition evidence without current role or identity to Notifications', async () => {
+    const source = await readFile(
+      path.join(membershipsDir, 'find-membership-notification-source.ts'),
+      'utf8',
+    );
+    assert.match(
+      source,
+      /FIND_MEMBERSHIP_ROLE_TRANSITION_NOTIFICATION_SOURCE_SQL/,
+    );
+    assert.match(source, /membership_role_transitions/);
+    assert.match(source, /actor_membership_id/);
+    assert.match(source, /changed_at/);
+    assert.match(source, /expectedHomeId/);
+    assert.doesNotMatch(source, /FROM memberships\b/);
+    assert.doesNotMatch(source, /user_id|userId|email|\bname\b/);
+    assert.doesNotMatch(source, /previousRole|newRole|currentRole/);
+    assert.doesNotMatch(source, /from ['"]\.\/repository/);
+  });
+
   void it('keeps historical Membership display free of email, role, and userId', async () => {
     const source = await readFile(
       path.join(membershipsDir, 'find-historical-membership-display.ts'),

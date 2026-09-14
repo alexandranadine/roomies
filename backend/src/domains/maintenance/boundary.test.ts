@@ -100,6 +100,24 @@ void describe('maintenance domain boundary', () => {
     assert.doesNotMatch(source, /insertHomeVisibleActivity/);
   });
 
+  void it('exposes lifecycle and exact private recipients without protected content to Notifications', async () => {
+    const source = await readFile(
+      path.join(maintenanceDir, 'find-maintenance-notification-source.ts'),
+      'utf8',
+    );
+    assert.match(source, /FIND_MAINTENANCE_NOTIFICATION_SOURCE_SQL/);
+    assert.match(source, /FIND_MAINTENANCE_NOTIFICATION_RECIPIENTS_SQL/);
+    assert.match(source, /created_at/);
+    assert.match(source, /resolved_at/);
+    assert.match(source, /maintenance_audiences/);
+    assert.match(source, /ORDER BY a\.membership_id ASC/);
+    assert.match(source, /expectedHomeId/);
+    assert.doesNotMatch(source, /e\.title|e\.details/);
+    assert.doesNotMatch(source, /user_id|email|\bname\b/);
+    assert.doesNotMatch(source, /isHomeAdmin|\brole\b/);
+    assert.doesNotMatch(source, /from ['"]\.\/repository/);
+  });
+
   void it('keeps Activity list display free of PRIVATE title, details, and audience', async () => {
     const source = await readFile(
       path.join(maintenanceDir, 'find-maintenance-activity-display.ts'),

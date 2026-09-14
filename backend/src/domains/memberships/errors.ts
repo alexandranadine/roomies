@@ -36,3 +36,15 @@ export class MembershipActivitySourceIntegrityError extends Error {
     super('Membership activity source integrity failure');
   }
 }
+
+/**
+ * Canonical Membership Notification source could not be read safely.
+ * Messages never include identity, role, Home, or Membership values.
+ */
+export class MembershipNotificationSourceIntegrityError extends Error {
+  override readonly name = 'MembershipNotificationSourceIntegrityError';
+
+  constructor() {
+    super('Membership notification source integrity failure');
+  }
+}

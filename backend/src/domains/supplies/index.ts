@@ -22,6 +22,7 @@ export {
   SupplyActivitySourceIntegrityError,
   SupplyAlreadyClaimedError,
   SupplyClaimNotActiveError,
+  SupplyNotificationSourceIntegrityError,
   SupplyNotOpenError,
   SupplyPersistenceError,
 } from './errors.js';
@@ -45,6 +46,12 @@ export {
   type FindSupplyActivitySourceInput,
   type SupplyActivitySource,
 } from './find-supply-activity-source.js';
+export {
+  FIND_SUPPLY_NOTIFICATION_SOURCE_SQL,
+  findSupplyNotificationSource,
+  type FindSupplyNotificationSource,
+  type SupplyNotificationSource,
+} from './find-supply-notification-source.js';
 export {
   createSuppliesRouter,
   type CancelSupplyEntryCommand,

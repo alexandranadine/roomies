@@ -63,3 +63,15 @@ export class SupplyActivitySourceIntegrityError extends Error {
     super('Supply activity source integrity failure');
   }
 }
+
+/**
+ * Canonical Supply Notification source could not be read safely.
+ * Messages never include title, claimant, creator, Home, or Membership IDs.
+ */
+export class SupplyNotificationSourceIntegrityError extends Error {
+  override readonly name = 'SupplyNotificationSourceIntegrityError';
+
+  constructor() {
+    super('Supply notification source integrity failure');
+  }
+}

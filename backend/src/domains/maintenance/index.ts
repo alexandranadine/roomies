@@ -23,6 +23,7 @@ export {
   InvalidMaintenanceRequestError,
   InvalidMaintenanceTitleError,
   MaintenanceActivitySourceIntegrityError,
+  MaintenanceNotificationSourceIntegrityError,
   MaintenanceNotOpenError,
   MaintenancePersistenceError,
 } from './errors.js';
@@ -50,6 +51,13 @@ export {
   type FindMaintenanceActivitySourceInput,
   type MaintenanceActivitySource,
 } from './find-maintenance-activity-source.js';
+export {
+  FIND_MAINTENANCE_NOTIFICATION_RECIPIENTS_SQL,
+  FIND_MAINTENANCE_NOTIFICATION_SOURCE_SQL,
+  findMaintenanceNotificationSource,
+  type FindMaintenanceNotificationSource,
+  type MaintenanceNotificationSource,
+} from './find-maintenance-notification-source.js';
 export {
   decideMaintenanceList,
   isMaintenanceListCapableRole,

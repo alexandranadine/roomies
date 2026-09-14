@@ -23,6 +23,7 @@ export {
   TaskActivitySourceIntegrityError,
   TaskAlreadyCompletedError,
   TaskDefinitionAlreadyDeactivatedError,
+  TaskNotificationSourceIntegrityError,
   TaskPersistenceError,
 } from './errors.js';
 export {
@@ -45,6 +46,12 @@ export {
   type FindTaskActivitySourceInput,
   type TaskActivitySource,
 } from './find-task-activity-source.js';
+export {
+  FIND_TASK_NOTIFICATION_SOURCE_SQL,
+  findTaskNotificationSource,
+  type FindTaskNotificationSource,
+  type TaskNotificationSource,
+} from './find-task-notification-source.js';
 export {
   HOME_LOCAL_DATE_PATTERN,
   parseHomeLocalDate,

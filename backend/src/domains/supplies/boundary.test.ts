@@ -112,6 +112,22 @@ void describe('supplies domain boundary', () => {
     assert.doesNotMatch(source, /from ['"]\.\/repository/);
   });
 
+  void it('exposes creator and obtain evidence without claim or identity data to Notifications', async () => {
+    const source = await readFile(
+      path.join(suppliesDir, 'find-supply-notification-source.ts'),
+      'utf8',
+    );
+    assert.match(source, /FIND_SUPPLY_NOTIFICATION_SOURCE_SQL/);
+    assert.match(source, /created_by_membership_id/);
+    assert.match(source, /obtained_by_membership_id/);
+    assert.match(source, /obtained_at/);
+    assert.match(source, /expectedHomeId/);
+    assert.doesNotMatch(source, /e\.title/);
+    assert.doesNotMatch(source, /supply_claims|claimant/);
+    assert.doesNotMatch(source, /user_id|email|\bname\b/);
+    assert.doesNotMatch(source, /from ['"]\.\/repository/);
+  });
+
   void it('keeps title rules free of persistence, HTTP, and JS Date', async () => {
     const source = await readFile(
       path.join(suppliesDir, 'supply-title.ts'),

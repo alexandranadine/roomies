@@ -44,6 +44,18 @@ export class MaintenanceActivitySourceIntegrityError extends Error {
 }
 
 /**
+ * Canonical Maintenance Notification source could not be read safely.
+ * Messages never include protected source values or identity data.
+ */
+export class MaintenanceNotificationSourceIntegrityError extends Error {
+  override readonly name = 'MaintenanceNotificationSourceIntegrityError';
+
+  constructor() {
+    super('Maintenance notification source integrity failure');
+  }
+}
+
+/**
  * Visible state conflict: resolve is allowed only while the entry is OPEN.
  * Returned only after the entry is proven visible.
  */

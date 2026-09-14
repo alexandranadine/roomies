@@ -123,6 +123,22 @@ void describe('tasks domain boundary', () => {
     assert.doesNotMatch(source, /from ['"]\.\/repository/);
   });
 
+  void it('exposes only persisted assignment and completion evidence to Notifications', async () => {
+    const source = await readFile(
+      path.join(tasksDir, 'find-task-notification-source.ts'),
+      'utf8',
+    );
+    assert.match(source, /FIND_TASK_NOTIFICATION_SOURCE_SQL/);
+    assert.match(source, /assigned_membership_id/);
+    assert.match(source, /completed_by_membership_id/);
+    assert.match(source, /completed_at/);
+    assert.match(source, /expectedHomeId/);
+    assert.doesNotMatch(source, /t\.title/);
+    assert.doesNotMatch(source, /task_definitions/);
+    assert.doesNotMatch(source, /user_id|email|\bname\b/);
+    assert.doesNotMatch(source, /from ['"]\.\/repository/);
+  });
+
   void it('keeps Task Activity event contracts free of titles and names', async () => {
     const source = await readFile(path.join(tasksDir, 'events.ts'), 'utf8');
     assert.match(source, /import type \{ OutboxEventInput \}/);
