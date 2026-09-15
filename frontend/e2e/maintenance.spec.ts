@@ -380,7 +380,7 @@ test.describe('Maintenance authenticated UI', () => {
       page.getByRole('heading', { name: 'Replace furnace filter', level: 1 }),
     ).toBeVisible();
     await page.getByRole('button', { name: 'Mark resolved' }).click();
-    await expect(page.getByText('Resolved')).toBeVisible();
+    await expect(page.getByText('Resolved', { exact: true })).toBeVisible();
     await expect(
       page.getByRole('button', { name: 'Mark resolved' }),
     ).toHaveCount(0);
