@@ -33,6 +33,7 @@ import { verifyMembershipSchema } from './verify-membership-schema.js';
 import { verifyNotificationSchema } from './verify-notification-schema.js';
 import { verifySupplySchema } from './verify-supply-schema.js';
 import { verifyTaskSchema } from './verify-task-schema.js';
+import { verifyUserDeletionMarker } from './verify-user-deletion-marker.js';
 
 const backendRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -90,5 +91,6 @@ await verifyMaintenanceSchema(databaseUrl);
 await verifyActivitySchema(databaseUrl);
 await verifyMembershipSchema(databaseUrl);
 await verifyNotificationSchema(databaseUrl);
+await verifyUserDeletionMarker(databaseUrl);
 
 console.log('Fresh migrations and strict persistence verification passed.');

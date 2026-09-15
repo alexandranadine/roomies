@@ -105,6 +105,8 @@ void describe('GET /api/v1/me', () => {
         'homeId',
         'capability',
         'userId',
+        'deletedAt',
+        'deleted_at',
       ],
     });
   });

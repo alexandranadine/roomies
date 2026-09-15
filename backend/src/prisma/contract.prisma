@@ -91,6 +91,7 @@ enum NotificationSourceEntityType {
 
 model User {
   id          Uuid                 @id @default(uuid(7))
+  deletedAt   Timestamptz?         @map("deleted_at")
   createdAt   temporal.createdAt() @map("created_at")
   updatedAt   temporal.updatedAt() @map("updated_at")
   memberships Membership[]

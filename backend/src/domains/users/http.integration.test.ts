@@ -202,6 +202,8 @@ void describe('GET /api/v1/me HTTP integration', () => {
               'membership',
               'homeId',
               SPOOFED_USER_ID,
+              'deletedAt',
+              'deleted_at',
             ],
           });
 

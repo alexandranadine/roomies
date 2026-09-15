@@ -222,6 +222,12 @@ async function verifyProvisioning(client: PoolClient): Promise<void> {
       [id],
     );
     assert.equal(matchingIdentity.rows[0]?.count, '1');
+
+    const deletionMarker = await client.query<{ deleted_at: Date | null }>(
+      'SELECT deleted_at FROM public.users WHERE id = $1::uuid',
+      [id],
+    );
+    assert.equal(deletionMarker.rows[0]?.deleted_at, null);
   });
 
   console.log('Auth identity provisioning verification passed.');

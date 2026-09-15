@@ -48,11 +48,32 @@ void describe('authenticated user surface boundary', () => {
     }
   });
 
+  void it('keeps the deletion marker port on users-only SQL without sibling imports', async () => {
+    const source = await readFile(
+      path.join(usersDir, 'canonical-user-deletion-marker.ts'),
+      'utf8',
+    );
+    assert.match(source, /FROM users/);
+    assert.match(source, /FOR UPDATE/);
+    assert.match(source, /SET deleted_at = \$1/);
+    assert.doesNotMatch(source, /DELETE FROM/i);
+    assert.doesNotMatch(source, /FROM\s+homes/i);
+    assert.doesNotMatch(source, /FROM\s+memberships/i);
+    assert.doesNotMatch(source, /FROM\s+auth_/i);
+    assert.doesNotMatch(source, /domains\/(?:homes|memberships)/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+    assert.doesNotMatch(source, /better-auth/);
+    assert.doesNotMatch(source, /Date\.now/);
+    assert.doesNotMatch(source, /console\.(?:log|info|debug)\(/);
+  });
+
   void it('does not import Better Auth from application/domain user modules', async () => {
     const applicationAndDomain = [
       path.join(usersDir, 'current-user.ts'),
       path.join(usersDir, 'get-current-user.ts'),
       path.join(usersDir, 'current-user-dto.ts'),
+      path.join(usersDir, 'canonical-user-deletion-marker.ts'),
     ];
 
     for (const file of applicationAndDomain) {
@@ -61,6 +82,21 @@ void describe('authenticated user surface boundary', () => {
       assert.doesNotMatch(source, /auth-runtime/);
       assert.doesNotMatch(source, /platform\/auth/);
       assert.doesNotMatch(source, /express/);
+    }
+  });
+
+  void it('keeps deletion markers off the ordinary current-user surface', async () => {
+    const surface = [
+      path.join(usersDir, 'current-user.ts'),
+      path.join(usersDir, 'get-current-user.ts'),
+      path.join(usersDir, 'current-user-dto.ts'),
+      path.join(usersDir, 'http.ts'),
+    ];
+    for (const file of surface) {
+      const source = await readFile(file, 'utf8');
+      const rel = file.replaceAll('\\', '/');
+      assert.doesNotMatch(source, /deletedAt/, rel);
+      assert.doesNotMatch(source, /deleted_at/, rel);
     }
   });
 });
