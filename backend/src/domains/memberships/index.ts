@@ -119,6 +119,13 @@ export {
 } from './insert-membership-role-transition.js';
 export type { LeaveMembershipInput } from './leave.js';
 export {
+  LIST_USER_MEMBERSHIP_TENURES_SQL,
+  listUserMembershipTenures,
+  MembershipTenureDiscoveryIntegrityError,
+  type ListUserMembershipTenures,
+  type UserMembershipTenure,
+} from './list-user-membership-tenures.js';
+export {
   decideMembershipLeave,
   decideMembershipLeaveSelf,
   type MembershipLeaveDenial,

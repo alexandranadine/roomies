@@ -4,13 +4,11 @@ import {
   type HomeArchiveWriter,
 } from '../../domains/homes/archive-home.js';
 import { FinalMemberRequiredError } from '../../domains/homes/errors.js';
-import { createHomeArchivedV1Event } from '../../domains/homes/events.js';
 import type { LockedHomeStructure } from '../../domains/homes/locked-home-structure.js';
 import { lockHomeStructure } from '../../domains/homes/lock-home-structure.js';
 import { decideArchiveFinalMember } from '../../domains/homes/policies.js';
 import { StructuralIntegrityError } from '../../domains/homes/structure-errors.js';
 import { evaluateHomeStructureInvariant } from '../../domains/homes/structure-invariant.js';
-import { createMembershipEndedV1Event } from '../../domains/memberships/events.js';
 import type { ActiveHomeActor } from '../../platform/authz/context.js';
 import { ForbiddenError } from '../../platform/authz/errors.js';
 import type { OutboxWriter } from '../../platform/events/outbox-writer.js';
@@ -24,6 +22,7 @@ import {
 } from '../../platform/persistence/transaction.js';
 import type { Clock } from '../../platform/time/clock.js';
 import { systemClock } from '../../platform/time/clock.js';
+import { createApplyArchiveFinalMemberHome } from './apply-archive-final-member-home.js';
 import {
   createApplyMembershipEndingWithinHomeStructureFromPool,
   type ApplyMembershipEndingWithinHomeStructure,
@@ -56,6 +55,8 @@ export type ArchiveFinalMemberHomeDependencies = {
 export function createArchiveFinalMemberHome(
   deps: ArchiveFinalMemberHomeDependencies,
 ): (input: ArchiveFinalMemberInput) => Promise<void> {
+  const applyArchive = createApplyArchiveFinalMemberHome(deps);
+
   return async (input) => {
     await deps.runTransaction(async (tx) => {
       const locked = await deps.lockHomeStructure(tx, input);
@@ -80,54 +81,11 @@ export function createArchiveFinalMemberHome(
       }
 
       const archivedAt = deps.clock.now();
-
-      const invitationInput = Object.freeze({
-        homeId: locked.home.id,
-        archivedAt,
-        cause: 'HOME_ARCHIVED' as const,
-      });
-      await deps.invitationRevoker.lockPendingForHomeArchive(
-        tx,
-        invitationInput,
-      );
-      await deps.invitationRevoker.revokeLockedPendingForHomeArchive(
-        tx,
-        invitationInput,
-      );
-
-      await deps.applyMembershipEnding(tx, {
+      await applyArchive(tx, {
         homeId: locked.home.id,
         membershipId: locked.actor.membershipId,
-        endedAt: archivedAt,
-        endedByMembershipId: locked.actor.membershipId,
-        cause: 'HOME_ARCHIVED',
-      });
-
-      const archived = await deps.homeArchive.archiveActiveHome(tx, {
-        homeId: locked.home.id,
         archivedAt,
       });
-      if (archived !== 1) {
-        throw new StructuralIntegrityError();
-      }
-
-      await deps.outbox.append(
-        tx,
-        createMembershipEndedV1Event({
-          eventId: deps.ids.next(),
-          occurredAt: archivedAt,
-          membershipId: locked.actor.membershipId,
-          homeId: locked.home.id,
-        }),
-      );
-      await deps.outbox.append(
-        tx,
-        createHomeArchivedV1Event({
-          eventId: deps.ids.next(),
-          occurredAt: archivedAt,
-          homeId: locked.home.id,
-        }),
-      );
     });
   };
 }

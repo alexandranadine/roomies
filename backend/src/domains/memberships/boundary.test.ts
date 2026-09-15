@@ -298,6 +298,29 @@ void describe('memberships domain boundary', () => {
     assert.doesNotMatch(source, /from ['"]\.\/repository/);
   });
 
+  void it('discovers all User tenures without locking or collapsing history', async () => {
+    const source = await readFile(
+      path.join(membershipsDir, 'list-user-membership-tenures.ts'),
+      'utf8',
+    );
+    assert.match(source, /LIST_USER_MEMBERSHIP_TENURES_SQL/);
+    assert.match(source, /user_id = \$1::uuid/);
+    assert.match(source, /ORDER BY home_id ASC, id ASC/);
+    assert.doesNotMatch(source, /FOR UPDATE/i);
+    assert.doesNotMatch(source, /INSERT |UPDATE |DELETE /i);
+    assert.doesNotMatch(source, /ended_at IS NULL/);
+    assert.doesNotMatch(source, /\bemail\b/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /better-auth/);
+    assert.doesNotMatch(source, /memberships\/repository/);
+    assert.doesNotMatch(source, /homes\/repository/);
+    assert.doesNotMatch(source, /domains\/maintenance/);
+    assert.doesNotMatch(source, /domains\/tasks/);
+    assert.doesNotMatch(source, /domains\/supplies/);
+    assert.doesNotMatch(source, /SERIALIZABLE/);
+    assert.doesNotMatch(source, /pg_advisory/i);
+  });
+
   void it('keeps historical Membership display free of email, role, and userId', async () => {
     const source = await readFile(
       path.join(membershipsDir, 'find-historical-membership-display.ts'),

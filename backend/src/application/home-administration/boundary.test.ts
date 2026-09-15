@@ -155,6 +155,35 @@ void describe('home-administration application boundary', () => {
     );
   });
 
+  void it('exposes caller-owned final-member archive mutation without a nested transaction', async () => {
+    const source = await readFile(
+      path.join(dir, 'apply-archive-final-member-home.ts'),
+      'utf8',
+    );
+    assert.match(source, /lockPendingForHomeArchive/);
+    assert.match(source, /revokeLockedPendingForHomeArchive/);
+    assert.match(source, /applyMembershipEnding/);
+    assert.match(source, /archiveActiveHome/);
+    assert.match(source, /createMembershipEndedV1Event/);
+    assert.match(source, /createHomeArchivedV1Event/);
+    assert.doesNotMatch(source, /runInReadCommittedTransaction/);
+    assert.doesNotMatch(source, /BEGIN/);
+    assert.doesNotMatch(source, /COMMIT/);
+    assert.doesNotMatch(source, /ROLLBACK/);
+    assert.doesNotMatch(source, /lockHomeStructure/);
+    assert.doesNotMatch(source, /decideArchiveFinalMember/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /better-auth/);
+    assert.doesNotMatch(source, /memberships\/repository/);
+    assert.doesNotMatch(source, /homes\/repository/);
+    assert.doesNotMatch(source, /invitations\/repository/);
+    assert.doesNotMatch(source, /Date\.now/);
+    assert.ok(
+      source.lastIndexOf('createMembershipEndedV1Event') <
+        source.lastIndexOf('createHomeArchivedV1Event'),
+    );
+  });
+
   void it('owns final archive sequencing without repository or fake lock infrastructure', async () => {
     const source = await readFile(
       path.join(dir, 'archive-final-member-home.ts'),
@@ -174,8 +203,8 @@ void describe('home-administration application boundary', () => {
       source,
       /createApplyMembershipEndingWithinHomeStructureFromPool/,
     );
-    assert.match(source, /applyMembershipEnding/);
-    assert.match(source, /archiveActiveHome/);
+    assert.match(source, /createApplyArchiveFinalMemberHome/);
+    assert.match(source, /applyArchive/);
     assert.doesNotMatch(source, /tasks\/repository/);
     assert.doesNotMatch(
       source,
@@ -183,10 +212,6 @@ void describe('home-administration application boundary', () => {
     );
     assert.doesNotMatch(source, /invitations\/repository/);
     assert.doesNotMatch(source, /Date\.now/);
-    assert.ok(
-      source.lastIndexOf('createMembershipEndedV1Event') <
-        source.lastIndexOf('createHomeArchivedV1Event'),
-    );
     assert.ok(
       source.lastIndexOf('deps.clock.now()') >
         source.lastIndexOf('lockHomeStructure(tx'),
