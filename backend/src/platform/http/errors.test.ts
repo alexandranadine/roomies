@@ -12,6 +12,7 @@ import {
   InvalidRequestError,
 } from '../authz/errors.js';
 import { StructuralIntegrityError } from '../../domains/homes/structure-errors.js';
+import { CanonicalUserPersistenceIntegrityError } from '../../domains/users/canonical-user-deletion-marker.js';
 import {
   AlreadyHomeMemberError,
   InvitationAlreadyPendingError,
@@ -321,6 +322,34 @@ void describe('HTTP known-error mappings', () => {
     assert.equal(body.error.code, 'INTERNAL_ERROR');
     assert.equal(body.error.message, 'An unexpected error occurred');
     assert.equal(res.text.includes('Home structure integrity failure'), false);
+  });
+
+  void it('maps CanonicalUserPersistenceIntegrityError to a safe 500', async () => {
+    const logs: string[] = [];
+    const originalError = console.error;
+    console.error = (...args: unknown[]) => {
+      logs.push(args.map((value) => JSON.stringify(value)).join(' '));
+    };
+    try {
+      const res = await appRequest(
+        appThatThrows(new CanonicalUserPersistenceIntegrityError()),
+        { path: '/throw' },
+      );
+      assert.equal(res.status, 500);
+      const body = res.json() as ApiErrorBody;
+      assert.equal(body.error.code, 'INTERNAL_ERROR');
+      assert.equal(body.error.message, 'An unexpected error occurred');
+      assert.equal(res.text.includes('deletedAt'), false);
+      assert.equal(res.text.includes('deleted_at'), false);
+      assert.equal(
+        res.text.includes('Canonical user persistence integrity failure'),
+        false,
+      );
+      assert.equal(logs.join('\n').includes('deletedAt'), false);
+      assert.equal(logs.join('\n').includes('deleted_at'), false);
+    } finally {
+      console.error = originalError;
+    }
   });
 
   void it('maps SupplyPersistenceError to a safe 500', async () => {

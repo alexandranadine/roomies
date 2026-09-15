@@ -43,6 +43,12 @@ export type CanonicalUserDeletionMarkerPersistence = {
   ): Promise<number>;
 };
 
+/** Lock-only slice of the public marker port. Does not write deletedAt. */
+export type CanonicalUserLockPort = Pick<
+  CanonicalUserDeletionMarkerPersistence,
+  'lockByUserId'
+>;
+
 type CanonicalUserLockRow = {
   id: unknown;
   deleted_at: unknown;

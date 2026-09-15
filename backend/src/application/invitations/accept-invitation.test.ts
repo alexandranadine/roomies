@@ -17,6 +17,7 @@ import type {
   NewInvitationMembership,
   PriorMembershipTenure,
 } from '../../domains/memberships/index.js';
+import type { LockedCanonicalUser } from '../../domains/users/canonical-user-deletion-marker.js';
 import { normalizeEmail } from '../../platform/auth/index.js';
 import type {
   JsonObject,
@@ -85,6 +86,7 @@ type HarnessOptions = {
   email?: string;
   verified?: boolean;
   identityMissing?: boolean;
+  lockedUser?: LockedCanonicalUser | null;
   prior?: PriorMembershipTenure | null;
   acceptCount?: number;
   insertError?: Error;
@@ -126,6 +128,13 @@ function harness(options: HarnessOptions = {}) {
         order.push('invitation-accept');
         return Promise.resolve(options.acceptCount ?? 1);
       },
+    },
+    lockCanonicalUser: () => {
+      order.push('user-lock');
+      if (options.lockedUser === null) return Promise.resolve(null);
+      return Promise.resolve(
+        options.lockedUser ?? { userId: USER_ID, deletedAt: null },
+      );
     },
     lockHomeStructure: () => {
       order.push('home-memberships-lock');
@@ -239,6 +248,7 @@ void describe('acceptInvitation', () => {
     assert.deepEqual(test.order, [
       'preread',
       'begin',
+      'user-lock',
       'home-memberships-lock',
       'invitation-lock',
       'identity',
@@ -342,6 +352,7 @@ void describe('acceptInvitation', () => {
     assert.deepEqual(test.order, [
       'preread',
       'begin',
+      'user-lock',
       'home-memberships-lock',
       'invitation-lock',
     ]);
@@ -393,5 +404,29 @@ void describe('acceptInvitation', () => {
     const outbox = harness({ outboxError: outboxFailure });
     await assert.rejects(outbox.run(), (error) => error === outboxFailure);
     assert.equal(outbox.order.includes('commit'), false);
+  });
+
+  void it('refuses acceptance when the locked User has deletedAt set', async () => {
+    const test = harness({
+      lockedUser: {
+        userId: USER_ID,
+        deletedAt: new Date('2026-09-14T21:00:00.000Z'),
+      },
+    });
+    const error = await rejectsWith(test.run(), InvitationNotAvailableError);
+    assert.equal(error.message.includes('deleted'), false);
+    assert.equal(error.message.includes(USER_ID), false);
+    assert.deepEqual(test.inserted, []);
+    assert.deepEqual(test.events, []);
+    assert.deepEqual(test.order, ['preread', 'begin', 'user-lock']);
+    assert.equal(test.order.includes('home-memberships-lock'), false);
+    assert.equal(test.order.includes('membership-insert'), false);
+    assert.equal(test.order.includes('invitation-accept'), false);
+  });
+
+  void it('fails closed when the canonical User row is missing', async () => {
+    const error = await rejectsWith(harness({ lockedUser: null }).run(), Error);
+    assert.equal(error.name, 'StructuralIntegrityError');
+    assert.equal(error.message.includes(USER_ID), false);
   });
 });

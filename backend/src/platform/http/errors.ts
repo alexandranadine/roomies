@@ -12,6 +12,7 @@ import {
 } from '../authz/errors.js';
 import { TransactionInfrastructureError } from '../persistence/errors.js';
 import { StructuralIntegrityError } from '../../domains/homes/structure-errors.js';
+import { CanonicalUserPersistenceIntegrityError } from '../../domains/users/canonical-user-deletion-marker.js';
 import { FinalMemberRequiredError } from '../../domains/homes/errors.js';
 import {
   AlreadyHomeMemberError,
@@ -331,6 +332,7 @@ export function errorHandler(
   if (
     err instanceof AuthorizationIntegrityError ||
     err instanceof StructuralIntegrityError ||
+    err instanceof CanonicalUserPersistenceIntegrityError ||
     err instanceof TaskPersistenceError ||
     err instanceof SupplyPersistenceError ||
     err instanceof MaintenancePersistenceError ||

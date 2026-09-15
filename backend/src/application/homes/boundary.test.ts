@@ -32,6 +32,9 @@ void describe('homes application boundary', () => {
     assert.match(source, /role: 'ADMIN'/);
     assert.match(source, /createMembershipStartedV1Event/);
     assert.match(source, /outboxWriter/);
+    assert.match(source, /lockCanonicalUser|lockByUserId/);
+    assert.match(source, /canonical-user-deletion-marker/);
+    assert.doesNotMatch(source, /markDeleted/);
     assert.doesNotMatch(source, /memberships\/repository/);
     assert.doesNotMatch(source, /homes\/repository/);
     assert.doesNotMatch(source, /home-repository/);

@@ -11,6 +11,11 @@ import {
   insertActiveMembership,
   type NewActiveMembership,
 } from '../../domains/memberships/insert-active-membership.js';
+import {
+  createCanonicalUserDeletionMarkerPersistence,
+  type LockedCanonicalUser,
+} from '../../domains/users/canonical-user-deletion-marker.js';
+import { UnauthenticatedError } from '../../platform/auth/errors.js';
 import { InvalidRequestError } from '../../platform/authz/errors.js';
 import type { OutboxWriter } from '../../platform/events/outbox-writer.js';
 import { outboxWriter } from '../../platform/events/outbox-writer.js';
@@ -46,6 +51,10 @@ export type CreateHomeDependencies = Readonly<{
   runTransaction: <T>(
     work: (tx: TransactionContext) => Promise<T>,
   ) => Promise<T>;
+  lockCanonicalUser: (
+    tx: TransactionContext,
+    userId: string,
+  ) => Promise<LockedCanonicalUser | null>;
   insertHome: (tx: TransactionContext, home: NewHome) => Promise<void>;
   insertMembership: (
     tx: TransactionContext,
@@ -87,6 +96,16 @@ export function createCreateHome(
     const { name, timezone } = validatedCreateInput(input);
 
     return deps.runTransaction(async (tx) => {
+      const lockedUser = await deps.lockCanonicalUser(tx, input.userId);
+      if (lockedUser === null) {
+        throw new StructuralIntegrityError();
+      }
+      // Deleted canonical User: refuse without disclosing deletion.
+      // HTTP: UnauthenticatedError → 401 UNAUTHENTICATED.
+      if (lockedUser.deletedAt !== null) {
+        throw new UnauthenticatedError();
+      }
+
       const occurredAt = deps.clock.now();
       const homeId = deps.ids.next();
       const membershipId = deps.ids.next();
@@ -140,8 +159,10 @@ export function createCreateHome(
 export function createCreateHomeFromPool(
   pool: TransactionPool,
 ): ReturnType<typeof createCreateHome> {
+  const canonicalUsers = createCanonicalUserDeletionMarkerPersistence();
   return createCreateHome({
     runTransaction: (work) => runInReadCommittedTransaction(pool, work),
+    lockCanonicalUser: (tx, userId) => canonicalUsers.lockByUserId(tx, userId),
     insertHome,
     insertMembership: insertActiveMembership,
     outbox: outboxWriter,

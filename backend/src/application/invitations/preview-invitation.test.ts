@@ -211,4 +211,20 @@ void describe('previewInvitation', () => {
     const { command, input } = previewOf({ home: null });
     await expectUnavailable(() => command(input));
   });
+
+  void it('does not acquire a canonical User write lock', async () => {
+    const source = await readFile(
+      path.join(
+        path.dirname(fileURLToPath(import.meta.url)),
+        'preview-invitation.ts',
+      ),
+      'utf8',
+    );
+    assert.doesNotMatch(source, /lockCanonicalUser/);
+    assert.doesNotMatch(source, /lockByUserId/);
+    assert.doesNotMatch(source, /canonical-user-deletion-marker/);
+    assert.doesNotMatch(source, /FOR UPDATE/i);
+    assert.doesNotMatch(source, /deletedAt/);
+    assert.doesNotMatch(source, /runInReadCommittedTransaction/);
+  });
 });

@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { describe, it } from 'node:test';
 import { Pool } from 'pg';
 import { lockActiveHomeStructureForEntry } from '../../domains/homes/index.js';
+import { InvitationNotAvailableError } from '../../domains/invitations/errors.js';
 import { createInvitationRepository } from '../../domains/invitations/repository.js';
 import {
   generateInvitationSecret,
@@ -13,6 +14,7 @@ import {
   findLatestEndedMembershipTenure,
   insertInvitationMembership,
 } from '../../domains/memberships/index.js';
+import { createCanonicalUserDeletionMarkerPersistence } from '../../domains/users/canonical-user-deletion-marker.js';
 import { findCurrentCanonicalIdentityByUser } from '../../platform/auth/index.js';
 import { outboxWriter } from '../../platform/events/outbox-writer.js';
 import { systemUuidV7 } from '../../platform/ids/uuid-v7.js';
@@ -143,6 +145,7 @@ function createRollbackTestCommand(
 ) {
   const repository = createInvitationRepository(pool);
   const appendOverride = overrides.append;
+  const canonicalUsers = createCanonicalUserDeletionMarkerPersistence();
   return createAcceptInvitation({
     runTransaction: (work) => runInReadCommittedTransaction(pool, work),
     invitations: {
@@ -150,6 +153,7 @@ function createRollbackTestCommand(
       lockById: repository.lockById,
       acceptLocked: overrides.acceptLocked ?? repository.acceptLocked,
     },
+    lockCanonicalUser: (tx, userId) => canonicalUsers.lockByUserId(tx, userId),
     lockHomeStructure: lockActiveHomeStructureForEntry,
     findCurrentIdentity: findCurrentCanonicalIdentityByUser,
     findLatestEndedTenure: findLatestEndedMembershipTenure,
@@ -768,6 +772,134 @@ void describe('invitation acceptance PostgreSQL concurrency', () => {
           active_count: '0',
           accepted_at: null,
         });
+      } finally {
+        await cleanup(pool, seed);
+        await pool.end();
+      }
+    },
+  );
+
+  void it(
+    'refuses a deleted canonical User without accepting or creating Membership',
+    { skip: skipWithoutDatabase, timeout: 30_000 },
+    async () => {
+      const pool = new Pool({
+        connectionString: resolveSafeDedicatedTestDatabaseUrl(),
+        max: 4,
+      });
+      const seed = await seedAcceptance(pool, randomUUID());
+      const deletedAt = new Date('2026-09-14T21:00:00.000Z');
+      try {
+        const marked = await pool.query(
+          `UPDATE users SET deleted_at = $1 WHERE id = $2 AND deleted_at IS NULL`,
+          [deletedAt, seed.userId],
+        );
+        assert.equal(marked.rowCount, 1);
+
+        const command = createAcceptInvitationFromPool(pool);
+        await assert.rejects(
+          command({
+            invitationId: seed.invitationId,
+            userId: seed.userId,
+            secret: seed.secret.encoded,
+          }),
+          InvitationNotAvailableError,
+        );
+
+        const invitation = await pool.query<{
+          accepted_at: Date | null;
+          accepted_membership_id: string | null;
+        }>(
+          `SELECT accepted_at, accepted_membership_id
+           FROM invitations WHERE id = $1`,
+          [seed.invitationId],
+        );
+        assert.equal(invitation.rows[0]?.accepted_at, null);
+        assert.equal(invitation.rows[0]?.accepted_membership_id, null);
+
+        const memberships = await pool.query(
+          `SELECT id FROM memberships WHERE home_id = $1 AND user_id = $2`,
+          [seed.homeId, seed.userId],
+        );
+        assert.equal(memberships.rowCount, 0);
+
+        const marker = await pool.query<{ deleted_at: Date | null }>(
+          'SELECT deleted_at FROM users WHERE id = $1',
+          [seed.userId],
+        );
+        assert.equal(
+          marker.rows[0]?.deleted_at?.getTime(),
+          deletedAt.getTime(),
+        );
+      } finally {
+        await cleanup(pool, seed);
+        await pool.end();
+      }
+    },
+  );
+
+  void it(
+    'rolls back after the User lock when later acceptance work fails and leaves deletedAt unchanged',
+    { skip: skipWithoutDatabase, timeout: 30_000 },
+    async () => {
+      const pool = new Pool({
+        connectionString: resolveSafeDedicatedTestDatabaseUrl(),
+        max: 4,
+      });
+      const seed = await seedAcceptance(pool, randomUUID());
+      const before = await pool.query<{ deleted_at: Date | null }>(
+        'SELECT deleted_at FROM users WHERE id = $1',
+        [seed.userId],
+      );
+      assert.equal(before.rows[0]?.deleted_at, null);
+      try {
+        const command = createAcceptInvitation({
+          runTransaction: (work) => runInReadCommittedTransaction(pool, work),
+          invitations: createInvitationRepository(pool),
+          lockCanonicalUser: (tx, userId) =>
+            createCanonicalUserDeletionMarkerPersistence().lockByUserId(
+              tx,
+              userId,
+            ),
+          lockHomeStructure: () =>
+            Promise.reject(new Error('injected home lock failure')),
+          findCurrentIdentity: findCurrentCanonicalIdentityByUser,
+          findLatestEndedTenure: findLatestEndedMembershipTenure,
+          insertMembership: insertInvitationMembership,
+          outbox: outboxWriter,
+          clock: systemClock,
+          ids: systemUuidV7,
+          hashesEqual: invitationTokenHashesEqual,
+        });
+
+        await assert.rejects(
+          command({
+            invitationId: seed.invitationId,
+            userId: seed.userId,
+            secret: seed.secret.encoded,
+          }),
+        );
+
+        const invitation = await pool.query<{
+          accepted_at: Date | null;
+          accepted_membership_id: string | null;
+        }>(
+          `SELECT accepted_at, accepted_membership_id
+           FROM invitations WHERE id = $1`,
+          [seed.invitationId],
+        );
+        assert.equal(invitation.rows[0]?.accepted_at, null);
+        assert.equal(invitation.rows[0]?.accepted_membership_id, null);
+        const memberships = await pool.query(
+          `SELECT id FROM memberships WHERE home_id = $1 AND user_id = $2`,
+          [seed.homeId, seed.userId],
+        );
+        assert.equal(memberships.rowCount, 0);
+        const after = await pool.query<{ deleted_at: Date | null }>(
+          'SELECT deleted_at FROM users WHERE id = $1',
+          [seed.userId],
+        );
+        assert.equal(after.rows[0]?.deleted_at, null);
       } finally {
         await cleanup(pool, seed);
         await pool.end();

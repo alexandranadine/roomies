@@ -37,6 +37,10 @@ import {
   type PriorMembershipTenure,
 } from '../../domains/memberships/index.js';
 import {
+  createCanonicalUserDeletionMarkerPersistence,
+  type LockedCanonicalUser,
+} from '../../domains/users/canonical-user-deletion-marker.js';
+import {
   findCurrentCanonicalIdentityByUser,
   type CurrentCanonicalIdentity,
 } from '../../platform/auth/index.js';
@@ -74,6 +78,10 @@ export type AcceptInvitationDependencies = Readonly<{
     InvitationRepository,
     'findById' | 'lockById' | 'acceptLocked'
   >;
+  lockCanonicalUser: (
+    tx: TransactionContext,
+    userId: string,
+  ) => Promise<LockedCanonicalUser | null>;
   lockHomeStructure: (
     tx: TransactionContext,
     input: { homeId: string },
@@ -124,7 +132,7 @@ function tokenMatches(
 /**
  * Two-stage acceptance. Stage A only discovers immutable homeId and performs
  * uniform token work. Stage B is authoritative and serializes every structural
- * decision through Home → ordered active Memberships → invitation.
+ * decision through canonical User → Home → ordered active Memberships → invitation.
  */
 export function createAcceptInvitation(
   deps: AcceptInvitationDependencies,
@@ -141,6 +149,16 @@ export function createAcceptInvitation(
     const homeId = preread.homeId;
 
     return deps.runTransaction(async (tx) => {
+      const lockedUser = await deps.lockCanonicalUser(tx, input.userId);
+      if (lockedUser === null) {
+        throw new StructuralIntegrityError();
+      }
+      // Deleted canonical User: same concealed contract as unknown/stale invites.
+      // HTTP: InvitationNotAvailableError → 404 INVITATION_NOT_AVAILABLE.
+      if (lockedUser.deletedAt !== null) {
+        throw new InvitationNotAvailableError();
+      }
+
       let lockedHome: LockedHomeEntryStructure;
       try {
         lockedHome = await deps.lockHomeStructure(tx, { homeId });
@@ -245,11 +263,13 @@ export function createAcceptInvitation(
 export function createAcceptInvitationFromPool(
   pool: TransactionPool,
 ): ReturnType<typeof createAcceptInvitation> {
+  const canonicalUsers = createCanonicalUserDeletionMarkerPersistence();
   return createAcceptInvitation({
     runTransaction: (work) => runInReadCommittedTransaction(pool, work),
     invitations: createInvitationRepository(
       pool as Parameters<typeof createInvitationRepository>[0],
     ),
+    lockCanonicalUser: (tx, userId) => canonicalUsers.lockByUserId(tx, userId),
     lockHomeStructure: lockActiveHomeStructureForEntry,
     findCurrentIdentity: findCurrentCanonicalIdentityByUser,
     findLatestEndedTenure: findLatestEndedMembershipTenure,

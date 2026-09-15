@@ -266,4 +266,19 @@ void describe('POST /api/v1/homes', () => {
       console.error = originalError;
     }
   });
+
+  void it('maps command UnauthenticatedError to 401 without leaking deletion', async () => {
+    const { app, calls } = buildApp({
+      createHome: () => Promise.reject(new UnauthenticatedError()),
+    });
+    const res = await postHome(app);
+    assert.equal(res.status, 401);
+    const body = res.json() as ApiErrorBody;
+    assert.equal(body.error.code, 'UNAUTHENTICATED');
+    assert.equal(body.error.message, 'Authentication required');
+    assert.equal(res.text.includes('deleted'), false);
+    assert.equal(res.text.includes('deletedAt'), false);
+    assert.equal(res.text.includes(USER_ID), false);
+    assert.equal(calls.length, 1);
+  });
 });

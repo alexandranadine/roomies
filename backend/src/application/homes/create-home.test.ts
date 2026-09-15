@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { NewHome } from '../../domains/homes/insert-home.js';
 import type { NewActiveMembership } from '../../domains/memberships/insert-active-membership.js';
+import type { LockedCanonicalUser } from '../../domains/users/canonical-user-deletion-marker.js';
+import { UnauthenticatedError } from '../../platform/auth/errors.js';
 import { InvalidRequestError } from '../../platform/authz/errors.js';
 import { TransactionInfrastructureError } from '../../platform/persistence/errors.js';
 import type { TransactionContext } from '../../platform/persistence/transaction.js';
@@ -25,6 +27,8 @@ type HarnessOptions = {
   membershipError?: Error;
   homeError?: Error;
   outboxError?: Error;
+  lockedUser?: LockedCanonicalUser | null;
+  lockError?: Error;
 };
 
 function harness(options: HarnessOptions = {}) {
@@ -49,6 +53,18 @@ function harness(options: HarnessOptions = {}) {
         order.push('rollback');
         throw error;
       }
+    },
+    lockCanonicalUser: () => {
+      order.push('user-lock');
+      if (options.lockError) {
+        return Promise.reject(options.lockError);
+      }
+      if (options.lockedUser === null) {
+        return Promise.resolve(null);
+      }
+      return Promise.resolve(
+        options.lockedUser ?? { userId: USER_ID, deletedAt: null },
+      );
     },
     insertHome: (_tx, home) => {
       order.push('home-insert');
@@ -122,6 +138,7 @@ void describe('createCreateHome', () => {
     assert.equal(run.clockCalls, 1);
     assert.deepEqual(run.order, [
       'begin',
+      'user-lock',
       'home-insert',
       'membership-insert',
       'outbox',
@@ -180,6 +197,8 @@ void describe('createCreateHome', () => {
     let idIndex = 0;
     const second = createCreateHome({
       runTransaction: async (work) => work(TX),
+      lockCanonicalUser: () =>
+        Promise.resolve({ userId: USER_ID, deletedAt: null }),
       insertHome: () => Promise.resolve(),
       insertMembership: () => Promise.resolve(),
       outbox: { append: () => Promise.resolve() },
@@ -247,6 +266,7 @@ void describe('createCreateHome', () => {
     assert.equal(committed, false);
     assert.deepEqual(order, [
       'begin',
+      'user-lock',
       'home-insert',
       'membership-insert',
       'rollback',
@@ -270,6 +290,7 @@ void describe('createCreateHome', () => {
     assert.equal(committed, false);
     assert.deepEqual(order, [
       'begin',
+      'user-lock',
       'home-insert',
       'membership-insert',
       'outbox',
@@ -293,8 +314,65 @@ void describe('createCreateHome', () => {
       TransactionInfrastructureError,
     );
     assert.equal(committed, false);
-    assert.deepEqual(order, ['begin', 'home-insert', 'rollback']);
+    assert.deepEqual(order, ['begin', 'user-lock', 'home-insert', 'rollback']);
     assert.equal(homes.length, 0);
     assert.equal(memberships.length, 0);
+  });
+
+  void it('refuses Home creation when the locked User has deletedAt set', async () => {
+    const run = harness({
+      lockedUser: {
+        userId: USER_ID,
+        deletedAt: new Date('2026-09-14T21:00:00.000Z'),
+      },
+    });
+    await assert.rejects(
+      run.create({
+        userId: USER_ID,
+        name: 'Oak Street',
+        timezone: 'UTC',
+      }),
+      UnauthenticatedError,
+    );
+    assert.equal(run.committed, false);
+    assert.deepEqual(run.order, ['begin', 'user-lock', 'rollback']);
+    assert.equal(run.homes.length, 0);
+    assert.equal(run.memberships.length, 0);
+    assert.equal(run.events.length, 0);
+    assert.equal(run.clockCalls, 0);
+  });
+
+  void it('fails closed when the canonical User row is missing', async () => {
+    const run = harness({ lockedUser: null });
+    await assert.rejects(
+      run.create({
+        userId: USER_ID,
+        name: 'Oak Street',
+        timezone: 'UTC',
+      }),
+      (error: unknown) =>
+        error instanceof Error && error.name === 'StructuralIntegrityError',
+    );
+    assert.equal(run.committed, false);
+    assert.deepEqual(run.order, ['begin', 'user-lock', 'rollback']);
+    assert.equal(run.homes.length, 0);
+    assert.equal(run.memberships.length, 0);
+  });
+
+  void it('does not create a Home when the User lock fails', async () => {
+    const lockError = new TransactionInfrastructureError();
+    const run = harness({ lockError });
+    await assert.rejects(
+      run.create({
+        userId: USER_ID,
+        name: 'Oak Street',
+        timezone: 'UTC',
+      }),
+      TransactionInfrastructureError,
+    );
+    assert.equal(run.committed, false);
+    assert.deepEqual(run.order, ['begin', 'user-lock', 'rollback']);
+    assert.equal(run.homes.length, 0);
+    assert.equal(run.memberships.length, 0);
   });
 });

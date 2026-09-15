@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 import type { Pool } from 'pg';
 import { insertHome } from '../../domains/homes/insert-home.js';
 import { evaluateHomeStructureInvariant } from '../../domains/homes/structure-invariant.js';
+import { UnauthenticatedError } from '../../platform/auth/errors.js';
 import { TransactionInfrastructureError } from '../../platform/persistence/errors.js';
 import type { AppConfig } from '../../platform/config/types.js';
 import { createDatabasePool } from '../../platform/persistence/pool.js';
@@ -14,6 +15,7 @@ import {
 } from '../../platform/persistence/test-database.js';
 import { runInReadCommittedTransaction } from '../../platform/persistence/transaction.js';
 import { systemUuidV7 } from '../../platform/ids/uuid-v7.js';
+import { createCanonicalUserDeletionMarkerPersistence } from '../../domains/users/canonical-user-deletion-marker.js';
 import { createCreateHome, createCreateHomeFromPool } from './create-home.js';
 
 const skipWithoutDatabase = skipUnlessDedicatedTestDatabase();
@@ -305,9 +307,11 @@ void describe('createCreateHome PostgreSQL', () => {
       const homeId = systemUuidV7.next();
       const membershipId = systemUuidV7.next();
       const remainingIds = [homeId, membershipId];
+      const canonicalUsers = createCanonicalUserDeletionMarkerPersistence();
       const create = createCreateHome({
         runTransaction: (work) =>
           runInReadCommittedTransaction(database.pool, work),
+        lockCanonicalUser: (tx, id) => canonicalUsers.lockByUserId(tx, id),
         insertHome,
         insertMembership: () =>
           Promise.reject(new TransactionInfrastructureError()),
@@ -422,6 +426,130 @@ void describe('createCreateHome PostgreSQL', () => {
         assert.equal(rightRow.home_id, right.home.id);
       } finally {
         await cleanup(database.pool, { userIds: [userId], homeIds });
+        await database.close();
+      }
+    },
+  );
+
+  void it(
+    'refuses Home creation when deletedAt is set and does not write Home or Membership',
+    { skip: skipWithoutDatabase, timeout: 60_000 },
+    async () => {
+      const database = createDatabasePool(
+        testConfig(resolveSafeDedicatedTestDatabaseUrl()),
+      );
+      const userId = randomUUID();
+      const deletedAt = new Date('2026-09-14T21:00:00.000Z');
+      const create = createCreateHomeFromPool(database.pool);
+
+      try {
+        await insertUser(database.pool, userId);
+        await database.pool.query(
+          `UPDATE users SET deleted_at = $1 WHERE id = $2`,
+          [deletedAt, userId],
+        );
+
+        await assert.rejects(
+          create({
+            userId,
+            name: 'Deleted User Home',
+            timezone: 'UTC',
+          }),
+          UnauthenticatedError,
+        );
+
+        const homes = await database.pool.query(
+          `SELECT id FROM homes WHERE name = $1`,
+          ['Deleted User Home'],
+        );
+        const memberships = await database.pool.query(
+          `SELECT id FROM memberships WHERE user_id = $1`,
+          [userId],
+        );
+        const marker = await database.pool.query<{ deleted_at: Date | null }>(
+          'SELECT deleted_at FROM users WHERE id = $1',
+          [userId],
+        );
+        assert.equal(homes.rowCount, 0);
+        assert.equal(memberships.rowCount, 0);
+        assert.equal(
+          marker.rows[0]?.deleted_at?.getTime(),
+          deletedAt.getTime(),
+        );
+      } finally {
+        await cleanup(database.pool, { userIds: [userId], homeIds: [] });
+        await database.close();
+      }
+    },
+  );
+
+  void it(
+    'rolls back after the User lock when Home insert fails and leaves deletedAt unchanged',
+    { skip: skipWithoutDatabase, timeout: 60_000 },
+    async () => {
+      const database = createDatabasePool(
+        testConfig(resolveSafeDedicatedTestDatabaseUrl()),
+      );
+      const userId = randomUUID();
+      const homeId = systemUuidV7.next();
+      const membershipId = systemUuidV7.next();
+      const remainingIds = [homeId, membershipId];
+      const canonicalUsers = createCanonicalUserDeletionMarkerPersistence();
+      const create = createCreateHome({
+        runTransaction: (work) =>
+          runInReadCommittedTransaction(database.pool, work),
+        lockCanonicalUser: (tx, id) => canonicalUsers.lockByUserId(tx, id),
+        insertHome: () => Promise.reject(new TransactionInfrastructureError()),
+        insertMembership: () =>
+          Promise.reject(new Error('membership should not run')),
+        outbox: {
+          append() {
+            throw new Error('outbox should not run');
+          },
+        },
+        clock: { now: () => OCCURRED_AT },
+        ids: {
+          next() {
+            const id = remainingIds.shift();
+            if (id === undefined) {
+              throw new Error('unexpected extra id');
+            }
+            return id;
+          },
+        },
+      });
+
+      try {
+        await insertUser(database.pool, userId);
+        await assert.rejects(
+          create({
+            userId,
+            name: 'Lock Then Fail',
+            timezone: 'UTC',
+          }),
+          TransactionInfrastructureError,
+        );
+
+        const homes = await database.pool.query(
+          'SELECT id FROM homes WHERE id = $1',
+          [homeId],
+        );
+        const memberships = await database.pool.query(
+          'SELECT id FROM memberships WHERE id = $1 OR home_id = $2 OR user_id = $3',
+          [membershipId, homeId, userId],
+        );
+        const marker = await database.pool.query<{ deleted_at: Date | null }>(
+          'SELECT deleted_at FROM users WHERE id = $1',
+          [userId],
+        );
+        assert.equal(homes.rowCount, 0);
+        assert.equal(memberships.rowCount, 0);
+        assert.equal(marker.rows[0]?.deleted_at, null);
+      } finally {
+        await cleanup(database.pool, {
+          userIds: [userId],
+          homeIds: [homeId],
+        });
         await database.close();
       }
     },

@@ -318,4 +318,142 @@ void describe('POST /api/v1/homes PostgreSQL', () => {
       }
     },
   );
+
+  void it(
+    'refuses Home creation for a live session whose canonical User has deletedAt set',
+    { skip: skipWithoutDatabase, timeout: 60_000 },
+    async () => {
+      const databaseUrl = resolveSafeDedicatedTestDatabaseUrl();
+      const config = authConfig(databaseUrl);
+      const database = createDatabasePool(config);
+      const db = createDb(database.pool);
+      const auth = createAuthRuntime(database.pool, config);
+      const identityIds: string[] = [];
+      const homeIds: string[] = [];
+      const deletedAt = new Date('2026-09-14T21:00:00.000Z');
+
+      try {
+        await db.connect();
+        const app = createApp({
+          config,
+          readiness: createDbReadiness(db),
+          auth,
+          roomiesApi: createRoomiesApiRouter({
+            principalResolver: createPrincipalResolver({
+              auth,
+              hasCanonicalUser: createCanonicalUserLookup(database.pool),
+            }),
+            activeHomeActorResolver: createActiveHomeActorResolver(
+              database.pool,
+            ),
+            homeReader: createHomeRepository(database.pool),
+            createHome: createCreateHomeFromPool(database.pool),
+            archiveFinalMemberHome: () =>
+              Promise.reject(new Error('archive must not run for home create')),
+            changeMembershipRole: () =>
+              Promise.reject(new Error('role change must not run')),
+            leaveMembership: () =>
+              Promise.reject(new Error('leave must not run')),
+            removeMembership: () =>
+              Promise.reject(new Error('remove must not run')),
+          }),
+        });
+
+        await withAppServer(app, async (request) => {
+          const email = `m82-deleted-create-${randomUUID()}@example.test`;
+          const signup = await request({
+            method: 'POST',
+            path: '/api/auth/sign-up/email',
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({
+              name: 'Deleted Creator',
+              email,
+              password: PASSWORD,
+            }),
+          });
+          assert.ok(signup.status >= 200 && signup.status < 300);
+          const userId = (signup.json() as { user?: { id?: string } }).user?.id;
+          assert.ok(userId);
+          identityIds.push(userId);
+          const cookie = findSessionSetCookie(signup.headers);
+          assert.ok(cookie);
+          const session = sessionCookieHeader(cookie);
+
+          const marked = await database.pool.query(
+            `UPDATE users SET deleted_at = $1 WHERE id = $2 AND deleted_at IS NULL`,
+            [deletedAt, userId],
+          );
+          assert.equal(marked.rowCount, 1);
+
+          const refused = await request({
+            method: 'POST',
+            path: '/api/v1/homes',
+            headers: {
+              Origin: TRUSTED_ORIGIN,
+              Cookie: session,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({ name: 'Should Not Exist', timezone: 'UTC' }),
+          });
+          assert.equal(refused.status, 401);
+          const body = refused.json() as ApiErrorBody;
+          assert.equal(body.error.code, 'UNAUTHENTICATED');
+          assert.equal(body.error.message, 'Authentication required');
+          assert.equal(refused.text.includes('deleted'), false);
+          assert.equal(refused.text.includes('deletedAt'), false);
+          assert.equal(refused.text.includes(userId), false);
+          assertNoForbiddenLeak({
+            context: 'deleted user create home',
+            text: refused.text,
+            forbidden: [...COMMON_SECRET_SENTINELS, email, PASSWORD, userId],
+          });
+
+          const homes = await database.pool.query(
+            `SELECT id FROM homes WHERE name = $1`,
+            ['Should Not Exist'],
+          );
+          const memberships = await database.pool.query(
+            `SELECT id FROM memberships WHERE user_id = $1`,
+            [userId],
+          );
+          const marker = await database.pool.query<{ deleted_at: Date | null }>(
+            'SELECT deleted_at FROM users WHERE id = $1',
+            [userId],
+          );
+          assert.equal(homes.rowCount, 0);
+          assert.equal(memberships.rowCount, 0);
+          assert.equal(
+            marker.rows[0]?.deleted_at?.getTime(),
+            deletedAt.getTime(),
+          );
+        });
+      } finally {
+        if (homeIds.length > 0) {
+          await database.pool.query(
+            'DELETE FROM outbox_events WHERE home_id = ANY($1)',
+            [homeIds],
+          );
+          await database.pool.query(
+            'DELETE FROM memberships WHERE home_id = ANY($1)',
+            [homeIds],
+          );
+          await database.pool.query('DELETE FROM homes WHERE id = ANY($1)', [
+            homeIds,
+          ]);
+        }
+        for (const id of identityIds) {
+          await database.pool.query(
+            'DELETE FROM auth_identities WHERE id = $1',
+            [id],
+          );
+          await database.pool.query('DELETE FROM users WHERE id = $1', [id]);
+        }
+        await db.close();
+        await database.close();
+      }
+    },
+  );
 });
