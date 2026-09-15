@@ -166,6 +166,18 @@ void describe('createAuthRuntime', () => {
       new URL('./index.ts', import.meta.url),
       'utf8',
     );
+    const cookieSource = await readFile(
+      new URL('./expired-session-cookie.ts', import.meta.url),
+      'utf8',
+    );
+    assert.doesNotMatch(cookieSource, /\bnew\s+Pool\s*\(/);
+    assert.doesNotMatch(cookieSource, /auth\.api/);
+    assert.doesNotMatch(
+      cookieSource,
+      /\bsignOut\b|\bdeleteUser\b|\/delete-user/,
+    );
+    assert.match(cookieSource, /getCookies/);
+    assert.match(source, /expiredAuthSessionSetCookie/);
     const packageJson = JSON.parse(
       await readFile(new URL('../package.json', import.meta.url), 'utf8'),
     ) as { scripts?: Record<string, string> };

@@ -62,4 +62,26 @@ void describe('auth platform boundary', () => {
       assert.doesNotMatch(source, /\bmembershipId\b/);
     }
   });
+
+  void it('keeps auth teardown off domain rows and Better Auth HTTP delete-user', async () => {
+    const source = await readFile(
+      path.join(backendSrc, 'platform/auth/auth-identity-teardown.ts'),
+      'utf8',
+    );
+    assert.match(source, /DELETE FROM auth_verifications/);
+    assert.match(source, /DELETE FROM auth_identities/);
+    assert.doesNotMatch(source, /DELETE FROM auth_accounts/i);
+    assert.doesNotMatch(source, /DELETE FROM auth_sessions/i);
+    assert.doesNotMatch(source, /FROM\s+users/i);
+    assert.doesNotMatch(source, /FROM\s+homes/i);
+    assert.doesNotMatch(source, /FROM\s+memberships/i);
+    assert.doesNotMatch(source, /deleted_at/i);
+    assert.doesNotMatch(source, /FOR UPDATE/i);
+    assert.doesNotMatch(source, /['"`]BEGIN/);
+    assert.doesNotMatch(source, /['"`]COMMIT/);
+    assert.doesNotMatch(source, /\/delete-user/);
+    assert.doesNotMatch(source, /auth\.api/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /console\.(?:log|info|debug)\(/);
+  });
 });

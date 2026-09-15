@@ -40,3 +40,15 @@ export {
   type EmailCollisionQuery,
 } from './normalized-email-collision-audit.js';
 export { AuthInfrastructureError, UnauthenticatedError } from './errors.js';
+export {
+  authLifecycleIdentityFromCurrent,
+  createAuthIdentityTeardownPersistence,
+  type AuthIdentityTeardownPersistence,
+  type AuthLifecycleIdentity,
+  type TeardownAuthIdentityInput,
+} from './auth-identity-teardown.js';
+export {
+  appendExpiredAuthSessionCookieAfterCommit,
+  expiredAuthSessionSetCookie,
+  type AuthSessionCookieCommitOutcome,
+} from './expired-session-cookie.js';

@@ -213,6 +213,7 @@ export {
   normalizeEmail,
   type NormalizedEmail,
 } from './normalized-email.js';
+export { expiredAuthSessionSetCookie } from './expired-session-cookie.js';
 
 /**
  * Official Better Auth Node/Express adapter. Callers must mount this before
