@@ -35,10 +35,17 @@ export {
   type InvitationHomeArchiveCleanupInput,
 } from './home-archive-cleanup.js';
 export {
+  createEraseInvitationsForTargetEmail,
+  createEraseInvitationsForTargetEmailFromPool,
+  type EraseInvitationsForTargetEmail,
+  type EraseInvitationsForTargetEmailInput,
+} from './erase-invitations-for-target-email.js';
+export {
   createInvitationRepository,
   type InvitationRepository,
   type LockedOpenInvitation,
   type NewInvitation,
+  type TargetEmailInvitationRef,
 } from './repository.js';
 export {
   decodeInvitationSecret,

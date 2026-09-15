@@ -126,6 +126,23 @@ ORDER BY id
 FOR UPDATE
 `;
 
+/**
+ * Account-erasure lock. Exact invited_email match only. All lifecycle states.
+ * Stable invitation UUID order. No Home or Membership lock.
+ */
+export const LOCK_INVITATIONS_FOR_TARGET_EMAIL_ERASE_SQL = `
+SELECT id, home_id
+FROM invitations
+WHERE invited_email = $1::text
+ORDER BY id ASC
+FOR UPDATE
+`;
+
+export const DELETE_INVITATIONS_FOR_TARGET_EMAIL_ERASE_SQL = `
+DELETE FROM invitations
+WHERE id = ANY($1::uuid[])
+`;
+
 type InvitationRow = {
   id: unknown;
   home_id: unknown;
@@ -241,6 +258,16 @@ export type LockedOpenInvitation = Readonly<{
   lifecycle: Extract<InvitationLifecycle, 'PENDING' | 'EXPIRED'>;
 }>;
 
+export type TargetEmailInvitationRef = Readonly<{
+  id: string;
+  homeId: string;
+}>;
+
+type TargetEmailInvitationRow = {
+  id: unknown;
+  home_id: unknown;
+};
+
 export type InvitationRepository = Readonly<{
   insert(tx: TransactionContext, invitation: NewInvitation): Promise<void>;
   findById(invitationId: string): Promise<Invitation | null>;
@@ -282,6 +309,14 @@ export type InvitationRepository = Readonly<{
     tx: TransactionContext,
     input: { homeId: string; at: Date },
   ): Promise<readonly Invitation[]>;
+  lockByInvitedEmailForErase(
+    tx: TransactionContext,
+    input: { invitedEmail: NormalizedEmail },
+  ): Promise<readonly TargetEmailInvitationRef[]>;
+  deleteLockedForTargetEmailErase(
+    tx: TransactionContext,
+    input: { invitationIds: readonly string[] },
+  ): Promise<number>;
 }>;
 
 export function createInvitationRepository(pool: Pool): InvitationRepository {
@@ -457,6 +492,51 @@ export function createInvitationRepository(pool: Pool): InvitationRepository {
           return invitation;
         }),
       );
+    },
+
+    async lockByInvitedEmailForErase(tx, input) {
+      let rows: TargetEmailInvitationRow[];
+      try {
+        rows = (
+          await tx.query<TargetEmailInvitationRow>(
+            LOCK_INVITATIONS_FOR_TARGET_EMAIL_ERASE_SQL,
+            [input.invitedEmail],
+          )
+        ).rows;
+      } catch {
+        throw new InvitationPersistenceError();
+      }
+      return Object.freeze(
+        rows.map((row) => {
+          if (!isUuid(row.id) || !isUuid(row.home_id)) {
+            throw new InvitationPersistenceError();
+          }
+          return Object.freeze({
+            id: row.id,
+            homeId: row.home_id,
+          });
+        }),
+      );
+    },
+
+    async deleteLockedForTargetEmailErase(tx, input) {
+      if (input.invitationIds.length === 0) {
+        return 0;
+      }
+      for (const invitationId of input.invitationIds) {
+        if (!isUuid(invitationId)) {
+          throw new InvitationPersistenceError();
+        }
+      }
+      try {
+        const result = await tx.query(
+          DELETE_INVITATIONS_FOR_TARGET_EMAIL_ERASE_SQL,
+          [input.invitationIds],
+        );
+        return result.rowCount ?? 0;
+      } catch {
+        throw new InvitationPersistenceError();
+      }
     },
   });
 }
