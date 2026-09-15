@@ -205,6 +205,7 @@ type HarnessOptions = Readonly<{
   taskSource?: TaskNotificationSource | null;
   supplySource?: SupplyNotificationSource | null;
   maintenanceSource?: MaintenanceNotificationSource | null;
+  lockedMaintenanceSource?: MaintenanceNotificationSource | null;
   sourceErrors?: Partial<Record<SourceName, Error>>;
   lockError?: Error;
   lockHome?: LockedHomeAndExactMemberships['home'];
@@ -282,6 +283,12 @@ function harness(options: HarnessOptions = {}) {
       const error = options.sourceErrors?.maintenance;
       if (error !== undefined) {
         return Promise.reject(error);
+      }
+      if (
+        input.lock === 'forUpdate' &&
+        options.lockedMaintenanceSource !== undefined
+      ) {
+        return Promise.resolve(options.lockedMaintenanceSource);
       }
       return Promise.resolve(
         options.maintenanceSource === undefined
@@ -953,6 +960,33 @@ void describe('createNotificationOutboxHandler', () => {
         assert.deepEqual(state.lockCalls, []);
         assertNoInsert(state);
       }
+    });
+
+    void it('does not insert from a stale peek after the locked re-read is absent', async () => {
+      const state = harness({
+        maintenanceSource: maintenanceSource(),
+        lockedMaintenanceSource: null,
+      });
+      await state.handler.handle(TX, maintenanceEvent(MAINTENANCE_CREATED_V1));
+      assert.equal(state.sourceCalls.maintenance.length, 2);
+      assert.equal(
+        (
+          state.sourceCalls.maintenance[0] as {
+            input: { lock?: string };
+          }
+        ).input.lock,
+        undefined,
+      );
+      assert.equal(
+        (
+          state.sourceCalls.maintenance[1] as {
+            input: { lock?: string };
+          }
+        ).input.lock,
+        'forUpdate',
+      );
+      assert.equal(state.lockCalls.length, 1);
+      assertNoInsert(state);
     });
 
     void it('no-ops when the exact lock reports an archived or missing Home', async () => {

@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  DELETE_AUTHORED_MAINTENANCE_SOURCE_SQL,
+  DELETE_MAINTENANCE_AUDIENCE_FOR_ERASED_SOURCE_SQL,
   FIND_VISIBLE_MAINTENANCE_ENTRY_SQL,
   LIST_VISIBLE_MAINTENANCE_ENTRIES_SQL,
+  LOCK_AUTHORED_MAINTENANCE_SOURCES_FOR_ERASE_SQL,
   LOCK_VISIBLE_MAINTENANCE_ENTRY_FOR_RESOLVE_SQL,
   MAINTENANCE_ACTOR_SCOPE_SQL,
   MAINTENANCE_VISIBLE_PREDICATE_SQL,
@@ -87,5 +90,41 @@ void describe('canonical Maintenance visibility SQL', () => {
     assert.match(RESOLVE_OPEN_MAINTENANCE_ENTRY_SQL, /status = 'RESOLVED'/);
     assert.doesNotMatch(RESOLVE_OPEN_MAINTENANCE_ENTRY_SQL, /reopen/i);
     assert.doesNotMatch(RESOLVE_OPEN_MAINTENANCE_ENTRY_SQL, /user_id/);
+  });
+
+  void it('locks authored sources by exact membership without Home or content', () => {
+    assert.match(
+      LOCK_AUTHORED_MAINTENANCE_SOURCES_FOR_ERASE_SQL,
+      /created_by_membership_id = ANY\(\$1::uuid\[\]\)/,
+    );
+    assert.match(
+      LOCK_AUTHORED_MAINTENANCE_SOURCES_FOR_ERASE_SQL,
+      /ORDER BY home_id ASC, id ASC/,
+    );
+    assert.match(LOCK_AUTHORED_MAINTENANCE_SOURCES_FOR_ERASE_SQL, /FOR UPDATE/);
+    assert.doesNotMatch(
+      LOCK_AUTHORED_MAINTENANCE_SOURCES_FOR_ERASE_SQL,
+      /title/,
+    );
+    assert.doesNotMatch(
+      LOCK_AUTHORED_MAINTENANCE_SOURCES_FOR_ERASE_SQL,
+      /details/,
+    );
+    assert.doesNotMatch(
+      LOCK_AUTHORED_MAINTENANCE_SOURCES_FOR_ERASE_SQL,
+      /user_id/,
+    );
+    assert.doesNotMatch(
+      LOCK_AUTHORED_MAINTENANCE_SOURCES_FOR_ERASE_SQL,
+      /resolved_by_membership_id/,
+    );
+    assert.match(
+      DELETE_MAINTENANCE_AUDIENCE_FOR_ERASED_SOURCE_SQL,
+      /DELETE FROM maintenance_audiences/,
+    );
+    assert.match(
+      DELETE_AUTHORED_MAINTENANCE_SOURCE_SQL,
+      /DELETE FROM maintenance_entries/,
+    );
   });
 });

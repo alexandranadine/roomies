@@ -82,6 +82,8 @@ void describe('maintenance application boundary', () => {
       assert.doesNotMatch(source, /homes\/repository/, rel);
       assert.doesNotMatch(source, /supplies\/repository/, rel);
       assert.doesNotMatch(source, /tasks\/repository/, rel);
+      assert.doesNotMatch(source, /activity\/repository/, rel);
+      assert.doesNotMatch(source, /notifications\/repository/, rel);
       assert.doesNotMatch(source, /home-administration/, rel);
       assert.doesNotMatch(source, /from ['"]express['"]/, rel);
       assert.doesNotMatch(source, /better-auth/, rel);
@@ -192,5 +194,40 @@ void describe('maintenance application boundary', () => {
     assert.doesNotMatch(read, /from ['"]pg['"]/);
     assert.doesNotMatch(read, /outbox/);
     assert.doesNotMatch(read, /maintenance\.read_private/);
+  });
+
+  void it('erases authored sources through public Activity and Notification ports', async () => {
+    const source = await readFile(
+      path.join(dir, 'erase-authored-maintenance.ts'),
+      'utf8',
+    );
+    assert.match(source, /lockAuthoredSourcesForErase/);
+    assert.match(source, /deleteNotificationsForSource/);
+    assert.match(source, /deleteActivitiesForSource/);
+    assert.match(source, /deleteAudienceForErasedSource/);
+    assert.match(source, /deleteAuthoredSource/);
+    assert.match(source, /createdByMembershipId|created_by_membership_id/);
+    assert.match(source, /membershipIds/);
+    assert.doesNotMatch(source, /runInReadCommittedTransaction/);
+    assert.doesNotMatch(source, /BEGIN/);
+    assert.doesNotMatch(source, /COMMIT/);
+    assert.doesNotMatch(source, /userId/);
+    assert.doesNotMatch(source, /user_id/);
+    assert.doesNotMatch(source, /isHomeAdmin/);
+    assert.doesNotMatch(source, /lockHomeAndExactMemberships/);
+    assert.doesNotMatch(source, /lockHomeStructure/);
+    assert.doesNotMatch(source, /activity\/repository/);
+    assert.doesNotMatch(source, /notifications\/repository/);
+    assert.doesNotMatch(source, /deleteByRecipientMembership/);
+    assert.doesNotMatch(source, /title/);
+    assert.doesNotMatch(source, /details/);
+    assert.doesNotMatch(source, /audienceMembershipIds/);
+    assert.doesNotMatch(source, /console\./);
+    assert.doesNotMatch(source, /SERIALIZABLE/);
+    assert.doesNotMatch(source, /pg_advisory/i);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+    assert.doesNotMatch(source, /router\./);
+    assert.doesNotMatch(source, /account\.deleted/);
   });
 });

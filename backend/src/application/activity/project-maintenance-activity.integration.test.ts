@@ -9,6 +9,7 @@ import {
   MAINTENANCE_CREATED_V1,
   MAINTENANCE_RESOLVED_V1,
 } from '../../domains/maintenance/events.js';
+import { lockHomeAndExactMemberships } from '../../domains/homes/lock-home-and-exact-memberships.js';
 import { findMaintenanceActivitySource } from '../../domains/maintenance/find-maintenance-activity-source.js';
 import {
   findMembershipEndedActivitySource,
@@ -863,6 +864,7 @@ void describe('Maintenance Activity projection PostgreSQL', () => {
           findMembershipStartedActivitySource,
           findMembershipEndedActivitySource,
           findMembershipRoleTransitionActivitySource,
+          lockHomeAndExactMemberships,
           activity: {
             async insertHomeVisibleActivity(tx, activity) {
               if (failInsert) {

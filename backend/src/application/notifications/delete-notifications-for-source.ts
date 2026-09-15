@@ -9,8 +9,8 @@ import type {
 
 /**
  * Notifications-owned public erasure port for a single Home/source pair.
- * Canonical Maintenance erasure does not exist yet; later tickets invoke this
- * inside that future same-transaction erase. Does not delete Maintenance rows.
+ * Canonical Maintenance erasure invokes this inside the caller-owned
+ * transaction. Does not delete Maintenance rows.
  */
 export type DeleteNotificationsForSourceInput = Readonly<{
   homeId: string;

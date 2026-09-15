@@ -74,6 +74,7 @@ void describe('notifications application boundary', () => {
     assert.doesNotMatch(erasure, /maintenance\/repository/);
     assert.doesNotMatch(erasure, /DELETE\s+FROM\s+maintenance/i);
     assert.doesNotMatch(erasure, /console\./);
+    assert.match(erasure, /caller-owned/);
     assert.match(prune, /NOTIFICATION_RETENTION_DAYS/);
     assert.match(prune, /NOTIFICATION_PRUNE_BATCH_SIZE/);
     assert.doesNotMatch(prune, /setInterval/);
@@ -173,6 +174,7 @@ void describe('notifications application boundary', () => {
     assert.match(source, /MAINTENANCE_CREATED_V1/);
     assert.match(source, /MAINTENANCE_RESOLVED_V1/);
     assert.match(source, /lockHomeAndExactMemberships/);
+    assert.match(source, /lock: 'forUpdate'/);
     assert.match(source, /recipientMembershipId/);
     assert.match(source, /sourceOutboxEventId/);
     assert.doesNotMatch(source, /runInReadCommittedTransaction|BEGIN|COMMIT/);

@@ -7,6 +7,10 @@ import {
   type MaintenanceStatus,
   type MaintenanceVisibility,
 } from './maintenance.js';
+import {
+  maintenanceSourceLockSql,
+  type MaintenanceSourceLockMode,
+} from './maintenance-source-lock.js';
 
 /**
  * Public Notification-safe canonical Maintenance evidence. Protected entry
@@ -24,9 +28,15 @@ export type MaintenanceNotificationSource = Readonly<{
   recipientMembershipIds: readonly string[];
 }>;
 
+export type FindMaintenanceNotificationSourceInput = Readonly<{
+  maintenanceEntryId: string;
+  expectedHomeId: string;
+  lock?: MaintenanceSourceLockMode;
+}>;
+
 export type FindMaintenanceNotificationSource = (
   tx: TransactionContext,
-  input: Readonly<{ maintenanceEntryId: string; expectedHomeId: string }>,
+  input: FindMaintenanceNotificationSourceInput,
 ) => Promise<MaintenanceNotificationSource | null>;
 
 const UUID_PATTERN =
@@ -94,7 +104,7 @@ function optionalDate(value: unknown): Date | null {
 
 export async function findMaintenanceNotificationSource(
   tx: TransactionContext,
-  input: Readonly<{ maintenanceEntryId: string; expectedHomeId: string }>,
+  input: FindMaintenanceNotificationSourceInput,
 ): Promise<MaintenanceNotificationSource | null> {
   if (!isUuid(input.maintenanceEntryId) || !isUuid(input.expectedHomeId)) {
     throw new MaintenanceNotificationSourceIntegrityError();
@@ -103,9 +113,13 @@ export async function findMaintenanceNotificationSource(
   let rows: SourceRow[];
   try {
     rows = (
-      await tx.query<SourceRow>(FIND_MAINTENANCE_NOTIFICATION_SOURCE_SQL, [
-        input.maintenanceEntryId,
-      ])
+      await tx.query<SourceRow>(
+        maintenanceSourceLockSql(
+          FIND_MAINTENANCE_NOTIFICATION_SOURCE_SQL,
+          input.lock,
+        ),
+        [input.maintenanceEntryId],
+      )
     ).rows;
   } catch {
     throw new MaintenanceNotificationSourceIntegrityError();

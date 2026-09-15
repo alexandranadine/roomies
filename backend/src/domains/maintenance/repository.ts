@@ -187,6 +187,30 @@ WHERE home_id = $1::uuid
 RETURNING ${MAINTENANCE_ENTRY_COLUMNS}
 `;
 
+/**
+ * Account-erasure lock. Authorship is exact created_by_membership_id.
+ * Stable Home then entry UUID order. No title/details. No Home lock.
+ */
+export const LOCK_AUTHORED_MAINTENANCE_SOURCES_FOR_ERASE_SQL = `
+SELECT id, home_id
+FROM maintenance_entries
+WHERE created_by_membership_id = ANY($1::uuid[])
+ORDER BY home_id ASC, id ASC
+FOR UPDATE
+`;
+
+export const DELETE_MAINTENANCE_AUDIENCE_FOR_ERASED_SOURCE_SQL = `
+DELETE FROM maintenance_audiences
+WHERE home_id = $1::uuid
+  AND maintenance_entry_id = $2::uuid
+`;
+
+export const DELETE_AUTHORED_MAINTENANCE_SOURCE_SQL = `
+DELETE FROM maintenance_entries
+WHERE home_id = $1::uuid
+  AND id = $2::uuid
+`;
+
 export const LIST_VISIBLE_MAINTENANCE_ENTRIES_SQL = `
 WITH actor_scope AS (
   SELECT memberships.id AS actor_membership_id
@@ -280,6 +304,15 @@ export type MaintenanceVisiblePage = Readonly<{
   nextCursor: string | null;
 }>;
 
+export type AuthoredMaintenanceSourceRef = Readonly<{
+  id: string;
+  homeId: string;
+}>;
+
+export type LockAuthoredMaintenanceSourcesForErase = Readonly<{
+  membershipIds: readonly string[];
+}>;
+
 export type MaintenanceRepository = Readonly<{
   insertEntryWithAudience(
     tx: TransactionContext,
@@ -303,6 +336,18 @@ export type MaintenanceRepository = Readonly<{
     tx: TransactionContext,
     input: ResolveOpenMaintenanceEntry,
   ): Promise<MaintenanceEntry | null>;
+  lockAuthoredSourcesForErase(
+    tx: TransactionContext,
+    input: LockAuthoredMaintenanceSourcesForErase,
+  ): Promise<readonly AuthoredMaintenanceSourceRef[]>;
+  deleteAudienceForErasedSource(
+    tx: TransactionContext,
+    source: AuthoredMaintenanceSourceRef,
+  ): Promise<void>;
+  deleteAuthoredSource(
+    tx: TransactionContext,
+    source: AuthoredMaintenanceSourceRef,
+  ): Promise<void>;
 }>;
 
 type MaintenanceEntryRow = {
@@ -344,6 +389,11 @@ type MaintenanceListRow = {
   created_at: unknown;
   updated_at: unknown;
   status_rank: unknown;
+};
+
+type AuthoredMaintenanceSourceRow = {
+  id: unknown;
+  home_id: unknown;
 };
 
 function isUuid(value: unknown): value is string {
@@ -763,6 +813,63 @@ export function createMaintenanceRepository(pool: Pool): MaintenanceRepository {
         if (error instanceof MaintenancePersistenceError) {
           throw error;
         }
+        throw new MaintenancePersistenceError();
+      }
+    },
+
+    async lockAuthoredSourcesForErase(tx, input) {
+      const membershipIds = orderedUniqueMembershipIds(input.membershipIds);
+      if (membershipIds.length === 0) {
+        return Object.freeze([]);
+      }
+      try {
+        const result = await tx.query<AuthoredMaintenanceSourceRow>(
+          LOCK_AUTHORED_MAINTENANCE_SOURCES_FOR_ERASE_SQL,
+          [membershipIds],
+        );
+        return Object.freeze(
+          result.rows.map((row) => {
+            if (!isUuid(row.id) || !isUuid(row.home_id)) {
+              throw new MaintenancePersistenceError();
+            }
+            return Object.freeze({
+              id: row.id,
+              homeId: row.home_id,
+            });
+          }),
+        );
+      } catch (error) {
+        if (error instanceof MaintenancePersistenceError) {
+          throw error;
+        }
+        throw new MaintenancePersistenceError();
+      }
+    },
+
+    async deleteAudienceForErasedSource(tx, source) {
+      if (!isUuid(source.homeId) || !isUuid(source.id)) {
+        throw new MaintenancePersistenceError();
+      }
+      try {
+        await tx.query(DELETE_MAINTENANCE_AUDIENCE_FOR_ERASED_SOURCE_SQL, [
+          source.homeId,
+          source.id,
+        ]);
+      } catch {
+        throw new MaintenancePersistenceError();
+      }
+    },
+
+    async deleteAuthoredSource(tx, source) {
+      if (!isUuid(source.homeId) || !isUuid(source.id)) {
+        throw new MaintenancePersistenceError();
+      }
+      try {
+        await tx.query(DELETE_AUTHORED_MAINTENANCE_SOURCE_SQL, [
+          source.homeId,
+          source.id,
+        ]);
+      } catch {
         throw new MaintenancePersistenceError();
       }
     },

@@ -141,6 +141,27 @@ WHERE source_outbox_event_id = $1::uuid
 LIMIT 2
 `;
 
+/**
+ * Source-scoped recipient delete. ActivityRecipient FK is ON DELETE
+ * RESTRICT, so recipients must be removed before the Activity row.
+ */
+export const DELETE_ACTIVITY_RECIPIENTS_BY_SOURCE_SQL = `
+DELETE FROM activity_recipients r
+USING activities a
+WHERE r.home_id = $1::uuid
+  AND a.home_id = $1::uuid
+  AND r.activity_id = a.id
+  AND a.source_entity_type = $2
+  AND a.source_entity_id = $3::uuid
+`;
+
+export const DELETE_ACTIVITIES_BY_SOURCE_SQL = `
+DELETE FROM activities
+WHERE home_id = $1::uuid
+  AND source_entity_type = $2
+  AND source_entity_id = $3::uuid
+`;
+
 export const FIND_VISIBLE_ACTIVITY_SQL = `
 SELECT ${VISIBLE_ACTIVITY_COLUMNS}
 FROM memberships
@@ -260,6 +281,12 @@ export type ActivityInsertResult =
       sourceOutboxEventId: string;
     }>;
 
+export type ActivitySourceErasureKey = Readonly<{
+  homeId: string;
+  sourceEntityType: ActivitySourceEntityType;
+  sourceEntityId: string;
+}>;
+
 export type ActivityRepository = Readonly<{
   insertHomeVisibleActivity(
     tx: TransactionContext,
@@ -285,6 +312,14 @@ export type ActivityRepository = Readonly<{
   listVisiblePageByHome(
     input: ListVisibleActivityPage,
   ): Promise<ActivityRepositoryPage | null>;
+  deleteRecipientsBySource(
+    tx: TransactionContext,
+    input: ActivitySourceErasureKey,
+  ): Promise<void>;
+  deleteActivitiesBySource(
+    tx: TransactionContext,
+    input: ActivitySourceErasureKey,
+  ): Promise<void>;
 }>;
 
 export type ListVisibleActivityPage = Readonly<{
@@ -324,6 +359,16 @@ function hasConstraint(error: unknown, constraint: string): boolean {
 
 function isUuid(value: unknown): value is string {
   return typeof value === 'string' && UUID_PATTERN.test(value);
+}
+
+function assertActivitySourceErasureKey(input: ActivitySourceErasureKey): void {
+  if (
+    !isUuid(input.homeId) ||
+    !isActivitySourceEntityType(input.sourceEntityType) ||
+    !isUuid(input.sourceEntityId)
+  ) {
+    throw new ActivityPersistenceError();
+  }
 }
 
 function isDate(value: unknown): value is Date {
@@ -636,6 +681,32 @@ export function createActivityRepository(pool: Pool): ActivityRepository {
         ) {
           throw error;
         }
+        throw new ActivityPersistenceError();
+      }
+    },
+
+    async deleteRecipientsBySource(tx, input) {
+      assertActivitySourceErasureKey(input);
+      try {
+        await tx.query(DELETE_ACTIVITY_RECIPIENTS_BY_SOURCE_SQL, [
+          input.homeId,
+          input.sourceEntityType,
+          input.sourceEntityId,
+        ]);
+      } catch {
+        throw new ActivityPersistenceError();
+      }
+    },
+
+    async deleteActivitiesBySource(tx, input) {
+      assertActivitySourceErasureKey(input);
+      try {
+        await tx.query(DELETE_ACTIVITIES_BY_SOURCE_SQL, [
+          input.homeId,
+          input.sourceEntityType,
+          input.sourceEntityId,
+        ]);
+      } catch {
         throw new ActivityPersistenceError();
       }
     },

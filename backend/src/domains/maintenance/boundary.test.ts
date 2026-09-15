@@ -60,25 +60,43 @@ void describe('maintenance domain boundary', () => {
       'lockVisibleForResolve',
       'listVisibleByHome',
       'resolveOpenEntry',
+      'lockAuthoredSourcesForErase',
+      'deleteAudienceForErasedSource',
+      'deleteAuthoredSource',
     ]) {
       assert.match(source, new RegExp(primitive));
     }
     assert.match(source, /MAINTENANCE_ACTOR_SCOPE_SQL/);
     assert.match(source, /MAINTENANCE_VISIBLE_PREDICATE_SQL/);
     assert.match(source, /INSERT_MAINTENANCE_AUDIENCE_SET_SQL/);
+    assert.match(source, /LOCK_AUTHORED_MAINTENANCE_SOURCES_FOR_ERASE_SQL/);
     assert.match(source, /ORDER BY u\.membership_id ASC/);
+    assert.match(source, /ORDER BY home_id ASC, id ASC/);
     assert.match(source, /FOR UPDATE OF e/);
+    assert.match(source, /created_by_membership_id = ANY\(\$1::uuid\[\]\)/);
     assert.match(source, /status = 'OPEN'/);
     assert.match(source, /resolved_by_membership_id IS NULL/);
     assert.doesNotMatch(source, /export async function insertAudience/);
-    assert.doesNotMatch(source, /addAudience|updateAudience|deleteAudience/);
+    assert.doesNotMatch(source, /addAudience|updateAudience/);
     assert.doesNotMatch(source, /INSERT_MAINTENANCE_AUDIENCE_SQL =/);
     assert.doesNotMatch(source, /findById\(/);
-    assert.doesNotMatch(source, /DELETE /i);
     assert.doesNotMatch(source, /reopen/i);
     assert.doesNotMatch(source, /console\.log/);
     assert.doesNotMatch(source, /maintenance\.created/);
     assert.doesNotMatch(source, /outbox/);
+  });
+
+  void it('keeps the shared source-lock helper free of content and sibling repos', async () => {
+    const source = await readFile(
+      path.join(maintenanceDir, 'maintenance-source-lock.ts'),
+      'utf8',
+    );
+    assert.match(source, /FOR UPDATE/);
+    assert.match(source, /MaintenanceSourceLockMode/);
+    assert.doesNotMatch(source, /title|details|user_id|email/);
+    assert.doesNotMatch(source, /activity\/repository/);
+    assert.doesNotMatch(source, /notifications\/repository/);
+    assert.doesNotMatch(source, /from ['"]\.\/repository/);
   });
 
   void it('keeps Activity source lookup free of title, details, and names', async () => {
@@ -89,6 +107,8 @@ void describe('maintenance domain boundary', () => {
     assert.match(source, /FIND_MAINTENANCE_ACTIVITY_SOURCE_SQL/);
     assert.match(source, /FIND_MAINTENANCE_ACTIVITY_SOURCE_AUDIENCE_SQL/);
     assert.match(source, /expectedHomeId/);
+    assert.match(source, /maintenanceSourceLockSql/);
+    assert.match(source, /lock\?: MaintenanceSourceLockMode/);
     assert.doesNotMatch(source, /e\.title/);
     assert.doesNotMatch(source, /e\.details/);
     assert.doesNotMatch(source, /user_id/);
@@ -107,6 +127,8 @@ void describe('maintenance domain boundary', () => {
     );
     assert.match(source, /FIND_MAINTENANCE_NOTIFICATION_SOURCE_SQL/);
     assert.match(source, /FIND_MAINTENANCE_NOTIFICATION_RECIPIENTS_SQL/);
+    assert.match(source, /maintenanceSourceLockSql/);
+    assert.match(source, /lock\?: MaintenanceSourceLockMode/);
     assert.match(source, /created_at/);
     assert.match(source, /resolved_at/);
     assert.match(source, /maintenance_audiences/);

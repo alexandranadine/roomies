@@ -56,6 +56,8 @@ void describe('activity domain boundary', () => {
       'findVisibleByHomeAndId',
       'listVisibleByHome',
       'listVisiblePageByHome',
+      'deleteRecipientsBySource',
+      'deleteActivitiesBySource',
     ]) {
       assert.match(source, new RegExp(primitive));
     }
@@ -63,16 +65,17 @@ void describe('activity domain boundary', () => {
     assert.match(source, /ACTIVITY_VISIBLE_PREDICATE_SQL/);
     assert.match(source, /LIST_VISIBLE_ACTIVITY_PAGE_SQL/);
     assert.match(source, /INSERT_ACTIVITY_RECIPIENT_SET_SQL/);
+    assert.match(source, /DELETE_ACTIVITY_RECIPIENTS_BY_SOURCE_SQL/);
+    assert.match(source, /DELETE_ACTIVITIES_BY_SOURCE_SQL/);
     assert.match(source, /ORDER BY u\.membership_id ASC/);
     assert.match(source, /activities_source_outbox_event_id_key_17bba872/);
     assert.match(source, /visibility_class = 'HOME_VISIBLE'/);
     assert.match(source, /visibility_class = 'SOURCE_AUTHORIZED'/);
     assert.doesNotMatch(source, /export async function insertRecipient/);
-    assert.doesNotMatch(source, /addRecipient|updateRecipient|deleteRecipient/);
+    assert.doesNotMatch(source, /addRecipient|updateRecipient/);
     assert.doesNotMatch(source, /INSERT_ACTIVITY_RECIPIENT_SQL =/);
     assert.doesNotMatch(source, /insertHomeVisibleActivity\([^)]*recipient/s);
     assert.doesNotMatch(source, /findById\(/);
-    assert.doesNotMatch(source, /DELETE /i);
     assert.doesNotMatch(source, /console\.log/);
     assert.doesNotMatch(source, /CREATE TRIGGER/i);
     assert.doesNotMatch(source, /title|details|renderedText|actorName/);

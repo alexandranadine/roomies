@@ -31,6 +31,8 @@ void describe('activity application boundary', () => {
     assert.match(source, /MEMBERSHIP_ENDED_V1/);
     assert.match(source, /MEMBERSHIP_ROLE_CHANGED_V1/);
     assert.match(source, /findMaintenanceActivitySource/);
+    assert.match(source, /lockHomeAndExactMemberships/);
+    assert.match(source, /lock: 'forUpdate'/);
     assert.match(source, /findTaskActivitySource/);
     assert.match(source, /findSupplyActivitySource/);
     assert.match(source, /findMembershipStartedActivitySource/);
@@ -86,6 +88,27 @@ void describe('activity application boundary', () => {
     assert.doesNotMatch(source, /tasks\/repository/);
     assert.doesNotMatch(source, /supplies\/repository/);
     assert.doesNotMatch(source, /memberships\/repository/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+  });
+
+  void it('erases Maintenance-derived Activity through repository source deletes', async () => {
+    const source = await readFile(
+      path.join(dir, 'delete-activities-for-source.ts'),
+      'utf8',
+    );
+    assert.match(source, /deleteRecipientsBySource/);
+    assert.match(source, /deleteActivitiesBySource/);
+    assert.match(source, /sourceEntityType: 'MAINTENANCE'/);
+    assert.doesNotMatch(source, /runInReadCommittedTransaction/);
+    assert.doesNotMatch(source, /BEGIN/);
+    assert.doesNotMatch(source, /COMMIT/);
+    assert.doesNotMatch(source, /maintenance\/repository/);
+    assert.doesNotMatch(source, /notifications\/repository/);
+    assert.doesNotMatch(source, /deleteByRecipientMembership/);
+    assert.doesNotMatch(source, /title/);
+    assert.doesNotMatch(source, /details/);
+    assert.doesNotMatch(source, /console\./);
     assert.doesNotMatch(source, /from ['"]express['"]/);
     assert.doesNotMatch(source, /from ['"]pg['"]/);
   });

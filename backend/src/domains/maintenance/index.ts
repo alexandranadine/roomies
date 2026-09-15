@@ -57,8 +57,13 @@ export {
   FIND_MAINTENANCE_NOTIFICATION_SOURCE_SQL,
   findMaintenanceNotificationSource,
   type FindMaintenanceNotificationSource,
+  type FindMaintenanceNotificationSourceInput,
   type MaintenanceNotificationSource,
 } from './find-maintenance-notification-source.js';
+export {
+  maintenanceSourceLockSql,
+  type MaintenanceSourceLockMode,
+} from './maintenance-source-lock.js';
 export {
   FIND_MAINTENANCE_PULSE_SUMMARY_SQL,
   findMaintenancePulseSummary,
@@ -115,16 +120,21 @@ export {
 } from './read-policy.js';
 export {
   createMaintenanceRepository,
+  DELETE_AUTHORED_MAINTENANCE_SOURCE_SQL,
+  DELETE_MAINTENANCE_AUDIENCE_FOR_ERASED_SOURCE_SQL,
   FIND_VISIBLE_MAINTENANCE_ENTRY_SQL,
   INSERT_MAINTENANCE_ENTRY_SQL,
   LIST_VISIBLE_MAINTENANCE_ENTRIES_SQL,
+  LOCK_AUTHORED_MAINTENANCE_SOURCES_FOR_ERASE_SQL,
   LOCK_VISIBLE_MAINTENANCE_ENTRY_FOR_RESOLVE_SQL,
   MAINTENANCE_ACTOR_SCOPE_SQL,
   MAINTENANCE_STATUS_RANK_SQL,
   MAINTENANCE_VISIBLE_PREDICATE_SQL,
   RESOLVE_OPEN_MAINTENANCE_ENTRY_SQL,
+  type AuthoredMaintenanceSourceRef,
   type InsertMaintenanceEntryWithAudience,
   type ListVisibleMaintenanceEntries,
+  type LockAuthoredMaintenanceSourcesForErase,
   type MaintenanceRepository,
   type MaintenanceVisiblePage,
   type NewMaintenanceEntry,

@@ -143,7 +143,9 @@ function roleTransitionSource(
 
 type HarnessOptions = {
   source?: MaintenanceActivitySource | null;
+  lockedSource?: MaintenanceActivitySource | null;
   sourceError?: Error;
+  lockError?: Error;
   taskSource?: TaskActivitySource | null;
   taskSourceError?: Error;
   supplySource?: SupplyActivitySource | null;
@@ -161,12 +163,21 @@ type HarnessOptions = {
 function harness(options: HarnessOptions = {}) {
   const homeVisible: unknown[] = [];
   const sourceAuthorized: unknown[] = [];
+  const sourceCalls: Array<{ lock?: string }> = [];
+  const lockCalls: Array<{
+    homeId: string;
+    membershipIds: readonly string[];
+  }> = [];
   let uuidCalls = 0;
 
   const handler = createActivityOutboxHandler({
-    findMaintenanceActivitySource() {
+    findMaintenanceActivitySource(_tx, input) {
+      sourceCalls.push({ lock: input.lock });
       if (options.sourceError) {
         return Promise.reject(options.sourceError);
+      }
+      if (input.lock === 'forUpdate' && options.lockedSource !== undefined) {
+        return Promise.resolve(options.lockedSource);
       }
       return Promise.resolve(
         options.source === undefined ? maintenanceSource() : options.source,
@@ -222,6 +233,25 @@ function harness(options: HarnessOptions = {}) {
           : options.roleSource,
       );
     },
+    lockHomeAndExactMemberships(_tx, input) {
+      lockCalls.push({
+        homeId: input.homeId,
+        membershipIds: input.membershipIds,
+      });
+      if (options.lockError) {
+        return Promise.reject(options.lockError);
+      }
+      return Promise.resolve(
+        Object.freeze({
+          home: Object.freeze({
+            id: input.homeId,
+            archivedAt: null,
+            timezone: 'UTC',
+          }),
+          memberships: Object.freeze([]),
+        }),
+      );
+    },
     activity: {
       insertHomeVisibleActivity(_tx, activity) {
         homeVisible.push(activity);
@@ -266,6 +296,8 @@ function harness(options: HarnessOptions = {}) {
     handler,
     homeVisible,
     sourceAuthorized,
+    sourceCalls,
+    lockCalls,
     uuidCalls: () => uuidCalls,
   };
 }
@@ -286,8 +318,10 @@ void describe('createActivityOutboxHandler', () => {
   });
 
   void it('projects HOUSEHOLD create as HOME_VISIBLE with the creator Membership', async () => {
-    const { handler, homeVisible, sourceAuthorized, uuidCalls } = harness();
+    const { handler, homeVisible, sourceAuthorized, uuidCalls, lockCalls } =
+      harness();
     await handler.handle(TX, event());
+    assert.deepEqual(lockCalls, [{ homeId: HOME, membershipIds: [] }]);
     assert.equal(homeVisible.length, 1);
     assert.deepEqual(sourceAuthorized, []);
     assert.equal(uuidCalls(), 1);
@@ -345,13 +379,55 @@ void describe('createActivityOutboxHandler', () => {
   });
 
   void it('no-ops when the canonical source is missing', async () => {
-    const { handler, homeVisible, sourceAuthorized, uuidCalls } = harness({
-      source: null,
-    });
+    const { handler, homeVisible, sourceAuthorized, uuidCalls, lockCalls } =
+      harness({
+        source: null,
+      });
     await handler.handle(TX, event());
     assert.deepEqual(homeVisible, []);
     assert.deepEqual(sourceAuthorized, []);
+    assert.deepEqual(lockCalls, []);
     assert.equal(uuidCalls(), 0);
+  });
+
+  void it('does not insert from a stale peek after the locked re-read is absent', async () => {
+    const { handler, homeVisible, sourceAuthorized, sourceCalls, uuidCalls } =
+      harness({
+        source: maintenanceSource({
+          visibility: 'PRIVATE',
+          audienceMembershipIds: Object.freeze([CREATOR, RECIPIENT]),
+        }),
+        lockedSource: null,
+      });
+    await handler.handle(TX, event());
+    assert.deepEqual(
+      sourceCalls.map((call) => call.lock),
+      [undefined, 'forUpdate'],
+    );
+    assert.deepEqual(homeVisible, []);
+    assert.deepEqual(sourceAuthorized, []);
+    assert.equal(uuidCalls(), 0);
+  });
+
+  void it('locks Home then audience Memberships before the Maintenance source lock', async () => {
+    const { handler, lockCalls, sourceCalls, sourceAuthorized } = harness({
+      source: maintenanceSource({
+        visibility: 'PRIVATE',
+        audienceMembershipIds: Object.freeze([CREATOR, RECIPIENT]),
+      }),
+    });
+    await handler.handle(TX, event());
+    assert.deepEqual(lockCalls, [
+      {
+        homeId: HOME,
+        membershipIds: [CREATOR, RECIPIENT],
+      },
+    ]);
+    assert.deepEqual(
+      sourceCalls.map((call) => call.lock),
+      [undefined, 'forUpdate'],
+    );
+    assert.equal(sourceAuthorized.length, 1);
   });
 
   void it('treats duplicate sourceOutboxEvent as successful replay', async () => {

@@ -61,6 +61,8 @@ export {
   ACTIVITY_SOURCE_OUTBOX_EVENT_UNIQUE_CONSTRAINT,
   ACTIVITY_VISIBLE_PREDICATE_SQL,
   createActivityRepository,
+  DELETE_ACTIVITIES_BY_SOURCE_SQL,
+  DELETE_ACTIVITY_RECIPIENTS_BY_SOURCE_SQL,
   FIND_ACTIVITY_BY_SOURCE_OUTBOX_EVENT_ID_SQL,
   FIND_VISIBLE_ACTIVITY_SQL,
   INSERT_ACTIVITY_SQL,
@@ -68,6 +70,7 @@ export {
   LIST_VISIBLE_ACTIVITY_PAGE_SQL,
   type ActivityInsertResult,
   type ActivityRepository,
+  type ActivitySourceErasureKey,
   type ListVisibleActivityPage,
   type NewActivity,
 } from './repository.js';

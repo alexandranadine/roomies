@@ -234,20 +234,17 @@ async function supplyObtainedPlan(
   });
 }
 
-async function maintenancePlan(
-  tx: TransactionContext,
+function planFromMaintenanceSource(
   event: OutboxEvent,
-  deps: NotificationOutboxHandlerDependencies,
-): Promise<NotificationPlan | null> {
-  const homeId = requireHomeId(event);
-  const maintenanceEntryId = payloadUuid(event.payload, 'maintenanceEntryId');
-  const source = await deps.findMaintenanceSource(tx, {
-    maintenanceEntryId,
-    expectedHomeId: homeId,
-  });
+  source: Awaited<
+    ReturnType<NotificationOutboxHandlerDependencies['findMaintenanceSource']>
+  >,
+): NotificationPlan | null {
   if (source === null || source.visibility === 'HOUSEHOLD') {
     return null;
   }
+  const homeId = requireHomeId(event);
+  const maintenanceEntryId = payloadUuid(event.payload, 'maintenanceEntryId');
   if (source.id !== maintenanceEntryId || source.homeId !== homeId) {
     throw new NotificationProjectionIntegrityError();
   }
@@ -289,6 +286,62 @@ async function maintenancePlan(
   });
 }
 
+async function readMaintenanceNotificationSource(
+  tx: TransactionContext,
+  event: OutboxEvent,
+  deps: NotificationOutboxHandlerDependencies,
+  lock?: 'forUpdate',
+): Promise<
+  Awaited<
+    ReturnType<NotificationOutboxHandlerDependencies['findMaintenanceSource']>
+  >
+> {
+  const homeId = requireHomeId(event);
+  const maintenanceEntryId = payloadUuid(event.payload, 'maintenanceEntryId');
+  try {
+    return await deps.findMaintenanceSource(tx, {
+      maintenanceEntryId,
+      expectedHomeId: homeId,
+      ...(lock === 'forUpdate' ? { lock: 'forUpdate' as const } : {}),
+    });
+  } catch (error) {
+    if (isSourceIntegrityError(error)) {
+      throw new NotificationProjectionIntegrityError();
+    }
+    throw error;
+  }
+}
+
+async function projectMaintenanceNotifications(
+  tx: TransactionContext,
+  event: OutboxEvent,
+  deps: NotificationOutboxHandlerDependencies,
+): Promise<void> {
+  const peeked = await readMaintenanceNotificationSource(tx, event, deps);
+  const peekPlan = planFromMaintenanceSource(event, peeked);
+  if (peekPlan === null) {
+    return;
+  }
+
+  const eligible = await eligibleMembershipIds(tx, peekPlan, deps);
+  if (eligible === null) {
+    return;
+  }
+
+  const locked = await readMaintenanceNotificationSource(
+    tx,
+    event,
+    deps,
+    'forUpdate',
+  );
+  const lockedPlan = planFromMaintenanceSource(event, locked);
+  if (lockedPlan === null) {
+    return;
+  }
+
+  await insertPlan(tx, event, lockedPlan, deps);
+}
+
 async function planFor(
   tx: TransactionContext,
   event: OutboxEvent,
@@ -303,12 +356,6 @@ async function planFor(
     }
     if (event.eventType === SUPPLY_OBTAINED_V1) {
       return await supplyObtainedPlan(tx, event, deps);
-    }
-    if (
-      event.eventType === MAINTENANCE_CREATED_V1 ||
-      event.eventType === MAINTENANCE_RESOLVED_V1
-    ) {
-      return await maintenancePlan(tx, event, deps);
     }
   } catch (error) {
     if (isSourceIntegrityError(error)) {
@@ -438,6 +485,13 @@ export function createNotificationOutboxHandler(
     handlerId: NOTIFICATIONS_OUTBOX_HANDLER_ID,
     eventTypes: NOTIFICATIONS_OUTBOX_EVENT_TYPES,
     async handle(tx, event) {
+      if (
+        event.eventType === MAINTENANCE_CREATED_V1 ||
+        event.eventType === MAINTENANCE_RESOLVED_V1
+      ) {
+        await projectMaintenanceNotifications(tx, event, deps);
+        return;
+      }
       const plan = await planFor(tx, event, deps);
       if (plan !== null) {
         await insertPlan(tx, event, plan, deps);

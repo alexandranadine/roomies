@@ -1,3 +1,10 @@
+export {
+  createDeleteActivitiesForSource,
+  createDeleteActivitiesForSourceFromPool,
+  type DeleteActivitiesForSource,
+  type DeleteActivitiesForSourceHooks,
+  type DeleteActivitiesForSourceInput,
+} from './delete-activities-for-source.js';
 export { ActivityProjectionIntegrityError } from './errors.js';
 export {
   createListHomeActivityFromPool,

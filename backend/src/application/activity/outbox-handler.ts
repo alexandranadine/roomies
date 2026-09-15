@@ -4,6 +4,10 @@ import {
   type NewActivity,
 } from '../../domains/activity/repository.js';
 import {
+  lockHomeAndExactMemberships,
+  type LockedHomeAndExactMemberships,
+} from '../../domains/homes/lock-home-and-exact-memberships.js';
+import {
   MAINTENANCE_CREATED_V1,
   MAINTENANCE_RESOLVED_V1,
 } from '../../domains/maintenance/events.js';
@@ -13,6 +17,7 @@ import {
   type FindMaintenanceActivitySource,
   type MaintenanceActivitySource,
 } from '../../domains/maintenance/find-maintenance-activity-source.js';
+import { ConcealedNotFoundError } from '../../platform/authz/index.js';
 import { SupplyActivitySourceIntegrityError } from '../../domains/supplies/errors.js';
 import { SUPPLY_OBTAINED_V1 } from '../../domains/supplies/events.js';
 import {
@@ -70,6 +75,11 @@ export const ACTIVITY_OUTBOX_EVENT_TYPES = [
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+type LockHomeAndExactMemberships = (
+  tx: TransactionContext,
+  input: Readonly<{ homeId: string; membershipIds: readonly string[] }>,
+) => Promise<LockedHomeAndExactMemberships>;
+
 export type ActivityOutboxHandlerDependencies = Readonly<{
   findMaintenanceActivitySource: FindMaintenanceActivitySource;
   findTaskActivitySource: FindTaskActivitySource;
@@ -77,6 +87,7 @@ export type ActivityOutboxHandlerDependencies = Readonly<{
   findMembershipStartedActivitySource: FindMembershipStartedActivitySource;
   findMembershipEndedActivitySource: FindMembershipEndedActivitySource;
   findMembershipRoleTransitionActivitySource: FindMembershipRoleTransitionActivitySource;
+  lockHomeAndExactMemberships: LockHomeAndExactMemberships;
   activity: Pick<
     ActivityRepository,
     'insertHomeVisibleActivity' | 'insertSourceAuthorizedActivity'
@@ -139,6 +150,29 @@ function newMaintenanceActivity(
   });
 }
 
+async function readMaintenanceActivitySource(
+  tx: TransactionContext,
+  input: Readonly<{
+    maintenanceEntryId: string;
+    expectedHomeId: string;
+    lock?: 'forUpdate';
+    deps: ActivityOutboxHandlerDependencies;
+  }>,
+): Promise<MaintenanceActivitySource | null> {
+  try {
+    return await input.deps.findMaintenanceActivitySource(tx, {
+      maintenanceEntryId: input.maintenanceEntryId,
+      expectedHomeId: input.expectedHomeId,
+      ...(input.lock === 'forUpdate' ? { lock: 'forUpdate' as const } : {}),
+    });
+  } catch (error) {
+    if (error instanceof MaintenanceActivitySourceIntegrityError) {
+      throw new ActivityProjectionIntegrityError();
+    }
+    throw error;
+  }
+}
+
 async function projectMaintenanceActivity(
   tx: TransactionContext,
   event: OutboxEvent,
@@ -152,19 +186,33 @@ async function projectMaintenanceActivity(
     event.payload,
     'maintenanceEntryId',
   );
-  let source: MaintenanceActivitySource | null;
-  try {
-    source = await deps.findMaintenanceActivitySource(tx, {
-      maintenanceEntryId,
-      expectedHomeId: event.homeId,
-    });
-  } catch (error) {
-    if (error instanceof MaintenanceActivitySourceIntegrityError) {
-      throw new ActivityProjectionIntegrityError();
-    }
-    throw error;
+  const peeked = await readMaintenanceActivitySource(tx, {
+    maintenanceEntryId,
+    expectedHomeId: event.homeId,
+    deps,
+  });
+  if (peeked === null) {
+    return;
   }
 
+  try {
+    await deps.lockHomeAndExactMemberships(tx, {
+      homeId: event.homeId,
+      membershipIds:
+        peeked.visibility === 'PRIVATE' ? peeked.audienceMembershipIds : [],
+    });
+  } catch (error) {
+    if (!(error instanceof ConcealedNotFoundError)) {
+      throw error;
+    }
+  }
+
+  const source = await readMaintenanceActivitySource(tx, {
+    maintenanceEntryId,
+    expectedHomeId: event.homeId,
+    lock: 'forUpdate',
+    deps,
+  });
   if (source === null) {
     return;
   }
@@ -527,6 +575,7 @@ export function createActivityOutboxHandlerFromPool(
     findMembershipStartedActivitySource,
     findMembershipEndedActivitySource,
     findMembershipRoleTransitionActivitySource,
+    lockHomeAndExactMemberships,
     activity: createActivityRepository(
       pool as Parameters<typeof createActivityRepository>[0],
     ),

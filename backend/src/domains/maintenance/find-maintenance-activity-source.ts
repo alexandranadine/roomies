@@ -6,6 +6,10 @@ import {
   type MaintenanceStatus,
   type MaintenanceVisibility,
 } from './maintenance.js';
+import {
+  maintenanceSourceLockSql,
+  type MaintenanceSourceLockMode,
+} from './maintenance-source-lock.js';
 
 /**
  * Public Activity-safe canonical Maintenance projection. No title, details,
@@ -25,6 +29,7 @@ export type MaintenanceActivitySource = Readonly<{
 export type FindMaintenanceActivitySourceInput = Readonly<{
   maintenanceEntryId: string;
   expectedHomeId: string;
+  lock?: MaintenanceSourceLockMode;
 }>;
 
 export type FindMaintenanceActivitySource = (
@@ -138,7 +143,10 @@ export async function findMaintenanceActivitySource(
   let sourceRows: SourceRow[];
   try {
     const result = await tx.query<SourceRow>(
-      FIND_MAINTENANCE_ACTIVITY_SOURCE_SQL,
+      maintenanceSourceLockSql(
+        FIND_MAINTENANCE_ACTIVITY_SOURCE_SQL,
+        input.lock,
+      ),
       [input.maintenanceEntryId],
     );
     sourceRows = result.rows;
