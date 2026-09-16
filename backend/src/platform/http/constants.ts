@@ -12,7 +12,8 @@ export const SHUTDOWN_TIMEOUT_MS = 10_000;
 
 /**
  * Explicit HTTP pipeline order. Health/ready stay after JSON (they do not
- * consume bodies) and before `/api/v1`. Credential rate limiting is not
+ * consume bodies) and before `/api/v1`. Credential and other sensitive-
+ * operation rate limiting — including account deletion — is not
  * implemented yet and is required before public launch.
  *
  * `api-mutation-origin` runs after request IDs / CORS / Better Auth and

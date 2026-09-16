@@ -75,6 +75,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Require TEST_DATABASE_URL for PostgreSQL suites
+        run: node scripts/require-test-database-url.mjs
+
       - name: Migration artifact integrity + fresh DB apply/verify
         run: npm run db:test:migrate
 

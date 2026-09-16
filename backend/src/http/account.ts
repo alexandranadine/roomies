@@ -46,6 +46,9 @@ function parseDeleteAccountBody(body: unknown): void {
 /**
  * Authenticated account-deletion route. Mount at `/account` on the v1 router.
  * Origin/CSRF is enforced by the `/api/v1` mutation guard before this router.
+ *
+ * TODO(launch): include this sensitive operation in credential/sensitive-
+ * operation rate limiting before public launch. Do not add a limiter here.
  */
 export function createAccountRouter(
   options: CreateAccountRouterOptions,

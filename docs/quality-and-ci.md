@@ -30,6 +30,22 @@ Runs, in order:
 
 This suite does **not** start PostgreSQL, apply migrations, or launch Playwright. Use it for fast iteration.
 
+When `TEST_DATABASE_URL` is unset, backend PostgreSQL integration tests
+**skip**. A green `npm run check` is not proof that PG suites ran.
+
+## Full local verification (`npm run check:full`)
+
+```bash
+export TEST_DATABASE_URL=postgresql://roomies:roomies_dev_only@127.0.0.1:5432/roomies_test
+npm run db:test:migrate
+npm run check:full
+```
+
+`check:full` refuses to start if `TEST_DATABASE_URL` is missing or blank.
+CI also runs `scripts/require-test-database-url.mjs` before backend tests.
+Dedicated integration suites throw (instead of skipping) when `CI=true` or
+`REQUIRE_TEST_DATABASE=1` and the URL is absent.
+
 ## Database / migration verification
 
 Offline artifact integrity (no database):

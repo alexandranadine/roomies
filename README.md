@@ -133,8 +133,9 @@ same request-ID, Helmet, and exact-origin CORS middleware. Unexpected auth
 failures use the Roomies error boundary and must never return or log raw SQL,
 tokens, cookies, credentials, or authorization headers. Better Auth enforces
 its own CSRF/origin checks against the same validated `trustedOrigins` list
-(plus `SameSite=Lax` HttpOnly session cookies). Credential-endpoint rate
-limiting is not implemented yet and is required before public launch.
+(plus `SameSite=Lax` HttpOnly session cookies). Credential and other
+sensitive-operation rate limiting — including account deletion — is not
+implemented yet and is required before public launch.
 
 Upgrade Better Auth by changing its exact pin inside `backend/auth-runtime`,
 running `npm install` there to review the isolated lock diff, then running the
@@ -155,7 +156,9 @@ The backend HTTP runtime lives under `backend/src/platform/http/` (app factory) 
 - Exact-origin CORS from `TRUSTED_ORIGINS`, Helmet defaults, JSON body limit `32kb`
 - `TRUST_PROXY` is an integer hop count (default `0`). Railway should set an explicit hop count after verifying proxy topology; unrestricted `true` is rejected.
 - `RECURRENCE_POLL_INTERVAL_MS` is the worker sleep when no immediate due work remains (default `30000`, range `1000`–`300000`).
-- No auth rate limiter yet. Add credential-endpoint rate limiting before public launch.
+- No auth rate limiter yet. Add credential and sensitive-operation rate
+  limiting — including account deletion — before public launch. See
+  [`docs/account-lifecycle.md`](docs/account-lifecycle.md).
 
 ### Fresh-database bootstrap note
 
@@ -192,11 +195,21 @@ Signing / initializing Prisma’s database marker (`db sign`, `db init`) writes 
 
 ## Quality gates and CI
 
-Local fast suite (format, lint, boundaries, typecheck, unit tests, frontend build):
+Local fast suite (format, lint, boundaries, typecheck, unit tests, frontend build).
+PostgreSQL integration tests **skip** when `TEST_DATABASE_URL` is unset:
 
 ```bash
 npm run check
 ```
+
+Authoritative local full verification. Fails immediately if
+`TEST_DATABASE_URL` is absent so PG suites cannot silently skip:
+
+```bash
+npm run check:full
+```
+
+Account deletion invariants: [`docs/account-lifecycle.md`](docs/account-lifecycle.md).
 
 Database migration integrity + fresh test-DB apply/verify, and Playwright browser foundation tests, are separate. See [`docs/quality-and-ci.md`](docs/quality-and-ci.md) for commands, CI overview, test-database safety, and how `/__dev/ui` is exercised without entering production builds.
 
@@ -206,4 +219,4 @@ npm run db:test:migrate      # fresh empty test DB → migrate → verify (needs
 npm run test:browser         # Playwright + Axe (Vite dev server)
 ```
 
-CI (`.github/workflows/ci.yml`) runs the full set on pull requests and `main` with Node 24, `npm ci`, and an ephemeral PostgreSQL 18 service. No repository secrets and no deploy.
+CI (`.github/workflows/ci.yml`) runs the full set on pull requests and `main` with Node 24, `npm ci`, and an ephemeral PostgreSQL 18 service. It refuses to start backend tests if `TEST_DATABASE_URL` is missing. No repository secrets and no deploy.

@@ -66,6 +66,31 @@ void describe('test database safety', () => {
     );
   });
 
+  void it('refuses silent PostgreSQL skips on CI or REQUIRE_TEST_DATABASE', () => {
+    assert.throws(
+      () =>
+        skipUnlessDedicatedTestDatabase({
+          CI: 'true',
+          DATABASE_URL: 'postgresql://u:p@127.0.0.1:5432/roomies',
+        }),
+      /TEST_DATABASE_URL is required/,
+    );
+    assert.throws(
+      () =>
+        skipUnlessDedicatedTestDatabase({
+          REQUIRE_TEST_DATABASE: '1',
+        }),
+      /TEST_DATABASE_URL is required/,
+    );
+    assert.equal(
+      skipUnlessDedicatedTestDatabase({
+        CI: 'true',
+        TEST_DATABASE_URL: 'postgresql://u:p@127.0.0.1:5432/roomies_test',
+      }),
+      false,
+    );
+  });
+
   void it('does not fall back to DATABASE_URL when a dedicated test URL is required', () => {
     assert.throws(
       () =>

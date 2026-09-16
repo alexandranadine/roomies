@@ -26,6 +26,7 @@
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "check:ci-secrets": "node scripts/check-ci-no-secrets.mjs",
     "check": "npm run format:check && npm run lint && npm run check:boundaries && npm run check:ci-secrets && npm run typecheck && npm run test && npm run build --workspace=@roomies/frontend",
+    "check:full": "node scripts/require-test-database-url.mjs && npm run check",
     "test:browser": "npm run test:browser --workspace=@roomies/frontend",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",

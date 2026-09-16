@@ -50,14 +50,21 @@ export function resolveTestDatabaseUrl(
 
 /**
  * Skip reason for suites that must never fall back to DATABASE_URL.
- * Missing or blank TEST_DATABASE_URL skips; an explicit unsafe URL is refused later.
+ * Missing or blank TEST_DATABASE_URL skips locally; an explicit unsafe URL
+ * is refused later. CI and `REQUIRE_TEST_DATABASE=1` refuse silent skips.
  */
 export function skipUnlessDedicatedTestDatabase(
   env: NodeJS.ProcessEnv = process.env,
 ): string | false {
-  return !env['TEST_DATABASE_URL']?.trim()
-    ? 'requires a migrated PostgreSQL test database'
-    : false;
+  if (env['TEST_DATABASE_URL']?.trim()) {
+    return false;
+  }
+  if (env['CI'] === 'true' || env['REQUIRE_TEST_DATABASE'] === '1') {
+    throw new Error(
+      'TEST_DATABASE_URL is required for this verification path. PostgreSQL integration tests must not be skipped.',
+    );
+  }
+  return 'requires a migrated PostgreSQL test database';
 }
 
 /**
