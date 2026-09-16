@@ -371,4 +371,63 @@ describe('invitation landing page', () => {
       rendered.unmount();
     }
   });
+
+  it('lets an unverified matching session resend a verification email', async () => {
+    captureInvitationFragment(
+      {
+        pathname: `/invitations/${INVITATION_ID}`,
+        search: '',
+        hash: `#secret=${SECRET}`,
+      },
+      window.history,
+    );
+    const fetchMock = vi
+      .fn()
+      .mockImplementation((url: string, init?: RequestInit) => {
+        if (url.includes('/api/auth/get-session')) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                user: { id: 'user-id', email: EMAIL, emailVerified: false },
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } },
+            ),
+          );
+        }
+        if (url.includes('/api/auth/send-verification-email')) {
+          expect(init?.method).toBe('POST');
+          const rawBody = init?.body;
+          if (typeof rawBody !== 'string') {
+            throw new Error('expected JSON string body');
+          }
+          expect(JSON.parse(rawBody)).toEqual({
+            email: EMAIL,
+            callbackURL: `${window.location.origin}/verify-email`,
+          });
+          return Promise.resolve(
+            new Response(JSON.stringify({ status: true }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            }),
+          );
+        }
+        return Promise.resolve(
+          new Response(JSON.stringify(previewBody()), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        );
+      });
+    vi.stubGlobal('fetch', fetchMock);
+    renderApp(`/invitations/${INVITATION_ID}`);
+
+    expect(
+      await screen.findByRole('button', { name: 'Join Home' }),
+    ).toBeDisabled();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Send verification email' }),
+    );
+    expect(await screen.findByText(/check your email/i)).toBeInTheDocument();
+    expect(document.body.innerHTML).not.toContain(SECRET);
+  });
 });

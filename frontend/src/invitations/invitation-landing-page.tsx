@@ -16,6 +16,7 @@ import {
   getCapturedInvitationSecret,
 } from './capture-invitation-fragment.js';
 import { invitationPreviewQueryKey, previewInvitation } from './preview-api.js';
+import { sendVerificationEmail } from './send-verification-email-api.js';
 
 const INVITATION_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -87,6 +88,10 @@ export function InvitationLandingPage() {
         replace: true,
       });
     },
+  });
+  const resendVerification = useMutation({
+    mutationFn: (email: string) => sendVerificationEmail(email),
+    retry: false,
   });
 
   if (secret === null) {
@@ -205,6 +210,28 @@ export function InvitationLandingPage() {
                 Verify your current Roomies email, then reopen this invitation
                 link.
               </Alert>
+              <Button
+                variant="secondary"
+                loading={resendVerification.isPending}
+                onClick={() => {
+                  resendVerification.mutate(session.user.email);
+                }}
+              >
+                Send verification email
+              </Button>
+              {resendVerification.isSuccess ? (
+                <Alert variant="success" title="Check your email">
+                  Open the verification link, then reopen this invitation link.
+                </Alert>
+              ) : null}
+              {resendVerification.isError ? (
+                <Alert
+                  variant="danger"
+                  title="Couldn’t send a verification email"
+                >
+                  Try again in a moment.
+                </Alert>
+              ) : null}
             </>
           ) : null}
           {signedIn &&

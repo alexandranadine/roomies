@@ -29,6 +29,24 @@ export type ProcessRuntimeConfig = Readonly<{
   recurrencePollIntervalMs: number;
 }>;
 
+export const EMAIL_PROVIDERS = ['fake', 'resend'] as const;
+
+export type EmailProvider = (typeof EMAIL_PROVIDERS)[number];
+
+export type FakeEmailConfig = Readonly<{
+  provider: 'fake';
+}>;
+
+export type ResendEmailConfig = Readonly<{
+  provider: 'resend';
+  /** Resend API key. Never log this value. */
+  apiKey: string;
+  /** Verified From address (`email` or `Name <email>`). */
+  from: string;
+}>;
+
+export type EmailRuntimeConfig = FakeEmailConfig | ResendEmailConfig;
+
 /**
  * Immutable, typed application configuration.
  * Parsed once at process startup; modules consume this object, not `process.env`.
@@ -67,4 +85,9 @@ export type AppConfig = Readonly<{
    * Never an environment dump or filesystem path.
    */
   releaseSha?: string;
+  /**
+   * Transactional auth-email adapter. Omitted only in tests that construct
+   * AppConfig by hand; those default to the in-memory fake sender.
+   */
+  email?: EmailRuntimeConfig;
 }>;

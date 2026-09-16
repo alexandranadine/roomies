@@ -1,17 +1,23 @@
 export type {
   AppConfig,
   AppEnv,
+  EmailProvider,
+  EmailRuntimeConfig,
+  FakeEmailConfig,
   ProcessMode,
   ProcessRuntimeConfig,
+  ResendEmailConfig,
 } from './types.js';
 export {
   APP_ENVS,
   DEFAULT_PROCESS_MODE,
   DEFAULT_RECURRENCE_POLL_INTERVAL_MS,
+  EMAIL_PROVIDERS,
   MAX_RECURRENCE_POLL_INTERVAL_MS,
   MIN_RECURRENCE_POLL_INTERVAL_MS,
   PROCESS_MODES,
 } from './types.js';
+export { areSameSiteOrigins, registrableSite } from './same-site-origins.js';
 export { ConfigError, SECRET_ENV_KEYS } from './errors.js';
 export {
   normalizeTrustedOrigin,

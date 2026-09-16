@@ -24,9 +24,13 @@ Better Auth's built-in limiter is explicitly disabled. Roomies owns the
 and `POST /api/auth/sign-out` are not credential-throttled.
 `GET /health` and `GET /ready` are not limited.
 
-Password reset and email verification **sending** are not product features
-yet (`requireEmailVerification: false`, no mailer). Those Better Auth POST
-paths still exist and are credential-limited so they cannot be hammered.
+Password reset and email verification **sending** now have a Roomies
+transactional adapter (Resend in production, explicit `fake` in
+local/test/staging). Better Auth `requireEmailVerification` remains
+`false`. Invitation acceptance still requires a verified email.
+`POST /api/auth/send-verification-email` (and password-reset paths)
+stay credential-limited so they cannot be hammered. Password-reset
+**delivery** is still not a product feature.
 
 ## Single-instance limitation
 

@@ -53,4 +53,13 @@ describe('parseFrontendEnv', () => {
       parseFrontendEnv({ VITE_API_ORIGIN: '   ' }, { isDevelopment: false }),
     ).toThrow(/required for deployed builds/i);
   });
+
+  it('does not accept mail secrets as public Vite env', () => {
+    const env = parseFrontendEnv(
+      { VITE_API_ORIGIN: 'https://api.roomies.example' },
+      { isDevelopment: false },
+    );
+    expect(env).toEqual({ apiOrigin: 'https://api.roomies.example' });
+    expect(Object.keys(env)).toEqual(['apiOrigin']);
+  });
 });

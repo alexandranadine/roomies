@@ -1,16 +1,24 @@
-# Deployment (M9.2 / M9.3)
+# Deployment (M9.2 / M9.3 / M9.4)
 
 M9.2 prepared the repository. M9.3 created an isolated **staging**
-deployment and recorded live platform facts below.
+deployment and recorded live platform facts below. M9.4 made the
+repository production-ready for domain, email verification, and
+infrastructure provisioning. **M9.5 owns actual production resources.**
 
-Public production origin placeholders until a real Roomies domain exists:
+Production hostnames are **operator-supplied**. This repository does not
+invent, purchase, or configure a Roomies domain. Until the operator
+selects one, use this same-site shape on **one registrable domain**:
+
+- Frontend: `https://<production-site-host>`
+- API: `https://<production-api-host>`
+
+Preferred example shape (not a real registration):
 
 - Frontend: `https://roomies.example`
 - API: `https://api.roomies.example`
 
-Do not invent or purchase a domain from this document. Staging uses
-provider hostnames only (`*.up.railway.app`, `*.workers.dev`). Those
-origins are not production.
+Staging uses provider hostnames only (`*.up.railway.app`, `*.workers.dev`).
+Those origins are **not** production and are **not** same-site.
 
 Facts are marked **VERIFIED LIVE** (observed on the M9.3 staging stack) or
 **CONFIGURED/EXPECTED** (set in provider config or required by code, not
@@ -52,7 +60,43 @@ frontend `package.json` `engines` fields. Railpack reads `engines.node`.
 Cloudflare frontend builds should use Node 24 as well.
 
 Do not set `RAILPACK_NODE_VERSION` to another major. Production must not
-silently run Node 22/25.
+silently run Node 22/25. Production runtime **fails fast** if
+`process.versions.node` major is not `24`. Staging/preview log
+`[process] node <version>` at boot (no public diagnostic endpoint).
+
+## Production domain contract (operator-supplied)
+
+Do not configure DNS in this ticket. M9.5 / the operator must provide:
+
+| Item                        | Production requirement                                                                      |
+| --------------------------- | ------------------------------------------------------------------------------------------- |
+| Frontend origin             | `https://<production-site-host>` (`FRONTEND_ORIGIN`, Cloudflare Worker custom domain)       |
+| API origin                  | `https://<production-api-host>` (`AUTH_BASE_URL`, `VITE_API_ORIGIN`, Railway custom domain) |
+| Registrable site            | Frontend and API **must be same-site** (e.g. `roomies.example` + `api.roomies.example`)     |
+| DNS ownership/provider      | Operator-owned zone (not invented here)                                                     |
+| TLS                         | Cloudflare (frontend) and Railway (API) terminate TLS on the custom hostnames               |
+| Better Auth `AUTH_BASE_URL` | Exact API HTTPS origin                                                                      |
+| `TRUSTED_ORIGINS`           | Exact frontend origin (include `FRONTEND_ORIGIN`)                                           |
+| Cookie model                | Unchanged: `HttpOnly`, `Secure`, `SameSite=Lax`, **host-only** (no `Domain=`)               |
+
+Production config **rejects** cross-site pairs such as `*.workers.dev` +
+`*.railway.app` or an unrelated `FRONTEND_ORIGIN`. Staging may still use
+provider hostnames.
+
+### Cookie production proof (after custom hostnames exist)
+
+From the real frontend custom hostname in a browser:
+
+1. Sign up / sign in
+2. API `Set-Cookie` is `__Secure-better-auth.session_token`
+3. Attributes: `Secure`, `HttpOnly`, `SameSite=Lax`, host-only (no `Domain`)
+4. Browser stores the cookie for the **API hostname**
+5. Credentialed frontend `fetch` sends it
+6. `GET /api/v1/me` returns 200
+7. Unrelated external origin: no credentialed CORS (`ACAO` withheld)
+8. `/api/v1` mutation with hostile Origin: `403 FORBIDDEN`
+
+Do not weaken cookies to make staging provider domains work.
 
 ## Backend build and start
 
@@ -180,6 +224,14 @@ exits with `Invalid configuration` and is not promoted).
 staging, region `us-west2`, service domain `*.up.railway.app`, no extra
 CDN in front.)
 
+**TRUST_PROXY production rule:** `2` is valid **only** for
+`client → Railway public edge → app`. If the production API custom
+hostname maps **directly** to Railway with no Cloudflare proxy/CDN in
+front, M9.5 must re-run a small spoof probe and may reuse `2` if the
+chain still matches. If Cloudflare (or any extra proxy) is placed in
+front of Railway, `2` is **not** automatically valid — reprobe from
+scratch. Do not ship a permanent public forwarding-header diagnostic.
+
 Observed forwarding (hashes only; client IPs are not recorded here):
 
 - Railway presents **exactly two** `X-Forwarded-For` hops, both public.
@@ -243,20 +295,23 @@ Never commit real secrets. Values below are names only.
 
 ### Backend
 
-| Variable                      | Local                      | CI           | Preview / staging                                | Production                                          | Class                        |
-| ----------------------------- | -------------------------- | ------------ | ------------------------------------------------ | --------------------------------------------------- | ---------------------------- |
-| `APP_ENV`                     | `development`              | `test`       | `preview` / `staging`                            | `production`                                        | required                     |
-| `PORT`                        | `3000`                     | n/a          | platform                                         | platform (`PORT`)                                   | optional / platform-provided |
-| `PROCESS_MODE`                | default `combined`         | n/a          | `combined`                                       | `combined`                                          | optional (default)           |
-| `RECURRENCE_POLL_INTERVAL_MS` | default `30000`            | n/a          | default                                          | default                                             | optional                     |
-| `DATABASE_URL`                | Compose Postgres           | CI Postgres  | **non-prod Neon**                                | **prod Neon pooled**                                | required                     |
-| `AUTH_SECRET`                 | local placeholder replaced | CI-only      | distinct                                         | distinct                                            | required                     |
-| `AUTH_BASE_URL`               | default localhost          | CI localhost | HTTPS API origin                                 | HTTPS API origin                                    | required outside local       |
-| `FRONTEND_ORIGIN`             | default localhost          | n/a          | HTTPS frontend                                   | HTTPS frontend                                      | required outside local       |
-| `TRUSTED_ORIGINS`             | default localhost          | n/a          | exact HTTPS list including `FRONTEND_ORIGIN`     | same                                                | required outside local       |
-| `TRUST_PROXY`                 | default `0`                | default `0`  | Railway `us-west2` edge: **`2`** (VERIFIED LIVE) | same Railway topology: `2`; re-probe if hops change | optional (default 0)         |
-| `RELEASE_SHA`                 | unset                      | unset        | optional                                         | optional (else Railway SHA)                         | optional                     |
-| `RAILWAY_GIT_COMMIT_SHA`      | n/a                        | n/a          | platform                                         | platform                                            | platform-provided            |
+| Variable                      | Local                      | CI             | Preview / staging                                | Production                                                               | Class                        |
+| ----------------------------- | -------------------------- | -------------- | ------------------------------------------------ | ------------------------------------------------------------------------ | ---------------------------- |
+| `APP_ENV`                     | `development`              | `test`         | `preview` / `staging`                            | `production`                                                             | required                     |
+| `PORT`                        | `3000`                     | n/a            | platform                                         | platform (`PORT`)                                                        | optional / platform-provided |
+| `PROCESS_MODE`                | default `combined`         | n/a            | `combined`                                       | `combined`                                                               | optional (default)           |
+| `RECURRENCE_POLL_INTERVAL_MS` | default `30000`            | n/a            | default                                          | default                                                                  | optional                     |
+| `DATABASE_URL`                | Compose Postgres           | CI Postgres    | **non-prod Neon**                                | **prod Neon pooled**                                                     | required                     |
+| `AUTH_SECRET`                 | local placeholder replaced | CI-only        | distinct                                         | distinct                                                                 | required                     |
+| `AUTH_BASE_URL`               | default localhost          | CI localhost   | HTTPS API origin                                 | HTTPS API origin                                                         | required outside local       |
+| `FRONTEND_ORIGIN`             | default localhost          | n/a            | HTTPS frontend                                   | HTTPS frontend                                                           | required outside local       |
+| `TRUSTED_ORIGINS`             | default localhost          | n/a            | exact HTTPS list including `FRONTEND_ORIGIN`     | same                                                                     | required outside local       |
+| `TRUST_PROXY`                 | default `0`                | default `0`    | Railway `us-west2` edge: **`2`** (VERIFIED LIVE) | same Railway topology: `2` only if still direct; re-probe if hops change | optional (default 0)         |
+| `RELEASE_SHA`                 | unset                      | unset          | optional                                         | optional (else Railway SHA)                                              | optional                     |
+| `RAILWAY_GIT_COMMIT_SHA`      | n/a                        | n/a            | platform                                         | platform                                                                 | platform-provided            |
+| `EMAIL_PROVIDER`              | default `fake`             | default `fake` | required (`resend` or explicit `fake`)           | **`resend` only** (fake rejected)                                        | required outside local       |
+| `EMAIL_API_KEY`               | n/a for fake               | n/a for fake   | required for `resend`                            | required                                                                 | secret                       |
+| `EMAIL_FROM`                  | n/a for fake               | n/a for fake   | required for `resend`                            | required (`Roomies <noreply@<sending-domain>>`)                          | required for resend          |
 
 ### Frontend (public)
 
@@ -326,12 +381,109 @@ literally named `production` with **zero** services; do not use it.
 | Cookies       | API `Set-Cookie`: `__Secure-better-auth.session_token`, `HttpOnly`, `Secure`, `SameSite=Lax`, host-only (no `Domain=`). Operator `Cookie` header reaches `/api/v1/me`. A browser document on `workers.dev` **does not** store/send that cookie to `railway.app` (cross-site / third-party). Production must use same-site hostnames (`roomies.example` + `api.roomies.example`). Do not weaken SameSite to make staging browsers work.                                                  |
 | CORS / Origin | Trusted staging frontend: `ACAO` exact origin + credentials. Hostile origin: no `ACAO`. `/api/v1` mutations: missing/hostile Origin → `403 FORBIDDEN`.                                                                                                                                                                                                                                                                                                                                  |
 | Worker/outbox | Combined process drained staging outbox (`processed_at` set, no dead rows). Activity projections created. No payload/content in outbox logs.                                                                                                                                                                                                                                                                                                                                            |
-| Invitations   | Create works without a mailer (`inviteUrl` returned once). Accept requires Better Auth `email_verified`. October has no mailer; staging isolation used an operator `email_verified=true` patch on a disposable identity only.                                                                                                                                                                                                                                                           |
+| Invitations   | Create works without a product invitation mailer (`inviteUrl` returned once). Accept requires Better Auth `email_verified`. Verification mail uses the transactional adapter (staging may set `EMAIL_PROVIDER=fake` until a sending domain exists). Do not DB-patch `email_verified` for the production proof path.                                                                                                                                                                     |
+
+## Email verification (M9.4)
+
+October transactional mail is **email verification only** (invitation
+acceptance). Password-reset delivery is **not** wired. No newsletters,
+product notifications, or invitation emails.
+
+Provider: **Resend** (HTTPS API, verified sending domain, secret API
+key, no SMTP password in the repo). The application uses `fetch` to
+`https://api.resend.com/emails`. No Resend SDK. No provider types in
+`shared/` or domain packages.
+
+`TransactionalEmailSender.sendVerificationEmail` is the only send
+surface. Better Auth's `emailVerification.sendVerificationEmail` hook
+is the integration point. Tokens remain Better Auth JWTs (`expiresIn`
+3600 seconds / 1 hour). `requireEmailVerification` stays **false** so
+ordinary Roomies use does not require a verified inbox; **invitation
+acceptance** still requires `email_verified`.
+
+Signup can send a verification email (`sendOnSignUp`). The invitation
+landing page can resend for a signed-in unverified session.
+`POST /api/auth/send-verification-email` stays on the M9.1 credential
+limiter (IP key, not email). Unauthenticated Better Auth resend already
+returns a generic success for missing/already-verified addresses.
+Provider outage on a real unverified address can surface as 500 vs 200;
+the product resend path is session-authenticated.
+
+Delivery failure: do not claim the email was sent. HTTP maps to
+`500 INTERNAL_ERROR` without provider bodies, emails, tokens, or URLs.
+Logs are `[email] verification delivery failed` only.
+
+Verification links use Better Auth's URL with `callbackURL` forced to
+`${FRONTEND_ORIGIN}/verify-email`. GET `/api/auth/verify-email`
+`originCheck` rejects callbacks outside `TRUSTED_ORIGINS`.
+
+### Sending-domain plan (M9.5 / operator)
+
+Do not fabricate provider DNS records before an account and domain
+exist. After Resend + the production zone exist:
+
+- Verify the sending domain in Resend
+- Publish the provider's **SPF** TXT on the sending domain
+- Publish the provider's **DKIM** CNAMEs/TXT as instructed
+- Publish a **DMARC** TXT (`v=DMARC1; p=quarantine` is a reasonable
+  starting policy for a small transactional app; tighten later)
+- `EMAIL_FROM` like `Roomies <noreply@mail.<production-site-host>>`
+  or the provider-recommended subdomain
+
+## M9.5 production provisioning checklist
+
+Do **not** create these in M9.4.
+
+**Neon**
+
+- Region: `aws-us-west-2` (match staging / Railway US West)
+- Tier: Launch if PITR/backup expectations require it
+- Pooled runtime `DATABASE_URL` (`sslmode=require`)
+- Direct `MIGRATION_DATABASE_URL` (no `-pooler`)
+- PITR expectation: practical Neon PITR (later backup ticket still applies)
+- Distinct production credentials; never reuse staging
+
+**Railway**
+
+- Region `us-west2`
+- Exactly 1 replica
+- Auto-sleep **OFF**
+- Combined `PROCESS_MODE`
+- Healthcheck `/ready`
+- Node 24 (Railpack `engines.node` + boot assertion)
+- Exact `RELEASE_SHA`
+- `TRUST_PROXY=2` only if topology remains direct-to-Railway; else reprobe
+- Custom API hostname
+
+**Cloudflare**
+
+- Workers Static Assets
+- Custom frontend hostname
+- `VITE_API_ORIGIN` exact API origin
+- Document CSP `connect-src` exact API hostname
+- SPA fallback
+- Cache headers as staging
+
+**Email**
+
+- Resend account
+- Sending domain verified
+- API secret in Railway (not Vite, not git)
+- From address
+
+**GitHub**
+
+- Protected production environment
+- Required release secrets in that environment only
+- No push-to-main production deployment (`check:ci-secrets` still forbids
+  workflow secret coupling for CI)
 
 ## Remaining M9 steps
 
+- Operator selects the production registrable domain
 - Same-site production DNS (not `workers.dev` + `railway.app`)
 - Production Neon / Railway / Cloudflare environments (separate from staging)
+- Resend account + sending-domain DNS (SPF/DKIM/DMARC)
 - Protected production promotion workflow
 - R2 media
 - Backup/PITR validation

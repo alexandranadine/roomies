@@ -63,4 +63,24 @@ void describe('deployment production scripts', () => {
     assert.doesNotMatch(source, /STAGING_IP_PROBE/);
     assert.doesNotMatch(source, /staging-ip-probe/);
   });
+
+  void it('fails production when Node major is not 24', async () => {
+    const main = await readFile(path.join(backendRoot, 'src/main.ts'), 'utf8');
+    const nodeMajor = await readFile(
+      path.join(backendRoot, 'src/platform/runtime/node-major.ts'),
+      'utf8',
+    );
+    assert.match(main, /assertProductionNodeMajor\(config\.appEnv\)/);
+    assert.match(nodeMajor, /REQUIRED_NODE_MAJOR = 24/);
+    assert.doesNotMatch(main, /\/debug\/node/);
+  });
+
+  void it('does not expose mail secrets to the Vite public env surface', async () => {
+    const source = await readFile(
+      path.join(repoRoot, 'frontend/src/vite-env.d.ts'),
+      'utf8',
+    );
+    assert.doesNotMatch(source, /EMAIL_API_KEY|AUTH_SECRET|DATABASE_URL/);
+    assert.match(source, /VITE_API_ORIGIN/);
+  });
 });

@@ -11,6 +11,7 @@ import {
   InvalidRequestError,
 } from '../authz/errors.js';
 import { TransactionInfrastructureError } from '../persistence/errors.js';
+import { TransactionalEmailDeliveryError } from '../email/errors.js';
 import { StructuralIntegrityError } from '../../domains/homes/structure-errors.js';
 import { CanonicalUserPersistenceIntegrityError } from '../../domains/users/canonical-user-deletion-marker.js';
 import { FinalMemberRequiredError } from '../../domains/homes/errors.js';
@@ -348,7 +349,8 @@ export function errorHandler(
     err instanceof ActivityPersistenceError ||
     err instanceof NotificationPersistenceError ||
     err instanceof TransactionInfrastructureError ||
-    err instanceof AuthInfrastructureError
+    err instanceof AuthInfrastructureError ||
+    err instanceof TransactionalEmailDeliveryError
   ) {
     console.error('[http] request failed', {
       requestId,

@@ -8,18 +8,21 @@ export type AppTestResponse = {
   json: () => unknown;
 };
 
+export type AppTestRequestOptions = {
+  method?: string;
+  path: string;
+  headers?: Record<string, string>;
+  body?: string;
+  redirect?: 'follow' | 'error' | 'manual';
+};
+
 /**
  * Keep one ephemeral HTTP server open for multi-request flows (cookies/session).
  */
 export async function withAppServer<T>(
   app: Express,
   run: (
-    request: (options: {
-      method?: string;
-      path: string;
-      headers?: Record<string, string>;
-      body?: string;
-    }) => Promise<AppTestResponse>,
+    request: (options: AppTestRequestOptions) => Promise<AppTestResponse>,
   ) => Promise<T>,
 ): Promise<T> {
   const server = http.createServer(app);
@@ -34,18 +37,16 @@ export async function withAppServer<T>(
     throw new Error('expected TCP listen address');
   }
 
-  const request = async (options: {
-    method?: string;
-    path: string;
-    headers?: Record<string, string>;
-    body?: string;
-  }): Promise<AppTestResponse> => {
+  const request = async (
+    options: AppTestRequestOptions,
+  ): Promise<AppTestResponse> => {
     const response = await fetch(
       `http://127.0.0.1:${address.port}${options.path}`,
       {
         method: options.method ?? 'GET',
         headers: options.headers,
         body: options.body,
+        redirect: options.redirect,
       },
     );
     const text = await response.text();
@@ -70,12 +71,7 @@ export async function withAppServer<T>(
  */
 export async function appRequest(
   app: Express,
-  options: {
-    method?: string;
-    path: string;
-    headers?: Record<string, string>;
-    body?: string;
-  },
+  options: AppTestRequestOptions,
 ): Promise<AppTestResponse> {
   return withAppServer(app, (request) => request(options));
 }

@@ -61,6 +61,15 @@ export type CreateAuthRuntimeOptions = Readonly<{
   secret: string;
   secureCookies: boolean;
   /**
+   * Better Auth verification-email hook. When omitted, verification sending
+   * stays disabled. The callback must not log tokens or verification URLs.
+   */
+  sendVerificationEmail?: (data: {
+    user: { email: string };
+    url: string;
+    token: string;
+  }) => Promise<void>;
+  /**
    * Content-free operational sink. Better Auth messages and metadata are not
    * forwarded because they may contain SQL or authentication material.
    */
@@ -78,6 +87,14 @@ function createOptions(input: CreateAuthRuntimeOptions): BetterAuthOptions {
       enabled: true,
       requireEmailVerification: false,
     },
+    emailVerification: input.sendVerificationEmail
+      ? {
+          sendVerificationEmail: input.sendVerificationEmail,
+          sendOnSignUp: true,
+          autoSignInAfterVerification: true,
+          expiresIn: 60 * 60,
+        }
+      : undefined,
     user: {
       modelName: 'auth_identities',
       fields: {

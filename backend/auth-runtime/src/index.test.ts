@@ -123,6 +123,7 @@ void describe('createAuthRuntime', () => {
       enabled: true,
       requireEmailVerification: false,
     });
+    assert.equal(auth.options.emailVerification, undefined);
     assert.deepEqual(auth.options.account?.accountLinking, {
       enabled: false,
       disableImplicitLinking: true,
@@ -147,6 +148,35 @@ void describe('createAuthRuntime', () => {
     assert.equal(auth.options.advanced?.disableOriginCheck, false);
     assert.deepEqual(auth.options.plugins, []);
     assert.equal(auth.options.rateLimit?.enabled, false);
+  });
+
+  void it('wires Better Auth verification email without a Domain cookie', () => {
+    const caller = callerOwnedPool();
+    const sent: string[] = [];
+    const auth = createAuthRuntime({
+      pool: caller.pool,
+      baseURL: 'https://api.example.test',
+      trustedOrigins: ['https://app.example.test'],
+      secret: TEST_SECRET,
+      secureCookies: true,
+      sendVerificationEmail: ({ user, url, token }) => {
+        sent.push(user.email, url, token);
+        return Promise.resolve();
+      },
+    });
+
+    assert.equal(auth.options.emailVerification?.sendOnSignUp, true);
+    assert.equal(
+      auth.options.emailVerification?.autoSignInAfterVerification,
+      true,
+    );
+    assert.equal(auth.options.emailVerification?.expiresIn, 3600);
+    assert.equal(
+      auth.options.advanced?.defaultCookieAttributes &&
+        'domain' in auth.options.advanced.defaultCookieAttributes,
+      false,
+    );
+    assert.equal(sent.length, 0);
   });
 
   void it('uses exact supplied base URL/origins and content-free logging', () => {

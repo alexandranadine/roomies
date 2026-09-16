@@ -5,6 +5,7 @@ import { ConfigError, parseConfig, type ConfigSource } from './index.js';
 const SECRET_DATABASE_URL =
   'postgresql://roomies:super_secret_credential_xyz@127.0.0.1:5432/roomies';
 const VALID_AUTH_SECRET = 'roomies_test_secret_32_chars_minimum_value';
+const VALID_EMAIL_API_KEY = 're_test_config_only_not_a_real_secret_key';
 
 function validDevelopmentEnv(overrides: ConfigSource = {}): ConfigSource {
   return {
@@ -13,6 +14,21 @@ function validDevelopmentEnv(overrides: ConfigSource = {}): ConfigSource {
     AUTH_SECRET: VALID_AUTH_SECRET,
     PORT: '3000',
     TRUSTED_ORIGINS: 'http://localhost:5173,http://127.0.0.1:5173',
+    ...overrides,
+  };
+}
+
+function validProductionEnv(overrides: ConfigSource = {}): ConfigSource {
+  return {
+    APP_ENV: 'production',
+    DATABASE_URL: SECRET_DATABASE_URL,
+    AUTH_SECRET: VALID_AUTH_SECRET,
+    AUTH_BASE_URL: 'https://api.roomies.example',
+    FRONTEND_ORIGIN: 'https://roomies.example',
+    TRUSTED_ORIGINS: 'https://roomies.example',
+    EMAIL_PROVIDER: 'resend',
+    EMAIL_API_KEY: VALID_EMAIL_API_KEY,
+    EMAIL_FROM: 'Roomies <noreply@roomies.example>',
     ...overrides,
   };
 }
@@ -36,6 +52,7 @@ void describe('parseConfig', () => {
     assert.equal(config.processMode, 'combined');
     assert.equal(config.recurrencePollIntervalMs, 30_000);
     assert.equal(config.releaseSha, undefined);
+    assert.deepEqual(config.email, { provider: 'fake' });
     assert.ok(Object.isFrozen(config));
   });
 
@@ -338,15 +355,14 @@ void describe('parseConfig', () => {
   });
 
   void it('accepts explicit production origins without localhost defaults', () => {
-    const config = parseConfig({
-      APP_ENV: 'production',
-      DATABASE_URL: SECRET_DATABASE_URL,
-      PORT: '8080',
-      TRUSTED_ORIGINS: 'https://app.roomies.example',
-      FRONTEND_ORIGIN: 'https://app.roomies.example',
-      AUTH_BASE_URL: 'https://api.roomies.example',
-      AUTH_SECRET: VALID_AUTH_SECRET,
-    });
+    const config = parseConfig(
+      validProductionEnv({
+        PORT: '8080',
+        TRUSTED_ORIGINS: 'https://app.roomies.example',
+        FRONTEND_ORIGIN: 'https://app.roomies.example',
+        AUTH_BASE_URL: 'https://api.roomies.example',
+      }),
+    );
     assert.deepEqual(config.trustedOrigins, ['https://app.roomies.example']);
     assert.equal(config.frontendOrigin, 'https://app.roomies.example');
     assert.equal(config.authBaseUrl, 'https://api.roomies.example');
@@ -355,6 +371,11 @@ void describe('parseConfig', () => {
     assert.equal(config.trustProxyHops, 0);
     assert.equal(config.processMode, 'combined');
     assert.equal(config.releaseSha, undefined);
+    assert.deepEqual(config.email, {
+      provider: 'resend',
+      apiKey: VALID_EMAIL_API_KEY,
+      from: 'Roomies <noreply@roomies.example>',
+    });
   });
 
   void it('requires an explicit valid auth base URL outside local environments', () => {
@@ -506,17 +527,32 @@ void describe('parseConfig', () => {
         return true;
       },
     );
+
+    assert.throws(
+      () =>
+        parseConfig({
+          APP_ENV: 'production',
+          DATABASE_URL: databaseUrl,
+          AUTH_SECRET: VALID_AUTH_SECRET,
+          AUTH_BASE_URL: 'https://api.roomies.example',
+          FRONTEND_ORIGIN: 'https://roomies.example',
+          TRUSTED_ORIGINS: 'https://roomies.example',
+          EMAIL_PROVIDER: 'resend',
+          EMAIL_API_KEY: VALID_EMAIL_API_KEY,
+          EMAIL_FROM: undefined,
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof ConfigError);
+        assert.equal(error.message.includes(VALID_EMAIL_API_KEY), false);
+        assert.equal(error.message.includes(secret), false);
+        assert.match(error.message, /EMAIL_FROM/);
+        return true;
+      },
+    );
   });
 
   void it('defaults TRUST_PROXY to 0 in production when unset', () => {
-    const config = parseConfig({
-      APP_ENV: 'production',
-      DATABASE_URL: SECRET_DATABASE_URL,
-      AUTH_SECRET: VALID_AUTH_SECRET,
-      AUTH_BASE_URL: 'https://api.roomies.example',
-      FRONTEND_ORIGIN: 'https://roomies.example',
-      TRUSTED_ORIGINS: 'https://roomies.example',
-    });
+    const config = parseConfig(validProductionEnv());
     assert.equal(config.trustProxyHops, 0);
     assert.equal(config.secureAuthCookies, true);
   });
@@ -552,29 +588,21 @@ void describe('parseConfig', () => {
   });
 
   void it('accepts RELEASE_SHA and prefers it over the Railway commit SHA', () => {
-    const config = parseConfig({
-      APP_ENV: 'production',
-      DATABASE_URL: SECRET_DATABASE_URL,
-      AUTH_SECRET: VALID_AUTH_SECRET,
-      AUTH_BASE_URL: 'https://api.roomies.example',
-      FRONTEND_ORIGIN: 'https://roomies.example',
-      TRUSTED_ORIGINS: 'https://roomies.example',
-      RELEASE_SHA: 'abcDEF1',
-      RAILWAY_GIT_COMMIT_SHA: '0123456789abcdef0123456789abcdef01234567',
-    });
+    const config = parseConfig(
+      validProductionEnv({
+        RELEASE_SHA: 'abcDEF1',
+        RAILWAY_GIT_COMMIT_SHA: '0123456789abcdef0123456789abcdef01234567',
+      }),
+    );
     assert.equal(config.releaseSha, 'abcdef1');
   });
 
   void it('uses RAILWAY_GIT_COMMIT_SHA when RELEASE_SHA is omitted', () => {
-    const config = parseConfig({
-      APP_ENV: 'production',
-      DATABASE_URL: SECRET_DATABASE_URL,
-      AUTH_SECRET: VALID_AUTH_SECRET,
-      AUTH_BASE_URL: 'https://api.roomies.example',
-      FRONTEND_ORIGIN: 'https://roomies.example',
-      TRUSTED_ORIGINS: 'https://roomies.example',
-      RAILWAY_GIT_COMMIT_SHA: '0123456789abcdef0123456789abcdef01234567',
-    });
+    const config = parseConfig(
+      validProductionEnv({
+        RAILWAY_GIT_COMMIT_SHA: '0123456789abcdef0123456789abcdef01234567',
+      }),
+    );
     assert.equal(config.releaseSha, '0123456789abcdef0123456789abcdef01234567');
   });
 
@@ -587,6 +615,112 @@ void describe('parseConfig', () => {
           }),
         ),
       /RELEASE_SHA must be a 7-40 character hexadecimal git SHA/,
+    );
+  });
+
+  void it('defaults local mail to the fake adapter', () => {
+    const config = parseConfig(validDevelopmentEnv());
+    assert.deepEqual(config.email, { provider: 'fake' });
+  });
+
+  void it('rejects production when verification mail config is missing', () => {
+    assert.throws(
+      () =>
+        parseConfig({
+          APP_ENV: 'production',
+          DATABASE_URL: SECRET_DATABASE_URL,
+          AUTH_SECRET: VALID_AUTH_SECRET,
+          AUTH_BASE_URL: 'https://api.roomies.example',
+          FRONTEND_ORIGIN: 'https://roomies.example',
+          TRUSTED_ORIGINS: 'https://roomies.example',
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof ConfigError);
+        assert.match(error.message, /EMAIL_PROVIDER is required/);
+        return true;
+      },
+    );
+  });
+
+  void it('rejects fake mail in production', () => {
+    assert.throws(
+      () => parseConfig(validProductionEnv({ EMAIL_PROVIDER: 'fake' })),
+      /EMAIL_PROVIDER=fake is not allowed when APP_ENV=production/,
+    );
+  });
+
+  void it('rejects resend without an API key and does not echo the key', () => {
+    assert.throws(
+      () =>
+        parseConfig(
+          validProductionEnv({
+            EMAIL_API_KEY: undefined,
+          }),
+        ),
+      (error: unknown) => {
+        assert.ok(error instanceof ConfigError);
+        assert.match(error.message, /EMAIL_API_KEY is required/);
+        assert.equal(error.message.includes(VALID_EMAIL_API_KEY), false);
+        return true;
+      },
+    );
+
+    assert.throws(
+      () =>
+        parseConfig(
+          validProductionEnv({
+            EMAIL_API_KEY: VALID_EMAIL_API_KEY,
+            EMAIL_FROM: undefined,
+          }),
+        ),
+      (error: unknown) => {
+        assert.ok(error instanceof ConfigError);
+        assert.match(error.message, /EMAIL_FROM/);
+        assert.equal(error.message.includes(VALID_EMAIL_API_KEY), false);
+        return true;
+      },
+    );
+  });
+
+  void it('allows explicit fake mail in staging', () => {
+    const config = parseConfig({
+      APP_ENV: 'staging',
+      DATABASE_URL: SECRET_DATABASE_URL,
+      AUTH_SECRET: VALID_AUTH_SECRET,
+      AUTH_BASE_URL: 'https://roomies-api-staging.up.railway.app',
+      FRONTEND_ORIGIN: 'https://roomies-frontend-staging.example.workers.dev',
+      TRUSTED_ORIGINS: 'https://roomies-frontend-staging.example.workers.dev',
+      EMAIL_PROVIDER: 'fake',
+    });
+    assert.deepEqual(config.email, { provider: 'fake' });
+  });
+
+  void it('accepts same-site production origins and rejects unrelated hosts', () => {
+    const accepted = parseConfig(validProductionEnv());
+    assert.equal(accepted.frontendOrigin, 'https://roomies.example');
+    assert.equal(accepted.authBaseUrl, 'https://api.roomies.example');
+
+    assert.throws(
+      () =>
+        parseConfig(
+          validProductionEnv({
+            FRONTEND_ORIGIN: 'https://evil.example',
+            TRUSTED_ORIGINS: 'https://evil.example',
+          }),
+        ),
+      /must be same-site HTTPS origins in production/,
+    );
+
+    assert.throws(
+      () =>
+        parseConfig(
+          validProductionEnv({
+            FRONTEND_ORIGIN: 'https://app.workers.dev',
+            AUTH_BASE_URL: 'https://api.up.railway.app',
+            TRUSTED_ORIGINS: 'https://app.workers.dev',
+          }),
+        ),
+      /must be same-site HTTPS origins in production/,
     );
   });
 });

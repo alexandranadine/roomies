@@ -5,6 +5,7 @@ import { HomeDiscoveryPage } from '../homes/home-discovery-page.js';
 import { HomeOverviewPage } from '../homes/home-overview-page.js';
 import { HomeShellPage } from '../homes/home-shell-page.js';
 import { InvitationLandingPage } from '../invitations/invitation-landing-page.js';
+import { VerifyEmailPage } from '../invitations/verify-email-page.js';
 import { MaintenanceDetailPage } from '../maintenance/maintenance-detail-page.js';
 import { MaintenanceListPage } from '../maintenance/maintenance-list-page.js';
 import { NotificationsListPage } from '../notifications/notifications-list-page.js';
@@ -28,6 +29,7 @@ export type CreateAppRouterOptions = {
  * - `/notifications` — authenticated global Notifications inbox
  * - `/account` — authenticated Account settings (cross-Home)
  * - `/invitations/:invitationId` — signed-out invitation preview landing
+ * - `/verify-email` — Better Auth verification return
  * - `/__dev/ui` — development visual QA fixture (never in production)
  * - `*` — not-found
  *
@@ -103,6 +105,10 @@ export function buildAppChildRoutes(includeDevRoutes: boolean): RouteObject[] {
     {
       path: 'invitations/:invitationId',
       element: <InvitationLandingPage />,
+    },
+    {
+      path: 'verify-email',
+      element: <VerifyEmailPage />,
     },
   ];
 

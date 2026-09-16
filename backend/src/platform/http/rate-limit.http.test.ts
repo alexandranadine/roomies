@@ -199,6 +199,56 @@ void describe('HTTP rate limiting', () => {
     }
   });
 
+  void it('rate-limits send-verification-email on the credential class', async () => {
+    const handlerCalls: string[] = [];
+    const rateLimits = createInMemoryRateLimitRuntime({
+      policies: { credential: { max: 1, windowMs: 60_000 } },
+    });
+    try {
+      const app = createApp({
+        config: { trustedOrigins: [TRUSTED_ORIGIN], trustProxyHops: 0 },
+        readiness: { checkReady: () => Promise.resolve(true) },
+        rateLimits,
+        auth: stubAuth(handlerCalls),
+      });
+
+      await withAppServer(app, async (request) => {
+        const allowed = await request({
+          method: 'POST',
+          path: '/api/auth/send-verification-email',
+          headers: {
+            Origin: TRUSTED_ORIGIN,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: 'anyone@example.test',
+            callbackURL: 'http://localhost:5173/verify-email',
+          }),
+        });
+        assert.equal(allowed.status, 200);
+
+        const blocked = await request({
+          method: 'POST',
+          path: '/api/auth/send-verification-email',
+          headers: {
+            Origin: TRUSTED_ORIGIN,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: 'other@example.test',
+            callbackURL: 'http://localhost:5173/verify-email',
+          }),
+        });
+        assertRateLimited(blocked);
+        assert.equal(handlerCalls.length, 1);
+        assert.equal(blocked.text.includes('anyone@example.test'), false);
+        assert.equal(blocked.text.includes('other@example.test'), false);
+      });
+    } finally {
+      rateLimits.stop();
+    }
+  });
+
   void it('rate-limits account deletion before lifecycle and does not expire cookies', async () => {
     const deleteCalls: string[] = [];
     const rateLimits = createInMemoryRateLimitRuntime({

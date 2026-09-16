@@ -18,4 +18,5 @@ export const SECRET_ENV_KEYS = new Set([
   'DATABASE_URL',
   'MIGRATION_DATABASE_URL',
   'AUTH_SECRET',
+  'EMAIL_API_KEY',
 ]);

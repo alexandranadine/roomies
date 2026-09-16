@@ -57,6 +57,7 @@ import {
   type DatabasePoolRuntime,
 } from './platform/persistence/pool.js';
 import { createDbReadiness } from './platform/persistence/readiness.js';
+import { assertProductionNodeMajor } from './platform/runtime/node-major.js';
 import {
   startsHttpServer,
   startsRecurrenceWorker,
@@ -218,6 +219,10 @@ function createWebHttpRuntime(
  */
 async function main(): Promise<void> {
   const config = loadConfig();
+  assertProductionNodeMajor(config.appEnv);
+  if (config.appEnv !== 'development' && config.appEnv !== 'test') {
+    console.info(`[process] node ${process.version}`);
+  }
   const databasePool = createDatabasePool(config);
   let poolClosed = false;
   const resources: ClosableResource[] = [

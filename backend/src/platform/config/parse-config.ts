@@ -9,14 +9,17 @@ import {
   APP_ENVS,
   DEFAULT_PROCESS_MODE,
   DEFAULT_RECURRENCE_POLL_INTERVAL_MS,
+  EMAIL_PROVIDERS,
   MAX_RECURRENCE_POLL_INTERVAL_MS,
   MIN_RECURRENCE_POLL_INTERVAL_MS,
   PROCESS_MODES,
   type AppConfig,
   type AppEnv,
+  type EmailRuntimeConfig,
   type ProcessMode,
   type ProcessRuntimeConfig,
 } from './types.js';
+import { areSameSiteOrigins } from './same-site-origins.js';
 
 /** Default Vite-style local frontend origins (development / test only). */
 const LOCAL_DEV_ORIGINS = [
@@ -194,6 +197,9 @@ const envSchema = z
     RECURRENCE_POLL_INTERVAL_MS: recurrencePollIntervalSchema,
     RELEASE_SHA: z.string().optional(),
     RAILWAY_GIT_COMMIT_SHA: z.string().optional(),
+    EMAIL_PROVIDER: z.string().optional(),
+    EMAIL_API_KEY: z.string().optional(),
+    EMAIL_FROM: z.string().optional(),
   })
   .transform((data, ctx) => {
     const appEnv = data.APP_ENV;
@@ -316,6 +322,32 @@ const envSchema = z
       }
     }
 
+    if (
+      appEnv === 'production' &&
+      !areSameSiteOrigins(frontendOrigin, authBaseUrl)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['FRONTEND_ORIGIN'],
+        message:
+          'FRONTEND_ORIGIN and AUTH_BASE_URL must be same-site HTTPS origins in production',
+      });
+      return z.NEVER;
+    }
+
+    const email = parseEmailConfig(
+      appEnv,
+      {
+        EMAIL_PROVIDER: data.EMAIL_PROVIDER,
+        EMAIL_API_KEY: data.EMAIL_API_KEY,
+        EMAIL_FROM: data.EMAIL_FROM,
+      },
+      ctx,
+    );
+    if (email === z.NEVER) {
+      return z.NEVER;
+    }
+
     const releaseSha = parseReleaseSha(
       data.RELEASE_SHA,
       data.RAILWAY_GIT_COMMIT_SHA,
@@ -338,6 +370,7 @@ const envSchema = z
       processMode: data.PROCESS_MODE,
       recurrencePollIntervalMs: data.RECURRENCE_POLL_INTERVAL_MS,
       releaseSha,
+      email,
     } satisfies {
       appEnv: AppEnv;
       port: number;
@@ -351,6 +384,7 @@ const envSchema = z
       processMode: ProcessMode;
       recurrencePollIntervalMs: number;
       releaseSha: string | undefined;
+      email: EmailRuntimeConfig;
     };
   });
 
@@ -363,6 +397,84 @@ function optionalString(value: string | undefined): string | undefined {
 
 function isHttpsOrigin(origin: string): boolean {
   return origin.startsWith('https://');
+}
+
+const FROM_NAMED_PATTERN = /^([^<>@]+)\s*<([^<>@\s]+@[^<>@\s]+)>$/;
+const FROM_EMAIL_PATTERN = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
+
+function isValidFromAddress(value: string): boolean {
+  const named = FROM_NAMED_PATTERN.exec(value);
+  const email = named?.[2] ?? value;
+  return FROM_EMAIL_PATTERN.test(email);
+}
+
+function parseEmailConfig(
+  appEnv: AppEnv,
+  source: {
+    EMAIL_PROVIDER: string | undefined;
+    EMAIL_API_KEY: string | undefined;
+    EMAIL_FROM: string | undefined;
+  },
+  ctx: z.RefinementCtx,
+): EmailRuntimeConfig | typeof z.NEVER {
+  const rawProvider = source.EMAIL_PROVIDER?.trim().toLowerCase() ?? '';
+  const rawKey = source.EMAIL_API_KEY?.trim() ?? '';
+  const rawFrom = source.EMAIL_FROM?.trim() ?? '';
+
+  let provider: (typeof EMAIL_PROVIDERS)[number];
+  if (rawProvider.length === 0) {
+    if (isLocalDefaultEnv(appEnv)) {
+      provider = 'fake';
+    } else {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['EMAIL_PROVIDER'],
+        message: `EMAIL_PROVIDER is required when APP_ENV=${appEnv}`,
+      });
+      return z.NEVER;
+    }
+  } else if ((EMAIL_PROVIDERS as readonly string[]).includes(rawProvider)) {
+    provider = rawProvider as (typeof EMAIL_PROVIDERS)[number];
+  } else {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['EMAIL_PROVIDER'],
+      message: `EMAIL_PROVIDER must be one of: ${EMAIL_PROVIDERS.join(', ')}`,
+    });
+    return z.NEVER;
+  }
+
+  if (appEnv === 'production' && provider === 'fake') {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['EMAIL_PROVIDER'],
+      message: 'EMAIL_PROVIDER=fake is not allowed when APP_ENV=production',
+    });
+    return z.NEVER;
+  }
+
+  if (provider === 'fake') {
+    return { provider: 'fake' };
+  }
+
+  if (rawKey.length === 0) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['EMAIL_API_KEY'],
+      message: 'EMAIL_API_KEY is required when EMAIL_PROVIDER=resend',
+    });
+    return z.NEVER;
+  }
+  if (rawFrom.length === 0 || !isValidFromAddress(rawFrom)) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['EMAIL_FROM'],
+      message: 'EMAIL_FROM must be an email or "Name <email>" address',
+    });
+    return z.NEVER;
+  }
+
+  return { provider: 'resend', apiKey: rawKey, from: rawFrom };
 }
 
 const RELEASE_SHA_PATTERN = /^[0-9a-f]{7,40}$/i;
@@ -468,6 +580,26 @@ function formatIssues(zodError: z.ZodError): string[] {
       );
       continue;
     }
+    if (key === 'EMAIL_PROVIDER') {
+      issues.push(
+        issue.message.startsWith('EMAIL_PROVIDER')
+          ? issue.message
+          : `EMAIL_PROVIDER must be one of: ${EMAIL_PROVIDERS.join(', ')}`,
+      );
+      continue;
+    }
+    if (key === 'EMAIL_API_KEY') {
+      issues.push('EMAIL_API_KEY is required when EMAIL_PROVIDER=resend');
+      continue;
+    }
+    if (key === 'EMAIL_FROM') {
+      issues.push(
+        issue.message.startsWith('EMAIL_FROM')
+          ? issue.message
+          : 'EMAIL_FROM must be an email or "Name <email>" address',
+      );
+      continue;
+    }
     // Fallback: keep message but never echo unknown received blobs for secrets.
     issues.push(issue.message);
   }
@@ -497,6 +629,9 @@ export function parseConfig(
     ),
     RELEASE_SHA: optionalString(source['RELEASE_SHA']),
     RAILWAY_GIT_COMMIT_SHA: optionalString(source['RAILWAY_GIT_COMMIT_SHA']),
+    EMAIL_PROVIDER: optionalString(source['EMAIL_PROVIDER']),
+    EMAIL_API_KEY: optionalString(source['EMAIL_API_KEY']),
+    EMAIL_FROM: optionalString(source['EMAIL_FROM']),
   });
 
   if (!result.success) {
@@ -520,6 +655,7 @@ export function parseConfig(
     processMode: result.data.processMode,
     recurrencePollIntervalMs: result.data.recurrencePollIntervalMs,
     releaseSha: result.data.releaseSha,
+    email: Object.freeze({ ...result.data.email }),
   });
 }
 
