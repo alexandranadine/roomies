@@ -85,11 +85,13 @@ Playwright starts the Vite **dev** server so `/__dev/ui` is available. Productio
 GitHub Actions workflow: `.github/workflows/ci.yml` (pull requests + `main`).
 
 - Node 24 + root `npm ci`, including the isolated auth-runtime lockfile
-- Format, lint, boundaries, typecheck, backend/frontend tests, frontend production build
+- Format, lint, boundaries, typecheck, backend production build, backend/frontend tests, frontend production build
 - PostgreSQL 18 service with empty `roomies_ci` database → `db:test:migrate`
 - Playwright + Axe against the Vite dev server
 - No repository secrets, no Neon/production, no deploy steps
 - Workflow permissions: `contents: read`
+
+Deployment operator notes: [`docs/deployment.md`](deployment.md).
 
 Dependabot: `.github/dependabot.yml` (both npm lockfiles weekly, Actions
 monthly). Prisma RC packages are ignored so upgrades stay reviewed; the Better
@@ -114,3 +116,4 @@ Prefer `TEST_DATABASE_URL` over `DATABASE_URL` for test tooling. Parallel destru
 - `.env` is gitignored; commit only `.env.example` placeholders
 - Frontend Vite env is public (`VITE_API_ORIGIN` only) — never put secrets there
 - `npm run check:ci-secrets` fails if workflows reference repository secrets or load `.env`
+- Deployment configuration: [`docs/deployment.md`](deployment.md)

@@ -60,6 +60,20 @@ only after a deployed probe confirms `req.ip` against known client
 addresses. Until that probe, leave `TRUST_PROXY=0` (fail closed: all
 clients share the proxy socket identity).
 
+Live-probe procedure (after a private backend exists; M9.3 owns the
+diagnostic, which is not a permanent public header dump):
+
+1. Deploy a private/non-public backend with `TRUST_PROXY=0`
+2. Hit the dedicated safe diagnostic
+3. Observe server-side `req.ip` through Railway
+4. Test a controlled `X-Forwarded-For` spoof
+5. Determine the exact hop count
+6. Set `TRUST_PROXY` to that integer
+7. Repeat the spoof test
+8. Only then expose production publicly
+
+See [`docs/deployment.md`](deployment.md) for the rest of the deploy contract.
+
 ## General API limiter
 
 Not implemented for October. Credential, sensitive, and invitation-token

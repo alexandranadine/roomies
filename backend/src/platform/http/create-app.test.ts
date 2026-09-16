@@ -202,6 +202,40 @@ void describe('HTTP platform app', () => {
     assert.equal(res.text.includes('postgresql'), false);
   });
 
+  void it('includes a safe release SHA on health and ready when configured', async () => {
+    const app = createApp({
+      config: {
+        ...testConfig,
+        releaseSha: 'abcdef1',
+      },
+      readiness: readyAlways(),
+    });
+    const health = await appRequest(app, { path: '/health' });
+    assert.equal(health.status, 200);
+    assert.deepEqual(health.json(), { status: 'ok', release: 'abcdef1' });
+    const ready = await appRequest(app, { path: '/ready' });
+    assert.equal(ready.status, 200);
+    assert.deepEqual(ready.json(), { status: 'ready', release: 'abcdef1' });
+    assertNoForbiddenLeak({
+      context: 'health release payload',
+      text: health.text,
+      forbidden: [...COMMON_SECRET_SENTINELS, 'AUTH_SECRET', 'stack'],
+    });
+  });
+
+  void it('omits release from not-ready payloads', async () => {
+    const app = createApp({
+      config: {
+        ...testConfig,
+        releaseSha: 'abcdef1',
+      },
+      readiness: readyNever(),
+    });
+    const res = await appRequest(app, { path: '/ready' });
+    assert.equal(res.status, 503);
+    assert.deepEqual(res.json(), { status: 'not_ready' });
+  });
+
   void it('keeps Better Auth mounted before Roomies JSON parsing', async () => {
     const source = await readFile(
       new URL('./create-app.ts', import.meta.url),

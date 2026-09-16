@@ -35,6 +35,7 @@ void describe('parseConfig', () => {
     assert.equal(config.trustProxyHops, 0);
     assert.equal(config.processMode, 'combined');
     assert.equal(config.recurrencePollIntervalMs, 30_000);
+    assert.equal(config.releaseSha, undefined);
     assert.ok(Object.isFrozen(config));
   });
 
@@ -351,6 +352,9 @@ void describe('parseConfig', () => {
     assert.equal(config.authBaseUrl, 'https://api.roomies.example');
     assert.equal(config.secureAuthCookies, true);
     assert.equal(config.port, 8080);
+    assert.equal(config.trustProxyHops, 0);
+    assert.equal(config.processMode, 'combined');
+    assert.equal(config.releaseSha, undefined);
   });
 
   void it('requires an explicit valid auth base URL outside local environments', () => {
@@ -501,6 +505,88 @@ void describe('parseConfig', () => {
         assert.equal(error.message.includes('postgresql://'), false);
         return true;
       },
+    );
+  });
+
+  void it('defaults TRUST_PROXY to 0 in production when unset', () => {
+    const config = parseConfig({
+      APP_ENV: 'production',
+      DATABASE_URL: SECRET_DATABASE_URL,
+      AUTH_SECRET: VALID_AUTH_SECRET,
+      AUTH_BASE_URL: 'https://api.roomies.example',
+      FRONTEND_ORIGIN: 'https://roomies.example',
+      TRUSTED_ORIGINS: 'https://roomies.example',
+    });
+    assert.equal(config.trustProxyHops, 0);
+    assert.equal(config.secureAuthCookies, true);
+  });
+
+  void it('rejects http origins outside local environments', () => {
+    assert.throws(
+      () =>
+        parseConfig({
+          APP_ENV: 'production',
+          DATABASE_URL: SECRET_DATABASE_URL,
+          AUTH_SECRET: VALID_AUTH_SECRET,
+          AUTH_BASE_URL: 'http://api.roomies.example',
+          FRONTEND_ORIGIN: 'https://roomies.example',
+          TRUSTED_ORIGINS: 'https://roomies.example',
+        }),
+      /AUTH_BASE_URL must use https/,
+    );
+  });
+
+  void it('requires FRONTEND_ORIGIN to be listed in TRUSTED_ORIGINS outside local environments', () => {
+    assert.throws(
+      () =>
+        parseConfig({
+          APP_ENV: 'staging',
+          DATABASE_URL: SECRET_DATABASE_URL,
+          AUTH_SECRET: VALID_AUTH_SECRET,
+          AUTH_BASE_URL: 'https://api.staging.example',
+          FRONTEND_ORIGIN: 'https://staging.example',
+          TRUSTED_ORIGINS: 'https://other.example',
+        }),
+      /FRONTEND_ORIGIN must be included in TRUSTED_ORIGINS/,
+    );
+  });
+
+  void it('accepts RELEASE_SHA and prefers it over the Railway commit SHA', () => {
+    const config = parseConfig({
+      APP_ENV: 'production',
+      DATABASE_URL: SECRET_DATABASE_URL,
+      AUTH_SECRET: VALID_AUTH_SECRET,
+      AUTH_BASE_URL: 'https://api.roomies.example',
+      FRONTEND_ORIGIN: 'https://roomies.example',
+      TRUSTED_ORIGINS: 'https://roomies.example',
+      RELEASE_SHA: 'abcDEF1',
+      RAILWAY_GIT_COMMIT_SHA: '0123456789abcdef0123456789abcdef01234567',
+    });
+    assert.equal(config.releaseSha, 'abcdef1');
+  });
+
+  void it('uses RAILWAY_GIT_COMMIT_SHA when RELEASE_SHA is omitted', () => {
+    const config = parseConfig({
+      APP_ENV: 'production',
+      DATABASE_URL: SECRET_DATABASE_URL,
+      AUTH_SECRET: VALID_AUTH_SECRET,
+      AUTH_BASE_URL: 'https://api.roomies.example',
+      FRONTEND_ORIGIN: 'https://roomies.example',
+      TRUSTED_ORIGINS: 'https://roomies.example',
+      RAILWAY_GIT_COMMIT_SHA: '0123456789abcdef0123456789abcdef01234567',
+    });
+    assert.equal(config.releaseSha, '0123456789abcdef0123456789abcdef01234567');
+  });
+
+  void it('rejects non-SHA release identifiers', () => {
+    assert.throws(
+      () =>
+        parseConfig(
+          validDevelopmentEnv({
+            RELEASE_SHA: '../secret-path',
+          }),
+        ),
+      /RELEASE_SHA must be a 7-40 character hexadecimal git SHA/,
     );
   });
 });

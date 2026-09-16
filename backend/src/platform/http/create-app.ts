@@ -18,7 +18,7 @@ import { createSecurityHeadersMiddleware } from './security-headers.js';
 
 export type CreateAppOptions = {
   config: Pick<AppConfig, 'trustedOrigins' | 'trustProxyHops'> &
-    Partial<Pick<AppConfig, 'secureAuthCookies'>>;
+    Partial<Pick<AppConfig, 'secureAuthCookies' | 'releaseSha'>>;
   readiness: PersistenceReadiness;
   /**
    * In-process limiter used for Better Auth credential routes. Product
@@ -84,7 +84,7 @@ export function createApp(options: CreateAppOptions): Express {
   // failure (BAD_REQUEST) and does not classify wrong shapes here.
   app.use(express.json({ limit: JSON_BODY_LIMIT, strict: false }));
 
-  app.use(createHealthRouter(readiness));
+  app.use(createHealthRouter(readiness, { releaseSha: config.releaseSha }));
 
   app.use('/api/v1', roomiesApi ?? express.Router());
 

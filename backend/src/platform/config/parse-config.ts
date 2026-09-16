@@ -192,6 +192,8 @@ const envSchema = z
     TRUST_PROXY: trustProxySchema,
     PROCESS_MODE: processModeSchema,
     RECURRENCE_POLL_INTERVAL_MS: recurrencePollIntervalSchema,
+    RELEASE_SHA: z.string().optional(),
+    RAILWAY_GIT_COMMIT_SHA: z.string().optional(),
   })
   .transform((data, ctx) => {
     const appEnv = data.APP_ENV;
@@ -277,6 +279,52 @@ const envSchema = z
       }
     }
 
+    if (!isLocalDefaultEnv(appEnv)) {
+      if (!isHttpsOrigin(authBaseUrl)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['AUTH_BASE_URL'],
+          message: `AUTH_BASE_URL must use https when APP_ENV=${appEnv}`,
+        });
+        return z.NEVER;
+      }
+      if (!isHttpsOrigin(frontendOrigin)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['FRONTEND_ORIGIN'],
+          message: `FRONTEND_ORIGIN must use https when APP_ENV=${appEnv}`,
+        });
+        return z.NEVER;
+      }
+      for (const origin of trustedOrigins) {
+        if (!isHttpsOrigin(origin)) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['TRUSTED_ORIGINS'],
+            message: `TRUSTED_ORIGINS must use https when APP_ENV=${appEnv}`,
+          });
+          return z.NEVER;
+        }
+      }
+      if (!trustedOrigins.includes(frontendOrigin)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['FRONTEND_ORIGIN'],
+          message: 'FRONTEND_ORIGIN must be included in TRUSTED_ORIGINS',
+        });
+        return z.NEVER;
+      }
+    }
+
+    const releaseSha = parseReleaseSha(
+      data.RELEASE_SHA,
+      data.RAILWAY_GIT_COMMIT_SHA,
+      ctx,
+    );
+    if (releaseSha === z.NEVER) {
+      return z.NEVER;
+    }
+
     return {
       appEnv,
       port: data.PORT,
@@ -289,6 +337,7 @@ const envSchema = z
       trustProxyHops: data.TRUST_PROXY,
       processMode: data.PROCESS_MODE,
       recurrencePollIntervalMs: data.RECURRENCE_POLL_INTERVAL_MS,
+      releaseSha,
     } satisfies {
       appEnv: AppEnv;
       port: number;
@@ -301,6 +350,7 @@ const envSchema = z
       trustProxyHops: number;
       processMode: ProcessMode;
       recurrencePollIntervalMs: number;
+      releaseSha: string | undefined;
     };
   });
 
@@ -309,6 +359,36 @@ function optionalString(value: string | undefined): string | undefined {
     return undefined;
   }
   return value;
+}
+
+function isHttpsOrigin(origin: string): boolean {
+  return origin.startsWith('https://');
+}
+
+const RELEASE_SHA_PATTERN = /^[0-9a-f]{7,40}$/i;
+
+/**
+ * Accept an explicit RELEASE_SHA, else Railway's commit SHA.
+ * Rejects anything that is not a short/full git hex SHA.
+ */
+function parseReleaseSha(
+  releaseSha: string | undefined,
+  railwayGitCommitSha: string | undefined,
+  ctx: z.RefinementCtx,
+): string | undefined | typeof z.NEVER {
+  const raw = (releaseSha ?? railwayGitCommitSha)?.trim() ?? '';
+  if (raw.length === 0) {
+    return undefined;
+  }
+  if (!RELEASE_SHA_PATTERN.test(raw)) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['RELEASE_SHA'],
+      message: 'RELEASE_SHA must be a 7-40 character hexadecimal git SHA',
+    });
+    return z.NEVER;
+  }
+  return raw.toLowerCase();
 }
 
 /**
@@ -380,6 +460,14 @@ function formatIssues(zodError: z.ZodError): string[] {
       );
       continue;
     }
+    if (key === 'RELEASE_SHA') {
+      issues.push(
+        issue.message.startsWith('RELEASE_SHA')
+          ? issue.message
+          : 'RELEASE_SHA must be a 7-40 character hexadecimal git SHA',
+      );
+      continue;
+    }
     // Fallback: keep message but never echo unknown received blobs for secrets.
     issues.push(issue.message);
   }
@@ -407,6 +495,8 @@ export function parseConfig(
     RECURRENCE_POLL_INTERVAL_MS: optionalString(
       source['RECURRENCE_POLL_INTERVAL_MS'],
     ),
+    RELEASE_SHA: optionalString(source['RELEASE_SHA']),
+    RAILWAY_GIT_COMMIT_SHA: optionalString(source['RAILWAY_GIT_COMMIT_SHA']),
   });
 
   if (!result.success) {
@@ -429,6 +519,7 @@ export function parseConfig(
     trustProxyHops: result.data.trustProxyHops,
     processMode: result.data.processMode,
     recurrencePollIntervalMs: result.data.recurrencePollIntervalMs,
+    releaseSha: result.data.releaseSha,
   });
 }
 

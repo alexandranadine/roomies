@@ -135,6 +135,15 @@ void describe('createAuthRuntime', () => {
       secure: true,
       sameSite: 'lax',
     });
+    assert.equal(
+      auth.options.advanced?.defaultCookieAttributes &&
+        'domain' in auth.options.advanced.defaultCookieAttributes,
+      false,
+    );
+    assert.equal(
+      auth.options.advanced?.crossSubDomainCookies?.enabled,
+      undefined,
+    );
     assert.equal(auth.options.advanced?.disableOriginCheck, false);
     assert.deepEqual(auth.options.plugins, []);
     assert.equal(auth.options.rateLimit?.enabled, false);

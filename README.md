@@ -20,7 +20,7 @@ npm workspaces link `frontend`, `backend`, and `shared`. Prefer this simple layo
 npm install
 ```
 
-Requires Node.js 24+ and npm 10+.
+Requires Node.js 24 (see `engines.node`: `>=24 <25`) and npm 10+.
 
 The root install lifecycle also runs a lockfile-clean install for
 `backend/auth-runtime`. That package is intentionally outside npm workspaces and
@@ -147,7 +147,7 @@ install succeeds without bypass flags.
 
 ### HTTP web process
 
-The backend HTTP runtime lives under `backend/src/platform/http/` (app factory) and `backend/src/platform/server/` (listen + graceful shutdown). Entrypoint: `backend/src/main.ts` (`npm run start --workspace=@roomies/backend`).
+The backend HTTP runtime lives under `backend/src/platform/http/` (app factory) and `backend/src/platform/server/` (listen + graceful shutdown). Entrypoint: `backend/src/main.ts`. Local: `npm run start --workspace=@roomies/backend` (`tsx`). Production: `npm run start:prod --workspace=@roomies/backend` (`node dist/main.js` after `npm run build --workspace=@roomies/backend`).
 
 `PROCESS_MODE` selects `web`, `worker`, or `combined` (default `combined`). Combined mode is the initial production deployment: one process serves HTTP and runs the recurrence polling worker against the shared pool. Worker-only mode does not listen for HTTP.
 
@@ -220,4 +220,6 @@ npm run db:test:migrate      # fresh empty test DB → migrate → verify (needs
 npm run test:browser         # Playwright + Axe (Vite dev server)
 ```
 
-CI (`.github/workflows/ci.yml`) runs the full set on pull requests and `main` with Node 24, `npm ci`, and an ephemeral PostgreSQL 18 service. It refuses to start backend tests if `TEST_DATABASE_URL` is missing. No repository secrets and no deploy.
+CI (`.github/workflows/ci.yml`) runs the full set on pull requests and `main` with Node 24, `npm ci`, and an ephemeral PostgreSQL 18 service. It refuses to start backend tests if `TEST_DATABASE_URL` is missing. It also compiles the backend production bundle. No repository secrets and no deploy.
+
+Deployment configuration (Railway, Neon, Cloudflare Workers Static Assets, release order) is documented in [`docs/deployment.md`](docs/deployment.md). Do not treat this README as the operator runbook.

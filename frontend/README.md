@@ -43,6 +43,8 @@ cp .env.example .env
 - **Development:** if `VITE_API_ORIGIN` is unset, the app defaults to `http://localhost:3000`.
 - **Deployed / production builds:** `VITE_API_ORIGIN` is required. There is no silent localhost fallback. Production assumes separate frontend and API hosts.
 
+Production static hosting is Cloudflare Workers Static Assets (`wrangler.json`). Direct navigation to `/account`, `/homes/:id`, and `/invitations/:id` uses the SPA `not_found_handling` fallback. Document CSP and cache headers are written to `dist/_headers` at build time. Source maps are not emitted. See [`docs/deployment.md`](../docs/deployment.md).
+
 ## Typography
 
 Manrope (400/500/600/700) is loaded via `@fontsource/manrope` (files served from `node_modules`, not committed as binaries). Self-hosting through the package keeps fonts off a third-party CDN; production CSP still needs to allow the app origin for font files.

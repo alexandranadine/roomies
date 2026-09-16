@@ -10,6 +10,11 @@ const backendRoot = fileURLToPath(new URL('.', import.meta.url));
 loadEnv({ path: resolve(backendRoot, '../.env'), quiet: true });
 loadEnv({ path: resolve(backendRoot, '.env'), override: true, quiet: true });
 
+const prismaCliDatabaseUrl =
+  process.env['MIGRATION_DATABASE_URL']?.trim() ||
+  process.env['DATABASE_URL'] ||
+  '';
+
 export default definePrismaConfig({
   skills: {
     // Agent skills are optional for this monorepo; disable the CLI staleness nudge.
@@ -19,7 +24,8 @@ export default definePrismaConfig({
   orm: ormConfig({
     contract: './src/prisma/contract.prisma',
     db: {
-      connection: process.env['DATABASE_URL']!,
+      // Release migrate sets MIGRATION_DATABASE_URL (Neon direct). Local/CI use DATABASE_URL.
+      connection: prismaCliDatabaseUrl,
     },
   }),
 });

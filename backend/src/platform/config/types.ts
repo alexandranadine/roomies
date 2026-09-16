@@ -62,4 +62,9 @@ export type AppConfig = Readonly<{
    * Never unrestricted `true`.
    */
   trustProxyHops: number;
+  /**
+   * Safe release identifier for health/readiness probes. Hex git SHA when set.
+   * Never an environment dump or filesystem path.
+   */
+  releaseSha?: string;
 }>;
