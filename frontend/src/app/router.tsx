@@ -1,4 +1,5 @@
 import { createBrowserRouter, type RouteObject } from 'react-router';
+import { AccountSettingsPage } from '../account/account-settings-page.js';
 import { ActivityListPage } from '../activity/activity-list-page.js';
 import { HomeDiscoveryPage } from '../homes/home-discovery-page.js';
 import { HomeOverviewPage } from '../homes/home-overview-page.js';
@@ -25,6 +26,7 @@ export type CreateAppRouterOptions = {
  * - `/` — authenticated active-Home discovery
  * - `/homes/:homeId` — URL-backed authorized Home shell
  * - `/notifications` — authenticated global Notifications inbox
+ * - `/account` — authenticated Account settings (cross-Home)
  * - `/invitations/:invitationId` — signed-out invitation preview landing
  * - `/__dev/ui` — development visual QA fixture (never in production)
  * - `*` — not-found
@@ -87,6 +89,14 @@ export function buildAppChildRoutes(includeDevRoutes: boolean): RouteObject[] {
       element: (
         <RequireAuth>
           <NotificationsListPage />
+        </RequireAuth>
+      ),
+    },
+    {
+      path: 'account',
+      element: (
+        <RequireAuth>
+          <AccountSettingsPage />
         </RequireAuth>
       ),
     },

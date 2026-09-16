@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, type ReactNode } from 'react';
+import { useLocation } from 'react-router';
 import { DocumentTitle } from '../components/document-title.js';
 import { Spinner } from '../components/ui/index.js';
 import { clearPrivateHomeQueryState } from '../homes/clear-private-home-queries.js';
@@ -10,6 +11,11 @@ import { getCurrentUser } from '../users/current-user-api.js';
 function isUnauthenticated(error: unknown): boolean {
   return error instanceof ApiError && error.status === 401;
 }
+
+type AuthLandingLocationState = {
+  accountDeleted?: boolean;
+  needsFreshSignInForDeletion?: boolean;
+};
 
 function AuthLanding({
   title,
@@ -35,12 +41,18 @@ function AuthLanding({
  * Home data is cleared on authentication loss so a prior Home cannot linger.
  */
 export function RequireAuth({ children }: { children: ReactNode }) {
+  const location = useLocation();
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: currentUserQueryKey,
     queryFn: ({ signal }) => getCurrentUser(signal),
     retry: false,
   });
+
+  const locationState =
+    location.state !== null && typeof location.state === 'object'
+      ? (location.state as AuthLandingLocationState)
+      : null;
 
   useEffect(() => {
     if (isUnauthenticated(query.error)) {
@@ -59,6 +71,16 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   if (isUnauthenticated(query.error)) {
     return (
       <AuthLanding title="Sign in · Roomies">
+        {locationState?.accountDeleted ? (
+          <p className="max-w-prose text-base text-text-secondary">
+            Your Roomies account has been deleted.
+          </p>
+        ) : null}
+        {locationState?.needsFreshSignInForDeletion ? (
+          <p className="max-w-prose text-base text-text-secondary">
+            Sign in again, then try deleting your account.
+          </p>
+        ) : null}
         <p className="max-w-prose text-base text-text-secondary">
           Sign in to see your Homes.
         </p>
