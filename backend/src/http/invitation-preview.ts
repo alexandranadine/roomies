@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 import { z } from 'zod';
 import type { PreviewInvitationInput } from '../application/invitations/preview-invitation.js';
 import { InvalidRequestError } from '../platform/authz/index.js';
@@ -43,6 +43,7 @@ export type PreviewInvitationCommand = (
 
 export type CreateInvitationPreviewRouterOptions = {
   previewInvitation: PreviewInvitationCommand;
+  rateLimitInvitationToken?: RequestHandler;
 };
 
 function parsePreviewBody(body: unknown): void {
@@ -86,9 +87,9 @@ function readAuthorizationHeader(
 
 /**
  * Invitation preview is authenticated only by the invitation bearer secret.
- * Brute-force protection is an outstanding launch security item: the platform
- * has no reusable rate-limit architecture yet. The 256-bit secret remains the
- * primary entropy control. Do not shorten it.
+ * Rate limiting uses trustworthy client network identity only — never the
+ * invitation id, secret, or target email. The 256-bit secret remains the
+ * primary entropy control.
  *
  * Mount at `/invitations` on the v1 router. Origin enforcement stays on the
  * platform `/api/v1` mutation guard — this route does not weaken it.
@@ -99,6 +100,9 @@ export function createInvitationPreviewRouter(
   const router = Router();
   router.use(setPrivateNoStoreHeaders);
   router.use(stripResponseEtag);
+  if (options.rateLimitInvitationToken !== undefined) {
+    router.use(options.rateLimitInvitationToken);
+  }
 
   router.post('/:invitationId/preview', (req, res, next) => {
     void (async () => {

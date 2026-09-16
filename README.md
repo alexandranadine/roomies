@@ -134,8 +134,9 @@ failures use the Roomies error boundary and must never return or log raw SQL,
 tokens, cookies, credentials, or authorization headers. Better Auth enforces
 its own CSRF/origin checks against the same validated `trustedOrigins` list
 (plus `SameSite=Lax` HttpOnly session cookies). Credential and other
-sensitive-operation rate limiting — including account deletion — is not
-implemented yet and is required before public launch.
+sensitive-operation rate limiting is documented in
+[`docs/production-security.md`](docs/production-security.md). Better Auth's
+own limiter is disabled so Roomies owns the `429 RATE_LIMITED` contract.
 
 Upgrade Better Auth by changing its exact pin inside `backend/auth-runtime`,
 running `npm install` there to review the isolated lock diff, then running the
@@ -153,12 +154,12 @@ The backend HTTP runtime lives under `backend/src/platform/http/` (app factory) 
 - `GET /health` — process liveness (no database dependency)
 - `GET /ready` — persistence readiness (503 when the DB probe fails)
 - `ALL /api/auth/*` — Better Auth credential/session HTTP (mounted before `express.json()`)
-- Exact-origin CORS from `TRUSTED_ORIGINS`, Helmet defaults, JSON body limit `32kb`
-- `TRUST_PROXY` is an integer hop count (default `0`). Railway should set an explicit hop count after verifying proxy topology; unrestricted `true` is rejected.
+- Exact-origin CORS from `TRUSTED_ORIGINS`, Helmet API headers (no document CSP), JSON body limit `32kb`
+- `TRUST_PROXY` is an integer hop count (default `0`). Set an explicit hop count only after verifying Railway `req.ip`; unrestricted `true` is rejected.
 - `RECURRENCE_POLL_INTERVAL_MS` is the worker sleep when no immediate due work remains (default `30000`, range `1000`–`300000`).
-- No auth rate limiter yet. Add credential and sensitive-operation rate
-  limiting — including account deletion — before public launch. See
-  [`docs/account-lifecycle.md`](docs/account-lifecycle.md).
+- In-process credential, sensitive, and invitation-token rate limiting. See
+  [`docs/production-security.md`](docs/production-security.md). Single-instance
+  only until the store is centralized.
 
 ### Fresh-database bootstrap note
 

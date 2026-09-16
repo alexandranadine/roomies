@@ -181,6 +181,9 @@ function createOptions(input: CreateAuthRuntimeOptions): BetterAuthOptions {
       disableOriginCheck: false,
     },
     plugins: [],
+    rateLimit: {
+      enabled: false,
+    },
     logger: {
       level: 'warn',
       disableColors: true,

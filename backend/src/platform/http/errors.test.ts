@@ -55,6 +55,7 @@ import {
 import { REQUEST_ID_HEADER } from './constants.js';
 import { createApp } from './create-app.js';
 import type { ApiErrorBody } from './errors.js';
+import { RateLimitedError } from './rate-limit-errors.js';
 
 function appThatThrows(error: unknown) {
   return createApp({
@@ -78,6 +79,20 @@ void describe('HTTP known-error mappings', () => {
     assert.equal(body.error.code, 'UNAUTHENTICATED');
     assert.equal(body.error.message, 'Authentication required');
     assert.equal(body.error.requestId, res.headers.get(REQUEST_ID_HEADER));
+  });
+
+  void it('maps RateLimitedError to 429 RATE_LIMITED with Retry-After', async () => {
+    const res = await appRequest(appThatThrows(new RateLimitedError(12)), {
+      path: '/throw',
+    });
+    assert.equal(res.status, 429);
+    const body = res.json() as ApiErrorBody;
+    assert.equal(body.error.code, 'RATE_LIMITED');
+    assert.equal(body.error.message, 'Too many requests');
+    assert.equal(body.error.requestId, res.headers.get(REQUEST_ID_HEADER));
+    assert.equal(res.headers.get('retry-after'), '12');
+    assert.equal(res.text.includes('bucket'), false);
+    assert.equal(res.text.includes('credential'), false);
   });
 
   void it('maps InvalidRequestError to 400 INVALID_REQUEST', async () => {

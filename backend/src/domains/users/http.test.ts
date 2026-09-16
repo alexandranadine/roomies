@@ -179,11 +179,8 @@ void describe('GET /api/v1/me', () => {
       TRUSTED_ORIGIN,
     );
     assert.equal(res.headers.get('access-control-allow-credentials'), 'true');
-    assert.ok(res.headers.get('x-content-type-options'));
-    assert.ok(
-      res.headers.get('x-frame-options') ||
-        res.headers.get('content-security-policy'),
-    );
+    assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(res.headers.get('x-frame-options'), 'DENY');
     assert.equal(res.headers.get('x-powered-by'), null);
   });
 

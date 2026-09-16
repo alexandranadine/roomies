@@ -49,6 +49,7 @@ import {
   TaskDefinitionAlreadyDeactivatedError,
   TaskPersistenceError,
 } from '../../domains/tasks/errors.js';
+import { RateLimitedError } from './rate-limit-errors.js';
 import { getRequestId } from './request-id.js';
 
 export type ApiErrorBody = {
@@ -136,6 +137,14 @@ export function errorHandler(
   // Malformed JSON syntax only. Valid JSON primitives reach route schemas.
   if (isEntityParseFailed(err)) {
     sendApiError(res, 400, 'BAD_REQUEST', 'Invalid JSON body', requestId);
+    return;
+  }
+
+  if (err instanceof RateLimitedError) {
+    if (err.retryAfterSeconds > 0) {
+      res.setHeader('Retry-After', String(err.retryAfterSeconds));
+    }
+    sendApiError(res, 429, 'RATE_LIMITED', 'Too many requests', requestId);
     return;
   }
 

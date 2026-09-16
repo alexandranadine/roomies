@@ -137,6 +137,7 @@ void describe('createAuthRuntime', () => {
     });
     assert.equal(auth.options.advanced?.disableOriginCheck, false);
     assert.deepEqual(auth.options.plugins, []);
+    assert.equal(auth.options.rateLimit?.enabled, false);
   });
 
   void it('uses exact supplied base URL/origins and content-free logging', () => {

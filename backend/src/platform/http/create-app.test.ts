@@ -207,15 +207,20 @@ void describe('HTTP platform app', () => {
       new URL('./create-app.ts', import.meta.url),
       'utf8',
     );
-    const authMount = source.indexOf('app.all(AUTH_HTTP_ROUTE');
+    const authMount = source.indexOf('AUTH_HTTP_ROUTE');
+    const credentialLimit = source.indexOf('createCredentialAuthRateLimit');
+    const authHandler = source.indexOf('createAuthHttpHandler(auth)');
     const originGuard = source.indexOf(
       "app.use('/api/v1', createApiMutationOriginGuard",
     );
     const jsonParser = source.indexOf('express.json(');
     assert.ok(authMount >= 0);
+    assert.ok(credentialLimit >= 0);
+    assert.ok(authHandler >= 0);
     assert.ok(originGuard >= 0);
     assert.ok(jsonParser >= 0);
-    assert.ok(authMount < originGuard);
+    assert.ok(credentialLimit < authHandler);
+    assert.ok(authHandler < originGuard);
     assert.ok(originGuard < jsonParser);
     assert.equal(AUTH_HTTP_ROUTE, '/api/auth/*splat');
     assert.deepEqual(HTTP_PIPELINE_ORDER, [
@@ -223,6 +228,7 @@ void describe('HTTP platform app', () => {
       'request-id',
       'security-headers',
       'cors',
+      'credential-rate-limit',
       'better-auth',
       'api-mutation-origin',
       'json-body',
@@ -289,11 +295,31 @@ void describe('HTTP platform app', () => {
     const app = buildApp();
     const res = await appRequest(app, { path: '/health' });
     assert.equal(res.status, 200);
-    assert.ok(res.headers.get('x-content-type-options'));
-    assert.ok(
-      res.headers.get('x-frame-options') ||
-        res.headers.get('content-security-policy'),
+    assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(res.headers.get('x-frame-options'), 'DENY');
+    assert.equal(res.headers.get('referrer-policy'), 'no-referrer');
+    assert.equal(
+      res.headers.get('permissions-policy'),
+      'camera=(), microphone=(), geolocation=(), payment=()',
     );
+    assert.equal(res.headers.get('content-security-policy'), null);
+    assert.equal(res.headers.get('strict-transport-security'), null);
     assert.equal(res.headers.get('x-powered-by'), null);
+  });
+
+  void it('sends HSTS only when secure auth cookies are enabled', async () => {
+    const app = createApp({
+      config: {
+        trustedOrigins: ['http://localhost:5173'],
+        trustProxyHops: 0,
+        secureAuthCookies: true,
+      },
+      readiness: readyAlways(),
+    });
+    const res = await appRequest(app, { path: '/health' });
+    assert.match(
+      res.headers.get('strict-transport-security') ?? '',
+      /max-age=15552000/,
+    );
   });
 });

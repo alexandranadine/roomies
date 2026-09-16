@@ -12,9 +12,10 @@ export const SHUTDOWN_TIMEOUT_MS = 10_000;
 
 /**
  * Explicit HTTP pipeline order. Health/ready stay after JSON (they do not
- * consume bodies) and before `/api/v1`. Credential and other sensitive-
- * operation rate limiting — including account deletion — is not
- * implemented yet and is required before public launch.
+ * consume bodies) and before `/api/v1`. Credential rate limiting wraps
+ * matching Better Auth POST paths immediately before the auth handler.
+ * Sensitive/invitation classes are applied inside `/api/v1` routers after
+ * authentication where a userId key is required.
  *
  * `api-mutation-origin` runs after request IDs / CORS / Better Auth and
  * before JSON parsing so hostile `/api/v1` mutations die without body work.
@@ -24,6 +25,7 @@ export const HTTP_PIPELINE_ORDER = [
   'request-id',
   'security-headers',
   'cors',
+  'credential-rate-limit',
   'better-auth',
   'api-mutation-origin',
   'json-body',

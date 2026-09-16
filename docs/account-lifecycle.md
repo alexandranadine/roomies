@@ -72,6 +72,7 @@ outbox event.
 
 ## Rate limiting
 
-Credential and other sensitive-operation rate limiting — including
-account deletion — remains required before public launch. M8 does not
-add a limiter.
+`DELETE /api/v1/account` uses the `sensitive` class (canonical `userId`,
+10 requests / 15 minutes by default). `429 RATE_LIMITED` is returned after
+auth and before freshness, body confirmation, lifecycle, or cookie expiry.
+See [`production-security.md`](production-security.md).

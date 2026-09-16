@@ -1,5 +1,4 @@
 import express, { type Express, type Router } from 'express';
-import helmet from 'helmet';
 import { AUTH_HTTP_ROUTE, createAuthHttpHandler } from '../auth/http.js';
 import type { AuthRuntime } from '../auth/runtime.js';
 import type { AppConfig } from '../config/types.js';
@@ -9,11 +8,23 @@ import { createCorsMiddleware } from './cors.js';
 import { errorHandler, notFoundHandler } from './errors.js';
 import { createHealthRouter } from './health.js';
 import { createApiMutationOriginGuard } from './mutation-origin.js';
+import {
+  createCredentialAuthRateLimit,
+  createInMemoryRateLimitRuntime,
+  type RateLimitRuntime,
+} from './rate-limit.js';
 import { requestIdMiddleware } from './request-id.js';
+import { createSecurityHeadersMiddleware } from './security-headers.js';
 
 export type CreateAppOptions = {
-  config: Pick<AppConfig, 'trustedOrigins' | 'trustProxyHops'>;
+  config: Pick<AppConfig, 'trustedOrigins' | 'trustProxyHops'> &
+    Partial<Pick<AppConfig, 'secureAuthCookies'>>;
   readiness: PersistenceReadiness;
+  /**
+   * In-process limiter used for Better Auth credential routes. Product
+   * routers receive the same runtime for sensitive/invitation classes.
+   */
+  rateLimits?: RateLimitRuntime;
   /** Isolated Better Auth runtime. Mounted at `/api/auth/*` before JSON parsing. */
   auth?: AuthRuntime;
   /**
@@ -34,6 +45,7 @@ export type CreateAppOptions = {
  */
 export function createApp(options: CreateAppOptions): Express {
   const { config, readiness, auth, roomiesApi, configure } = options;
+  const rateLimits = options.rateLimits ?? createInMemoryRateLimitRuntime();
   const app = express();
 
   // Explicit hop count — never unrestricted `true`. Matters later for secure
@@ -43,13 +55,23 @@ export function createApp(options: CreateAppOptions): Express {
   app.disable('x-powered-by');
 
   app.use(requestIdMiddleware);
-  app.use(helmet());
+  app.use(
+    ...createSecurityHeadersMiddleware({
+      enableHsts: config.secureAuthCookies === true,
+    }),
+  );
   app.use(createCorsMiddleware(config.trustedOrigins));
 
   // Better Auth must see the native request body. Roomies JSON parsing
   // is mounted after `/api/auth/*` and applies only to later routes.
+  // Credential rate limiting wraps matching POST paths only; session lookup
+  // and /ok are not credential-throttled.
   if (auth) {
-    app.all(AUTH_HTTP_ROUTE, createAuthHttpHandler(auth));
+    app.all(
+      AUTH_HTTP_ROUTE,
+      createCredentialAuthRateLimit(rateLimits),
+      createAuthHttpHandler(auth),
+    );
   }
 
   // Cookie CSRF: reject untrusted/missing Origin on /api/v1 mutations after

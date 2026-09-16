@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 import { z } from 'zod';
 import type { CreateInvitationInput } from '../application/home-administration/create-invitation.js';
 import type { RevokeInvitationInput } from '../application/home-administration/revoke-invitation.js';
@@ -64,6 +64,7 @@ export type CreateInvitationsRouterOptions = {
   createInvitation: CreateInvitationCommand;
   revokeInvitation: RevokeInvitationCommand;
   frontendOrigin: string;
+  rateLimitSensitive?: RequestHandler;
 };
 
 function parseRevokeInvitationBody(body: unknown): void {
@@ -131,6 +132,9 @@ export function createInvitationsRouter(
   const router = Router();
   router.use(setPrivateNoStoreHeaders);
   router.use(createRequireAuth(options.principalResolver));
+  if (options.rateLimitSensitive !== undefined) {
+    router.post('/:homeId/invitations', options.rateLimitSensitive);
+  }
   router.use(
     '/:homeId',
     createRequireHomeContext(options.activeHomeActorResolver),

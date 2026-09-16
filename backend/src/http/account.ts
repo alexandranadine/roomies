@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 import { z } from 'zod';
 import type {
   DeleteAccountLifecycleInput,
@@ -35,6 +35,7 @@ export type CreateAccountRouterOptions = {
   deleteAccount: DeleteAccountCommand;
   auth: AuthRuntime;
   clock?: Clock;
+  rateLimitSensitive?: RequestHandler;
 };
 
 function parseDeleteAccountBody(body: unknown): void {
@@ -46,9 +47,8 @@ function parseDeleteAccountBody(body: unknown): void {
 /**
  * Authenticated account-deletion route. Mount at `/account` on the v1 router.
  * Origin/CSRF is enforced by the `/api/v1` mutation guard before this router.
- *
- * TODO(launch): include this sensitive operation in credential/sensitive-
- * operation rate limiting before public launch. Do not add a limiter here.
+ * Sensitive-operation rate limiting, when provided, runs after auth and
+ * before freshness, body parsing, and lifecycle work.
  */
 export function createAccountRouter(
   options: CreateAccountRouterOptions,
@@ -58,7 +58,11 @@ export function createAccountRouter(
   router.use(setPrivateNoStoreHeaders);
   router.use(createRequireAuth(options.principalResolver));
 
-  router.delete('/', (req, res, next) => {
+  const deleteHandlers: RequestHandler[] = [];
+  if (options.rateLimitSensitive !== undefined) {
+    deleteHandlers.push(options.rateLimitSensitive);
+  }
+  deleteHandlers.push((req, res, next) => {
     void (async () => {
       const { principal } = req as RequestWithPrincipal;
       requireFreshAccountDeletionSession(principal.sessionCreatedAt, clock);
@@ -78,6 +82,8 @@ export function createAccountRouter(
       res.status(204).end();
     })().catch(next);
   });
+
+  router.delete('/', ...deleteHandlers);
 
   return router;
 }

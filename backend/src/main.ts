@@ -49,6 +49,10 @@ import type {
 } from './platform/config/types.js';
 import { createApp } from './platform/http/create-app.js';
 import {
+  DEFAULT_RATE_LIMIT_SWEEP_INTERVAL_MS,
+  createInMemoryRateLimitRuntime,
+} from './platform/http/rate-limit.js';
+import {
   createDatabasePool,
   type DatabasePoolRuntime,
 } from './platform/persistence/pool.js';
@@ -86,14 +90,25 @@ function createWebHttpRuntime(
     databasePool.pool,
   );
   const readiness = createDbReadiness(db);
+  const rateLimits = createInMemoryRateLimitRuntime({
+    sweepIntervalMs: DEFAULT_RATE_LIMIT_SWEEP_INTERVAL_MS,
+  });
+  resources.unshift({
+    close() {
+      rateLimits.stop();
+      return Promise.resolve();
+    },
+  });
   const app = createApp({
     config,
     readiness,
     auth,
+    rateLimits,
     roomiesApi: createRoomiesApiRouter({
       principalResolver,
       activeHomeActorResolver,
       homeReader,
+      rateLimits,
       createHome: createCreateHomeFromPool(databasePool.pool),
       listActiveHomes: (input) =>
         listActiveHomesForUser(input, activeHomesForUserReader),

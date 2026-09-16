@@ -59,6 +59,11 @@ import { createCurrentUserRouter } from '../domains/users/http.js';
 import type { PrincipalResolver } from '../platform/auth/principal.js';
 import type { ActiveHomeActorResolver } from '../platform/authz/index.js';
 import {
+  createInvitationTokenRateLimit,
+  createSensitiveUserRateLimit,
+  type RateLimitRuntime,
+} from '../platform/http/rate-limit.js';
+import {
   createAccountRouter,
   type CreateAccountRouterOptions,
 } from './account.js';
@@ -131,6 +136,7 @@ export type CreateRoomiesApiRouterOptions = {
     CreateAccountRouterOptions,
     'deleteAccount' | 'auth' | 'clock'
   >;
+  rateLimits?: RateLimitRuntime;
 };
 
 /**
@@ -159,6 +165,10 @@ export function createRoomiesApiRouter(
         deleteAccount: options.account.deleteAccount,
         auth: options.account.auth,
         clock: options.account.clock,
+        rateLimitSensitive:
+          options.rateLimits === undefined
+            ? undefined
+            : createSensitiveUserRateLimit(options.rateLimits),
       }),
     );
   }
@@ -173,6 +183,10 @@ export function createRoomiesApiRouter(
         createInvitation: options.invitations.createInvitation,
         revokeInvitation: options.invitations.revokeInvitation,
         frontendOrigin: options.invitations.frontendOrigin,
+        rateLimitSensitive:
+          options.rateLimits === undefined
+            ? undefined
+            : createSensitiveUserRateLimit(options.rateLimits),
       }),
     );
   }
@@ -181,6 +195,10 @@ export function createRoomiesApiRouter(
       '/invitations',
       createInvitationPreviewRouter({
         previewInvitation: options.previewInvitation,
+        rateLimitInvitationToken:
+          options.rateLimits === undefined
+            ? undefined
+            : createInvitationTokenRateLimit(options.rateLimits),
       }),
     );
   }
@@ -190,6 +208,10 @@ export function createRoomiesApiRouter(
       createInvitationAcceptanceRouter({
         principalResolver: options.principalResolver,
         acceptInvitation: options.acceptInvitation,
+        rateLimitInvitationToken:
+          options.rateLimits === undefined
+            ? undefined
+            : createInvitationTokenRateLimit(options.rateLimits),
       }),
     );
   }

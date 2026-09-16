@@ -25,3 +25,16 @@ export {
   createApiMutationOriginGuard,
   API_MUTATION_METHODS,
 } from './mutation-origin.js';
+export { RateLimitedError } from './rate-limit-errors.js';
+export {
+  DEFAULT_RATE_LIMITS,
+  DEFAULT_RATE_LIMIT_MAX_KEYS,
+  createInMemoryRateLimitRuntime,
+  createCredentialAuthRateLimit,
+  createSensitiveUserRateLimit,
+  createInvitationTokenRateLimit,
+  clientNetworkIdentity,
+  isCredentialAuthRequest,
+  type RateLimitClass,
+  type RateLimitRuntime,
+} from './rate-limit.js';

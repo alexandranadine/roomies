@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 import { z } from 'zod';
 import type {
   AcceptInvitationInput,
@@ -41,6 +41,7 @@ export type AcceptInvitationCommand = (
 export type CreateInvitationAcceptanceRouterOptions = {
   principalResolver: Pick<PrincipalResolver, 'requirePrincipal'>;
   acceptInvitation: AcceptInvitationCommand;
+  rateLimitInvitationToken?: RequestHandler;
 };
 
 function parseAcceptBody(body: unknown): void {
@@ -64,6 +65,9 @@ export function createInvitationAcceptanceRouter(
   const router = Router();
   router.use(setPrivateNoStoreHeaders);
   router.use(stripResponseEtag);
+  if (options.rateLimitInvitationToken !== undefined) {
+    router.use(options.rateLimitInvitationToken);
+  }
   router.use(createRequireAuth(options.principalResolver));
 
   router.post('/:invitationId/accept', (req, res, next) => {
