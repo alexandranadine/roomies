@@ -108,7 +108,7 @@ Prisma 8 owns the database contract and reviewed migration workflow inside `@roo
 | Runtime client      | `backend/src/prisma/db.ts`                          |
 | Migrations          | `backend/migrations/` (`app/`, `snapshots/`)        |
 
-Connection uses `DATABASE_URL` from the environment. Prisma CLI loads it via `backend/prisma.config.ts`. Application runtime validates env through `backend/src/platform/config/` (`APP_ENV`, `PORT`, `PROCESS_MODE`, `RECURRENCE_POLL_INTERVAL_MS`, `TRUSTED_ORIGINS`, `TRUST_PROXY`, `DATABASE_URL`, `AUTH_BASE_URL`, `AUTH_SECRET`). The process composition root creates one `pg.Pool`, passes it to Prisma, Better Auth, and the recurrence worker, closes Prisma, and then closes the pool exactly once. Consumers never own the pool. Do not hardcode credentials.
+Connection uses `DATABASE_URL` from the environment. Prisma CLI loads it via `backend/prisma.config.ts`. Application runtime validates env through `backend/src/platform/config/` (`APP_ENV`, `PORT`, `PROCESS_MODE`, `RECURRENCE_POLL_INTERVAL_MS`, `TRUSTED_ORIGINS`, `TRUST_PROXY`, `INGRESS_MODE`, `CLOUDFLARE_ORIGIN_AUTH_SECRET`, `DATABASE_URL`, `AUTH_BASE_URL`, `AUTH_SECRET`). The process composition root creates one `pg.Pool`, passes it to Prisma, Better Auth, and the recurrence worker, closes Prisma, and then closes the pool exactly once. Consumers never own the pool. Do not hardcode credentials.
 
 ### Better Auth runtime isolation
 
@@ -155,7 +155,8 @@ The backend HTTP runtime lives under `backend/src/platform/http/` (app factory) 
 - `GET /ready` — persistence readiness (503 when the DB probe fails)
 - `ALL /api/auth/*` — Better Auth credential/session HTTP (mounted before `express.json()`)
 - Exact-origin CORS from `TRUSTED_ORIGINS`, Helmet API headers (no document CSP), JSON body limit `32kb`
-- `TRUST_PROXY` is an integer hop count (default `0`). Set an explicit hop count only after verifying Railway `req.ip`; unrestricted `true` is rejected.
+- `TRUST_PROXY` is an integer hop count (default `0`). Set an explicit hop count only after verifying Railway `req.ip`; unrestricted `true` is rejected. Cloudflare limiter identity uses `INGRESS_MODE=cloudflare` plus `CLOUDFLARE_ORIGIN_AUTH_SECRET`, not a hop-count change.
+- `INGRESS_MODE` is `direct` (default) or `cloudflare`. It is never inferred from `APP_ENV`. Cloudflare mode requires a high-entropy `CLOUDFLARE_ORIGIN_AUTH_SECRET` and fails closed without it.
 - `RECURRENCE_POLL_INTERVAL_MS` is the worker sleep when no immediate due work remains (default `30000`, range `1000`–`300000`).
 - In-process credential, sensitive, and invitation-token rate limiting. See
   [`docs/production-security.md`](docs/production-security.md). Single-instance

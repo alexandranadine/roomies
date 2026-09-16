@@ -242,17 +242,27 @@ void describe('HTTP platform app', () => {
       'utf8',
     );
     const authMount = source.indexOf('AUTH_HTTP_ROUTE');
-    const credentialLimit = source.indexOf('createCredentialAuthRateLimit');
+    const cors = source.indexOf('createCorsMiddleware(config.trustedOrigins)');
+    const cloudflareIngress = source.indexOf(
+      'createTrustedCloudflareIngressMiddleware(',
+    );
+    const credentialLimit = source.indexOf(
+      'createCredentialAuthRateLimit(rateLimits)',
+    );
     const authHandler = source.indexOf('createAuthHttpHandler(auth)');
     const originGuard = source.indexOf(
       "app.use('/api/v1', createApiMutationOriginGuard",
     );
     const jsonParser = source.indexOf('express.json(');
     assert.ok(authMount >= 0);
+    assert.ok(cors >= 0);
+    assert.ok(cloudflareIngress >= 0);
     assert.ok(credentialLimit >= 0);
     assert.ok(authHandler >= 0);
     assert.ok(originGuard >= 0);
     assert.ok(jsonParser >= 0);
+    assert.ok(cors < cloudflareIngress);
+    assert.ok(cloudflareIngress < credentialLimit);
     assert.ok(credentialLimit < authHandler);
     assert.ok(authHandler < originGuard);
     assert.ok(originGuard < jsonParser);
@@ -262,6 +272,7 @@ void describe('HTTP platform app', () => {
       'request-id',
       'security-headers',
       'cors',
+      'cloudflare-ingress',
       'credential-rate-limit',
       'better-auth',
       'api-mutation-origin',

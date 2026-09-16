@@ -38,3 +38,13 @@ export {
   type RateLimitClass,
   type RateLimitRuntime,
 } from './rate-limit.js';
+export {
+  CF_CONNECTING_IP_HEADER,
+  CLOUDFLARE_ORIGIN_AUTH_HEADER,
+  createTrustedCloudflareIngressMiddleware,
+  getTrustedClientNetworkIdentity,
+  isCloudflareIngressMode,
+  isRailwayHealthExemption,
+  parseSingleClientIp,
+  readExactlyOneHeader,
+} from './trusted-cloudflare-ingress.js';

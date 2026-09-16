@@ -8,11 +8,11 @@ tickets.
 
 In-process sliding-window limiter. No Redis. No rate-limit table.
 
-| Class              | Routes                                                                                                                                                                       | Key                                      | Default         |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | --------------- |
-| `credential`       | `POST /api/auth/sign-in/email`, `sign-up/email`, `request-password-reset`, `forget-password`, `reset-password`, `send-verification-email`, `change-password`, `change-email` | Express `req.ip` (trust-proxy hop count) | 20 / 15 minutes |
-| `sensitive`        | `DELETE /api/v1/account`, `POST /api/v1/homes/:homeId/invitations`                                                                                                           | canonical `userId`                       | 10 / 15 minutes |
-| `invitation_token` | `POST /api/v1/invitations/:id/preview`, `POST /api/v1/invitations/:id/accept`                                                                                                | Express `req.ip`                         | 30 / 15 minutes |
+| Class              | Routes                                                                                                                                                                       | Key                                                 | Default         |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- | --------------- |
+| `credential`       | `POST /api/auth/sign-in/email`, `sign-up/email`, `request-password-reset`, `forget-password`, `reset-password`, `send-verification-email`, `change-password`, `change-email` | Trusted client identity (see Ingress below)         | 20 / 15 minutes |
+| `sensitive`        | `DELETE /api/v1/account`, `POST /api/v1/homes/:homeId/invitations`                                                                                                           | canonical `userId`                                  | 10 / 15 minutes |
+| `invitation_token` | `POST /api/v1/invitations/:id/preview`, `POST /api/v1/invitations/:id/accept`                                                                                                | Trusted client identity (same source as credential) | 30 / 15 minutes |
 
 Rejected requests are `429` with Roomies error code `RATE_LIMITED`, message
 `Too many requests`, and `Retry-After` in seconds when the window reset can
@@ -50,9 +50,13 @@ closed with 429 once the cap is reached.
 
 `TRUST_PROXY` remains an integer hop count. Default `0` ignores
 `X-Forwarded-*`. Boolean `true` is rejected (VERIFIED LIVE on staging
-Railway: the process exits at boot and is not promoted).
+Railway: the process exits at boot and is not promoted). Do not change
+`TRUST_PROXY` to fix Cloudflare limiter identity.
+
+### Direct ingress (`INGRESS_MODE=direct`, default)
 
 Unauthenticated limiter identity is Express `req.ip` under that hop count.
+`INGRESS_MODE` is never inferred from `APP_ENV`.
 
 **VERIFIED LIVE (M9.3 staging, Railway `us-west2`, `*.up.railway.app`, no
 CDN in front):** Railway overwrites client `X-Forwarded-For` and
@@ -63,12 +67,41 @@ headers. Credential limiter requests with varying fake `X-Forwarded-For`
 shared one bucket; limit+1 returned `429 RATE_LIMITED`. A different
 network (Cloudflare Worker egress) did not share that bucket.
 
-Use `TRUST_PROXY=2` for this Railway HTTP topology. Re-probe if a CDN or
-extra hop is placed in front. Do not ship a permanent public
+Use `TRUST_PROXY=2` for that direct Railway HTTP topology. Re-probe if a
+CDN or extra hop is placed in front. Do not ship a permanent public
 forwarding-header diagnostic.
 
 Older Railway docs mention `X-Real-IP` without a stable hop count; that
 speculation is superseded by the live overwrite + two-hop chain above.
+
+### Cloudflare ingress (`INGRESS_MODE=cloudflare`)
+
+Production visitor path is `visitor → Cloudflare → Railway → Express`.
+Limiter identity must **not** use `req.ip` / `TRUST_PROXY` on that path:
+`TRUST_PROXY=2` selects an unstable intermediary, not the connecting
+client. Keep the existing hop count; do not retune it as a workaround.
+
+Cloudflare provenance is established only by a dedicated overwritten
+request header `X-Roomies-Origin-Auth` matching
+`CLOUDFLARE_ORIGIN_AUTH_SECRET` (constant-time compare). Host, Origin,
+`X-Forwarded-For`, `X-Real-IP`, `CF-Connecting-IP` existence, and
+`socket.remoteAddress` are not proof that Cloudflare sent the request.
+
+Only after that origin authentication succeeds does the process trust a
+single `CF-Connecting-IP` (exactly one header, exactly one IPv4 or IPv6
+address, never a comma-separated list). The validated address is stored
+in request-local state and used by `clientNetworkIdentity()`. Missing or
+invalid origin auth, or missing/invalid/duplicate `CF-Connecting-IP`,
+fails closed (`403 FORBIDDEN`) and never falls back to `req.ip`.
+
+Direct Railway hostname traffic without the origin secret cannot reach
+credential, invitation, or product handlers. `GET /health` and
+`GET /ready` remain available without the secret for Railway probes and
+do not establish a trusted client identity.
+
+`CLOUDFLARE_ORIGIN_AUTH_SECRET` is required at boot when
+`INGRESS_MODE=cloudflare` and is redacted like other secrets. Do not set
+the secret when `INGRESS_MODE=direct`.
 
 ## General API limiter
 

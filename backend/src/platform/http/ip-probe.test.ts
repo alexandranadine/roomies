@@ -118,11 +118,16 @@ void describe('temporary production IP probe', () => {
         return true;
       },
     );
-    assert.equal(ipProbeTokenFromEnv({ IP_PROBE_TOKEN: PROBE_TOKEN }), PROBE_TOKEN);
+    assert.equal(
+      ipProbeTokenFromEnv({ IP_PROBE_TOKEN: PROBE_TOKEN }),
+      PROBE_TOKEN,
+    );
   });
 
   void it('returns the ordinary 404 when the probe token header is missing', async () => {
-    const unknown = await appRequest(unmountedApp(), { path: '/no-such-route' });
+    const unknown = await appRequest(unmountedApp(), {
+      path: '/no-such-route',
+    });
     const res = await appRequest(mountProbe(), { path: IP_PROBE_PATH });
     assertSafeUnknownRoute(res);
     assert.equal(res.status, unknown.status);
@@ -196,6 +201,11 @@ void describe('temporary production IP probe', () => {
     assert.equal(body.reqIpMatchesXRealIp, false);
     assert.equal(body.reqIpMatchesCfConnectingIp, false);
     assert.equal(body.xRealIpMatchesCfConnectingIp, false);
+    assert.equal(body.edgeAuthSucceeded, false);
+    assert.equal(body.trustedLimiterIdentityHash, body.reqIpHash);
+    assert.equal(body.trustedIdentityMatchesCfConnectingIp, false);
+    assert.equal(body.trustedIdentityMatchesXffIntermediary, false);
+    assert.equal(body.canaryInCfConnectingIp, false);
     assert.equal(hashNetworkValue(CANARY_A), expectedHash(CANARY_A));
     assert.equal(expectedHash(CANARY_A).length, IP_PROBE_HASH_LENGTH);
 
@@ -237,7 +247,9 @@ void describe('temporary production IP probe', () => {
     const capture =
       (name: keyof typeof original) =>
       (...args: unknown[]) => {
-        logs.push(`${name}:${args.map((value) => JSON.stringify(value)).join(' ')}`);
+        logs.push(
+          `${name}:${args.map((value) => JSON.stringify(value)).join(' ')}`,
+        );
       };
     console.log = capture('log');
     console.info = capture('info');
@@ -325,7 +337,10 @@ void describe('temporary production IP probe', () => {
   });
 
   void it('does not write trust-proxy or log network values in the probe module', async () => {
-    const source = await readFile(fileURLToPath(import.meta.url).replace(/\.test\.ts$/u, '.ts'), 'utf8');
+    const source = await readFile(
+      fileURLToPath(import.meta.url).replace(/\.test\.ts$/u, '.ts'),
+      'utf8',
+    );
     assert.match(source, new RegExp(TEMPORARY_PRODUCTION_IP_PROBE_MARKER));
     assert.doesNotMatch(source, /app\.set\(\s*['"]trust proxy['"]/);
     assert.doesNotMatch(source, /process\.env\.TRUST_PROXY/);

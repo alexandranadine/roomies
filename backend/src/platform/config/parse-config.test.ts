@@ -49,6 +49,7 @@ void describe('parseConfig', () => {
       'http://127.0.0.1:5173',
     ]);
     assert.equal(config.trustProxyHops, 0);
+    assert.deepEqual(config.ingress, { mode: 'direct' });
     assert.equal(config.processMode, 'combined');
     assert.equal(config.recurrencePollIntervalMs, 30_000);
     assert.equal(config.releaseSha, undefined);
@@ -174,6 +175,109 @@ void describe('parseConfig', () => {
       (error: unknown) => {
         assert.ok(error instanceof ConfigError);
         assert.match(error.message, /TRUST_PROXY/);
+        return true;
+      },
+    );
+  });
+
+  void it('defaults INGRESS_MODE to direct without assuming Cloudflare from APP_ENV', () => {
+    const development = parseConfig(
+      validDevelopmentEnv({ INGRESS_MODE: undefined }),
+    );
+    const production = parseConfig(
+      validProductionEnv({ INGRESS_MODE: undefined }),
+    );
+    assert.deepEqual(development.ingress, { mode: 'direct' });
+    assert.deepEqual(production.ingress, { mode: 'direct' });
+    assert.equal(production.trustProxyHops, 0);
+  });
+
+  void it('accepts INGRESS_MODE=cloudflare with a high-entropy origin secret', () => {
+    const originSecret = 'roomies_cf_origin_auth_secret_32_chars_min';
+    const config = parseConfig(
+      validProductionEnv({
+        INGRESS_MODE: 'cloudflare',
+        CLOUDFLARE_ORIGIN_AUTH_SECRET: originSecret,
+      }),
+    );
+    assert.deepEqual(config.ingress, {
+      mode: 'cloudflare',
+      originAuthSecret: originSecret,
+    });
+    assert.ok(Object.isFrozen(config.ingress));
+  });
+
+  void it('fails production Cloudflare mode when the origin secret is absent', () => {
+    assert.throws(
+      () =>
+        parseConfig(
+          validProductionEnv({
+            INGRESS_MODE: 'cloudflare',
+            CLOUDFLARE_ORIGIN_AUTH_SECRET: undefined,
+          }),
+        ),
+      (error: unknown) => {
+        assert.ok(error instanceof ConfigError);
+        assert.match(
+          error.message,
+          /CLOUDFLARE_ORIGIN_AUTH_SECRET is required when INGRESS_MODE=cloudflare/,
+        );
+        return true;
+      },
+    );
+  });
+
+  void it('rejects a low-entropy Cloudflare origin secret without echoing it', () => {
+    const weak = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    assert.throws(
+      () =>
+        parseConfig(
+          validProductionEnv({
+            INGRESS_MODE: 'cloudflare',
+            CLOUDFLARE_ORIGIN_AUTH_SECRET: weak,
+          }),
+        ),
+      (error: unknown) => {
+        assert.ok(error instanceof ConfigError);
+        assert.match(
+          error.message,
+          /CLOUDFLARE_ORIGIN_AUTH_SECRET must be a high-entropy/,
+        );
+        assert.equal(error.message.includes(weak), false);
+        return true;
+      },
+    );
+  });
+
+  void it('rejects a Cloudflare origin secret when INGRESS_MODE is direct', () => {
+    const originSecret = 'roomies_cf_origin_auth_secret_32_chars_min';
+    assert.throws(
+      () =>
+        parseConfig(
+          validProductionEnv({
+            INGRESS_MODE: 'direct',
+            CLOUDFLARE_ORIGIN_AUTH_SECRET: originSecret,
+          }),
+        ),
+      (error: unknown) => {
+        assert.ok(error instanceof ConfigError);
+        assert.match(
+          error.message,
+          /CLOUDFLARE_ORIGIN_AUTH_SECRET must not be set when INGRESS_MODE=direct/,
+        );
+        assert.equal(error.message.includes(originSecret), false);
+        return true;
+      },
+    );
+  });
+
+  void it('rejects invalid INGRESS_MODE values', () => {
+    assert.throws(
+      () => parseConfig(validDevelopmentEnv({ INGRESS_MODE: 'railway' })),
+      (error: unknown) => {
+        assert.ok(error instanceof ConfigError);
+        assert.match(error.message, /INGRESS_MODE/);
+        assert.match(error.message, /direct, cloudflare/);
         return true;
       },
     );

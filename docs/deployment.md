@@ -229,8 +229,11 @@ CDN in front.)
 hostname maps **directly** to Railway with no Cloudflare proxy/CDN in
 front, M9.5 must re-run a small spoof probe and may reuse `2` if the
 chain still matches. If Cloudflare (or any extra proxy) is placed in
-front of Railway, `2` is **not** automatically valid — reprobe from
-scratch. Do not ship a permanent public forwarding-header diagnostic.
+front of Railway, do **not** retune `TRUST_PROXY` to pick a client IP.
+Set `INGRESS_MODE=cloudflare` and `CLOUDFLARE_ORIGIN_AUTH_SECRET`
+instead. Limiter identity then comes from authenticated
+`CF-Connecting-IP`, not Express `req.ip`. Keep the existing hop count.
+Do not ship a permanent public forwarding-header diagnostic.
 
 Observed forwarding (hashes only; client IPs are not recorded here):
 
@@ -258,6 +261,38 @@ different bucket).
 Re-probe if the HTTP topology changes (Cloudflare in front of Railway,
 multiple hops, or a different region). Do not add a permanent public
 endpoint that returns forwarding headers.
+
+## Cloudflare origin authentication (production API)
+
+Production visitor path: `visitor → Cloudflare → Railway → Express`.
+Do **not** infer this from `APP_ENV`. Configure it explicitly:
+
+| Variable                        | Production value                                          | Class    |
+| ------------------------------- | --------------------------------------------------------- | -------- |
+| `INGRESS_MODE`                  | `cloudflare`                                              | required |
+| `CLOUDFLARE_ORIGIN_AUTH_SECRET` | high-entropy random secret, ≥32 characters                | secret   |
+| `TRUST_PROXY`                   | leave unchanged (Railway hop count; not limiter identity) | optional |
+
+The backend requires Cloudflare to **overwrite** (not append) a dedicated
+request header on every request to the API hostname:
+
+- Header name: `X-Roomies-Origin-Auth`
+- Header value: the same secret as Railway `CLOUDFLARE_ORIGIN_AUTH_SECRET`
+
+After that match succeeds, the backend trusts `CF-Connecting-IP` only when
+it occurs exactly once and contains exactly one IPv4 or IPv6 address.
+Missing/wrong/duplicate origin-auth or a missing/invalid/duplicate
+`CF-Connecting-IP` fails closed (`403 FORBIDDEN`) before credential,
+invitation, and product handlers. Direct Railway ingress without the
+header cannot reach those handlers.
+
+`GET /health` and `GET /ready` stay available without the secret so
+Railway health checks continue to work. Those exemptions do not store a
+trusted client identity.
+
+Do not configure Authenticated Origin Pulls as a substitute for this
+header. Do not trust Host, Origin, XFF, X-Real-IP, or the TCP peer as
+Cloudflare provenance.
 
 ## Frontend (Cloudflare Workers Static Assets)
 
@@ -295,23 +330,25 @@ Never commit real secrets. Values below are names only.
 
 ### Backend
 
-| Variable                      | Local                      | CI             | Preview / staging                                | Production                                                               | Class                        |
-| ----------------------------- | -------------------------- | -------------- | ------------------------------------------------ | ------------------------------------------------------------------------ | ---------------------------- |
-| `APP_ENV`                     | `development`              | `test`         | `preview` / `staging`                            | `production`                                                             | required                     |
-| `PORT`                        | `3000`                     | n/a            | platform                                         | platform (`PORT`)                                                        | optional / platform-provided |
-| `PROCESS_MODE`                | default `combined`         | n/a            | `combined`                                       | `combined`                                                               | optional (default)           |
-| `RECURRENCE_POLL_INTERVAL_MS` | default `30000`            | n/a            | default                                          | default                                                                  | optional                     |
-| `DATABASE_URL`                | Compose Postgres           | CI Postgres    | **non-prod Neon**                                | **prod Neon pooled**                                                     | required                     |
-| `AUTH_SECRET`                 | local placeholder replaced | CI-only        | distinct                                         | distinct                                                                 | required                     |
-| `AUTH_BASE_URL`               | default localhost          | CI localhost   | HTTPS API origin                                 | HTTPS API origin                                                         | required outside local       |
-| `FRONTEND_ORIGIN`             | default localhost          | n/a            | HTTPS frontend                                   | HTTPS frontend                                                           | required outside local       |
-| `TRUSTED_ORIGINS`             | default localhost          | n/a            | exact HTTPS list including `FRONTEND_ORIGIN`     | same                                                                     | required outside local       |
-| `TRUST_PROXY`                 | default `0`                | default `0`    | Railway `us-west2` edge: **`2`** (VERIFIED LIVE) | same Railway topology: `2` only if still direct; re-probe if hops change | optional (default 0)         |
-| `RELEASE_SHA`                 | unset                      | unset          | optional                                         | optional (else Railway SHA)                                              | optional                     |
-| `RAILWAY_GIT_COMMIT_SHA`      | n/a                        | n/a            | platform                                         | platform                                                                 | platform-provided            |
-| `EMAIL_PROVIDER`              | default `fake`             | default `fake` | required (`resend` or explicit `fake`)           | **`resend` only** (fake rejected)                                        | required outside local       |
-| `EMAIL_API_KEY`               | n/a for fake               | n/a for fake   | required for `resend`                            | required                                                                 | secret                       |
-| `EMAIL_FROM`                  | n/a for fake               | n/a for fake   | required for `resend`                            | required (`Roomies <noreply@<sending-domain>>`)                          | required for resend          |
+| Variable                        | Local                      | CI               | Preview / staging                                | Production                                               | Class                        |
+| ------------------------------- | -------------------------- | ---------------- | ------------------------------------------------ | -------------------------------------------------------- | ---------------------------- |
+| `APP_ENV`                       | `development`              | `test`           | `preview` / `staging`                            | `production`                                             | required                     |
+| `PORT`                          | `3000`                     | n/a              | platform                                         | platform (`PORT`)                                        | optional / platform-provided |
+| `PROCESS_MODE`                  | default `combined`         | n/a              | `combined`                                       | `combined`                                               | optional (default)           |
+| `RECURRENCE_POLL_INTERVAL_MS`   | default `30000`            | n/a              | default                                          | default                                                  | optional                     |
+| `DATABASE_URL`                  | Compose Postgres           | CI Postgres      | **non-prod Neon**                                | **prod Neon pooled**                                     | required                     |
+| `AUTH_SECRET`                   | local placeholder replaced | CI-only          | distinct                                         | distinct                                                 | required                     |
+| `AUTH_BASE_URL`                 | default localhost          | CI localhost     | HTTPS API origin                                 | HTTPS API origin                                         | required outside local       |
+| `FRONTEND_ORIGIN`               | default localhost          | n/a              | HTTPS frontend                                   | HTTPS frontend                                           | required outside local       |
+| `TRUSTED_ORIGINS`               | default localhost          | n/a              | exact HTTPS list including `FRONTEND_ORIGIN`     | same                                                     | required outside local       |
+| `TRUST_PROXY`                   | default `0`                | default `0`      | Railway `us-west2` edge: **`2`** (VERIFIED LIVE) | keep Railway hop count; **do not** retune for Cloudflare | optional (default 0)         |
+| `INGRESS_MODE`                  | default `direct`           | default `direct` | `direct` unless Cloudflare proxies the API       | **`cloudflare`** when Cloudflare proxies the API         | optional (default `direct`)  |
+| `CLOUDFLARE_ORIGIN_AUTH_SECRET` | unset                      | unset            | unset when `direct`                              | required when `INGRESS_MODE=cloudflare`                  | secret                       |
+| `RELEASE_SHA`                   | unset                      | unset            | optional                                         | optional (else Railway SHA)                              | optional                     |
+| `RAILWAY_GIT_COMMIT_SHA`        | n/a                        | n/a              | platform                                         | platform                                                 | platform-provided            |
+| `EMAIL_PROVIDER`                | default `fake`             | default `fake`   | required (`resend` or explicit `fake`)           | **`resend` only** (fake rejected)                        | required outside local       |
+| `EMAIL_API_KEY`                 | n/a for fake               | n/a for fake     | required for `resend`                            | required                                                 | secret                       |
+| `EMAIL_FROM`                    | n/a for fake               | n/a for fake     | required for `resend`                            | required (`Roomies <noreply@<sending-domain>>`)          | required for resend          |
 
 ### Frontend (public)
 
@@ -452,7 +489,9 @@ Do **not** create these in M9.4.
 - Healthcheck `/ready`
 - Node 24 (Railpack `engines.node` + boot assertion)
 - Exact `RELEASE_SHA`
-- `TRUST_PROXY=2` only if topology remains direct-to-Railway; else reprobe
+- `TRUST_PROXY=2` only if topology remains direct-to-Railway; with Cloudflare in front, keep the hop count and set `INGRESS_MODE=cloudflare` instead
+- `INGRESS_MODE=cloudflare`
+- `CLOUDFLARE_ORIGIN_AUTH_SECRET` (high-entropy; never in git)
 - Custom API hostname
 
 **Cloudflare**
@@ -463,6 +502,8 @@ Do **not** create these in M9.4.
 - Document CSP `connect-src` exact API hostname
 - SPA fallback
 - Cache headers as staging
+- API hostname proxied through Cloudflare
+- HTTP Request Header Modification rule: **overwrite** `X-Roomies-Origin-Auth` on all methods to the API origin with the Railway origin-auth secret (do not append; do not pass through a client value)
 
 **Email**
 

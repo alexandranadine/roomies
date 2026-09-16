@@ -12,6 +12,32 @@ export const PROCESS_MODES = ['web', 'worker', 'combined'] as const;
 
 export type ProcessMode = (typeof PROCESS_MODES)[number];
 
+/**
+ * How the HTTP process identifies the connecting client.
+ * Never inferred from APP_ENV. Default is `direct`.
+ */
+export const INGRESS_MODES = ['direct', 'cloudflare'] as const;
+
+export type IngressMode = (typeof INGRESS_MODES)[number];
+
+export const DEFAULT_INGRESS_MODE: IngressMode = 'direct';
+
+export type DirectIngressConfig = Readonly<{
+  mode: 'direct';
+}>;
+
+export type CloudflareIngressConfig = Readonly<{
+  mode: 'cloudflare';
+  /**
+   * Shared secret Cloudflare overwrites on `X-Roomies-Origin-Auth`.
+   * Never log this value.
+   */
+  originAuthSecret: string;
+}>;
+
+export type IngressRuntimeConfig =
+  DirectIngressConfig | CloudflareIngressConfig;
+
 /** Initial Railway deployment and local default: one process serves HTTP and polls. */
 export const DEFAULT_PROCESS_MODE: ProcessMode = 'combined';
 
@@ -80,6 +106,13 @@ export type AppConfig = Readonly<{
    * Never unrestricted `true`.
    */
   trustProxyHops: number;
+  /**
+   * Client network-identity source. `direct` uses Express `req.ip` under
+   * `trustProxyHops`. `cloudflare` authenticates the overwritten origin-auth
+   * header and then trusts a single `CF-Connecting-IP`. Omitted hand-built
+   * test configs behave as `direct`.
+   */
+  ingress?: IngressRuntimeConfig;
   /**
    * Safe release identifier for health/readiness probes. Hex git SHA when set.
    * Never an environment dump or filesystem path.

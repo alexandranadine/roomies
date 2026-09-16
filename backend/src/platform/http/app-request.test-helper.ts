@@ -11,7 +11,7 @@ export type AppTestResponse = {
 export type AppTestRequestOptions = {
   method?: string;
   path: string;
-  headers?: Record<string, string>;
+  headers?: Record<string, string | readonly string[]>;
   body?: string;
   redirect?: 'follow' | 'error' | 'manual';
 };
@@ -40,11 +40,20 @@ export async function withAppServer<T>(
   const request = async (
     options: AppTestRequestOptions,
   ): Promise<AppTestResponse> => {
+    if (headersHaveArrays(options.headers)) {
+      return nodeHttpRequest(address.port, options);
+    }
+    const headers: Record<string, string> = {};
+    for (const [name, value] of Object.entries(options.headers ?? {})) {
+      if (typeof value === 'string') {
+        headers[name] = value;
+      }
+    }
     const response = await fetch(
       `http://127.0.0.1:${address.port}${options.path}`,
       {
         method: options.method ?? 'GET',
-        headers: options.headers,
+        headers,
         body: options.body,
         redirect: options.redirect,
       },
@@ -74,6 +83,69 @@ export async function appRequest(
   options: AppTestRequestOptions,
 ): Promise<AppTestResponse> {
   return withAppServer(app, (request) => request(options));
+}
+
+function headersHaveArrays(
+  headers: Record<string, string | readonly string[]> | undefined,
+): boolean {
+  if (headers === undefined) {
+    return false;
+  }
+  return Object.values(headers).some((value) => Array.isArray(value));
+}
+
+function incomingToHeaders(incoming: http.IncomingHttpHeaders): Headers {
+  const headers = new Headers();
+  for (const [name, value] of Object.entries(incoming)) {
+    if (value === undefined) {
+      continue;
+    }
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        headers.append(name, item);
+      }
+      continue;
+    }
+    headers.set(name, value);
+  }
+  return headers;
+}
+
+function nodeHttpRequest(
+  port: number,
+  options: AppTestRequestOptions,
+): Promise<AppTestResponse> {
+  return new Promise((resolve, reject) => {
+    const request = http.request(
+      {
+        hostname: '127.0.0.1',
+        port,
+        path: options.path,
+        method: options.method ?? 'GET',
+        headers: options.headers as http.OutgoingHttpHeaders | undefined,
+      },
+      (response) => {
+        const chunks: Buffer[] = [];
+        response.on('data', (chunk: Buffer) => {
+          chunks.push(chunk);
+        });
+        response.on('end', () => {
+          const text = Buffer.concat(chunks).toString('utf8');
+          resolve({
+            status: response.statusCode ?? 0,
+            headers: incomingToHeaders(response.headers),
+            text,
+            json: () => JSON.parse(text) as unknown,
+          });
+        });
+      },
+    );
+    request.on('error', reject);
+    if (options.body !== undefined) {
+      request.write(options.body);
+    }
+    request.end();
+  });
 }
 
 function closeServer(server: http.Server): Promise<void> {

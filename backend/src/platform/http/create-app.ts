@@ -13,12 +13,13 @@ import {
   createInMemoryRateLimitRuntime,
   type RateLimitRuntime,
 } from './rate-limit.js';
+import { createTrustedCloudflareIngressMiddleware } from './trusted-cloudflare-ingress.js';
 import { requestIdMiddleware } from './request-id.js';
 import { createSecurityHeadersMiddleware } from './security-headers.js';
 
 export type CreateAppOptions = {
   config: Pick<AppConfig, 'trustedOrigins' | 'trustProxyHops'> &
-    Partial<Pick<AppConfig, 'secureAuthCookies' | 'releaseSha'>>;
+    Partial<Pick<AppConfig, 'secureAuthCookies' | 'releaseSha' | 'ingress'>>;
   readiness: PersistenceReadiness;
   /**
    * In-process limiter used for Better Auth credential routes. Product
@@ -61,6 +62,14 @@ export function createApp(options: CreateAppOptions): Express {
     }),
   );
   app.use(createCorsMiddleware(config.trustedOrigins));
+
+  // Cloudflare origin authentication must run after CORS so 403s still
+  // carry ACAO for trusted origins, and before credential/product work.
+  if (config.ingress?.mode === 'cloudflare') {
+    app.use(
+      createTrustedCloudflareIngressMiddleware(config.ingress.originAuthSecret),
+    );
+  }
 
   // Better Auth must see the native request body. Roomies JSON parsing
   // is mounted after `/api/auth/*` and applies only to later routes.

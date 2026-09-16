@@ -2,6 +2,11 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import { isIPv4, isIPv6 } from 'node:net';
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import { ConfigError } from '../config/errors.js';
+import { clientNetworkIdentity } from './rate-limit.js';
+import {
+  getTrustedClientNetworkIdentity,
+  parseSingleClientIp,
+} from './trusted-cloudflare-ingress.js';
 
 /**
  * TEMPORARY_PRODUCTION_IP_PROBE_REMOVE_AFTER_VERIFICATION
@@ -45,6 +50,11 @@ export type IpProbeDiagnostic = Readonly<{
   reqIpMatchesXRealIp: boolean;
   reqIpMatchesCfConnectingIp: boolean;
   xRealIpMatchesCfConnectingIp: boolean;
+  edgeAuthSucceeded: boolean;
+  trustedLimiterIdentityHash: string | null;
+  trustedIdentityMatchesCfConnectingIp: boolean;
+  trustedIdentityMatchesXffIntermediary: boolean;
+  canaryInCfConnectingIp: boolean;
 }>;
 
 function estimatedSecretEntropy(value: string): number {
@@ -105,10 +115,7 @@ function probeTokensEqual(expected: string, provided: string): boolean {
   return timingSafeEqual(left, right);
 }
 
-function singleHeader(
-  req: Request,
-  name: string,
-): string | undefined {
+function singleHeader(req: Request, name: string): string | undefined {
   const raw = req.headers[name];
   if (typeof raw === 'string') {
     return raw;
@@ -251,10 +258,7 @@ export function hopIsTestNetCanary(hop: string): boolean {
   return isTestNetIpv4(stripIpv4Mapped(hop.trim()));
 }
 
-function hashesEqual(
-  left: string | null,
-  right: string | null,
-): boolean {
+function hashesEqual(left: string | null, right: string | null): boolean {
   return left !== null && right !== null && left === right;
 }
 
@@ -275,6 +279,13 @@ function buildDiagnostic(
   const leftmostXff = hopHashes[0] ?? null;
   const rightmostXff =
     hopHashes.length > 0 ? (hopHashes[hopHashes.length - 1] ?? null) : null;
+  const trustedIdentity = getTrustedClientNetworkIdentity(req);
+  const selectedIdentity = clientNetworkIdentity(req);
+  const trustedLimiterIdentityHash = hashNetworkValue(selectedIdentity);
+  const cfConnectingRaw = forwardedHeader(req, 'cf-connecting-ip');
+  const cfConnectingHops = splitForwardedHops(cfConnectingRaw);
+  const parsedCfIdentity = parseSingleClientIp(cfConnectingRaw ?? '');
+  const parsedCfIdentityHash = hashNetworkValue(parsedCfIdentity);
 
   return {
     trustProxyHops,
@@ -293,10 +304,17 @@ function buildDiagnostic(
     reqIpMatchesRightmostXff: hashesEqual(reqIpHash, rightmostXff),
     reqIpMatchesXRealIp: hashesEqual(reqIpHash, xRealIpHash),
     reqIpMatchesCfConnectingIp: hashesEqual(reqIpHash, cfConnectingIpHash),
-    xRealIpMatchesCfConnectingIp: hashesEqual(
-      xRealIpHash,
-      cfConnectingIpHash,
+    xRealIpMatchesCfConnectingIp: hashesEqual(xRealIpHash, cfConnectingIpHash),
+    edgeAuthSucceeded: trustedIdentity !== undefined,
+    trustedLimiterIdentityHash,
+    trustedIdentityMatchesCfConnectingIp: hashesEqual(
+      trustedLimiterIdentityHash,
+      parsedCfIdentityHash ?? cfConnectingIpHash,
     ),
+    trustedIdentityMatchesXffIntermediary: hopHashes.some(
+      (hopHash) => hopHash.length > 0 && hopHash === trustedLimiterIdentityHash,
+    ),
+    canaryInCfConnectingIp: cfConnectingHops.some(hopIsTestNetCanary),
   };
 }
 

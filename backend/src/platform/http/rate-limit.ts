@@ -3,6 +3,10 @@ import type { Clock } from '../time/clock.js';
 import { systemClock } from '../time/clock.js';
 import { RateLimitedError } from './rate-limit-errors.js';
 import type { RequestWithPrincipal } from './require-auth.js';
+import {
+  getTrustedClientNetworkIdentity,
+  isCloudflareIngressMode,
+} from './trusted-cloudflare-ingress.js';
 
 export type RateLimitClass = 'credential' | 'sensitive' | 'invitation_token';
 
@@ -86,11 +90,20 @@ export function isCredentialAuthRequest(req: Request): boolean {
 }
 
 /**
- * Network identity Express derived from `trust proxy` hop count.
+ * Network identity for unauthenticated limiter classes.
+ *
+ * Cloudflare ingress uses the request-local identity stored only after
+ * origin-auth succeeds. It never falls back to `req.ip`, XFF, X-Real-IP,
+ * Host, Origin, or the socket address.
+ *
+ * Direct ingress uses Express `req.ip` under the configured hop count.
  * Does not read raw `X-Forwarded-For` and does not use cookies, emails,
  * invitation secrets, or session tokens.
  */
 export function clientNetworkIdentity(req: Request): string | undefined {
+  if (isCloudflareIngressMode(req)) {
+    return getTrustedClientNetworkIdentity(req);
+  }
   const ip = req.ip;
   if (typeof ip !== 'string') {
     return undefined;

@@ -7,15 +7,19 @@ import {
 import { loadRuntimeEnvFiles } from './load-dotenv.js';
 import {
   APP_ENVS,
+  DEFAULT_INGRESS_MODE,
   DEFAULT_PROCESS_MODE,
   DEFAULT_RECURRENCE_POLL_INTERVAL_MS,
   EMAIL_PROVIDERS,
+  INGRESS_MODES,
   MAX_RECURRENCE_POLL_INTERVAL_MS,
   MIN_RECURRENCE_POLL_INTERVAL_MS,
   PROCESS_MODES,
   type AppConfig,
   type AppEnv,
   type EmailRuntimeConfig,
+  type IngressMode,
+  type IngressRuntimeConfig,
   type ProcessMode,
   type ProcessRuntimeConfig,
 } from './types.js';
@@ -133,6 +137,24 @@ const processModeSchema = z
     return z.NEVER;
   });
 
+const ingressModeSchema = z
+  .string()
+  .trim()
+  .optional()
+  .transform((raw, ctx) => {
+    if (raw === undefined || raw === '') {
+      return DEFAULT_INGRESS_MODE;
+    }
+    if ((INGRESS_MODES as readonly string[]).includes(raw)) {
+      return raw as IngressMode;
+    }
+    ctx.addIssue({
+      code: 'custom',
+      message: `INGRESS_MODE must be one of: ${INGRESS_MODES.join(', ')}`,
+    });
+    return z.NEVER;
+  });
+
 const recurrencePollIntervalSchema = z
   .string()
   .trim()
@@ -194,6 +216,8 @@ const envSchema = z
     FRONTEND_ORIGIN: z.string().optional(),
     TRUST_PROXY: trustProxySchema,
     PROCESS_MODE: processModeSchema,
+    INGRESS_MODE: ingressModeSchema,
+    CLOUDFLARE_ORIGIN_AUTH_SECRET: z.string().optional(),
     RECURRENCE_POLL_INTERVAL_MS: recurrencePollIntervalSchema,
     RELEASE_SHA: z.string().optional(),
     RAILWAY_GIT_COMMIT_SHA: z.string().optional(),
@@ -357,6 +381,15 @@ const envSchema = z
       return z.NEVER;
     }
 
+    const ingress = parseIngressConfig(
+      data.INGRESS_MODE,
+      data.CLOUDFLARE_ORIGIN_AUTH_SECRET,
+      ctx,
+    );
+    if (ingress === z.NEVER) {
+      return z.NEVER;
+    }
+
     return {
       appEnv,
       port: data.PORT,
@@ -367,6 +400,7 @@ const envSchema = z
       frontendOrigin,
       trustedOrigins,
       trustProxyHops: data.TRUST_PROXY,
+      ingress,
       processMode: data.PROCESS_MODE,
       recurrencePollIntervalMs: data.RECURRENCE_POLL_INTERVAL_MS,
       releaseSha,
@@ -381,6 +415,7 @@ const envSchema = z
       frontendOrigin: string;
       trustedOrigins: string[];
       trustProxyHops: number;
+      ingress: IngressRuntimeConfig;
       processMode: ProcessMode;
       recurrencePollIntervalMs: number;
       releaseSha: string | undefined;
@@ -406,6 +441,52 @@ function isValidFromAddress(value: string): boolean {
   const named = FROM_NAMED_PATTERN.exec(value);
   const email = named?.[2] ?? value;
   return FROM_EMAIL_PATTERN.test(email);
+}
+
+function parseIngressConfig(
+  ingressMode: IngressMode,
+  originAuthSecret: string | undefined,
+  ctx: z.RefinementCtx,
+): IngressRuntimeConfig | typeof z.NEVER {
+  const secretPresent =
+    originAuthSecret !== undefined && originAuthSecret.length > 0;
+
+  if (ingressMode === 'direct') {
+    if (secretPresent) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['CLOUDFLARE_ORIGIN_AUTH_SECRET'],
+        message:
+          'CLOUDFLARE_ORIGIN_AUTH_SECRET must not be set when INGRESS_MODE=direct',
+      });
+      return z.NEVER;
+    }
+    return { mode: 'direct' };
+  }
+
+  if (originAuthSecret === undefined || originAuthSecret.length === 0) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['CLOUDFLARE_ORIGIN_AUTH_SECRET'],
+      message:
+        'CLOUDFLARE_ORIGIN_AUTH_SECRET is required when INGRESS_MODE=cloudflare',
+    });
+    return z.NEVER;
+  }
+  if (
+    originAuthSecret.length < 32 ||
+    estimatedSecretEntropy(originAuthSecret) < 120
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['CLOUDFLARE_ORIGIN_AUTH_SECRET'],
+      message:
+        'CLOUDFLARE_ORIGIN_AUTH_SECRET must be a high-entropy random value',
+    });
+    return z.NEVER;
+  }
+
+  return { mode: 'cloudflare', originAuthSecret };
 }
 
 function parseEmailConfig(
@@ -564,6 +645,22 @@ function formatIssues(zodError: z.ZodError): string[] {
       );
       continue;
     }
+    if (key === 'INGRESS_MODE') {
+      issues.push(
+        issue.message.startsWith('INGRESS_MODE')
+          ? issue.message
+          : `INGRESS_MODE must be one of: ${INGRESS_MODES.join(', ')}`,
+      );
+      continue;
+    }
+    if (key === 'CLOUDFLARE_ORIGIN_AUTH_SECRET') {
+      issues.push(
+        issue.message.startsWith('CLOUDFLARE_ORIGIN_AUTH_SECRET')
+          ? issue.message
+          : 'CLOUDFLARE_ORIGIN_AUTH_SECRET is invalid',
+      );
+      continue;
+    }
     if (key === 'RECURRENCE_POLL_INTERVAL_MS') {
       issues.push(
         issue.message.startsWith('RECURRENCE_POLL_INTERVAL_MS')
@@ -624,6 +721,10 @@ export function parseConfig(
     FRONTEND_ORIGIN: optionalString(source['FRONTEND_ORIGIN']),
     TRUST_PROXY: optionalString(source['TRUST_PROXY']),
     PROCESS_MODE: optionalString(source['PROCESS_MODE']),
+    INGRESS_MODE: optionalString(source['INGRESS_MODE']),
+    CLOUDFLARE_ORIGIN_AUTH_SECRET: optionalString(
+      source['CLOUDFLARE_ORIGIN_AUTH_SECRET'],
+    ),
     RECURRENCE_POLL_INTERVAL_MS: optionalString(
       source['RECURRENCE_POLL_INTERVAL_MS'],
     ),
@@ -652,6 +753,7 @@ export function parseConfig(
     frontendOrigin: result.data.frontendOrigin,
     trustedOrigins: Object.freeze([...result.data.trustedOrigins]),
     trustProxyHops: result.data.trustProxyHops,
+    ingress: Object.freeze({ ...result.data.ingress }),
     processMode: result.data.processMode,
     recurrencePollIntervalMs: result.data.recurrencePollIntervalMs,
     releaseSha: result.data.releaseSha,
