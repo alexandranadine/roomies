@@ -89,7 +89,11 @@ function createWebHttpRuntime(
   const activeHomesForUserReader = createActiveHomesForUserReader(
     databasePool.pool,
   );
-  const readiness = createDbReadiness(db);
+  const readiness = createDbReadiness({
+    // Neon pooled/PgBouncer: Prisma `connect()` is not a reliable repeated
+    // probe. The process-owned pool is the runtime source of truth.
+    connect: () => databasePool.pool.query('SELECT 1'),
+  });
   const rateLimits = createInMemoryRateLimitRuntime({
     sweepIntervalMs: DEFAULT_RATE_LIMIT_SWEEP_INTERVAL_MS,
   });

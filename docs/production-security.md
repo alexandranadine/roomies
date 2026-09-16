@@ -45,34 +45,26 @@ closed with 429 once the cap is reached.
 ## Trusted proxy
 
 `TRUST_PROXY` remains an integer hop count. Default `0` ignores
-`X-Forwarded-*`. Boolean `true` is rejected.
+`X-Forwarded-*`. Boolean `true` is rejected (VERIFIED LIVE on staging
+Railway: the process exits at boot and is not promoted).
 
 Unauthenticated limiter identity is Express `req.ip` under that hop count.
-With `TRUST_PROXY=0`, client-supplied `X-Forwarded-For` cannot rotate the
-credential bucket. With `TRUST_PROXY=1`, Express uses the rightmost
-forwarded address (one hop from the socket).
 
-Railway official docs identify `X-Real-IP` as the client-IP header and do
-not publish a stable hop count or `X-Forwarded-For` overwrite contract.
-Staff answers disagree on append vs strip and on hop count. Roomies does
-**not** guess `TRUST_PROXY=1` as a production default. Set the hop count
-only after a deployed probe confirms `req.ip` against known client
-addresses. Until that probe, leave `TRUST_PROXY=0` (fail closed: all
-clients share the proxy socket identity).
+**VERIFIED LIVE (M9.3 staging, Railway `us-west2`, `*.up.railway.app`, no
+CDN in front):** Railway overwrites client `X-Forwarded-For` and
+`X-Real-IP`, then presents exactly two public hops (client, then rotating
+Railway edge). `TRUST_PROXY=1` selects the edge (wrong, unstable).
+`TRUST_PROXY=2` selects the client and cannot be rotated by spoofed
+headers. Credential limiter requests with varying fake `X-Forwarded-For`
+shared one bucket; limit+1 returned `429 RATE_LIMITED`. A different
+network (Cloudflare Worker egress) did not share that bucket.
 
-Live-probe procedure (after a private backend exists; M9.3 owns the
-diagnostic, which is not a permanent public header dump):
+Use `TRUST_PROXY=2` for this Railway HTTP topology. Re-probe if a CDN or
+extra hop is placed in front. Do not ship a permanent public
+forwarding-header diagnostic.
 
-1. Deploy a private/non-public backend with `TRUST_PROXY=0`
-2. Hit the dedicated safe diagnostic
-3. Observe server-side `req.ip` through Railway
-4. Test a controlled `X-Forwarded-For` spoof
-5. Determine the exact hop count
-6. Set `TRUST_PROXY` to that integer
-7. Repeat the spoof test
-8. Only then expose production publicly
-
-See [`docs/deployment.md`](deployment.md) for the rest of the deploy contract.
+Older Railway docs mention `X-Real-IP` without a stable hop count; that
+speculation is superseded by the live overwrite + two-hop chain above.
 
 ## General API limiter
 

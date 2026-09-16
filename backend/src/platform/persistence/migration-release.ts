@@ -1,3 +1,5 @@
+import { createRequire } from 'node:module';
+import path from 'node:path';
 import { APP_ENVS } from '../config/types.js';
 
 const RELEASE_APP_ENVS = ['preview', 'staging', 'production'] as const;
@@ -8,6 +10,34 @@ export const RELEASE_MIGRATE_PRISMA_COMMANDS = Object.freeze([
   Object.freeze(['db', 'migrate', '--yes']),
   Object.freeze(['db', 'verify', '--strict']),
 ] as const);
+
+/**
+ * Never spawn the Prisma CLI through a shell. Neon URLs include `&`
+ * (`channel_binding`), which cmd.exe treats as a command separator.
+ * Windows `npx.cmd` also requires `shell: true`, so invoke `node prisma.js`
+ * directly instead.
+ */
+export const PRISMA_RELEASE_SPAWN_SHELL = false;
+
+export function resolvePrismaCliScript(fromDirectory: string): string {
+  const require = createRequire(path.join(fromDirectory, 'package.json'));
+  return path.join(
+    path.dirname(require.resolve('prisma/package.json')),
+    'dist',
+    'prisma.js',
+  );
+}
+
+export function prismaReleaseSpawnArgv(
+  prismaJsPath: string,
+  prismaArgs: readonly string[],
+  databaseUrl: string,
+): { command: string; args: string[] } {
+  return {
+    command: process.execPath,
+    args: [prismaJsPath, ...prismaArgs, '--db', databaseUrl],
+  };
+}
 
 const FORBIDDEN_PRISMA_TOKENS = [
   'push',

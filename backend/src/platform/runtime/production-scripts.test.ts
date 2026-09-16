@@ -53,4 +53,14 @@ void describe('deployment production scripts', () => {
     );
     assert.equal(rootPkg.scripts?.['start:prod']?.includes('migrate'), false);
   });
+
+  void it('probes readiness with the shared pool, not Prisma connect()', async () => {
+    const source = await readFile(
+      path.join(backendRoot, 'src/main.ts'),
+      'utf8',
+    );
+    assert.match(source, /pool\.query\('SELECT 1'\)/);
+    assert.doesNotMatch(source, /STAGING_IP_PROBE/);
+    assert.doesNotMatch(source, /staging-ip-probe/);
+  });
 });

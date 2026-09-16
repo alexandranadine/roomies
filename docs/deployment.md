@@ -1,15 +1,20 @@
-# Deployment (M9.2)
+# Deployment (M9.2 / M9.3)
 
-Repository preparation for the first Roomies production deploy.
-This ticket does **not** create Railway, Neon, or Cloudflare resources, does
-not modify DNS, and does not deploy.
+M9.2 prepared the repository. M9.3 created an isolated **staging**
+deployment and recorded live platform facts below.
 
-Public origin placeholders until a real Roomies domain exists:
+Public production origin placeholders until a real Roomies domain exists:
 
 - Frontend: `https://roomies.example`
 - API: `https://api.roomies.example`
 
-Do not invent or purchase a domain from this document.
+Do not invent or purchase a domain from this document. Staging uses
+provider hostnames only (`*.up.railway.app`, `*.workers.dev`). Those
+origins are not production.
+
+Facts are marked **VERIFIED LIVE** (observed on the M9.3 staging stack) or
+**CONFIGURED/EXPECTED** (set in provider config or required by code, not
+re-observed as a raw container property).
 
 ## Topology
 
@@ -166,23 +171,41 @@ compatible migrations.
 
 Do not put Better Auth secrets in Vite env.
 
-## TRUST_PROXY live probe
+## TRUST_PROXY (Railway US West)
 
-Production default remains **`TRUST_PROXY=0`**. Do not guess `1`. Boolean
-`true` is rejected.
+Boolean `true` is rejected at boot (VERIFIED LIVE: `TRUST_PROXY=true`
+exits with `Invalid configuration` and is not promoted).
 
-Before exposing the API publicly:
+**Proven hop count for this Railway edge: `2`.** (VERIFIED LIVE, M9.3
+staging, region `us-west2`, service domain `*.up.railway.app`, no extra
+CDN in front.)
 
-1. Deploy a private/non-public backend with `TRUST_PROXY=0`
-2. Hit a dedicated safe diagnostic (M9.3 — **not** shipped here)
-3. Observe server-side `req.ip` through Railway
-4. Test a controlled `X-Forwarded-For` spoof
-5. Determine the exact hop count
-6. Set `TRUST_PROXY` to that integer
-7. Repeat the spoof test
-8. Only then expose production publicly
+Observed forwarding (hashes only; client IPs are not recorded here):
 
-Do not add a permanent public endpoint that returns forwarding headers.
+- Railway presents **exactly two** `X-Forwarded-For` hops, both public.
+- Leftmost hop is the connecting client. Rightmost hop is a Railway edge
+  address and **rotates** across requests.
+- Railway **overwrites** client-supplied `X-Forwarded-For` and
+  `X-Real-IP`. Attacker canaries (`198.51.100.123` and multi-value
+  lists) never appear in the chain the app sees.
+- `X-Real-IP` matches the leftmost (client) hop.
+- `TRUST_PROXY=0`: Express `req.ip` is the private/CGNAT socket, not the
+  client, and rotates. `req.ips` is empty.
+- `TRUST_PROXY=1`: Express `req.ip` is the **rightmost Railway edge**,
+  not the client, and rotates. Unsafe as a limiter key.
+- `TRUST_PROXY=2`: Express `req.ip` is the **leftmost client**. Spoofed
+  `X-Forwarded-For` / `X-Real-IP` cannot rotate that identity because
+  Railway overwrote them before Express ran.
+
+Credential limiter (20 / 15 min, keyed on `req.ip`): from one client,
+rotating fake `X-Forwarded-For` values consumed the **same** bucket;
+request 20+ returned `429 RATE_LIMITED`. A Cloudflare Worker egress
+client received `401` on the same path, not `429` (different network,
+different bucket).
+
+Re-probe if the HTTP topology changes (Cloudflare in front of Railway,
+multiple hops, or a different region). Do not add a permanent public
+endpoint that returns forwarding headers.
 
 ## Frontend (Cloudflare Workers Static Assets)
 
@@ -195,6 +218,9 @@ Config: `frontend/wrangler.json`.
 - No secret Vite variables
 - Source maps: **off** in production (`build.sourcemap: false`)
 - Hashed `/assets/*`: `Cache-Control: public, max-age=31536000, immutable`
+  (VERIFIED LIVE on Cloudflare Workers Static Assets: the document
+  `/* must-revalidate` rule is also concatenated onto `/assets/*`, so the
+  live header contains both directives)
 - HTML: `public, max-age=0, must-revalidate`
 - Document CSP is generated into `dist/_headers` at build time
 - No service worker / offline cache
@@ -217,20 +243,20 @@ Never commit real secrets. Values below are names only.
 
 ### Backend
 
-| Variable                      | Local                      | CI           | Preview / staging                            | Production                  | Class                        |
-| ----------------------------- | -------------------------- | ------------ | -------------------------------------------- | --------------------------- | ---------------------------- |
-| `APP_ENV`                     | `development`              | `test`       | `preview` / `staging`                        | `production`                | required                     |
-| `PORT`                        | `3000`                     | n/a          | platform                                     | platform (`PORT`)           | optional / platform-provided |
-| `PROCESS_MODE`                | default `combined`         | n/a          | `combined`                                   | `combined`                  | optional (default)           |
-| `RECURRENCE_POLL_INTERVAL_MS` | default `30000`            | n/a          | default                                      | default                     | optional                     |
-| `DATABASE_URL`                | Compose Postgres           | CI Postgres  | **non-prod Neon**                            | **prod Neon pooled**        | required                     |
-| `AUTH_SECRET`                 | local placeholder replaced | CI-only      | distinct                                     | distinct                    | required                     |
-| `AUTH_BASE_URL`               | default localhost          | CI localhost | HTTPS API origin                             | HTTPS API origin            | required outside local       |
-| `FRONTEND_ORIGIN`             | default localhost          | n/a          | HTTPS frontend                               | HTTPS frontend              | required outside local       |
-| `TRUSTED_ORIGINS`             | default localhost          | n/a          | exact HTTPS list including `FRONTEND_ORIGIN` | same                        | required outside local       |
-| `TRUST_PROXY`                 | default `0`                | default `0`  | `0` until probed                             | `0` until probed            | optional (default 0)         |
-| `RELEASE_SHA`                 | unset                      | unset        | optional                                     | optional (else Railway SHA) | optional                     |
-| `RAILWAY_GIT_COMMIT_SHA`      | n/a                        | n/a          | platform                                     | platform                    | platform-provided            |
+| Variable                      | Local                      | CI           | Preview / staging                                | Production                                          | Class                        |
+| ----------------------------- | -------------------------- | ------------ | ------------------------------------------------ | --------------------------------------------------- | ---------------------------- |
+| `APP_ENV`                     | `development`              | `test`       | `preview` / `staging`                            | `production`                                        | required                     |
+| `PORT`                        | `3000`                     | n/a          | platform                                         | platform (`PORT`)                                   | optional / platform-provided |
+| `PROCESS_MODE`                | default `combined`         | n/a          | `combined`                                       | `combined`                                          | optional (default)           |
+| `RECURRENCE_POLL_INTERVAL_MS` | default `30000`            | n/a          | default                                          | default                                             | optional                     |
+| `DATABASE_URL`                | Compose Postgres           | CI Postgres  | **non-prod Neon**                                | **prod Neon pooled**                                | required                     |
+| `AUTH_SECRET`                 | local placeholder replaced | CI-only      | distinct                                         | distinct                                            | required                     |
+| `AUTH_BASE_URL`               | default localhost          | CI localhost | HTTPS API origin                                 | HTTPS API origin                                    | required outside local       |
+| `FRONTEND_ORIGIN`             | default localhost          | n/a          | HTTPS frontend                                   | HTTPS frontend                                      | required outside local       |
+| `TRUSTED_ORIGINS`             | default localhost          | n/a          | exact HTTPS list including `FRONTEND_ORIGIN`     | same                                                | required outside local       |
+| `TRUST_PROXY`                 | default `0`                | default `0`  | Railway `us-west2` edge: **`2`** (VERIFIED LIVE) | same Railway topology: `2`; re-probe if hops change | optional (default 0)         |
+| `RELEASE_SHA`                 | unset                      | unset        | optional                                         | optional (else Railway SHA)                         | optional                     |
+| `RAILWAY_GIT_COMMIT_SHA`      | n/a                        | n/a          | platform                                         | platform                                            | platform-provided            |
 
 ### Frontend (public)
 
@@ -284,12 +310,29 @@ artifacts (Railway deployment / Cloudflare assets) only when the schema remains
 expand-contract compatible. A failed migrate stops the release before new
 application code ships.
 
+## M9.3 staging facts (VERIFIED LIVE unless noted)
+
+Isolated non-production only. Railway also created an unused environment
+literally named `production` with **zero** services; do not use it.
+
+| Item          | Fact                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Neon          | Project `roomies-staging`, region `aws-us-west-2`, Postgres 18, db `roomies`. Pooled runtime URL and direct migrate URL both connect with `sslmode=require`. Same owner role for both.                                                                                                                                                                                                                                                                                                  |
+| Migrate       | `npm run db:migrate:release` with `MIGRATION_DATABASE_URL` (direct). 13 committed migrations applied; `db verify --strict` succeeded. No `db push`, no startup migrate. On Windows, Prisma must be spawned as `node prisma.js` with `shell: false` so `&channel_binding` is not treated as a cmd separator.                                                                                                                                                                             |
+| Railway       | Project `roomies-staging`, environment `staging`, service `roomies-api`, region **`us-west2`**, **1** replica, `sleepApplication: false`, healthcheck **`/ready`** (timeout 300s). Builder Railpack. Build `npm run build --workspace=@roomies/backend`. Start `npm run start:prod --workspace=@roomies/backend`. `PROCESS_MODE=combined`. No pre-deploy migrate.                                                                                                                       |
+| Node          | **CONFIGURED/EXPECTED:** `engines.node` `>=24 <25`; Railpack reads it. Container `node -v` was not SSH-confirmed.                                                                                                                                                                                                                                                                                                                                                                       |
+| Readiness     | `/health` 200 and `/ready` 200 with release SHA. Repeated Prisma `connect()` against Neon pooled/PgBouncer is not a reliable probe; runtime uses the process-owned `pg.Pool` `SELECT 1`.                                                                                                                                                                                                                                                                                                |
+| Cloudflare    | Worker `roomies-frontend-staging`, origin `https://roomies-frontend-staging.alexandra-nadine-lewis.workers.dev`. SPA fallback serves `/`, `/account`, `/invitations/...`. CSP present, no `unsafe-eval`, no host wildcards, `connect-src` exact API origin. Source maps absent. HTML `Cache-Control: public, max-age=0, must-revalidate`. Hashed `/assets/*` include `immutable` **and** also inherit the document `must-revalidate` rule (Cloudflare concatenates `/*` + `/assets/*`). |
+| Cookies       | API `Set-Cookie`: `__Secure-better-auth.session_token`, `HttpOnly`, `Secure`, `SameSite=Lax`, host-only (no `Domain=`). Operator `Cookie` header reaches `/api/v1/me`. A browser document on `workers.dev` **does not** store/send that cookie to `railway.app` (cross-site / third-party). Production must use same-site hostnames (`roomies.example` + `api.roomies.example`). Do not weaken SameSite to make staging browsers work.                                                  |
+| CORS / Origin | Trusted staging frontend: `ACAO` exact origin + credentials. Hostile origin: no `ACAO`. `/api/v1` mutations: missing/hostile Origin → `403 FORBIDDEN`.                                                                                                                                                                                                                                                                                                                                  |
+| Worker/outbox | Combined process drained staging outbox (`processed_at` set, no dead rows). Activity projections created. No payload/content in outbox logs.                                                                                                                                                                                                                                                                                                                                            |
+| Invitations   | Create works without a mailer (`inviteUrl` returned once). Accept requires Better Auth `email_verified`. October has no mailer; staging isolation used an operator `email_verified=true` patch on a disposable identity only.                                                                                                                                                                                                                                                           |
+
 ## Remaining M9 steps
 
-- Provision Railway (one combined service), Neon, Cloudflare, DNS
-- M9.3 private TRUST_PROXY probe (no permanent public header dump)
-- First private backend deploy, then public cutover
-- Protected production promotion workflow once secrets exist
+- Same-site production DNS (not `workers.dev` + `railway.app`)
+- Production Neon / Railway / Cloudflare environments (separate from staging)
+- Protected production promotion workflow
 - R2 media
 - Backup/PITR validation
 - Better Stack

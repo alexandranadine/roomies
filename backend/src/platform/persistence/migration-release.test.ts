@@ -3,9 +3,11 @@ import { readFile } from 'node:fs/promises';
 import { describe, it } from 'node:test';
 import {
   RELEASE_MIGRATE_PRISMA_COMMANDS,
+  PRISMA_RELEASE_SPAWN_SHELL,
   MigrationReleaseError,
   assertReleaseMigratePrismaCommands,
   assertReleaseMigrationTarget,
+  prismaReleaseSpawnArgv,
 } from './migration-release.js';
 
 const DIRECT_URL =
@@ -115,9 +117,30 @@ void describe('release migrate Prisma commands', () => {
       'utf8',
     );
     assert.match(source, /RELEASE_MIGRATE_PRISMA_COMMANDS/);
+    assert.match(source, /PRISMA_RELEASE_SPAWN_SHELL/);
     assert.doesNotMatch(
       source,
       /prisma db push|prisma migrate reset|prisma migration plan/,
     );
+  });
+
+  void it('invokes node prisma.js with --db as a separate argv entry', () => {
+    assert.equal(PRISMA_RELEASE_SPAWN_SHELL, false);
+    const url =
+      'postgresql://roomies:secret@ep-cool.us-west-2.aws.neon.tech/roomies?sslmode=require&channel_binding=require';
+    const spawn = prismaReleaseSpawnArgv(
+      '/tmp/prisma.js',
+      ['db', 'verify', '--strict'],
+      url,
+    );
+    assert.equal(spawn.command, process.execPath);
+    assert.deepEqual(spawn.args, [
+      '/tmp/prisma.js',
+      'db',
+      'verify',
+      '--strict',
+      '--db',
+      url,
+    ]);
   });
 });

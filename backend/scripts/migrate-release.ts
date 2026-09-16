@@ -19,9 +19,12 @@ import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
 import {
   RELEASE_MIGRATE_PRISMA_COMMANDS,
+  PRISMA_RELEASE_SPAWN_SHELL,
   MigrationReleaseError,
   assertReleaseMigratePrismaCommands,
   assertReleaseMigrationTarget,
+  prismaReleaseSpawnArgv,
+  resolvePrismaCliScript,
 } from '../src/platform/persistence/migration-release.js';
 
 const backendRoot = path.resolve(
@@ -41,7 +44,12 @@ function runPrisma(args: readonly string[], databaseUrl: string): void {
     arg === databaseUrl ? '<redacted-database-url>' : arg,
   );
   console.log(`> prisma ${printable.join(' ')}`);
-  const result = spawnSync('npx', ['prisma', ...args, '--db', databaseUrl], {
+  const spawn = prismaReleaseSpawnArgv(
+    resolvePrismaCliScript(backendRoot),
+    args,
+    databaseUrl,
+  );
+  const result = spawnSync(spawn.command, spawn.args, {
     cwd: backendRoot,
     env: {
       ...process.env,
@@ -50,7 +58,7 @@ function runPrisma(args: readonly string[], databaseUrl: string): void {
       CI: process.env['CI'] ?? 'true',
     },
     encoding: 'utf8',
-    shell: true,
+    shell: PRISMA_RELEASE_SPAWN_SHELL,
   });
 
   if (result.stdout) {
