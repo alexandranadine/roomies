@@ -60,8 +60,44 @@ void describe('deployment production scripts', () => {
       'utf8',
     );
     assert.match(source, /pool\.query\('SELECT 1'\)/);
+    // Staging probe must stay gone. The temporary production diagnostic uses
+    // IP_PROBE_* names and is gated by the test below until removal.
     assert.doesNotMatch(source, /STAGING_IP_PROBE/);
     assert.doesNotMatch(source, /staging-ip-probe/);
+  });
+
+  void it('keeps the temporary production IP probe explicitly marked for removal', async () => {
+    const main = await readFile(
+      path.join(backendRoot, 'src/main.ts'),
+      'utf8',
+    );
+    const probe = await readFile(
+      path.join(backendRoot, 'src/platform/http/ip-probe.ts'),
+      'utf8',
+    );
+    const secrets = await readFile(
+      path.join(backendRoot, 'src/platform/config/errors.ts'),
+      'utf8',
+    );
+
+    // TEMPORARY: these matches make the diagnostic detectable while it exists.
+    // After verification, delete ip-probe.ts / ip-probe.test.ts, unmount it
+    // from main.ts, drop IP_PROBE_TOKEN from SECRET_ENV_KEYS, and replace
+    // this test with:
+    //   assert.doesNotMatch(main, /IP_PROBE/);
+    //   assert.doesNotMatch(main, /__diag\/ip-probe/);
+    //   assert.doesNotMatch(main, /ip-probe/);
+    // That restores the original invariant: production code must not retain
+    // a forwarding-header probe.
+    assert.match(main, /TEMPORARY_PRODUCTION_IP_PROBE_REMOVE_AFTER_VERIFICATION/);
+    assert.match(probe, /TEMPORARY_PRODUCTION_IP_PROBE_REMOVE_AFTER_VERIFICATION/);
+    assert.match(secrets, /TEMPORARY_PRODUCTION_IP_PROBE_REMOVE_AFTER_VERIFICATION/);
+    assert.match(main, /IP_PROBE_PATH/);
+    assert.match(main, /ipProbeTokenFromEnv/);
+    assert.match(probe, /IP_PROBE_TOKEN/);
+    assert.doesNotMatch(main, /STAGING_IP_PROBE/);
+    assert.doesNotMatch(main, /staging-ip-probe/);
+    assert.doesNotMatch(probe, /STAGING_IP_PROBE/);
   });
 
   void it('fails production when Node major is not 24', async () => {
