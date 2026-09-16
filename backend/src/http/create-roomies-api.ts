@@ -59,6 +59,10 @@ import { createCurrentUserRouter } from '../domains/users/http.js';
 import type { PrincipalResolver } from '../platform/auth/principal.js';
 import type { ActiveHomeActorResolver } from '../platform/authz/index.js';
 import {
+  createAccountRouter,
+  type CreateAccountRouterOptions,
+} from './account.js';
+import {
   createInvitationAcceptanceRouter,
   type AcceptInvitationCommand,
 } from './invitation-acceptance.js';
@@ -123,6 +127,10 @@ export type CreateRoomiesApiRouterOptions = {
   pulse?: {
     getHousePulse: GetHousePulseCommand;
   };
+  account?: Pick<
+    CreateAccountRouterOptions,
+    'deleteAccount' | 'auth' | 'clock'
+  >;
 };
 
 /**
@@ -143,6 +151,17 @@ export function createRoomiesApiRouter(
     );
   }
   router.use('/me', createCurrentUserRouter(options));
+  if (options.account !== undefined) {
+    router.use(
+      '/account',
+      createAccountRouter({
+        principalResolver: options.principalResolver,
+        deleteAccount: options.account.deleteAccount,
+        auth: options.account.auth,
+        clock: options.account.clock,
+      }),
+    );
+  }
   router.use('/homes', createHomesRouter(options));
   router.use('/homes', createMembershipsRouter(options));
   if (options.invitations !== undefined) {

@@ -95,7 +95,7 @@ void describe('POST invitation acceptance HTTP PostgreSQL', () => {
   );
 
   void it(
-    'refuses acceptance for a live session whose canonical User has deletedAt set',
+    'refuses acceptance as unauthenticated when the canonical User has deletedAt set',
     { skip: skipWithoutDatabase, timeout: 60_000 },
     async () => {
       const databaseUrl = resolveSafeDedicatedTestDatabaseUrl();
@@ -219,10 +219,10 @@ void describe('POST invitation acceptance HTTP PostgreSQL', () => {
             },
             body: JSON.stringify({}),
           });
-          assert.equal(refused.status, 404);
+          assert.equal(refused.status, 401);
           const body = refused.json() as ApiErrorBody;
-          assert.equal(body.error.code, 'INVITATION_NOT_AVAILABLE');
-          assert.equal(body.error.message, 'Invitation is not available');
+          assert.equal(body.error.code, 'UNAUTHENTICATED');
+          assert.equal(body.error.message, 'Authentication required');
           assert.equal(refused.text.includes('deleted'), false);
           assert.equal(refused.text.includes('deletedAt'), false);
           assert.equal(refused.text.includes(invitee.id), false);

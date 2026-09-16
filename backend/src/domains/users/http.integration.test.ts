@@ -238,6 +238,29 @@ void describe('GET /api/v1/me HTTP integration', () => {
 
           const authStillMounted = await request({ path: '/api/auth/ok' });
           assert.equal(authStillMounted.status, 200);
+
+          const deletedAt = new Date('2026-09-15T18:00:00.000Z');
+          const marked = await database.pool.query(
+            `UPDATE users SET deleted_at = $1 WHERE id = $2 AND deleted_at IS NULL`,
+            [deletedAt, identityId],
+          );
+          assert.equal(marked.rowCount, 1);
+          const stillHasIdentity = await database.pool.query(
+            'SELECT id FROM auth_identities WHERE id = $1',
+            [identityId],
+          );
+          assert.equal(stillHasIdentity.rowCount, 1);
+
+          const deletedMe = await request({
+            path: '/api/v1/me',
+            headers: { Cookie: sessionCookieHeader(sessionCookie) },
+          });
+          assert.equal(deletedMe.status, 401);
+          const deletedMeBody = deletedMe.json() as ApiErrorBody;
+          assert.equal(deletedMeBody.error.code, 'UNAUTHENTICATED');
+          assert.equal(deletedMeBody.error.message, 'Authentication required');
+          assert.equal(deletedMe.text.includes('deleted'), false);
+          assert.equal(deletedMe.text.includes(email), false);
         });
       } finally {
         for (const id of identityIds) {

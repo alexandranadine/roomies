@@ -1,3 +1,4 @@
+import { createDeleteAccountLifecycleFromPool } from './application/account/delete-account-lifecycle.js';
 import { createCreateHomeFromPool } from './application/homes/create-home.js';
 import { createChangeMembershipRoleFromPool } from './application/home-administration/change-membership-role.js';
 import { createArchiveFinalMemberHomeFromPool } from './application/home-administration/archive-final-member-home.js';
@@ -59,6 +60,7 @@ import {
 import { startProcess } from './platform/runtime/start-process.js';
 import type { ClosableResource } from './platform/server/start-http-server.js';
 import { startHttpServer } from './platform/server/start-http-server.js';
+import { systemClock } from './platform/time/clock.js';
 import { createProcessWorkerFromPool } from './platform/workers/create-process-worker-from-pool.js';
 import { createDb } from './prisma/db.js';
 
@@ -165,6 +167,11 @@ function createWebHttpRuntime(
       },
       pulse: {
         getHousePulse: createGetHousePulseFromPool(databasePool.pool),
+      },
+      account: {
+        deleteAccount: createDeleteAccountLifecycleFromPool(databasePool.pool),
+        auth,
+        clock: systemClock,
       },
     }),
   });

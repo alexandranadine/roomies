@@ -72,6 +72,26 @@ function sessionTokenValue(setCookie: string): string {
   return pair.slice(pair.indexOf('=') + 1);
 }
 
+function assertResolvedPrincipal(body: unknown, userId: string): void {
+  assert.ok(body !== null && typeof body === 'object');
+  assert.ok('principal' in body);
+  const principal = body.principal;
+  assert.ok(principal !== null && typeof principal === 'object');
+  assert.ok('userId' in principal);
+  assert.ok('sessionCreatedAt' in principal);
+  const sessionCreatedAt = principal.sessionCreatedAt;
+  assert.equal(principal.userId, userId);
+  assert.ok(typeof sessionCreatedAt === 'string');
+  assert.ok(
+    !Number.isNaN(Date.parse(sessionCreatedAt)),
+    'sessionCreatedAt must be an authoritative timestamp',
+  );
+  assert.deepEqual(Object.keys(principal).sort(), [
+    'sessionCreatedAt',
+    'userId',
+  ]);
+}
+
 void describe('Better Auth HTTP integration', () => {
   void it(
     'mounts auth, provisions a User, and resolves a session principal',
@@ -295,9 +315,7 @@ void describe('Better Auth HTTP integration', () => {
             path: '/__test/principal',
             headers: { Cookie: sessionCookieHeader(signupCookie) },
           });
-          assert.deepEqual(afterSignup.json(), {
-            principal: { userId: identityId },
-          });
+          assertResolvedPrincipal(afterSignup.json(), identityId);
 
           const session = await request({
             path: '/api/auth/get-session',
@@ -387,9 +405,7 @@ void describe('Better Auth HTTP integration', () => {
             path: '/__test/principal',
             headers: { Cookie: sessionCookieHeader(loginCookie) },
           });
-          assert.deepEqual(afterLogin.json(), {
-            principal: { userId: identityId },
-          });
+          assertResolvedPrincipal(afterLogin.json(), identityId);
 
           await database.pool.query(
             "UPDATE auth_sessions SET expires_at = NOW() - INTERVAL '1 day' WHERE user_id = $1",
@@ -614,9 +630,7 @@ void describe('Better Auth HTTP integration', () => {
             path: '/__test/principal',
             headers: { Cookie: sessionCookieHeader(loginCookie) },
           });
-          assert.deepEqual(stillAuthenticated.json(), {
-            principal: { userId: identityId },
-          });
+          assertResolvedPrincipal(stillAuthenticated.json(), identityId);
         });
       } finally {
         if (identityId) {

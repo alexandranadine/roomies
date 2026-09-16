@@ -109,6 +109,20 @@ void describe('create-roomies-api composition boundary', () => {
     assert.doesNotMatch(source, /activity_recipients/);
   });
 
+  void it('wires account deletion HTTP without lifecycle SQL or cookie internals', async () => {
+    const source = await readFile(
+      new URL('./create-roomies-api.ts', import.meta.url),
+      'utf8',
+    );
+    assert.match(source, /createAccountRouter/);
+    assert.match(source, /\/account/);
+    assert.doesNotMatch(source, /createDeleteAccountLifecycleFromPool/);
+    assert.doesNotMatch(source, /appendExpiredAuthSessionCookieAfterCommit/);
+    assert.doesNotMatch(source, /deleted_at/);
+    assert.doesNotMatch(source, /FROM\s+users/i);
+    assert.doesNotMatch(source, /better-auth/);
+  });
+
   void it('wires active Membership list through Home context without SQL', async () => {
     const source = await readFile(
       new URL('./create-roomies-api.ts', import.meta.url),

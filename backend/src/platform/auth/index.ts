@@ -19,8 +19,10 @@ export {
 export {
   createCanonicalUserLookup,
   createPrincipalResolver,
+  readSessionCreatedAt,
   type AuthenticatedPrincipal,
   type CanonicalUserLookup,
+  type CanonicalUserPresence,
   type CreatePrincipalResolverOptions,
   type PrincipalResolver,
 } from './principal.js';
