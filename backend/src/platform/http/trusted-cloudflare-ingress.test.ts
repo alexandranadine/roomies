@@ -10,13 +10,6 @@ import {
 import { REQUEST_ID_HEADER } from './constants.js';
 import { createApp } from './create-app.js';
 import type { ApiErrorBody } from './errors.js';
-import {
-  IP_PROBE_PATH,
-  IP_PROBE_TOKEN_HEADER,
-  createIpProbeHandler,
-  hashNetworkValue,
-  type IpProbeDiagnostic,
-} from './ip-probe.js';
 import { createInMemoryRateLimitRuntime } from './rate-limit.js';
 import {
   CF_CONNECTING_IP_HEADER,
@@ -27,7 +20,6 @@ import {
 const TRUSTED_ORIGIN = 'http://localhost:5173';
 const ORIGIN_SECRET = 'roomies_cf_origin_auth_secret_32_chars_min';
 const WRONG_SECRET = 'roomies_cf_origin_auth_secret_32_chars_bad';
-const PROBE_TOKEN = 'roomies_test_secret_32_chars_minimum_value';
 const CLIENT_A = '203.0.113.10';
 const CLIENT_B = '198.51.100.20';
 const SPOOFED = '192.0.2.99';
@@ -813,41 +805,5 @@ void describe('trusted Cloudflare ingress', () => {
     assertForbidden(product);
     assert.equal(handlerCalls.length, 0);
     assert.equal(productCalls.length, 0);
-  });
-
-  void it('reports hashed trusted identity on the temporary probe without leaking secrets', async () => {
-    const app = createApp({
-      config: cloudflareConfig(2),
-      readiness: { checkReady: () => Promise.resolve(true) },
-      configure(expressApp) {
-        expressApp.get(
-          IP_PROBE_PATH,
-          createIpProbeHandler({ token: PROBE_TOKEN, trustProxyHops: 2 }),
-        );
-      },
-    });
-
-    const res = await appRequest(app, {
-      path: IP_PROBE_PATH,
-      headers: originHeaders(CLIENT_A, {
-        [IP_PROBE_TOKEN_HEADER]: PROBE_TOKEN,
-        'X-Forwarded-For': `${SPOOFED}, ${CLIENT_B}`,
-        'X-Real-IP': CLIENT_B,
-        Cookie: 'cookie-secret=1',
-      }),
-    });
-    assert.equal(res.status, 200);
-    const body = res.json() as IpProbeDiagnostic;
-    assert.equal(body.edgeAuthSucceeded, true);
-    assert.equal(body.trustedLimiterIdentityHash, hashNetworkValue(CLIENT_A));
-    assert.equal(body.trustedIdentityMatchesCfConnectingIp, true);
-    assert.equal(body.trustedIdentityMatchesXffIntermediary, false);
-    assert.equal(body.canaryInCfConnectingIp, true);
-    assert.notEqual(body.trustedLimiterIdentityHash, body.reqIpHash);
-    assertNoForbiddenLeak({
-      context: 'cloudflare probe',
-      text: res.text,
-      forbidden: LEAK_SENTINELS,
-    });
   });
 });

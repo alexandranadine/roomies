@@ -49,11 +49,6 @@ import type {
 } from './platform/config/types.js';
 import { createApp } from './platform/http/create-app.js';
 import {
-  IP_PROBE_PATH,
-  createIpProbeHandler,
-  ipProbeTokenFromEnv,
-} from './platform/http/ip-probe.js';
-import {
   DEFAULT_RATE_LIMIT_SWEEP_INTERVAL_MS,
   createInMemoryRateLimitRuntime,
 } from './platform/http/rate-limit.js';
@@ -109,25 +104,11 @@ function createWebHttpRuntime(
       return Promise.resolve();
     },
   });
-  // TEMPORARY_PRODUCTION_IP_PROBE_REMOVE_AFTER_VERIFICATION
-  const ipProbeToken = ipProbeTokenFromEnv(process.env);
   const app = createApp({
     config,
     readiness,
     auth,
     rateLimits,
-    configure:
-      ipProbeToken === undefined
-        ? undefined
-        : (expressApp) => {
-            expressApp.get(
-              IP_PROBE_PATH,
-              createIpProbeHandler({
-                token: ipProbeToken,
-                trustProxyHops: config.trustProxyHops,
-              }),
-            );
-          },
     roomiesApi: createRoomiesApiRouter({
       principalResolver,
       activeHomeActorResolver,

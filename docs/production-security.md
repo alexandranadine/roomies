@@ -103,6 +103,20 @@ do not establish a trusted client identity.
 `INGRESS_MODE=cloudflare` and is redacted like other secrets. Do not set
 the secret when `INGRESS_MODE=direct`.
 
+**VERIFIED LIVE (production, `api.roomies.casa`):** Cloudflare origin-auth
+overwrite succeeded, and authenticated Cloudflare ingress succeeded.
+Trusted limiter identity matched `CF-Connecting-IP` and did not match
+`X-Forwarded-For` intermediaries. Client-supplied `X-Forwarded-For` and
+`X-Real-IP` did not rotate limiter identity. Client-supplied
+`X-Roomies-Origin-Auth` was overwritten by Cloudflare. A client attempt to
+supply `CF-Connecting-IP` was rejected at the Cloudflare edge with
+Cloudflare error 1000 before reaching the application. No
+Railway-generated public `*.up.railway.app` hostname is currently enabled;
+only `api.roomies.casa` is publicly configured, plus the private
+`roomies.railway.internal` endpoint. The temporary production IP diagnostic
+was removed after verification, and `IP_PROBE_TOKEN` was removed from
+Railway. Do not reintroduce that diagnostic, its route, or that token.
+
 ## General API limiter
 
 Not implemented for October. Credential, sensitive, and invitation-token

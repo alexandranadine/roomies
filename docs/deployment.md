@@ -294,6 +294,28 @@ Do not configure Authenticated Origin Pulls as a substitute for this
 header. Do not trust Host, Origin, XFF, X-Real-IP, or the TCP peer as
 Cloudflare provenance.
 
+### Production ingress verification (VERIFIED LIVE)
+
+Observed on the production API. This record does not include secrets, raw
+client IPs, or diagnostic hashes.
+
+- Cloudflare origin-auth overwrite is verified.
+- Authenticated Cloudflare ingress succeeded.
+- Trusted limiter identity matched `CF-Connecting-IP`.
+- Trusted limiter identity did not match `X-Forwarded-For`
+  intermediaries.
+- Client-supplied `X-Forwarded-For` and `X-Real-IP` did not rotate
+  limiter identity.
+- Client-supplied `X-Roomies-Origin-Auth` was overwritten by Cloudflare.
+- A client attempt to supply `CF-Connecting-IP` was rejected at the
+  Cloudflare edge with Cloudflare error 1000 before reaching the
+  application.
+- No Railway-generated public `*.up.railway.app` hostname is currently
+  enabled. Only `api.roomies.casa` is publicly configured, plus the
+  private `roomies.railway.internal` endpoint.
+- The temporary production IP diagnostic was removed after verification.
+  `IP_PROBE_TOKEN` was removed from Railway and must not be reintroduced.
+
 ## Frontend (Cloudflare Workers Static Assets)
 
 Config: `frontend/wrangler.json`.

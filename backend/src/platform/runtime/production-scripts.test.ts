@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { access, readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -9,6 +9,22 @@ const backendRoot = path.resolve(
   '../../..',
 );
 const repoRoot = path.resolve(backendRoot, '..');
+
+async function listTypeScriptSources(root: string): Promise<string[]> {
+  const files: string[] = [];
+  const entries = await readdir(root, { withFileTypes: true });
+  for (const entry of entries) {
+    const full = path.join(root, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...(await listTypeScriptSources(full)));
+      continue;
+    }
+    if (entry.name.endsWith('.ts')) {
+      files.push(full);
+    }
+  }
+  return files;
+}
 
 void describe('deployment production scripts', () => {
   void it('uses compiled JS for production start and does not auto-migrate', async () => {
@@ -60,44 +76,42 @@ void describe('deployment production scripts', () => {
       'utf8',
     );
     assert.match(source, /pool\.query\('SELECT 1'\)/);
-    // Staging probe must stay gone. The temporary production diagnostic uses
-    // IP_PROBE_* names and is gated by the test below until removal.
-    assert.doesNotMatch(source, /STAGING_IP_PROBE/);
-    assert.doesNotMatch(source, /staging-ip-probe/);
   });
 
-  void it('keeps the temporary production IP probe explicitly marked for removal', async () => {
-    const main = await readFile(
-      path.join(backendRoot, 'src/main.ts'),
-      'utf8',
-    );
-    const probe = await readFile(
-      path.join(backendRoot, 'src/platform/http/ip-probe.ts'),
-      'utf8',
-    );
-    const secrets = await readFile(
-      path.join(backendRoot, 'src/platform/config/errors.ts'),
-      'utf8',
-    );
-
-    // TEMPORARY: these matches make the diagnostic detectable while it exists.
-    // After verification, delete ip-probe.ts / ip-probe.test.ts, unmount it
-    // from main.ts, drop IP_PROBE_TOKEN from SECRET_ENV_KEYS, and replace
-    // this test with:
-    //   assert.doesNotMatch(main, /IP_PROBE/);
-    //   assert.doesNotMatch(main, /__diag\/ip-probe/);
-    //   assert.doesNotMatch(main, /ip-probe/);
-    // That restores the original invariant: production code must not retain
-    // a forwarding-header probe.
-    assert.match(main, /TEMPORARY_PRODUCTION_IP_PROBE_REMOVE_AFTER_VERIFICATION/);
-    assert.match(probe, /TEMPORARY_PRODUCTION_IP_PROBE_REMOVE_AFTER_VERIFICATION/);
-    assert.match(secrets, /TEMPORARY_PRODUCTION_IP_PROBE_REMOVE_AFTER_VERIFICATION/);
-    assert.match(main, /IP_PROBE_PATH/);
-    assert.match(main, /ipProbeTokenFromEnv/);
-    assert.match(probe, /IP_PROBE_TOKEN/);
-    assert.doesNotMatch(main, /STAGING_IP_PROBE/);
-    assert.doesNotMatch(main, /staging-ip-probe/);
-    assert.doesNotMatch(probe, /STAGING_IP_PROBE/);
+  void it('does not retain a forwarding-header diagnostic', async () => {
+    const probeModule = ['ip', '-probe'].join('');
+    const removed = [
+      ['IP', '_PROBE'].join(''),
+      ['__diag', '/', probeModule].join(''),
+      probeModule,
+      [
+        'TEMPORARY_PRODUCTION',
+        '_IP',
+        '_PROBE',
+        '_REMOVE_AFTER_VERIFICATION',
+      ].join(''),
+      ['IP', '_PROBE', '_TOKEN'].join(''),
+      ['STAGING', '_IP', '_PROBE'].join(''),
+      ['staging', '-', probeModule].join(''),
+      ['x-', probeModule, '-token'].join(''),
+    ];
+    for (const name of [`${probeModule}.ts`, `${probeModule}.test.ts`]) {
+      await assert.rejects(
+        access(path.join(backendRoot, 'src/platform/http', name)),
+      );
+    }
+    const files = await listTypeScriptSources(path.join(backendRoot, 'src'));
+    for (const file of files) {
+      const source = await readFile(file, 'utf8');
+      const rel = path.relative(backendRoot, file).replaceAll('\\', '/');
+      for (const needle of removed) {
+        assert.equal(
+          source.includes(needle),
+          false,
+          `${rel} reintroduces a removed diagnostic`,
+        );
+      }
+    }
   });
 
   void it('fails production when Node major is not 24', async () => {
