@@ -1,17 +1,33 @@
 export type DocumentCspInput = {
   /** Canonical API origin (scheme://host[:port]). Omitted connect-src extra when unset. */
   apiOrigin?: string;
+  /**
+   * Canonical public R2 S3 origin (scheme://host[:port]). Added to connect-src
+   * only — never img-src. Home photos render from blob: URLs.
+   */
+  r2S3Origin?: string;
 };
+
+function renderConnectSrc(input: DocumentCspInput): string {
+  const parts = ["'self'"];
+  if (input.apiOrigin !== undefined && input.apiOrigin.length > 0) {
+    parts.push(input.apiOrigin);
+  }
+  if (input.r2S3Origin !== undefined && input.r2S3Origin.length > 0) {
+    parts.push(input.r2S3Origin);
+  }
+  return parts.join(' ');
+}
 
 /**
  * Minimal document CSP for the Vite/React frontend origin.
  *
  * Assets, fonts, and scripts are self-hosted. The JSON API lives on a separate
- * origin (`connect-src`). No `unsafe-eval`. No host wildcards.
+ * origin (`connect-src`). Direct Home-photo object transfer uses an exact
+ * public R2 S3 origin on `connect-src`. Images may use `blob:` object URLs.
+ * No `unsafe-eval`. No host wildcards.
  */
 export function renderDocumentCsp(input: DocumentCspInput = {}): string {
-  const connectSrc = input.apiOrigin ? `'self' ${input.apiOrigin}` : "'self'";
-
   return [
     "default-src 'self'",
     "base-uri 'self'",
@@ -20,15 +36,16 @@ export function renderDocumentCsp(input: DocumentCspInput = {}): string {
     "object-src 'none'",
     "script-src 'self'",
     "style-src 'self'",
-    "img-src 'self' data:",
+    "img-src 'self' data: blob:",
     "font-src 'self'",
-    `connect-src ${connectSrc}`,
+    `connect-src ${renderConnectSrc(input)}`,
     'upgrade-insecure-requests',
   ].join('; ');
 }
 
 export type CloudflareHeadersInput = {
   apiOrigin?: string;
+  r2S3Origin?: string;
 };
 
 /**
@@ -38,7 +55,10 @@ export type CloudflareHeadersInput = {
  * document origin, not on the JSON API.
  */
 export function renderCloudflareHeaders(input: CloudflareHeadersInput): string {
-  const csp = renderDocumentCsp({ apiOrigin: input.apiOrigin });
+  const csp = renderDocumentCsp({
+    apiOrigin: input.apiOrigin,
+    r2S3Origin: input.r2S3Origin,
+  });
   return [
     '/*',
     `  Content-Security-Policy: ${csp}`,

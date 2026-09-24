@@ -6,7 +6,10 @@ let cached: FrontendEnv | undefined;
 export function getFrontendEnv(): FrontendEnv {
   if (cached === undefined) {
     cached = parseFrontendEnv(
-      { VITE_API_ORIGIN: import.meta.env.VITE_API_ORIGIN },
+      {
+        VITE_API_ORIGIN: import.meta.env.VITE_API_ORIGIN,
+        VITE_R2_S3_ORIGIN: import.meta.env.VITE_R2_S3_ORIGIN,
+      },
       { isDevelopment: import.meta.env.DEV },
     );
   }

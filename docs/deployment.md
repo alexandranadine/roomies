@@ -342,9 +342,12 @@ release SHA for ops.
 
 ### Document CSP
 
-Self-hosted scripts, styles, and `@fontsource/manrope` fonts. Images: `'self'`
-and `data:`. `connect-src` is `'self'` plus the exact `VITE_API_ORIGIN`. No
-`unsafe-eval`, no host wildcards. API Helmet CSP stays disabled (JSON API).
+Self-hosted scripts, styles, and `@fontsource/manrope` fonts. Images: `'self'`,
+`data:`, and `blob:` (Home photos render from local object URLs, not signed R2
+URLs). `connect-src` is `'self'` plus the exact `VITE_API_ORIGIN` and, when
+configured, the exact `VITE_R2_S3_ORIGIN`. The R2 origin is never added to
+`img-src`. No `unsafe-eval`, no host wildcards. API Helmet CSP stays disabled
+(JSON API).
 
 ## Environment matrix
 
@@ -381,9 +384,10 @@ Never commit real secrets. Values below are names only.
 
 ### Frontend (public)
 
-| Variable          | Local                           | CI                         | Preview / staging | Production       | Class                        |
-| ----------------- | ------------------------------- | -------------------------- | ----------------- | ---------------- | ---------------------------- |
-| `VITE_API_ORIGIN` | default `http://localhost:3000` | `https://api.example.test` | HTTPS API origin  | HTTPS API origin | required for deployed builds |
+| Variable            | Local                           | CI                         | Preview / staging  | Production         | Class                              |
+| ------------------- | ------------------------------- | -------------------------- | ------------------ | ------------------ | ---------------------------------- |
+| `VITE_API_ORIGIN`   | default `http://localhost:3000` | `https://api.example.test` | HTTPS API origin   | HTTPS API origin   | required for deployed builds       |
+| `VITE_R2_S3_ORIGIN` | unset (optional)                | unset (optional)           | exact R2 S3 origin | exact R2 S3 origin | public origin; optional when unset |
 
 ### Release-only
 
@@ -413,12 +417,24 @@ No session replay.
 
 ## R2
 
-Backend-only private object store for Home photos. `R2_PROVIDER` defaults to
-`fake` in development/test. Preview, staging, and production must set the
-provider; production rejects `fake`. Cloudflare R2 uses the S3-compatible API
+Private object store for Home photos. `R2_PROVIDER` defaults to `fake` in
+development/test. Preview, staging, and production must set the provider;
+production rejects `fake`. Cloudflare R2 uses the S3-compatible API
 (`@aws-sdk/client-s3` + `@aws-sdk/s3-request-presigner`). Do not put R2
-credentials in `VITE_*` or any frontend env. Upload/finalize HTTP routes and
-bucket CORS/lifecycle provisioning are later tickets.
+credentials (`R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ACCOUNT_ID`) in
+`VITE_*` or any frontend env.
+
+The frontend may set public `VITE_R2_S3_ORIGIN` (`scheme://host` only) so
+document CSP `connect-src` can allow direct browser PUT/GET to signed object
+URLs. Home photos are displayed from local `blob:` URLs, not signed R2 URLs.
+
+The in-process `fake` object store cannot service a real browser’s presigned
+PUT. Local unit/component/E2E tests mock that transfer. Manual real-browser
+upload requires `R2_PROVIDER=cloudflare`, a private dev/staging bucket, bucket
+CORS for the frontend origin, and `VITE_R2_S3_ORIGIN`. Do not add an Express
+upload proxy, fake public upload server, Worker, or MinIO for local uploads.
+Bucket provisioning and lifecycle configuration are not owned by the frontend
+Home-photo UX.
 
 ## Backups (later M9)
 

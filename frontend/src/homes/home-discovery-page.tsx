@@ -5,6 +5,7 @@ import { DocumentTitle } from '../components/document-title.js';
 import { Button, Card, EmptyState, Spinner } from '../components/ui/index.js';
 import { ApiError } from '../platform/api/index.js';
 import { CreateHomeForm } from './create-home-form.js';
+import { HomeAvatar } from './home-avatar.js';
 import { currentUserHomesQueryKey } from './home-query-keys.js';
 import { homeRoleLabel } from './home-role-label.js';
 import { listCurrentUserHomes } from './homes-api.js';
@@ -110,11 +111,19 @@ export function HomeDiscoveryPage() {
               <Card padding="md">
                 <Link
                   to={`/homes/${home.id}`}
-                  className="flex flex-col gap-1 font-medium text-text-primary underline-offset-4 hover:text-brand-hover hover:underline focus-visible:rounded-sm"
+                  className="flex items-center gap-3 font-medium text-text-primary underline-offset-4 hover:text-brand-hover hover:underline focus-visible:rounded-sm"
                 >
-                  <span>{home.name}</span>
-                  <span className="text-sm font-normal text-text-secondary">
-                    {homeRoleLabel(home.role)}
+                  <HomeAvatar
+                    homeId={home.id}
+                    name={home.name}
+                    hasPhoto={home.hasPhoto}
+                    size="sm"
+                  />
+                  <span className="flex min-w-0 flex-col gap-1">
+                    <span>{home.name}</span>
+                    <span className="text-sm font-normal text-text-secondary">
+                      {homeRoleLabel(home.role)}
+                    </span>
                   </span>
                 </Link>
               </Card>

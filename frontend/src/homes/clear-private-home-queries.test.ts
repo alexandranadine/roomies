@@ -8,6 +8,7 @@ import {
   currentUserHomesQueryKey,
   currentUserQueryKey,
   homeContextQueryKey,
+  homePhotoQueryKey,
 } from './home-query-keys.js';
 
 const HOME_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -31,6 +32,7 @@ describe('clearPrivateHomeQueryState', () => {
       timezone: 'UTC',
       hasPhoto: false,
     });
+    queryClient.setQueryData(homePhotoQueryKey(HOME_ID), new Blob(['photo']));
     queryClient.setQueryData(pulseKeys.all(HOME_ID), clearHousePulse());
     queryClient.setQueryData(notificationKeys.list({}), {
       pages: [{ items: [], hasMore: false, nextCursor: null }],
@@ -42,6 +44,9 @@ describe('clearPrivateHomeQueryState', () => {
     expect(queryClient.getQueryData(currentUserHomesQueryKey)).toBeUndefined();
     expect(
       queryClient.getQueryData(homeContextQueryKey(HOME_ID)),
+    ).toBeUndefined();
+    expect(
+      queryClient.getQueryData(homePhotoQueryKey(HOME_ID)),
     ).toBeUndefined();
     expect(queryClient.getQueryData(pulseKeys.all(HOME_ID))).toBeUndefined();
     expect(queryClient.getQueryData(notificationKeys.list({}))).toBeUndefined();

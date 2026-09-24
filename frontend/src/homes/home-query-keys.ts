@@ -8,3 +8,8 @@ export const currentUserHomesQueryKey = ['me', 'homes'] as const;
 export function homeContextQueryKey(homeId: string) {
   return ['home', homeId, 'context'] as const;
 }
+
+/** Fetched Home-photo Blob for the URL Home. Never a signed URL. */
+export function homePhotoQueryKey(homeId: string) {
+  return ['home', homeId, 'photo'] as const;
+}

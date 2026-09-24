@@ -107,6 +107,9 @@ describe('invitation landing page', () => {
       `Invitation ${SECRET}`,
     );
     expect(url.includes('/accept')).toBe(false);
+    expect(
+      fetchMock.mock.calls.some((call) => String(call[0]).includes('/photo')),
+    ).toBe(false);
   });
 
   it('renders a generic unavailable state', async () => {

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { getApiClient } from '../platform/api/index.js';
 
-const homeContextSchema = z
+export const homeContextSchema = z
   .object({
     id: z.string().uuid(),
     name: z.string().min(1),

@@ -1,5 +1,8 @@
 import { z } from 'zod';
-import { normalizeApiOrigin } from './normalize-api-origin.js';
+import {
+  normalizeApiOrigin,
+  normalizePublicOrigin,
+} from './normalize-api-origin.js';
 
 /** Local backend default — development / Vitest only. Never used for deployed builds. */
 export const DEV_DEFAULT_API_ORIGIN = 'http://localhost:3000';
@@ -7,10 +10,16 @@ export const DEV_DEFAULT_API_ORIGIN = 'http://localhost:3000';
 export type FrontendEnv = {
   /** Canonical API origin (scheme://host[:port]), no trailing path. */
   apiOrigin: string;
+  /**
+   * Canonical public R2 S3 origin (scheme://host[:port]) for `connect-src`
+   * and browser object transfer. Omitted when unset.
+   */
+  r2S3Origin?: string;
 };
 
 export type FrontendEnvSource = Readonly<{
   VITE_API_ORIGIN?: string | undefined;
+  VITE_R2_S3_ORIGIN?: string | undefined;
 }>;
 
 export type ParseFrontendEnvOptions = {
@@ -30,11 +39,31 @@ export class FrontendEnvError extends Error {
 
 const rawOriginSchema = z.string().optional();
 
+function parseOptionalR2S3Origin(raw: string | undefined): string | undefined {
+  const rawResult = rawOriginSchema.safeParse(raw);
+  if (!rawResult.success) {
+    throw new FrontendEnvError('VITE_R2_S3_ORIGIN is invalid');
+  }
+
+  const trimmed = rawResult.data?.trim() ?? '';
+  if (trimmed.length === 0) {
+    return undefined;
+  }
+
+  try {
+    return normalizePublicOrigin(trimmed, 'VITE_R2_S3_ORIGIN');
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : 'invalid R2 S3 origin';
+    throw new FrontendEnvError(`VITE_R2_S3_ORIGIN: ${detail}`);
+  }
+}
+
 /**
  * Validate public frontend environment.
  *
- * Only `VITE_API_ORIGIN` is supported. Secrets (e.g. `DATABASE_URL`) must never
- * be placed in Vite env — they would be embedded in the client bundle.
+ * Only `VITE_API_ORIGIN` and optional `VITE_R2_S3_ORIGIN` are supported.
+ * Secrets (e.g. `DATABASE_URL`, `R2_ACCESS_KEY_ID`) must never be placed in
+ * Vite env — they would be embedded in the client bundle.
  */
 export function parseFrontendEnv(
   source: FrontendEnvSource,
@@ -46,20 +75,28 @@ export function parseFrontendEnv(
   }
 
   const raw = rawResult.data?.trim() ?? '';
+  let apiOrigin: string;
 
   if (raw.length === 0) {
     if (options.isDevelopment) {
-      return { apiOrigin: DEV_DEFAULT_API_ORIGIN };
+      apiOrigin = DEV_DEFAULT_API_ORIGIN;
+    } else {
+      throw new FrontendEnvError(
+        'VITE_API_ORIGIN is required for deployed builds (no localhost default)',
+      );
     }
-    throw new FrontendEnvError(
-      'VITE_API_ORIGIN is required for deployed builds (no localhost default)',
-    );
+  } else {
+    try {
+      apiOrigin = normalizeApiOrigin(raw);
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : 'invalid API origin';
+      throw new FrontendEnvError(`VITE_API_ORIGIN: ${detail}`);
+    }
   }
 
-  try {
-    return { apiOrigin: normalizeApiOrigin(raw) };
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : 'invalid API origin';
-    throw new FrontendEnvError(`VITE_API_ORIGIN: ${detail}`);
+  const r2S3Origin = parseOptionalR2S3Origin(source.VITE_R2_S3_ORIGIN);
+  if (r2S3Origin === undefined) {
+    return { apiOrigin };
   }
+  return { apiOrigin, r2S3Origin };
 }

@@ -7,6 +7,7 @@ import { ApiError } from '../platform/api/index.js';
 import { clearPrivateHomeQueryState } from './clear-private-home-queries.js';
 import { getHomeContext } from './home-context-api.js';
 import type { HomeShellOutletContext } from './home-overview-page.js';
+import { HomeAvatar } from './home-avatar.js';
 import { HomePrimaryNav } from './home-primary-nav.js';
 import { currentUserQueryKey, homeContextQueryKey } from './home-query-keys.js';
 
@@ -99,7 +100,17 @@ export function HomeShellPage() {
           Your Homes
         </Link>
       </p>
-      <p className="text-sm font-medium text-text-secondary">{home.name}</p>
+      <p className="flex items-center gap-2">
+        <HomeAvatar
+          homeId={home.id}
+          name={home.name}
+          hasPhoto={home.hasPhoto}
+          size="sm"
+        />
+        <span className="text-sm font-medium text-text-secondary">
+          {home.name}
+        </span>
+      </p>
       <HomePrimaryNav homeId={home.id} />
       <Outlet context={outletContext} />
     </div>

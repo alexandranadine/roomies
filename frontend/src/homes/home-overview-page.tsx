@@ -9,6 +9,7 @@ import { HousePulseSkeleton } from '../pulse/house-pulse-skeleton.js';
 import { useHousePulse } from '../pulse/use-house-pulse.js';
 import { clearPrivateHomeQueryState } from './clear-private-home-queries.js';
 import type { HomeContext } from './home-context-api.js';
+import { HomePhotoSection } from './home-photo-section.js';
 import { currentUserQueryKey } from './home-query-keys.js';
 
 export type HomeShellOutletContext = {
@@ -95,6 +96,7 @@ export function HomeOverviewPage() {
             Shared life for this Home. Use Maintenance for household upkeep
             items that need attention.
           </p>
+          <HomePhotoSection home={home} />
         </div>
 
         {showPulseLoading ? <HousePulseSkeleton /> : null}

@@ -114,6 +114,6 @@ Prefer `TEST_DATABASE_URL` over `DATABASE_URL` for test tooling. Parallel destru
 ## Secrets / env hygiene
 
 - `.env` is gitignored; commit only `.env.example` placeholders
-- Frontend Vite env is public (`VITE_API_ORIGIN` only) — never put secrets there
+- Frontend Vite env is public (`VITE_API_ORIGIN`, optional `VITE_R2_S3_ORIGIN`) — never put secrets there
 - `npm run check:ci-secrets` fails if workflows reference repository secrets or load `.env`
 - Deployment configuration: [`docs/deployment.md`](deployment.md)

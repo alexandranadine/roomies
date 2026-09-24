@@ -135,6 +135,7 @@ void describe('deployment production scripts', () => {
       /EMAIL_API_KEY|AUTH_SECRET|DATABASE_URL|R2_ACCESS_KEY_ID|R2_SECRET_ACCESS_KEY|R2_ACCOUNT_ID/,
     );
     assert.match(source, /VITE_API_ORIGIN/);
+    assert.match(source, /VITE_R2_S3_ORIGIN/);
   });
 
   void it('externalizes Sharp, @img, and AWS S3 packages in the production bundle', async () => {
