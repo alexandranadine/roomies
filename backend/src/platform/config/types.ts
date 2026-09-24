@@ -73,6 +73,32 @@ export type ResendEmailConfig = Readonly<{
 
 export type EmailRuntimeConfig = FakeEmailConfig | ResendEmailConfig;
 
+export const OBJECT_STORE_PROVIDERS = ['fake', 'cloudflare'] as const;
+
+export type ObjectStoreProvider = (typeof OBJECT_STORE_PROVIDERS)[number];
+
+export type FakeObjectStoreConfig = Readonly<{
+  provider: 'fake';
+}>;
+
+export type CloudflareObjectStoreConfig = Readonly<{
+  provider: 'cloudflare';
+  /** Cloudflare account id used to build the default S3 endpoint. */
+  accountId: string;
+  /** R2 access key id. Never log this value. */
+  accessKeyId: string;
+  /** R2 secret access key. Never log this value. */
+  secretAccessKey: string;
+  bucket: string;
+  /** S3-compatible API endpoint. */
+  s3Endpoint: string;
+  /** S3 region. R2 uses `auto`. */
+  region: string;
+}>;
+
+export type ObjectStoreRuntimeConfig =
+  FakeObjectStoreConfig | CloudflareObjectStoreConfig;
+
 /**
  * Immutable, typed application configuration.
  * Parsed once at process startup; modules consume this object, not `process.env`.
@@ -123,4 +149,9 @@ export type AppConfig = Readonly<{
    * AppConfig by hand; those default to the in-memory fake sender.
    */
   email?: EmailRuntimeConfig;
+  /**
+   * Private Home-photo object store. Omitted only in tests that construct
+   * AppConfig by hand; those default to the in-memory fake store.
+   */
+  objectStore?: ObjectStoreRuntimeConfig;
 }>;

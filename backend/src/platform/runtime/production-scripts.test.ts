@@ -125,12 +125,34 @@ void describe('deployment production scripts', () => {
     assert.doesNotMatch(main, /\/debug\/node/);
   });
 
-  void it('does not expose mail secrets to the Vite public env surface', async () => {
+  void it('does not expose mail or R2 secrets to the Vite public env surface', async () => {
     const source = await readFile(
       path.join(repoRoot, 'frontend/src/vite-env.d.ts'),
       'utf8',
     );
-    assert.doesNotMatch(source, /EMAIL_API_KEY|AUTH_SECRET|DATABASE_URL/);
+    assert.doesNotMatch(
+      source,
+      /EMAIL_API_KEY|AUTH_SECRET|DATABASE_URL|R2_ACCESS_KEY_ID|R2_SECRET_ACCESS_KEY|R2_ACCOUNT_ID/,
+    );
     assert.match(source, /VITE_API_ORIGIN/);
+  });
+
+  void it('externalizes Sharp, @img, and AWS S3 packages in the production bundle', async () => {
+    const source = await readFile(
+      path.join(backendRoot, 'scripts/build-production.mjs'),
+      'utf8',
+    );
+    assert.match(source, /['"]sharp['"]/);
+    assert.match(source, /['"]@img\/\*['"]/);
+    assert.match(source, /['"]@aws-sdk\/client-s3['"]/);
+    assert.match(source, /['"]@aws-sdk\/s3-request-presigner['"]/);
+  });
+
+  void it('configures Sharp at process bootstrap', async () => {
+    const source = await readFile(
+      path.join(backendRoot, 'src/main.ts'),
+      'utf8',
+    );
+    assert.match(source, /configureHomePhotoImageProcessor\(/);
   });
 });

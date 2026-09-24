@@ -371,6 +371,13 @@ Never commit real secrets. Values below are names only.
 | `EMAIL_PROVIDER`                | default `fake`             | default `fake`   | required (`resend` or explicit `fake`)           | **`resend` only** (fake rejected)                        | required outside local       |
 | `EMAIL_API_KEY`                 | n/a for fake               | n/a for fake     | required for `resend`                            | required                                                 | secret                       |
 | `EMAIL_FROM`                    | n/a for fake               | n/a for fake     | required for `resend`                            | required (`Roomies <noreply@<sending-domain>>`)          | required for resend          |
+| `R2_PROVIDER`                   | default `fake`             | default `fake`   | required (`cloudflare` or explicit `fake`)       | **`cloudflare` only** (fake rejected)                    | required outside local       |
+| `R2_ACCOUNT_ID`                 | n/a for fake               | n/a for fake     | required for `cloudflare`                        | required                                                 | required for cloudflare      |
+| `R2_ACCESS_KEY_ID`              | n/a for fake               | n/a for fake     | required for `cloudflare`                        | required                                                 | secret                       |
+| `R2_SECRET_ACCESS_KEY`          | n/a for fake               | n/a for fake     | required for `cloudflare`                        | required                                                 | secret                       |
+| `R2_BUCKET`                     | n/a for fake               | n/a for fake     | required for `cloudflare`                        | required                                                 | required for cloudflare      |
+| `R2_S3_ENDPOINT`                | n/a                        | n/a              | optional (default account endpoint)              | optional                                                 | optional                     |
+| `R2_REGION`                     | n/a                        | n/a              | optional (default `auto`)                        | optional (default `auto`)                                | optional                     |
 
 ### Frontend (public)
 
@@ -406,7 +413,12 @@ No session replay.
 
 ## R2
 
-Not in M9.2. No upload endpoints and no production R2 variables yet.
+Backend-only private object store for Home photos. `R2_PROVIDER` defaults to
+`fake` in development/test. Preview, staging, and production must set the
+provider; production rejects `fake`. Cloudflare R2 uses the S3-compatible API
+(`@aws-sdk/client-s3` + `@aws-sdk/s3-request-presigner`). Do not put R2
+credentials in `VITE_*` or any frontend env. Upload/finalize HTTP routes and
+bucket CORS/lifecycle provisioning are later tickets.
 
 ## Backups (later M9)
 

@@ -42,5 +42,9 @@ await build({
     '@prisma/orm-postgres',
     '@prisma/orm-postgres/runtime',
     '@js-temporal/polyfill',
+    'sharp',
+    '@img/*',
+    '@aws-sdk/client-s3',
+    '@aws-sdk/s3-request-presigner',
   ],
 });

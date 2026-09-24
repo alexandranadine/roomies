@@ -6,9 +6,15 @@ import { fileURLToPath } from 'node:url';
 import { AuthorizationIntegrityError } from '../../platform/authz/errors.js';
 import {
   CANONICAL_HOME_PHOTO_OBJECT_KEY_PATTERN,
+  InvalidHomePhotoObjectKeyInputError,
+  createCanonicalHomePhotoObjectKey,
   isCanonicalHomePhotoObjectKey,
   storedHomePhotoObjectKey,
 } from './photo-object-key.js';
+import {
+  createTempHomePhotoObjectKey,
+  isTempHomePhotoObjectKey,
+} from './temp-photo-object-key.js';
 
 const HOME_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const OTHER_HOME_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
@@ -87,5 +93,51 @@ void describe('canonical Home photo key helper boundary', () => {
     assert.doesNotMatch(source, /from ['"]@aws-sdk\//);
     assert.doesNotMatch(source, /from ['"]aws-sdk['"]/);
     assert.doesNotMatch(source, /from ['"]sharp['"]/);
+  });
+});
+
+void describe('createCanonicalHomePhotoObjectKey', () => {
+  void it('creates homes/{home UUID}/photo/{generation UUID}.webp', () => {
+    const key = createCanonicalHomePhotoObjectKey(HOME_ID, () => GENERATION_ID);
+    assert.equal(key, CANONICAL);
+    assert.equal(isCanonicalHomePhotoObjectKey(key, HOME_ID), true);
+  });
+
+  void it('mints generation IDs with crypto.randomUUID()', () => {
+    const key = createCanonicalHomePhotoObjectKey(HOME_ID);
+    const match = CANONICAL_HOME_PHOTO_OBJECT_KEY_PATTERN.exec(key);
+    assert.ok(match);
+    assert.equal(match[1], HOME_ID);
+    assert.match(
+      match[2] ?? '',
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+    );
+    assert.equal(key.includes('user'), false);
+    assert.equal(key.includes('membership'), false);
+    assert.equal(key.includes('@'), false);
+  });
+
+  void it('rejects non-UUID Home IDs', () => {
+    assert.throws(
+      () => createCanonicalHomePhotoObjectKey('not-a-uuid'),
+      InvalidHomePhotoObjectKeyInputError,
+    );
+    assert.throws(
+      () => createCanonicalHomePhotoObjectKey(HOME_ID.toUpperCase()),
+      InvalidHomePhotoObjectKeyInputError,
+    );
+  });
+});
+
+void describe('temp vs canonical Home photo keys', () => {
+  void it('rejects temp keys with the canonical validator', () => {
+    const temp = createTempHomePhotoObjectKey(HOME_ID, () => GENERATION_ID);
+    assert.equal(isTempHomePhotoObjectKey(temp, HOME_ID), true);
+    assert.equal(isCanonicalHomePhotoObjectKey(temp, HOME_ID), false);
+  });
+
+  void it('rejects canonical keys for a different Home', () => {
+    const key = createCanonicalHomePhotoObjectKey(HOME_ID, () => GENERATION_ID);
+    assert.equal(isCanonicalHomePhotoObjectKey(key, OTHER_HOME_ID), false);
   });
 });

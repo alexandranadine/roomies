@@ -57,6 +57,7 @@ import {
   type DatabasePoolRuntime,
 } from './platform/persistence/pool.js';
 import { createDbReadiness } from './platform/persistence/readiness.js';
+import { configureHomePhotoImageProcessor } from './platform/image/index.js';
 import { assertProductionNodeMajor } from './platform/runtime/node-major.js';
 import {
   startsHttpServer,
@@ -220,6 +221,7 @@ function createWebHttpRuntime(
 async function main(): Promise<void> {
   const config = loadConfig();
   assertProductionNodeMajor(config.appEnv);
+  configureHomePhotoImageProcessor();
   if (config.appEnv !== 'development' && config.appEnv !== 'test') {
     console.info(`[process] node ${process.version}`);
   }

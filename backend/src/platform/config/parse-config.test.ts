@@ -1,11 +1,22 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { ConfigError, parseConfig, type ConfigSource } from './index.js';
+import {
+  ConfigError,
+  SECRET_ENV_KEYS,
+  parseConfig,
+  redactSecrets,
+  type ConfigSource,
+} from './index.js';
 
 const SECRET_DATABASE_URL =
   'postgresql://roomies:super_secret_credential_xyz@127.0.0.1:5432/roomies';
 const VALID_AUTH_SECRET = 'roomies_test_secret_32_chars_minimum_value';
 const VALID_EMAIL_API_KEY = 're_test_config_only_not_a_real_secret_key';
+const VALID_R2_ACCESS_KEY_ID = 'r2_test_access_key_id_not_a_real_secret';
+const VALID_R2_SECRET_ACCESS_KEY =
+  'r2_test_secret_access_key_not_a_real_secret';
+const VALID_R2_ACCOUNT_ID = 'test-r2-account-id';
+const VALID_R2_BUCKET = 'roomies-home-photos';
 
 function validDevelopmentEnv(overrides: ConfigSource = {}): ConfigSource {
   return {
@@ -29,6 +40,11 @@ function validProductionEnv(overrides: ConfigSource = {}): ConfigSource {
     EMAIL_PROVIDER: 'resend',
     EMAIL_API_KEY: VALID_EMAIL_API_KEY,
     EMAIL_FROM: 'Roomies <noreply@roomies.example>',
+    R2_PROVIDER: 'cloudflare',
+    R2_ACCOUNT_ID: VALID_R2_ACCOUNT_ID,
+    R2_ACCESS_KEY_ID: VALID_R2_ACCESS_KEY_ID,
+    R2_SECRET_ACCESS_KEY: VALID_R2_SECRET_ACCESS_KEY,
+    R2_BUCKET: VALID_R2_BUCKET,
     ...overrides,
   };
 }
@@ -54,6 +70,7 @@ void describe('parseConfig', () => {
     assert.equal(config.recurrencePollIntervalMs, 30_000);
     assert.equal(config.releaseSha, undefined);
     assert.deepEqual(config.email, { provider: 'fake' });
+    assert.deepEqual(config.objectStore, { provider: 'fake' });
     assert.ok(Object.isFrozen(config));
   });
 
@@ -480,6 +497,15 @@ void describe('parseConfig', () => {
       apiKey: VALID_EMAIL_API_KEY,
       from: 'Roomies <noreply@roomies.example>',
     });
+    assert.deepEqual(config.objectStore, {
+      provider: 'cloudflare',
+      accountId: VALID_R2_ACCOUNT_ID,
+      accessKeyId: VALID_R2_ACCESS_KEY_ID,
+      secretAccessKey: VALID_R2_SECRET_ACCESS_KEY,
+      bucket: VALID_R2_BUCKET,
+      s3Endpoint: `https://${VALID_R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+      region: 'auto',
+    });
   });
 
   void it('requires an explicit valid auth base URL outside local environments', () => {
@@ -795,8 +821,10 @@ void describe('parseConfig', () => {
       FRONTEND_ORIGIN: 'https://roomies-frontend-staging.example.workers.dev',
       TRUSTED_ORIGINS: 'https://roomies-frontend-staging.example.workers.dev',
       EMAIL_PROVIDER: 'fake',
+      R2_PROVIDER: 'fake',
     });
     assert.deepEqual(config.email, { provider: 'fake' });
+    assert.deepEqual(config.objectStore, { provider: 'fake' });
   });
 
   void it('accepts same-site production origins and rejects unrelated hosts', () => {
@@ -826,5 +854,115 @@ void describe('parseConfig', () => {
         ),
       /must be same-site HTTPS origins in production/,
     );
+  });
+
+  void it('defaults local object store to the fake adapter', () => {
+    const config = parseConfig(validDevelopmentEnv());
+    assert.deepEqual(config.objectStore, { provider: 'fake' });
+  });
+
+  void it('accepts explicit fake object store in development', () => {
+    const config = parseConfig(validDevelopmentEnv({ R2_PROVIDER: 'fake' }));
+    assert.deepEqual(config.objectStore, { provider: 'fake' });
+  });
+
+  void it('rejects production when object-store config is missing', () => {
+    assert.throws(
+      () =>
+        parseConfig({
+          APP_ENV: 'production',
+          DATABASE_URL: SECRET_DATABASE_URL,
+          AUTH_SECRET: VALID_AUTH_SECRET,
+          AUTH_BASE_URL: 'https://api.roomies.example',
+          FRONTEND_ORIGIN: 'https://roomies.example',
+          TRUSTED_ORIGINS: 'https://roomies.example',
+          EMAIL_PROVIDER: 'resend',
+          EMAIL_API_KEY: VALID_EMAIL_API_KEY,
+          EMAIL_FROM: 'Roomies <noreply@roomies.example>',
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof ConfigError);
+        assert.match(error.message, /R2_PROVIDER is required/);
+        return true;
+      },
+    );
+  });
+
+  void it('rejects fake object store in production', () => {
+    assert.throws(
+      () => parseConfig(validProductionEnv({ R2_PROVIDER: 'fake' })),
+      /R2_PROVIDER=fake is not allowed when APP_ENV=production/,
+    );
+  });
+
+  void it('requires all cloudflare R2 variables and does not echo secrets', () => {
+    assert.throws(
+      () =>
+        parseConfig(
+          validProductionEnv({
+            R2_ACCOUNT_ID: undefined,
+            R2_ACCESS_KEY_ID: undefined,
+            R2_SECRET_ACCESS_KEY: undefined,
+            R2_BUCKET: undefined,
+          }),
+        ),
+      (error: unknown) => {
+        assert.ok(error instanceof ConfigError);
+        assert.match(error.message, /R2_ACCOUNT_ID is required/);
+        assert.match(error.message, /R2_ACCESS_KEY_ID is required/);
+        assert.match(error.message, /R2_SECRET_ACCESS_KEY is required/);
+        assert.match(error.message, /R2_BUCKET is required/);
+        assert.equal(error.message.includes(VALID_R2_ACCESS_KEY_ID), false);
+        assert.equal(error.message.includes(VALID_R2_SECRET_ACCESS_KEY), false);
+        return true;
+      },
+    );
+  });
+
+  void it('names the missing R2 secret variable without echoing secret contents', () => {
+    assert.throws(
+      () =>
+        parseConfig(
+          validProductionEnv({
+            R2_SECRET_ACCESS_KEY: undefined,
+          }),
+        ),
+      (error: unknown) => {
+        assert.ok(error instanceof ConfigError);
+        assert.match(
+          error.message,
+          /R2_SECRET_ACCESS_KEY is required when R2_PROVIDER=cloudflare/,
+        );
+        assert.equal(error.message.includes(VALID_R2_ACCESS_KEY_ID), false);
+        assert.equal(error.message.includes(VALID_R2_SECRET_ACCESS_KEY), false);
+        assert.equal(error.message.includes(VALID_EMAIL_API_KEY), false);
+        return true;
+      },
+    );
+  });
+
+  void it('accepts optional R2 endpoint and region overrides', () => {
+    const config = parseConfig(
+      validProductionEnv({
+        R2_S3_ENDPOINT: 'https://r2.example.invalid',
+        R2_REGION: 'wnam',
+      }),
+    );
+    assert.equal(config.objectStore?.provider, 'cloudflare');
+    if (config.objectStore?.provider === 'cloudflare') {
+      assert.equal(config.objectStore.s3Endpoint, 'https://r2.example.invalid');
+      assert.equal(config.objectStore.region, 'wnam');
+    }
+  });
+
+  void it('includes R2 credentials in the secret-redaction set', () => {
+    assert.equal(SECRET_ENV_KEYS.has('R2_ACCESS_KEY_ID'), true);
+    assert.equal(SECRET_ENV_KEYS.has('R2_SECRET_ACCESS_KEY'), true);
+    const leaked = `keys=${VALID_R2_ACCESS_KEY_ID} secret=${VALID_R2_SECRET_ACCESS_KEY}`;
+    const redacted = redactSecrets(leaked, validProductionEnv());
+    assert.equal(redacted.includes(VALID_R2_ACCESS_KEY_ID), false);
+    assert.equal(redacted.includes(VALID_R2_SECRET_ACCESS_KEY), false);
+    assert.match(redacted, /\[redacted:R2_ACCESS_KEY_ID\]/);
+    assert.match(redacted, /\[redacted:R2_SECRET_ACCESS_KEY\]/);
   });
 });

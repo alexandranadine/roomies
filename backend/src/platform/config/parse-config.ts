@@ -14,12 +14,14 @@ import {
   INGRESS_MODES,
   MAX_RECURRENCE_POLL_INTERVAL_MS,
   MIN_RECURRENCE_POLL_INTERVAL_MS,
+  OBJECT_STORE_PROVIDERS,
   PROCESS_MODES,
   type AppConfig,
   type AppEnv,
   type EmailRuntimeConfig,
   type IngressMode,
   type IngressRuntimeConfig,
+  type ObjectStoreRuntimeConfig,
   type ProcessMode,
   type ProcessRuntimeConfig,
 } from './types.js';
@@ -224,6 +226,13 @@ const envSchema = z
     EMAIL_PROVIDER: z.string().optional(),
     EMAIL_API_KEY: z.string().optional(),
     EMAIL_FROM: z.string().optional(),
+    R2_PROVIDER: z.string().optional(),
+    R2_ACCOUNT_ID: z.string().optional(),
+    R2_ACCESS_KEY_ID: z.string().optional(),
+    R2_SECRET_ACCESS_KEY: z.string().optional(),
+    R2_BUCKET: z.string().optional(),
+    R2_S3_ENDPOINT: z.string().optional(),
+    R2_REGION: z.string().optional(),
   })
   .transform((data, ctx) => {
     const appEnv = data.APP_ENV;
@@ -372,6 +381,23 @@ const envSchema = z
       return z.NEVER;
     }
 
+    const objectStore = parseObjectStoreConfig(
+      appEnv,
+      {
+        R2_PROVIDER: data.R2_PROVIDER,
+        R2_ACCOUNT_ID: data.R2_ACCOUNT_ID,
+        R2_ACCESS_KEY_ID: data.R2_ACCESS_KEY_ID,
+        R2_SECRET_ACCESS_KEY: data.R2_SECRET_ACCESS_KEY,
+        R2_BUCKET: data.R2_BUCKET,
+        R2_S3_ENDPOINT: data.R2_S3_ENDPOINT,
+        R2_REGION: data.R2_REGION,
+      },
+      ctx,
+    );
+    if (objectStore === z.NEVER) {
+      return z.NEVER;
+    }
+
     const releaseSha = parseReleaseSha(
       data.RELEASE_SHA,
       data.RAILWAY_GIT_COMMIT_SHA,
@@ -405,6 +431,7 @@ const envSchema = z
       recurrencePollIntervalMs: data.RECURRENCE_POLL_INTERVAL_MS,
       releaseSha,
       email,
+      objectStore,
     } satisfies {
       appEnv: AppEnv;
       port: number;
@@ -420,6 +447,7 @@ const envSchema = z
       recurrencePollIntervalMs: number;
       releaseSha: string | undefined;
       email: EmailRuntimeConfig;
+      objectStore: ObjectStoreRuntimeConfig;
     };
   });
 
@@ -556,6 +584,137 @@ function parseEmailConfig(
   }
 
   return { provider: 'resend', apiKey: rawKey, from: rawFrom };
+}
+
+const DEFAULT_R2_REGION = 'auto';
+
+function defaultR2S3Endpoint(accountId: string): string {
+  return `https://${accountId}.r2.cloudflarestorage.com`;
+}
+
+function parseObjectStoreConfig(
+  appEnv: AppEnv,
+  source: {
+    R2_PROVIDER: string | undefined;
+    R2_ACCOUNT_ID: string | undefined;
+    R2_ACCESS_KEY_ID: string | undefined;
+    R2_SECRET_ACCESS_KEY: string | undefined;
+    R2_BUCKET: string | undefined;
+    R2_S3_ENDPOINT: string | undefined;
+    R2_REGION: string | undefined;
+  },
+  ctx: z.RefinementCtx,
+): ObjectStoreRuntimeConfig | typeof z.NEVER {
+  const rawProvider = source.R2_PROVIDER?.trim().toLowerCase() ?? '';
+
+  let provider: (typeof OBJECT_STORE_PROVIDERS)[number];
+  if (rawProvider.length === 0) {
+    if (isLocalDefaultEnv(appEnv)) {
+      provider = 'fake';
+    } else {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['R2_PROVIDER'],
+        message: `R2_PROVIDER is required when APP_ENV=${appEnv}`,
+      });
+      return z.NEVER;
+    }
+  } else if (
+    (OBJECT_STORE_PROVIDERS as readonly string[]).includes(rawProvider)
+  ) {
+    provider = rawProvider as (typeof OBJECT_STORE_PROVIDERS)[number];
+  } else {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['R2_PROVIDER'],
+      message: `R2_PROVIDER must be one of: ${OBJECT_STORE_PROVIDERS.join(', ')}`,
+    });
+    return z.NEVER;
+  }
+
+  if (appEnv === 'production' && provider === 'fake') {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['R2_PROVIDER'],
+      message: 'R2_PROVIDER=fake is not allowed when APP_ENV=production',
+    });
+    return z.NEVER;
+  }
+
+  if (provider === 'fake') {
+    return { provider: 'fake' };
+  }
+
+  const accountId = source.R2_ACCOUNT_ID?.trim() ?? '';
+  const accessKeyId = source.R2_ACCESS_KEY_ID?.trim() ?? '';
+  const secretAccessKey = source.R2_SECRET_ACCESS_KEY?.trim() ?? '';
+  const bucket = source.R2_BUCKET?.trim() ?? '';
+  const rawEndpoint = source.R2_S3_ENDPOINT?.trim() ?? '';
+  const rawRegion = source.R2_REGION?.trim() ?? '';
+
+  let invalid = false;
+  if (accountId.length === 0) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['R2_ACCOUNT_ID'],
+      message: 'R2_ACCOUNT_ID is required when R2_PROVIDER=cloudflare',
+    });
+    invalid = true;
+  }
+  if (accessKeyId.length === 0) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['R2_ACCESS_KEY_ID'],
+      message: 'R2_ACCESS_KEY_ID is required when R2_PROVIDER=cloudflare',
+    });
+    invalid = true;
+  }
+  if (secretAccessKey.length === 0) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['R2_SECRET_ACCESS_KEY'],
+      message: 'R2_SECRET_ACCESS_KEY is required when R2_PROVIDER=cloudflare',
+    });
+    invalid = true;
+  }
+  if (bucket.length === 0) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['R2_BUCKET'],
+      message: 'R2_BUCKET is required when R2_PROVIDER=cloudflare',
+    });
+    invalid = true;
+  }
+
+  let s3Endpoint = defaultR2S3Endpoint(accountId);
+  if (rawEndpoint.length > 0) {
+    if (!rawEndpoint.startsWith('https://')) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['R2_S3_ENDPOINT'],
+        message: 'R2_S3_ENDPOINT must be an https URL',
+      });
+      invalid = true;
+    } else {
+      s3Endpoint = rawEndpoint.replace(/\/+$/, '');
+    }
+  }
+
+  const region = rawRegion.length > 0 ? rawRegion : DEFAULT_R2_REGION;
+
+  if (invalid) {
+    return z.NEVER;
+  }
+
+  return {
+    provider: 'cloudflare',
+    accountId,
+    accessKeyId,
+    secretAccessKey,
+    bucket,
+    s3Endpoint,
+    region,
+  };
 }
 
 const RELEASE_SHA_PATTERN = /^[0-9a-f]{7,40}$/i;
@@ -697,6 +856,48 @@ function formatIssues(zodError: z.ZodError): string[] {
       );
       continue;
     }
+    if (key === 'R2_PROVIDER') {
+      issues.push(
+        issue.message.startsWith('R2_PROVIDER')
+          ? issue.message
+          : `R2_PROVIDER must be one of: ${OBJECT_STORE_PROVIDERS.join(', ')}`,
+      );
+      continue;
+    }
+    if (key === 'R2_ACCOUNT_ID') {
+      issues.push('R2_ACCOUNT_ID is required when R2_PROVIDER=cloudflare');
+      continue;
+    }
+    if (key === 'R2_ACCESS_KEY_ID') {
+      issues.push('R2_ACCESS_KEY_ID is required when R2_PROVIDER=cloudflare');
+      continue;
+    }
+    if (key === 'R2_SECRET_ACCESS_KEY') {
+      issues.push(
+        'R2_SECRET_ACCESS_KEY is required when R2_PROVIDER=cloudflare',
+      );
+      continue;
+    }
+    if (key === 'R2_BUCKET') {
+      issues.push('R2_BUCKET is required when R2_PROVIDER=cloudflare');
+      continue;
+    }
+    if (key === 'R2_S3_ENDPOINT') {
+      issues.push(
+        issue.message.startsWith('R2_S3_ENDPOINT')
+          ? issue.message
+          : 'R2_S3_ENDPOINT must be an https URL',
+      );
+      continue;
+    }
+    if (key === 'R2_REGION') {
+      issues.push(
+        issue.message.startsWith('R2_REGION')
+          ? issue.message
+          : 'R2_REGION is invalid',
+      );
+      continue;
+    }
     // Fallback: keep message but never echo unknown received blobs for secrets.
     issues.push(issue.message);
   }
@@ -733,6 +934,13 @@ export function parseConfig(
     EMAIL_PROVIDER: optionalString(source['EMAIL_PROVIDER']),
     EMAIL_API_KEY: optionalString(source['EMAIL_API_KEY']),
     EMAIL_FROM: optionalString(source['EMAIL_FROM']),
+    R2_PROVIDER: optionalString(source['R2_PROVIDER']),
+    R2_ACCOUNT_ID: optionalString(source['R2_ACCOUNT_ID']),
+    R2_ACCESS_KEY_ID: optionalString(source['R2_ACCESS_KEY_ID']),
+    R2_SECRET_ACCESS_KEY: optionalString(source['R2_SECRET_ACCESS_KEY']),
+    R2_BUCKET: optionalString(source['R2_BUCKET']),
+    R2_S3_ENDPOINT: optionalString(source['R2_S3_ENDPOINT']),
+    R2_REGION: optionalString(source['R2_REGION']),
   });
 
   if (!result.success) {
@@ -758,6 +966,7 @@ export function parseConfig(
     recurrencePollIntervalMs: result.data.recurrencePollIntervalMs,
     releaseSha: result.data.releaseSha,
     email: Object.freeze({ ...result.data.email }),
+    objectStore: Object.freeze({ ...result.data.objectStore }),
   });
 }
 

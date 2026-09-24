@@ -44,9 +44,17 @@ export type { Home } from './home.js';
 export { homeDtoSchema, toHomeDto, type HomeDto } from './home-dto.js';
 export {
   CANONICAL_HOME_PHOTO_OBJECT_KEY_PATTERN,
+  InvalidHomePhotoObjectKeyInputError,
+  LOWERCASE_UUID_PATTERN,
+  createCanonicalHomePhotoObjectKey,
   isCanonicalHomePhotoObjectKey,
   storedHomePhotoObjectKey,
 } from './photo-object-key.js';
+export {
+  TEMP_HOME_PHOTO_OBJECT_KEY_PATTERN,
+  createTempHomePhotoObjectKey,
+  isTempHomePhotoObjectKey,
+} from './temp-photo-object-key.js';
 export {
   HOME_NAME_MAX_LENGTH,
   InvalidHomeNameError,

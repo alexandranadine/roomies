@@ -214,6 +214,7 @@ void describe('homes domain boundary', () => {
     assert.doesNotMatch(source, /from ['"]@aws-sdk\//);
     assert.doesNotMatch(source, /from ['"]sharp['"]/);
     assert.doesNotMatch(source, /presign/i);
+    assert.doesNotMatch(source, /tmp\/homes/);
   });
 
   void it('does not put Home policy inside platform/auth', async () => {
