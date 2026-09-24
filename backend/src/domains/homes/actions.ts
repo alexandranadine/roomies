@@ -1,5 +1,6 @@
 export const HOME_ACTION = {
   read: 'home.read',
+  changePhoto: 'home.changePhoto',
   archiveFinalMember: 'home.archiveFinalMember',
 } as const;
 

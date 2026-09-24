@@ -67,6 +67,7 @@ void describe('authorization platform boundary', () => {
         assert.doesNotMatch(source, /ActiveHomeActor/, rel);
         assert.doesNotMatch(source, /HOME_ACTION/, rel);
         assert.doesNotMatch(source, /decideHomeRead/, rel);
+        assert.doesNotMatch(source, /decideHomeChangePhoto/, rel);
         assert.doesNotMatch(source, /isHomeAdmin/, rel);
         assert.doesNotMatch(source, /platform\/authz/, rel);
       }

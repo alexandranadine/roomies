@@ -8,6 +8,8 @@ import type { LockedHomeStructure } from './locked-home-structure.js';
 
 export type HomeReadDenialReason = 'HOME_SCOPE_MISMATCH';
 
+export type HomeChangePhotoDenialReason = 'HOME_SCOPE_MISMATCH';
+
 /**
  * Pure home.read policy. Either active role may read. Does not query
  * persistence, inspect Express, or choose an HTTP status.
@@ -16,6 +18,20 @@ export function decideHomeRead(input: {
   actor: ActiveHomeActor;
   targetHomeId: string;
 }): AuthorizationDecision<HomeReadDenialReason> {
+  if (input.actor.homeId === input.targetHomeId) {
+    return allow();
+  }
+  return deny('HOME_SCOPE_MISMATCH');
+}
+
+/**
+ * Pure home.changePhoto policy. Active Roommate and Admin share the same
+ * grant. There is no Admin-only branch and no Admin bypass.
+ */
+export function decideHomeChangePhoto(input: {
+  actor: ActiveHomeActor;
+  targetHomeId: string;
+}): AuthorizationDecision<HomeChangePhotoDenialReason> {
   if (input.actor.homeId === input.targetHomeId) {
     return allow();
   }

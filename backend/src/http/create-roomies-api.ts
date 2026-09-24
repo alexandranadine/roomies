@@ -8,6 +8,13 @@ import {
   type ArchiveFinalMemberCommand,
   type CreateHomeCommand,
 } from '../domains/homes/http.js';
+import {
+  createHomePhotoRouter,
+  type DeleteHomePhotoCommand,
+  type FinalizeHomePhotoCommand,
+  type GetHomePhotoCommand,
+  type RequestHomePhotoUploadCommand,
+} from '../domains/homes/photo-http.js';
 import type { HomeReader } from '../domains/homes/index.js';
 import {
   createMembershipsRouter,
@@ -132,6 +139,12 @@ export type CreateRoomiesApiRouterOptions = {
   pulse?: {
     getHousePulse: GetHousePulseCommand;
   };
+  photo?: {
+    requestHomePhotoUpload: RequestHomePhotoUploadCommand;
+    finalizeHomePhoto: FinalizeHomePhotoCommand;
+    getHomePhoto: GetHomePhotoCommand;
+    deleteHomePhoto: DeleteHomePhotoCommand;
+  };
   account?: Pick<
     CreateAccountRouterOptions,
     'deleteAccount' | 'auth' | 'clock'
@@ -173,6 +186,23 @@ export function createRoomiesApiRouter(
     );
   }
   router.use('/homes', createHomesRouter(options));
+  if (options.photo !== undefined) {
+    router.use(
+      '/homes',
+      createHomePhotoRouter({
+        principalResolver: options.principalResolver,
+        activeHomeActorResolver: options.activeHomeActorResolver,
+        requestHomePhotoUpload: options.photo.requestHomePhotoUpload,
+        finalizeHomePhoto: options.photo.finalizeHomePhoto,
+        getHomePhoto: options.photo.getHomePhoto,
+        deleteHomePhoto: options.photo.deleteHomePhoto,
+        rateLimitSensitive:
+          options.rateLimits === undefined
+            ? undefined
+            : createSensitiveUserRateLimit(options.rateLimits),
+      }),
+    );
+  }
   router.use('/homes', createMembershipsRouter(options));
   if (options.invitations !== undefined) {
     router.use(

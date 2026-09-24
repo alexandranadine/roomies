@@ -9,7 +9,13 @@ import {
   ForbiddenError,
   InvalidPathInputError,
   InvalidRequestError,
+  PayloadTooLargeError,
 } from '../authz/errors.js';
+import {
+  ImageProcessingTimeoutError,
+  ImageProcessorInfrastructureError,
+} from '../image/errors.js';
+import { ObjectStoreInfrastructureError } from '../object-store/errors.js';
 import { TransactionInfrastructureError } from '../persistence/errors.js';
 import { TransactionalEmailDeliveryError } from '../email/errors.js';
 import { StructuralIntegrityError } from '../../domains/homes/structure-errors.js';
@@ -178,6 +184,17 @@ export function errorHandler(
     err instanceof InvalidNotificationRequestError
   ) {
     sendApiError(res, 400, 'INVALID_REQUEST', 'Invalid request', requestId);
+    return;
+  }
+
+  if (err instanceof PayloadTooLargeError) {
+    sendApiError(
+      res,
+      413,
+      'PAYLOAD_TOO_LARGE',
+      'Request body too large',
+      requestId,
+    );
     return;
   }
 
@@ -350,7 +367,10 @@ export function errorHandler(
     err instanceof NotificationPersistenceError ||
     err instanceof TransactionInfrastructureError ||
     err instanceof AuthInfrastructureError ||
-    err instanceof TransactionalEmailDeliveryError
+    err instanceof TransactionalEmailDeliveryError ||
+    err instanceof ObjectStoreInfrastructureError ||
+    err instanceof ImageProcessorInfrastructureError ||
+    err instanceof ImageProcessingTimeoutError
   ) {
     console.error('[http] request failed', {
       requestId,

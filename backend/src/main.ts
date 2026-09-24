@@ -1,5 +1,9 @@
 import { createDeleteAccountLifecycleFromPool } from './application/account/delete-account-lifecycle.js';
 import { createCreateHomeFromPool } from './application/homes/create-home.js';
+import { createDeleteHomePhotoFromPool } from './application/homes/delete-home-photo.js';
+import { createFinalizeHomePhotoFromPool } from './application/homes/finalize-home-photo.js';
+import { createGetHomePhoto } from './application/homes/get-home-photo.js';
+import { createRequestHomePhotoUpload } from './application/homes/request-home-photo-upload.js';
 import { createChangeMembershipRoleFromPool } from './application/home-administration/change-membership-role.js';
 import { createArchiveFinalMemberHomeFromPool } from './application/home-administration/archive-final-member-home.js';
 import { createCreateInvitationFromPool } from './application/home-administration/create-invitation.js';
@@ -57,7 +61,11 @@ import {
   type DatabasePoolRuntime,
 } from './platform/persistence/pool.js';
 import { createDbReadiness } from './platform/persistence/readiness.js';
-import { configureHomePhotoImageProcessor } from './platform/image/index.js';
+import {
+  configureHomePhotoImageProcessor,
+  createSharpHomePhotoImageProcessor,
+} from './platform/image/index.js';
+import { createHomePhotoObjectStore } from './platform/object-store/index.js';
 import { assertProductionNodeMajor } from './platform/runtime/node-major.js';
 import {
   startsHttpServer,
@@ -88,6 +96,8 @@ function createWebHttpRuntime(
     databasePool.pool,
   );
   const homeReader = createHomeRepository(databasePool.pool);
+  const homePhotoObjectStore = createHomePhotoObjectStore(config);
+  const homePhotoImageProcessor = createSharpHomePhotoImageProcessor();
   const activeHomesForUserReader = createActiveHomesForUserReader(
     databasePool.pool,
   );
@@ -188,6 +198,23 @@ function createWebHttpRuntime(
       },
       pulse: {
         getHousePulse: createGetHousePulseFromPool(databasePool.pool),
+      },
+      photo: {
+        requestHomePhotoUpload: createRequestHomePhotoUpload({
+          objectStore: homePhotoObjectStore,
+        }),
+        finalizeHomePhoto: createFinalizeHomePhotoFromPool(databasePool.pool, {
+          objectStore: homePhotoObjectStore,
+          imageProcessor: homePhotoImageProcessor,
+        }),
+        getHomePhoto: createGetHomePhoto({
+          homes: homeReader,
+          objectStore: homePhotoObjectStore,
+        }),
+        deleteHomePhoto: createDeleteHomePhotoFromPool(
+          databasePool.pool,
+          homePhotoObjectStore,
+        ),
       },
       account: {
         deleteAccount: createDeleteAccountLifecycleFromPool(databasePool.pool),

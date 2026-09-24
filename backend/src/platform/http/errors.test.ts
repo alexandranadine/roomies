@@ -10,7 +10,13 @@ import {
   ForbiddenError,
   InvalidPathInputError,
   InvalidRequestError,
+  PayloadTooLargeError,
 } from '../authz/errors.js';
+import {
+  ImageProcessingTimeoutError,
+  ImageProcessorInfrastructureError,
+} from '../image/errors.js';
+import { ObjectStoreInfrastructureError } from '../object-store/errors.js';
 import { StructuralIntegrityError } from '../../domains/homes/structure-errors.js';
 import { CanonicalUserPersistenceIntegrityError } from '../../domains/users/canonical-user-deletion-marker.js';
 import {
@@ -103,6 +109,16 @@ void describe('HTTP known-error mappings', () => {
     const body = res.json() as ApiErrorBody;
     assert.equal(body.error.code, 'INVALID_REQUEST');
     assert.equal(body.error.message, 'Invalid request');
+  });
+
+  void it('maps PayloadTooLargeError to 413 PAYLOAD_TOO_LARGE', async () => {
+    const res = await appRequest(appThatThrows(new PayloadTooLargeError()), {
+      path: '/throw',
+    });
+    assert.equal(res.status, 413);
+    const body = res.json() as ApiErrorBody;
+    assert.equal(body.error.code, 'PAYLOAD_TOO_LARGE');
+    assert.equal(body.error.message, 'Request body too large');
   });
 
   void it('maps InvalidNotificationRequestError to 400 INVALID_REQUEST', async () => {
@@ -425,6 +441,39 @@ void describe('HTTP known-error mappings', () => {
     assert.equal(body.error.code, 'INTERNAL_ERROR');
     assert.equal(body.error.message, 'An unexpected error occurred');
     assert.equal(res.text.includes('Task persistence failure'), false);
+  });
+
+  void it('maps ObjectStoreInfrastructureError to a safe 500', async () => {
+    const res = await appRequest(
+      appThatThrows(new ObjectStoreInfrastructureError()),
+      { path: '/throw' },
+    );
+    assert.equal(res.status, 500);
+    const body = res.json() as ApiErrorBody;
+    assert.equal(body.error.code, 'INTERNAL_ERROR');
+    assert.equal(res.text.includes('Object store infrastructure failure'), false);
+  });
+
+  void it('maps ImageProcessorInfrastructureError to a safe 500', async () => {
+    const res = await appRequest(
+      appThatThrows(new ImageProcessorInfrastructureError()),
+      { path: '/throw' },
+    );
+    assert.equal(res.status, 500);
+    const body = res.json() as ApiErrorBody;
+    assert.equal(body.error.code, 'INTERNAL_ERROR');
+    assert.equal(res.text.includes('Image processor infrastructure failure'), false);
+  });
+
+  void it('maps ImageProcessingTimeoutError to a safe 500', async () => {
+    const res = await appRequest(
+      appThatThrows(new ImageProcessingTimeoutError()),
+      { path: '/throw' },
+    );
+    assert.equal(res.status, 500);
+    const body = res.json() as ApiErrorBody;
+    assert.equal(body.error.code, 'INTERNAL_ERROR');
+    assert.equal(res.text.includes('Image processing timed out'), false);
   });
 
   void it('maps TransactionInfrastructureError to a safe 500', async () => {

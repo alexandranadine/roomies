@@ -44,6 +44,9 @@ type MutableStoredObject = {
 export type CreateFakeHomePhotoObjectStoreOptions = Readonly<{
   clock?: Clock;
   now?: () => Date;
+  beforeGet?: (key: string) => Promise<void>;
+  beforePut?: (key: string) => Promise<void>;
+  beforeDelete?: (key: string) => Promise<void>;
 }>;
 
 function runStoreOperation<T>(fn: () => T): Promise<T> {
@@ -174,6 +177,9 @@ export function createFakeHomePhotoObjectStore(
 
     async getObjectBounded(input) {
       calls.get.push(input.key);
+      if (options.beforeGet) {
+        await options.beforeGet(input.key);
+      }
       consumeFailure('get');
       const stored = objects.get(input.key);
       if (!stored) {
@@ -186,9 +192,12 @@ export function createFakeHomePhotoObjectStore(
       });
     },
 
-    putCanonicalObject(input) {
+    async putCanonicalObject(input) {
+      calls.put.push(input.key);
+      if (options.beforePut) {
+        await options.beforePut(input.key);
+      }
       return runStoreOperation(() => {
-        calls.put.push(input.key);
         consumeFailure('put');
         if (!isCanonicalHomePhotoObjectKey(input.key, input.homeId)) {
           throw new InvalidObjectStoreRequestError();
@@ -197,9 +206,12 @@ export function createFakeHomePhotoObjectStore(
       });
     },
 
-    deleteObject(input) {
+    async deleteObject(input) {
+      calls.delete.push(input.key);
+      if (options.beforeDelete) {
+        await options.beforeDelete(input.key);
+      }
       return runStoreOperation(() => {
-        calls.delete.push(input.key);
         consumeFailure('delete');
         objects.delete(input.key);
       });

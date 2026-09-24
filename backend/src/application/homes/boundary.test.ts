@@ -61,4 +61,33 @@ void describe('homes application boundary', () => {
       assert.doesNotMatch(source, /from ['"]pg['"]/, rel);
     }
   });
+
+  void it('keeps Home photo commands free of structural Admin invariants and outbox', async () => {
+    const files = [
+      'request-home-photo-upload.ts',
+      'finalize-home-photo.ts',
+      'get-home-photo.ts',
+      'delete-home-photo.ts',
+      'home-photo-cleanup.ts',
+      'map-home-photo-errors.ts',
+    ];
+    for (const name of files) {
+      const source = await readFile(path.join(dir, name), 'utf8');
+      assert.doesNotMatch(source, /evaluateHomeStructureInvariant/, name);
+      assert.doesNotMatch(source, /lockHomeStructure/, name);
+      assert.doesNotMatch(source, /home\.photo\./, name);
+      assert.doesNotMatch(source, /outbox/i, name);
+      assert.doesNotMatch(source, /from ['"]sharp['"]/, name);
+      assert.doesNotMatch(source, /from ['"]@aws-sdk\//, name);
+      assert.doesNotMatch(source, /from ['"]express['"]/, name);
+    }
+    const finalize = await readFile(
+      path.join(dir, 'finalize-home-photo.ts'),
+      'utf8',
+    );
+    assert.match(finalize, /getObjectBounded/);
+    assert.match(finalize, /putCanonicalObject/);
+    assert.match(finalize, /runTransaction/);
+    assert.match(finalize, /previousPhotoObjectKey/);
+  });
 });

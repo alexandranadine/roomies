@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { ActiveHomeActor } from '../../platform/authz/context.js';
 import type { LockedHomeStructure } from './locked-home-structure.js';
-import { decideArchiveFinalMember, decideHomeRead } from './policies.js';
+import { decideArchiveFinalMember, decideHomeChangePhoto, decideHomeRead } from './policies.js';
 
 const HOME_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const HOME_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
@@ -42,6 +42,42 @@ void describe('decideHomeRead', () => {
     );
     assert.deepEqual(
       decideHomeRead({ actor: actor('ROOMMATE'), targetHomeId: HOME_B }),
+      { allowed: false, reason: 'HOME_SCOPE_MISMATCH' },
+    );
+  });
+});
+
+void describe('decideHomeChangePhoto', () => {
+  void it('allows ROOMMATE and ADMIN for the same Home', () => {
+    assert.deepEqual(
+      decideHomeChangePhoto({
+        actor: actor('ROOMMATE'),
+        targetHomeId: HOME_A,
+      }),
+      { allowed: true },
+    );
+    assert.deepEqual(
+      decideHomeChangePhoto({
+        actor: actor('ADMIN'),
+        targetHomeId: HOME_A,
+      }),
+      { allowed: true },
+    );
+  });
+
+  void it('denies a Home-scope mismatch without an Admin-only path', () => {
+    assert.deepEqual(
+      decideHomeChangePhoto({
+        actor: actor('ADMIN'),
+        targetHomeId: HOME_B,
+      }),
+      { allowed: false, reason: 'HOME_SCOPE_MISMATCH' },
+    );
+    assert.deepEqual(
+      decideHomeChangePhoto({
+        actor: actor('ROOMMATE'),
+        targetHomeId: HOME_B,
+      }),
       { allowed: false, reason: 'HOME_SCOPE_MISMATCH' },
     );
   });

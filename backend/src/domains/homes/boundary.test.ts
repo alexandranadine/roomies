@@ -45,6 +45,8 @@ void describe('homes domain boundary', () => {
     assert.doesNotMatch(source, /isHomeAdmin/);
     assert.doesNotMatch(source, /role\s*===\s*['"]ADMIN['"]/);
     assert.doesNotMatch(source, /FROM\s+memberships/i);
+    assert.match(source, /decideHomeChangePhoto/);
+    assert.match(source, /HOME_SCOPE_MISMATCH/);
   });
 
   void it('keeps Home structural integrity errors free of authz ownership', async () => {
@@ -151,6 +153,7 @@ void describe('homes domain boundary', () => {
       path.join(homesDir, 'repository/active-homes-for-user.ts'),
       path.join(homesDir, 'http.ts'),
       path.join(homesDir, 'current-user-homes-http.ts'),
+      path.join(homesDir, 'photo-http.ts'),
     ];
     for (const file of readFiles) {
       const source = await readFile(file, 'utf8');
@@ -177,6 +180,7 @@ void describe('homes domain boundary', () => {
     const httpFiles = [
       path.join(homesDir, 'http.ts'),
       path.join(homesDir, 'current-user-homes-http.ts'),
+      path.join(homesDir, 'photo-http.ts'),
       path.resolve(homesDir, '../../platform/http/home-context.ts'),
     ];
     for (const file of httpFiles) {
@@ -215,6 +219,37 @@ void describe('homes domain boundary', () => {
     assert.doesNotMatch(source, /from ['"]sharp['"]/);
     assert.doesNotMatch(source, /presign/i);
     assert.doesNotMatch(source, /tmp\/homes/);
+  });
+
+  void it('keeps Home photo HTTP adapter-only', async () => {
+    const source = await readFile(path.join(homesDir, 'photo-http.ts'), 'utf8');
+    assert.match(source, /router\.post\('\/:homeId\/photo\/uploads'/);
+    assert.match(source, /router\.post\('\/:homeId\/photo'/);
+    assert.match(source, /router\.get\('\/:homeId\/photo'/);
+    assert.match(source, /router\.delete\('\/:homeId\/photo'/);
+    assert.doesNotMatch(source, /FOR UPDATE/i);
+    assert.doesNotMatch(source, /INSERT INTO/i);
+    assert.doesNotMatch(source, /lockHomeStructure/);
+    assert.doesNotMatch(source, /evaluateHomeStructureInvariant/);
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+    assert.doesNotMatch(source, /from ['"]sharp['"]/);
+    assert.doesNotMatch(source, /from ['"]@aws-sdk\//);
+  });
+
+  void it('locks Home photo mutations without the structural Admin invariant', async () => {
+    const source = await readFile(
+      path.join(homesDir, 'photo-pointer.ts'),
+      'utf8',
+    );
+    assert.match(source, /LOCK_ACTIVE_HOME_PHOTO_FOR_UPDATE_SQL/);
+    assert.match(source, /archived_at IS NULL/);
+    assert.match(source, /photo_object_key/);
+    assert.match(source, /FOR UPDATE/);
+    assert.doesNotMatch(source, /evaluateHomeStructureInvariant/);
+    assert.doesNotMatch(source, /lockHomeStructure/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+    assert.doesNotMatch(source, /from ['"]sharp['"]/);
   });
 
   void it('does not put Home policy inside platform/auth', async () => {

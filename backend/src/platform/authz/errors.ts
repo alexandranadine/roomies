@@ -18,6 +18,14 @@ export class InvalidRequestError extends Error {
   }
 }
 
+export class PayloadTooLargeError extends Error {
+  override readonly name = 'PayloadTooLargeError';
+
+  constructor() {
+    super('Request body too large');
+  }
+}
+
 export class ForbiddenError extends Error {
   override readonly name = 'ForbiddenError';
 

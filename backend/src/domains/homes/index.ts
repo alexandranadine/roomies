@@ -91,9 +91,39 @@ export type {
   LockedHomeStructure,
 } from './locked-home-structure.js';
 export {
+  toHomePhotoDownloadDto,
+  toHomePhotoUploadIntentDto,
+  homePhotoDownloadDtoSchema,
+  homePhotoUploadIntentDtoSchema,
+  type HomePhotoDownloadDto,
+  type HomePhotoUploadIntentDto,
+} from './photo-dto.js';
+export {
+  createHomePhotoRouter,
+  type CreateHomePhotoRouterOptions,
+  type DeleteHomePhotoCommand,
+  type FinalizeHomePhotoCommand,
+  type GetHomePhotoCommand,
+  type RequestHomePhotoUploadCommand,
+} from './photo-http.js';
+export {
+  CLEAR_HOME_PHOTO_POINTER_SQL,
+  LOCK_ACTIVE_HOME_PHOTO_FOR_UPDATE_SQL,
+  REPLACE_HOME_PHOTO_POINTER_SQL,
+  SELECT_EXACT_MEMBERSHIP_FOR_PHOTO_SQL,
+  clearHomePhotoPointer,
+  createHomePhotoPointerWriter,
+  lockActiveHomeForPhotoMutation,
+  replaceHomePhotoPointer,
+  type HomePhotoPointerWriter,
+  type LockedHomePhotoMutation,
+} from './photo-pointer.js';
+export {
   decideArchiveFinalMember,
+  decideHomeChangePhoto,
   decideHomeRead,
   type ArchiveFinalMemberDenialReason,
+  type HomeChangePhotoDenialReason,
   type HomeReadDenialReason,
 } from './policies.js';
 export {

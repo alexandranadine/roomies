@@ -148,11 +148,33 @@ void describe('deployment production scripts', () => {
     assert.match(source, /['"]@aws-sdk\/s3-request-presigner['"]/);
   });
 
+  void it('does not bundle AWS SDK, Sharp, or @img native binaries into dist/main.js', async () => {
+    const dist = path.join(backendRoot, 'dist/main.js');
+    try {
+      await access(dist);
+    } catch {
+      return;
+    }
+    const bundle = await readFile(dist, 'utf8');
+    assert.match(bundle, /from ["']@aws-sdk\/client-s3["']/);
+    assert.match(bundle, /from ["']@aws-sdk\/s3-request-presigner["']/);
+    assert.match(bundle, /from ["']sharp["']/);
+    assert.equal(bundle.includes('@img/'), false);
+    assert.equal(bundle.includes('libvips'), false);
+    assert.equal(bundle.includes('sharp-win32'), false);
+    assert.equal(bundle.includes('sharp-linux'), false);
+    assert.equal(bundle.includes('@smithy/'), false);
+  });
+
   void it('configures Sharp at process bootstrap', async () => {
     const source = await readFile(
       path.join(backendRoot, 'src/main.ts'),
       'utf8',
     );
     assert.match(source, /configureHomePhotoImageProcessor\(/);
+    assert.match(source, /createHomePhotoObjectStore\(/);
+    assert.match(source, /createSharpHomePhotoImageProcessor\(/);
+    assert.match(source, /createRequestHomePhotoUpload\(/);
+    assert.match(source, /createFinalizeHomePhotoFromPool\(/);
   });
 });

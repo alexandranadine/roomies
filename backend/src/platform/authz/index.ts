@@ -14,4 +14,5 @@ export {
   ForbiddenError,
   InvalidPathInputError,
   InvalidRequestError,
+  PayloadTooLargeError,
 } from './errors.js';
