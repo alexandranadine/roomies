@@ -26,6 +26,7 @@ import {
 } from '../src/platform/persistence/test-database.js';
 import { verifyActivitySchema } from './verify-activity-schema.js';
 import { verifyAuthPersistence } from './verify-auth-persistence.js';
+import { verifyHomePhotoSchema } from './verify-home-photo-schema.js';
 import { verifyInvitationSchema } from './verify-invitation-schema.js';
 import { verifyOutboxSchema } from './verify-outbox-schema.js';
 import { verifyMaintenanceSchema } from './verify-maintenance-schema.js';
@@ -92,5 +93,6 @@ await verifyActivitySchema(databaseUrl);
 await verifyMembershipSchema(databaseUrl);
 await verifyNotificationSchema(databaseUrl);
 await verifyUserDeletionMarker(databaseUrl);
+await verifyHomePhotoSchema(databaseUrl);
 
 console.log('Fresh migrations and strict persistence verification passed.');

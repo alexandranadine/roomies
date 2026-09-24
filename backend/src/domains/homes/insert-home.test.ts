@@ -28,6 +28,7 @@ void describe('insertHome', () => {
     assert.match(sql, /updated_at/);
     assert.doesNotMatch(sql, /memberships/i);
     assert.doesNotMatch(sql, /owner|created_by|primary_admin|founder/i);
+    assert.doesNotMatch(sql, /photo_object_key/);
     assert.deepEqual(values, [
       HOME_ID,
       'Oak Street',

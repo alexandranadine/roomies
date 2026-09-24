@@ -109,12 +109,14 @@ async function mockAuthenticatedNotificationApis(page: Page): Promise<void> {
           name: 'Oak Street',
           timezone: 'UTC',
           role: 'ADMIN',
+          hasPhoto: false,
         },
         {
           id: HOME_B,
           name: 'Cedar House',
           timezone: 'UTC',
           role: 'ROOMMATE',
+          hasPhoto: false,
         },
       ]);
       return;
@@ -140,6 +142,7 @@ async function mockAuthenticatedNotificationApis(page: Page): Promise<void> {
         id: HOME_A,
         name: 'Oak Street',
         timezone: 'UTC',
+        hasPhoto: false,
       });
       return;
     }
@@ -148,6 +151,7 @@ async function mockAuthenticatedNotificationApis(page: Page): Promise<void> {
         id: HOME_B,
         name: 'Cedar House',
         timezone: 'UTC',
+        hasPhoto: false,
       });
       return;
     }

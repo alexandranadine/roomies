@@ -1,9 +1,10 @@
 import type { Pool } from 'pg';
 import { AuthorizationIntegrityError } from '../../../platform/authz/errors.js';
 import type { Home } from '../home.js';
+import { storedHomePhotoObjectKey } from '../photo-object-key.js';
 
-const FIND_ACTIVE_HOME_SQL = `
-SELECT id, name, timezone
+export const FIND_ACTIVE_HOME_SQL = `
+SELECT id, name, timezone, photo_object_key
 FROM homes
 WHERE id = $1
   AND archived_at IS NULL
@@ -17,7 +18,25 @@ type HomeRow = {
   id: unknown;
   name: unknown;
   timezone: unknown;
+  photo_object_key: unknown;
 };
+
+function mapActiveHomeRow(row: HomeRow): Home {
+  if (
+    typeof row.id !== 'string' ||
+    typeof row.name !== 'string' ||
+    typeof row.timezone !== 'string'
+  ) {
+    throw new AuthorizationIntegrityError();
+  }
+
+  return Object.freeze({
+    id: row.id,
+    name: row.name,
+    timezone: row.timezone,
+    photoObjectKey: storedHomePhotoObjectKey(row.photo_object_key, row.id),
+  });
+}
 
 /**
  * Final Home read independently requires archived_at IS NULL. Do not assume
@@ -41,20 +60,11 @@ export function createHomeRepository(pool: Pool): HomeReader {
       }
 
       const row = rows[0];
-      if (
-        row === undefined ||
-        typeof row.id !== 'string' ||
-        typeof row.name !== 'string' ||
-        typeof row.timezone !== 'string'
-      ) {
+      if (row === undefined) {
         throw new AuthorizationIntegrityError();
       }
 
-      return Object.freeze({
-        id: row.id,
-        name: row.name,
-        timezone: row.timezone,
-      });
+      return mapActiveHomeRow(row);
     },
   };
 }

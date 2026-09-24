@@ -196,9 +196,24 @@ void describe('homes domain boundary', () => {
     assert.doesNotMatch(source, /memberships/i);
     assert.doesNotMatch(source, /outbox/i);
     assert.doesNotMatch(source, /owner|primaryAdmin|createdByUserId|founder/i);
+    assert.doesNotMatch(source, /photo_object_key/);
     assert.doesNotMatch(source, /from ['"]express['"]/);
     assert.doesNotMatch(source, /from ['"]pg['"]/);
     assert.doesNotMatch(source, /Date\.now/);
+  });
+
+  void it('keeps canonical Home photo keys free of HTTP, persistence, and image runtimes', async () => {
+    const source = await readFile(
+      path.join(homesDir, 'photo-object-key.ts'),
+      'utf8',
+    );
+    assert.match(source, /CANONICAL_HOME_PHOTO_OBJECT_KEY_PATTERN/);
+    assert.match(source, /isCanonicalHomePhotoObjectKey/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+    assert.doesNotMatch(source, /from ['"]pg['"]/);
+    assert.doesNotMatch(source, /from ['"]@aws-sdk\//);
+    assert.doesNotMatch(source, /from ['"]sharp['"]/);
+    assert.doesNotMatch(source, /presign/i);
   });
 
   void it('does not put Home policy inside platform/auth', async () => {

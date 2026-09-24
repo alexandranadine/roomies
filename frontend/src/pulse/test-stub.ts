@@ -14,6 +14,7 @@ type HomeContextBody = {
   id: string;
   name: string;
   timezone: string;
+  hasPhoto: boolean;
 };
 
 export type PulseResult = HousePulseDto | { status: number; body: unknown };
@@ -24,6 +25,7 @@ export type PulseStubOptions = {
     name: string;
     timezone: string;
     role: 'ADMIN' | 'ROOMMATE';
+    hasPhoto: boolean;
   }[];
   contexts?: Record<string, { status: number; body: unknown }>;
   pulseByHome?: Record<string, PulseResult | (() => PulseResult)>;
@@ -34,9 +36,19 @@ export type PulseStubOptions = {
 
 function defaultContext(homeId: string): HomeContextBody {
   if (homeId === TEST_HOME_B) {
-    return { id: TEST_HOME_B, name: 'Cedar House', timezone: 'UTC' };
+    return {
+      id: TEST_HOME_B,
+      name: 'Cedar House',
+      timezone: 'UTC',
+      hasPhoto: false,
+    };
   }
-  return { id: TEST_HOME_A, name: 'Oak Street', timezone: 'UTC' };
+  return {
+    id: TEST_HOME_A,
+    name: 'Oak Street',
+    timezone: 'UTC',
+    hasPhoto: false,
+  };
 }
 
 function resolvePulse(configured: PulseResult | (() => PulseResult)): Response {
@@ -69,12 +81,14 @@ export function stubPulseApis(options: PulseStubOptions = {}) {
                 id: TEST_HOME_A,
                 name: 'Oak Street',
                 timezone: 'UTC',
+                hasPhoto: false,
                 role: 'ADMIN',
               },
               {
                 id: TEST_HOME_B,
                 name: 'Cedar House',
                 timezone: 'UTC',
+                hasPhoto: false,
                 role: 'ROOMMATE',
               },
             ],

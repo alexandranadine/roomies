@@ -43,6 +43,11 @@ export {
 export type { Home } from './home.js';
 export { homeDtoSchema, toHomeDto, type HomeDto } from './home-dto.js';
 export {
+  CANONICAL_HOME_PHOTO_OBJECT_KEY_PATTERN,
+  isCanonicalHomePhotoObjectKey,
+  storedHomePhotoObjectKey,
+} from './photo-object-key.js';
+export {
   HOME_NAME_MAX_LENGTH,
   InvalidHomeNameError,
   normalizeHomeName,
@@ -90,6 +95,7 @@ export {
 } from './repository/active-homes-for-user.js';
 export {
   createHomeRepository,
+  FIND_ACTIVE_HOME_SQL,
   type HomeReader,
 } from './repository/home-repository.js';
 export { StructuralIntegrityError } from './structure-errors.js';

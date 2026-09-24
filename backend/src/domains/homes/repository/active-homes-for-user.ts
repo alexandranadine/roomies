@@ -4,6 +4,7 @@ import {
   isMembershipRole,
 } from '../../../platform/authz/index.js';
 import type { ActiveHomeSummary } from '../active-home-summary.js';
+import { storedHomePhotoObjectKey } from '../photo-object-key.js';
 
 /**
  * Canonical User → active Membership → unarchived Home.
@@ -14,6 +15,7 @@ SELECT
   h.id,
   h.name,
   h.timezone,
+  h.photo_object_key,
   m.role
 FROM memberships AS m
 JOIN homes AS h
@@ -32,6 +34,7 @@ type ActiveHomeRow = {
   id: unknown;
   name: unknown;
   timezone: unknown;
+  photo_object_key: unknown;
   role: unknown;
 };
 
@@ -78,6 +81,10 @@ export function createActiveHomesForUserReader(
             name: row.name,
             timezone: row.timezone,
             role: row.role,
+            photoObjectKey: storedHomePhotoObjectKey(
+              row.photo_object_key,
+              row.id,
+            ),
           }),
         );
       }

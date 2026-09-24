@@ -90,6 +90,7 @@ type HomeRow = {
   id: string;
   name: string;
   timezone: string;
+  photo_object_key: string | null;
   archived_at: Date | null;
   created_at: Date;
   updated_at: Date;
@@ -142,13 +143,15 @@ void describe('createCreateHome PostgreSQL', () => {
         assert.equal(first.membership.role, 'ADMIN');
 
         const home = await database.pool.query<HomeRow>(
-          `SELECT id, name, timezone, archived_at, created_at, updated_at
+          `SELECT id, name, timezone, photo_object_key, archived_at, created_at, updated_at
            FROM homes WHERE id = $1`,
           [first.home.id],
         );
         assert.equal(home.rowCount, 1);
         assert.equal(home.rows[0]?.name, 'Oak Street');
         assert.equal(home.rows[0]?.timezone, 'America/Los_Angeles');
+        assert.equal(home.rows[0]?.photo_object_key, null);
+        assert.equal(first.home.photoObjectKey, null);
         assert.equal(home.rows[0]?.archived_at, null);
         assert.deepEqual(
           Object.keys(home.rows[0] ?? {}).sort(),
@@ -157,6 +160,7 @@ void describe('createCreateHome PostgreSQL', () => {
             'created_at',
             'id',
             'name',
+            'photo_object_key',
             'timezone',
             'updated_at',
           ].sort(),

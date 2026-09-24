@@ -2,13 +2,14 @@ import { z } from 'zod';
 import { MEMBERSHIP_ROLES } from '../../platform/authz/context.js';
 import type { ActiveHomeSummary } from './active-home-summary.js';
 
-/** Explicit GET /me/homes row whitelist. No Membership id or archive fields. */
+/** Explicit GET /me/homes row whitelist. No Membership id, archive, or object-key fields. */
 export const activeHomeSummaryDtoSchema = z
   .object({
     id: z.string().min(1),
     name: z.string().min(1),
     timezone: z.string().min(1),
     role: z.enum(MEMBERSHIP_ROLES),
+    hasPhoto: z.boolean(),
   })
   .strict();
 
@@ -24,6 +25,7 @@ export function toActiveHomeSummaryDto(
     name: home.name,
     timezone: home.timezone,
     role: home.role,
+    hasPhoto: home.photoObjectKey !== null,
   });
 }
 

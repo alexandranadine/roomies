@@ -17,12 +17,19 @@ describe('clearPrivateHomeQueryState', () => {
     const queryClient = createAppQueryClient();
     queryClient.setQueryData(currentUserQueryKey, { id: HOME_ID });
     queryClient.setQueryData(currentUserHomesQueryKey, [
-      { id: HOME_ID, name: 'Oak Street', timezone: 'UTC', role: 'ADMIN' },
+      {
+        id: HOME_ID,
+        name: 'Oak Street',
+        timezone: 'UTC',
+        role: 'ADMIN',
+        hasPhoto: false,
+      },
     ]);
     queryClient.setQueryData(homeContextQueryKey(HOME_ID), {
       id: HOME_ID,
       name: 'Oak Street',
       timezone: 'UTC',
+      hasPhoto: false,
     });
     queryClient.setQueryData(pulseKeys.all(HOME_ID), clearHousePulse());
     queryClient.setQueryData(notificationKeys.list({}), {

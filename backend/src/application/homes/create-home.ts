@@ -146,6 +146,7 @@ export function createCreateHome(
           id: homeId,
           name,
           timezone,
+          photoObjectKey: null,
         }),
         membership: Object.freeze({
           id: membershipId,

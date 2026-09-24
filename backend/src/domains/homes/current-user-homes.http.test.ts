@@ -123,12 +123,14 @@ void describe('GET /api/v1/me/homes', () => {
         name: 'Cedar House',
         timezone: 'UTC',
         role: 'ROOMMATE',
+        photoObjectKey: null,
       },
       {
         id: HOME_B,
         name: 'Oak Street',
         timezone: 'America/Los_Angeles',
         role: 'ADMIN',
+        photoObjectKey: `homes/${HOME_B}/photo/11111111-1111-4111-8111-111111111111.webp`,
       },
     ];
     const { app } = buildApp({
@@ -136,11 +138,32 @@ void describe('GET /api/v1/me/homes', () => {
     });
     const res = await appRequest(app, { path: '/api/v1/me/homes' });
     assert.equal(res.status, 200);
-    assert.deepEqual(res.json(), homes);
+    assert.deepEqual(res.json(), [
+      {
+        id: HOME_A,
+        name: 'Cedar House',
+        timezone: 'UTC',
+        role: 'ROOMMATE',
+        hasPhoto: false,
+      },
+      {
+        id: HOME_B,
+        name: 'Oak Street',
+        timezone: 'America/Los_Angeles',
+        role: 'ADMIN',
+        hasPhoto: true,
+      },
+    ]);
     assertNoForbiddenLeak({
       context: 'discovery success body',
       text: res.text,
-      forbidden: leakSentinels,
+      forbidden: [
+        ...leakSentinels,
+        'photoObjectKey',
+        'photo_object_key',
+        `homes/${HOME_B}/photo/11111111-1111-4111-8111-111111111111.webp`,
+        '.webp',
+      ],
     });
   });
 
@@ -167,6 +190,7 @@ void describe('GET /api/v1/me/homes', () => {
             name: 'Oak Street',
             timezone: 'UTC',
             role: 'ADMIN',
+            photoObjectKey: null,
           },
         ]),
     });
@@ -183,6 +207,7 @@ void describe('GET /api/v1/me/homes', () => {
         name: 'Oak Street',
         timezone: 'UTC',
         role: 'ADMIN',
+        hasPhoto: false,
       },
     ]);
   });

@@ -74,6 +74,7 @@ async function mockAuthenticatedMaintenanceApis(
           name: 'Oak Street',
           timezone: 'UTC',
           role: 'ADMIN',
+          hasPhoto: false,
         },
       ]);
       return;
@@ -83,6 +84,7 @@ async function mockAuthenticatedMaintenanceApis(
         id: HOME_A,
         name: 'Oak Street',
         timezone: 'UTC',
+        hasPhoto: false,
       });
       return;
     }

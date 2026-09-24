@@ -162,6 +162,7 @@ void describe('createCreateHome', () => {
     assert.equal(result.membership.id, MEMBERSHIP_ID);
     assert.equal(result.home.name, 'Oak Street');
     assert.equal(result.home.timezone, 'America/Los_Angeles');
+    assert.equal(result.home.photoObjectKey, null);
     assert.equal(result.membership.role, 'ADMIN');
     assert.deepEqual(run.homes, [
       {

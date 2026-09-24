@@ -6,6 +6,7 @@ import {
   assertUniqueActiveHomeIds,
   listActiveHomesForUser,
 } from './list-active-homes.js';
+import { LIST_ACTIVE_HOMES_FOR_USER_SQL } from './repository/active-homes-for-user.js';
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 const HOME_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -16,8 +17,16 @@ function home(
   name: string,
   role: ActiveHomeSummary['role'] = 'ROOMMATE',
 ): ActiveHomeSummary {
-  return { id, name, timezone: 'UTC', role };
+  return { id, name, timezone: 'UTC', role, photoObjectKey: null };
 }
+
+void describe('LIST_ACTIVE_HOMES_FOR_USER_SQL', () => {
+  void it('selects the canonical photo pointer for discovery', () => {
+    assert.match(LIST_ACTIVE_HOMES_FOR_USER_SQL, /h\.photo_object_key/);
+    assert.match(LIST_ACTIVE_HOMES_FOR_USER_SQL, /h\.archived_at IS NULL/);
+    assert.doesNotMatch(LIST_ACTIVE_HOMES_FOR_USER_SQL, /FOR UPDATE/i);
+  });
+});
 
 void describe('assertUniqueActiveHomeIds', () => {
   void it('allows distinct Homes', () => {

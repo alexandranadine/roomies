@@ -249,12 +249,14 @@ describe('Account settings deletion', () => {
         name: 'Oak Street',
         timezone: 'UTC',
         role: 'ADMIN',
+        hasPhoto: false,
       },
     ]);
     queryClient.setQueryData(homeContextQueryKey(HOME_ID), {
       id: HOME_ID,
       name: 'Oak Street',
       timezone: 'UTC',
+      hasPhoto: false,
     });
     queryClient.setQueryData(notificationKeys.list({}), {
       pages: [{ items: [], hasMore: false, nextCursor: null }],
@@ -346,6 +348,7 @@ describe('Account settings deletion', () => {
         name: 'Oak Street',
         timezone: 'UTC',
         role: 'ADMIN',
+        hasPhoto: false,
       },
     ]);
 

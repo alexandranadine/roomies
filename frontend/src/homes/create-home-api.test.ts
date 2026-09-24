@@ -20,6 +20,7 @@ describe('createHome', () => {
             id: HOME_ID,
             name: 'Oak Street',
             timezone: 'America/Los_Angeles',
+            hasPhoto: false,
           },
           membership: { id: MEMBERSHIP_ID, role: 'ADMIN' },
         }),
@@ -48,6 +49,7 @@ describe('createHome', () => {
         id: HOME_ID,
         name: 'Oak Street',
         timezone: 'America/Los_Angeles',
+        hasPhoto: false,
       },
       membership: { id: MEMBERSHIP_ID, role: 'ADMIN' },
     });

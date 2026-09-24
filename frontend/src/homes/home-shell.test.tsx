@@ -19,6 +19,7 @@ type HomeRow = {
   name: string;
   timezone: string;
   role: 'ADMIN' | 'ROOMMATE';
+  hasPhoto: boolean;
 };
 
 function jsonResponse(status: number, body: unknown) {
@@ -124,6 +125,7 @@ describe('active Home discovery and shell', () => {
           id: HOME_A,
           name: 'Oak Street',
           timezone: 'UTC',
+          hasPhoto: false,
           role: 'ADMIN',
         },
       ],
@@ -134,6 +136,7 @@ describe('active Home discovery and shell', () => {
             id: HOME_A,
             name: 'Oak Street',
             timezone: 'UTC',
+            hasPhoto: false,
           },
         },
       },
@@ -157,19 +160,26 @@ describe('active Home discovery and shell', () => {
           id: HOME_A,
           name: 'Cedar House',
           timezone: 'UTC',
+          hasPhoto: false,
           role: 'ROOMMATE',
         },
         {
           id: HOME_B,
           name: 'Oak Street',
           timezone: 'UTC',
+          hasPhoto: false,
           role: 'ADMIN',
         },
       ],
       contexts: {
         [HOME_B]: {
           status: 200,
-          body: { id: HOME_B, name: 'Oak Street', timezone: 'UTC' },
+          body: {
+            id: HOME_B,
+            name: 'Oak Street',
+            timezone: 'UTC',
+            hasPhoto: false,
+          },
         },
       },
     });
@@ -198,7 +208,12 @@ describe('active Home discovery and shell', () => {
       contexts: {
         [HOME_A]: {
           status: 200,
-          body: { id: HOME_A, name: 'Oak Street', timezone: 'UTC' },
+          body: {
+            id: HOME_A,
+            name: 'Oak Street',
+            timezone: 'UTC',
+            hasPhoto: false,
+          },
         },
       },
     });
@@ -212,6 +227,7 @@ describe('active Home discovery and shell', () => {
       id: HOME_A,
       name: 'Oak Street',
       timezone: 'UTC',
+      hasPhoto: false,
     });
     expect(homeContextQueryKey(HOME_A)).toContain(HOME_A);
   });
@@ -244,11 +260,21 @@ describe('active Home discovery and shell', () => {
       contexts: {
         [HOME_A]: {
           status: 200,
-          body: { id: HOME_A, name: 'Oak Street', timezone: 'UTC' },
+          body: {
+            id: HOME_A,
+            name: 'Oak Street',
+            timezone: 'UTC',
+            hasPhoto: false,
+          },
         },
         [HOME_B]: {
           status: 200,
-          body: { id: HOME_B, name: 'Cedar House', timezone: 'UTC' },
+          body: {
+            id: HOME_B,
+            name: 'Cedar House',
+            timezone: 'UTC',
+            hasPhoto: false,
+          },
         },
       },
       delayedHomeId: HOME_B,
@@ -285,6 +311,7 @@ describe('active Home discovery and shell', () => {
               id: HOME_A,
               name: 'Oak Street',
               timezone: 'UTC',
+              hasPhoto: false,
               role: 'ADMIN',
             },
           ]),
@@ -312,6 +339,7 @@ describe('active Home discovery and shell', () => {
             id: HOME_A,
             name: 'Oak Street',
             timezone: 'UTC',
+            hasPhoto: false,
           }),
         );
       }

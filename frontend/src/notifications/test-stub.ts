@@ -20,6 +20,7 @@ export type NotificationStubOptions = {
     name: string;
     timezone: string;
     role: 'ADMIN' | 'ROOMMATE';
+    hasPhoto: boolean;
   }[];
   contexts?: Record<string, { status: number; body: unknown }>;
   list?: NotificationListResult | ((url: URL) => NotificationListResult);
@@ -37,11 +38,22 @@ function defaultContext(homeId: string): {
   id: string;
   name: string;
   timezone: string;
+  hasPhoto: boolean;
 } {
   if (homeId === TEST_HOME_B) {
-    return { id: TEST_HOME_B, name: 'Cedar House', timezone: 'UTC' };
+    return {
+      id: TEST_HOME_B,
+      name: 'Cedar House',
+      timezone: 'UTC',
+      hasPhoto: false,
+    };
   }
-  return { id: TEST_HOME_A, name: 'Oak Street', timezone: 'UTC' };
+  return {
+    id: TEST_HOME_A,
+    name: 'Oak Street',
+    timezone: 'UTC',
+    hasPhoto: false,
+  };
 }
 
 function resolveListResult(
@@ -78,12 +90,14 @@ export function stubNotificationsApis(options: NotificationStubOptions = {}) {
                 id: TEST_HOME_A,
                 name: 'Oak Street',
                 timezone: 'UTC',
+                hasPhoto: false,
                 role: 'ADMIN',
               },
               {
                 id: TEST_HOME_B,
                 name: 'Cedar House',
                 timezone: 'UTC',
+                hasPhoto: false,
                 role: 'ROOMMATE',
               },
             ],

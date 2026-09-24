@@ -50,6 +50,7 @@ function stubDiscoveryApis(options: {
               id: HOME_ID,
               name: 'Oak Street',
               timezone: 'America/New_York',
+              hasPhoto: false,
             },
             membership: { id: MEMBERSHIP_ID, role: 'ADMIN' },
           },
@@ -74,6 +75,7 @@ function stubDiscoveryApis(options: {
               id: HOME_ID,
               name: 'Oak Street',
               timezone: 'America/New_York',
+              hasPhoto: false,
             },
           ),
         );

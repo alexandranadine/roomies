@@ -48,6 +48,7 @@ function home(): Home {
     id: HOME_ID,
     name: 'Oak Street',
     timezone: 'America/Los_Angeles',
+    photoObjectKey: null,
   });
 }
 
@@ -129,10 +130,37 @@ void describe('previewInvitation', () => {
       },
     });
     assert.equal('timezone' in result.invitation.home, false);
+    assert.equal('hasPhoto' in result.invitation.home, false);
+    assert.equal('photoObjectKey' in result.invitation.home, false);
     assert.equal('tokenHash' in result.invitation, false);
     assert.equal('createdByMembershipId' in result.invitation, false);
     assert.equal('acceptedMembershipId' in result.invitation, false);
     assert.equal(compareCalls.length, 1);
+  });
+
+  void it('does not expose photo presence or object keys from a populated Home', async () => {
+    const photoObjectKey = `homes/${HOME_ID}/photo/11111111-1111-4111-8111-111111111111.webp`;
+    const { command, input } = previewOf({
+      home: Object.freeze({
+        id: HOME_ID,
+        name: 'Oak Street',
+        timezone: 'America/Los_Angeles',
+        photoObjectKey,
+      }),
+    });
+    const result = await command(input);
+    assert.deepEqual(result.invitation.home, {
+      id: HOME_ID,
+      name: 'Oak Street',
+    });
+    assert.deepEqual(Object.keys(result.invitation.home), ['id', 'name']);
+    const serialized = JSON.stringify(result);
+    assert.equal(serialized.includes('hasPhoto'), false);
+    assert.equal(serialized.includes('photoObjectKey'), false);
+    assert.equal(serialized.includes('photo_object_key'), false);
+    assert.equal(serialized.includes(photoObjectKey), false);
+    assert.equal(serialized.includes('https://'), false);
+    assert.equal(serialized.includes('.webp'), false);
   });
 
   void it('uses the constant-time digest helper before exposing metadata', async () => {

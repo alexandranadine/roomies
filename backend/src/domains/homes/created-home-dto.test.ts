@@ -9,6 +9,7 @@ void describe('toCreatedHomeDto', () => {
         id: 'home-1',
         name: 'Oak Street',
         timezone: 'America/Los_Angeles',
+        photoObjectKey: null,
       },
       membership: { id: 'membership-1', role: 'ADMIN' },
     });
@@ -17,20 +18,27 @@ void describe('toCreatedHomeDto', () => {
         id: 'home-1',
         name: 'Oak Street',
         timezone: 'America/Los_Angeles',
+        hasPhoto: false,
       },
       membership: { id: 'membership-1', role: 'ADMIN' },
     });
     assert.deepEqual(Object.keys(dto), ['home', 'membership']);
-    assert.deepEqual(Object.keys(dto.home), ['id', 'name', 'timezone']);
+    assert.deepEqual(Object.keys(dto.home), [
+      'id',
+      'name',
+      'timezone',
+      'hasPhoto',
+    ]);
     assert.deepEqual(Object.keys(dto.membership), ['id', 'role']);
   });
 
-  void it('does not copy Owner, archive, or tenure timestamp fields', () => {
+  void it('does not copy Owner, archive, tenure timestamp, or object-store fields', () => {
     const leaked = {
       home: {
         id: 'home-1',
         name: 'Oak Street',
         timezone: 'UTC',
+        photoObjectKey: 'homes/home-1/photo/secret.webp',
         ownerId: 'owner-secret',
         createdByUserId: 'creator-secret',
         primaryAdmin: true,
@@ -53,5 +61,8 @@ void describe('toCreatedHomeDto', () => {
     assert.equal(serialized.includes('archived'), false);
     assert.equal(serialized.includes('joinedAt'), false);
     assert.equal(serialized.includes('userId'), false);
+    assert.equal(serialized.includes('photoObjectKey'), false);
+    assert.equal(serialized.includes('photo_object_key'), false);
+    assert.equal(dto.home.hasPhoto, true);
   });
 });

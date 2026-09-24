@@ -19,6 +19,7 @@ type HomeContextBody = {
   id: string;
   name: string;
   timezone: string;
+  hasPhoto: boolean;
 };
 
 export type MaintenanceStubOptions = {
@@ -27,6 +28,7 @@ export type MaintenanceStubOptions = {
     name: string;
     timezone: string;
     role: 'ADMIN' | 'ROOMMATE';
+    hasPhoto: boolean;
   }[];
   contexts?: Record<string, { status: number; body: unknown }>;
   listByHome?: Record<
@@ -64,9 +66,19 @@ export type MaintenanceStubOptions = {
 
 function defaultContext(homeId: string): HomeContextBody {
   if (homeId === TEST_HOME_B) {
-    return { id: TEST_HOME_B, name: 'Cedar House', timezone: 'UTC' };
+    return {
+      id: TEST_HOME_B,
+      name: 'Cedar House',
+      timezone: 'UTC',
+      hasPhoto: false,
+    };
   }
-  return { id: TEST_HOME_A, name: 'Oak Street', timezone: 'UTC' };
+  return {
+    id: TEST_HOME_A,
+    name: 'Oak Street',
+    timezone: 'UTC',
+    hasPhoto: false,
+  };
 }
 
 export function defaultMemberships(
@@ -130,12 +142,14 @@ export function stubMaintenanceApis(options: MaintenanceStubOptions = {}) {
                 id: TEST_HOME_A,
                 name: 'Oak Street',
                 timezone: 'UTC',
+                hasPhoto: false,
                 role: 'ADMIN',
               },
               {
                 id: TEST_HOME_B,
                 name: 'Cedar House',
                 timezone: 'UTC',
+                hasPhoto: false,
                 role: 'ROOMMATE',
               },
             ],

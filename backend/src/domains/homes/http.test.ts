@@ -41,6 +41,7 @@ function buildApp(
       id: string;
       name: string;
       timezone: string;
+      photoObjectKey: string | null;
     } | null>;
   } = {},
 ) {
@@ -73,6 +74,7 @@ function buildApp(
                 id: homeId,
                 name: 'Oak Street',
                 timezone: 'America/Los_Angeles',
+                photoObjectKey: null,
               })),
         },
         archiveFinalMemberHome: () =>
@@ -139,6 +141,7 @@ void describe('GET /api/v1/homes/:homeId', () => {
       id: UUID_V7,
       name: 'Oak Street',
       timezone: 'America/Los_Angeles',
+      hasPhoto: false,
     });
   });
 
@@ -179,7 +182,7 @@ void describe('GET /api/v1/homes/:homeId', () => {
     assert.equal(body.error.code, 'NOT_FOUND');
   });
 
-  void it('returns only id, name, and timezone for ROOMMATE and ADMIN', async () => {
+  void it('returns only id, name, timezone, and hasPhoto for ROOMMATE and ADMIN', async () => {
     for (const role of ['ROOMMATE', 'ADMIN'] as const) {
       const { app } = buildApp({
         resolve: () => Promise.resolve(actor(role)),
@@ -193,6 +196,7 @@ void describe('GET /api/v1/homes/:homeId', () => {
         id: HOME_ID,
         name: 'Oak Street',
         timezone: 'America/Los_Angeles',
+        hasPhoto: false,
       });
       assert.equal(res.headers.get('cache-control'), 'private, no-store');
       assert.equal(res.headers.get(REQUEST_ID_HEADER)?.length, 36);
@@ -208,9 +212,44 @@ void describe('GET /api/v1/homes/:homeId', () => {
           'membershipId',
           'userId',
           'HOME_SCOPE_MISMATCH',
+          'photoObjectKey',
+          'photo_object_key',
         ],
       });
     }
+  });
+
+  void it('returns hasPhoto true without leaking the object key', async () => {
+    const photoObjectKey = `homes/${HOME_ID}/photo/11111111-1111-4111-8111-111111111111.webp`;
+    const { app } = buildApp({
+      findActiveHomeById: (homeId) =>
+        Promise.resolve({
+          id: homeId,
+          name: 'Oak Street',
+          timezone: 'America/Los_Angeles',
+          photoObjectKey,
+        }),
+    });
+    const res = await appRequest(app, { path: `/api/v1/homes/${HOME_ID}` });
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('cache-control'), 'private, no-store');
+    assert.deepEqual(res.json(), {
+      id: HOME_ID,
+      name: 'Oak Street',
+      timezone: 'America/Los_Angeles',
+      hasPhoto: true,
+    });
+    assertNoForbiddenLeak({
+      context: 'home read with photo',
+      text: res.text,
+      forbidden: [
+        'photoObjectKey',
+        'photo_object_key',
+        photoObjectKey,
+        'https://',
+        '.webp',
+      ],
+    });
   });
 
   void it('maps resolver integrity failures to a safe 500', async () => {

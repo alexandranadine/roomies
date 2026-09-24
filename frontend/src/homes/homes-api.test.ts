@@ -19,6 +19,7 @@ describe('listCurrentUserHomes', () => {
             id: HOME_ID,
             name: 'Oak Street',
             timezone: 'America/Los_Angeles',
+            hasPhoto: false,
             role: 'ADMIN',
           },
         ]),
@@ -39,6 +40,7 @@ describe('listCurrentUserHomes', () => {
         id: HOME_ID,
         name: 'Oak Street',
         timezone: 'America/Los_Angeles',
+        hasPhoto: false,
         role: 'ADMIN',
       },
     ]);

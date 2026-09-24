@@ -277,6 +277,11 @@ void describe('POST invitation preview HTTP PostgreSQL', () => {
           const membershipHomeB = randomUUID();
           const membershipAccepted = randomUUID();
           await insertHome(database.pool, { id: homeA, name: 'Preview Home' });
+          const homeAPhotoKey = `homes/${homeA}/photo/${randomUUID()}.webp`;
+          await database.pool.query(
+            `UPDATE homes SET photo_object_key = $2 WHERE id = $1`,
+            [homeA, homeAPhotoKey],
+          );
           await insertHome(database.pool, { id: homeB, name: 'Other Home' });
           await insertMembership(database.pool, {
             id: membershipAdmin,
@@ -385,11 +390,19 @@ void describe('POST invitation preview HTTP PostgreSQL', () => {
           assert.equal(body.invitation.home.id, homeA);
           assert.equal(body.invitation.home.name, 'Preview Home');
           assert.equal('photo' in body.invitation.home, false);
+          assert.equal('hasPhoto' in body.invitation.home, false);
+          assert.equal('photoObjectKey' in body.invitation.home, false);
           assert.equal('timezone' in body.invitation.home, false);
           assert.equal('tokenHash' in body.invitation, false);
           assert.equal('createdByMembershipId' in body.invitation, false);
           assert.equal(signedOut.text.includes(pendingSecret.encoded), false);
           assert.equal(signedOut.text.includes(admin.id), false);
+          assert.equal(signedOut.text.includes(homeAPhotoKey), false);
+          assert.equal(signedOut.text.includes('photoObjectKey'), false);
+          assert.equal(signedOut.text.includes('photo_object_key'), false);
+          assert.equal(signedOut.text.includes('hasPhoto'), false);
+          assert.equal(signedOut.text.includes('.webp'), false);
+          assert.equal(signedOut.text.includes('https://'), false);
 
           const signedIn = await preview({
             invitationId: pendingId,

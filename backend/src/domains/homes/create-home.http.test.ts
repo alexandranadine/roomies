@@ -69,6 +69,7 @@ function buildApp(
                 id: HOME_ID,
                 name: input.name,
                 timezone: input.timezone,
+                photoObjectKey: null,
               },
               membership: { id: MEMBERSHIP_ID, role: 'ADMIN' },
             };
@@ -78,6 +79,7 @@ function buildApp(
               id: SECOND_HOME_ID,
               name: input.name,
               timezone: input.timezone,
+              photoObjectKey: null,
             },
             membership: { id: SECOND_MEMBERSHIP_ID, role: 'ADMIN' },
           };
@@ -135,6 +137,7 @@ void describe('POST /api/v1/homes', () => {
         id: HOME_ID,
         name: 'Oak Street',
         timezone: 'America/Los_Angeles',
+        hasPhoto: false,
       },
       membership: { id: MEMBERSHIP_ID, role: 'ADMIN' },
     });
@@ -161,6 +164,8 @@ void describe('POST /api/v1/homes', () => {
         'archived',
         'SELECT',
         USER_ID,
+        'photoObjectKey',
+        'photo_object_key',
       ],
     });
   });

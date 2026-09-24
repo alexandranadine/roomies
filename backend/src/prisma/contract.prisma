@@ -104,6 +104,8 @@ model Home {
   id          Uuid                 @id @default(uuid(7))
   name        String
   timezone    String
+  // Canonical processed Home-photo object key only. NULL means no photo.
+  photoObjectKey String?           @map("photo_object_key")
   archivedAt  Timestamptz?         @map("archived_at")
   createdAt   temporal.createdAt() @map("created_at")
   updatedAt   temporal.updatedAt() @map("updated_at")
@@ -120,6 +122,11 @@ model Home {
   membershipRoleTransitions  MembershipRoleTransition[]
   notifications              Notification[]
 
+  @@check(
+    expression: "((photo_object_key IS NULL) OR (photo_object_key ~ '^homes/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/photo/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.webp$'::text))",
+    map: "homes_photo_object_key_canonical_check"
+  )
+  @@index([photoObjectKey], unique: true, name: "homes_photo_object_key_uidx")
   @@map("homes")
 }
 

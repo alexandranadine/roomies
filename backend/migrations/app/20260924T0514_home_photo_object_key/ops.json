@@ -1,0 +1,125 @@
+[
+  {
+    "id": "column.public.homes.photo_object_key",
+    "label": "Add column \"photo_object_key\" to \"homes\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "photo_object_key",
+        "table": "homes"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"photo_object_key\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "homes",
+          "photo_object_key"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"photo_object_key\"",
+        "sql": "ALTER TABLE \"public\".\"homes\" ADD COLUMN \"photo_object_key\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"photo_object_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "homes",
+          "photo_object_key"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "checkConstraint.homes.homes_photo_object_key_canonical_check",
+    "label": "Add check constraint \"homes_photo_object_key_canonical_check\" on \"homes\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "checkConstraint",
+        "name": "homes_photo_object_key_canonical_check",
+        "table": "homes"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"homes_photo_object_key_canonical_check\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "homes_photo_object_key_canonical_check",
+          "public",
+          "\"public\".\"homes\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add check constraint \"homes_photo_object_key_canonical_check\"",
+        "sql": "ALTER TABLE \"public\".\"homes\" ADD CONSTRAINT \"homes_photo_object_key_canonical_check\" CHECK (((photo_object_key IS NULL) OR (photo_object_key ~ '^homes/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/photo/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.webp$'::text)))"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"homes_photo_object_key_canonical_check\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "homes_photo_object_key_canonical_check",
+          "public",
+          "\"public\".\"homes\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.homes.homes_photo_object_key_uidx_746e59cb",
+    "label": "Create index \"homes_photo_object_key_uidx_746e59cb\" on \"homes\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "homes_photo_object_key_uidx_746e59cb",
+        "table": "homes"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"homes_photo_object_key_uidx_746e59cb\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"homes_photo_object_key_uidx_746e59cb\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"homes_photo_object_key_uidx_746e59cb\"",
+        "sql": "CREATE UNIQUE INDEX \"homes_photo_object_key_uidx_746e59cb\" ON \"public\".\"homes\" (\"photo_object_key\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"homes_photo_object_key_uidx_746e59cb\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"homes_photo_object_key_uidx_746e59cb\""
+        ]
+      }
+    ]
+  }
+]

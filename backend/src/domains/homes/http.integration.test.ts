@@ -261,6 +261,7 @@ void describe('GET /api/v1/homes/:homeId PostgreSQL authorization', () => {
             id: homeAId,
             name: 'Home A',
             timezone: 'America/Los_Angeles',
+            hasPhoto: false,
           });
           assert.equal(
             roommateRead.headers.get('cache-control'),
@@ -287,6 +288,8 @@ void describe('GET /api/v1/homes/:homeId PostgreSQL authorization', () => {
               'HOME_SCOPE_MISMATCH',
               userA.email,
               PASSWORD,
+              'photoObjectKey',
+              'photo_object_key',
             ],
           });
 
@@ -299,11 +302,43 @@ void describe('GET /api/v1/homes/:homeId PostgreSQL authorization', () => {
             id: homeBId,
             name: 'Home B',
             timezone: 'UTC',
+            hasPhoto: false,
           });
           assertNoForbiddenLeak({
             context: 'ADMIN home read',
             text: adminRead.text,
             forbidden: [membershipBId, 'ADMIN', 'ROOMMATE', 'archived'],
+          });
+
+          const photoObjectKey = `homes/${homeAId}/photo/${randomUUID()}.webp`;
+          await database.pool.query(
+            `UPDATE homes SET photo_object_key = $2 WHERE id = $1`,
+            [homeAId, photoObjectKey],
+          );
+          const photoRead = await request({
+            path: `/api/v1/homes/${homeAId}`,
+            headers: { Cookie: userA.cookie },
+          });
+          assert.equal(photoRead.status, 200);
+          assert.equal(
+            photoRead.headers.get('cache-control'),
+            'private, no-store',
+          );
+          assert.deepEqual(photoRead.json(), {
+            id: homeAId,
+            name: 'Home A',
+            timezone: 'America/Los_Angeles',
+            hasPhoto: true,
+          });
+          assertNoForbiddenLeak({
+            context: 'home read with photo pointer',
+            text: photoRead.text,
+            forbidden: [
+              'photoObjectKey',
+              'photo_object_key',
+              photoObjectKey,
+              '.webp',
+            ],
           });
 
           console.error = (...args: unknown[]) => {

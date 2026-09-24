@@ -205,6 +205,7 @@ void describe('POST /api/v1/homes PostgreSQL', () => {
           assert.match(body.membership.id, UUID_V7);
           assert.equal(body.home.name, 'Oak Street');
           assert.equal(body.home.timezone, 'America/Los_Angeles');
+          assert.equal(body.home.hasPhoto, false);
           assert.equal(body.membership.role, 'ADMIN');
           assertNoForbiddenLeak({
             context: 'HTTP create home 201',
@@ -218,6 +219,8 @@ void describe('POST /api/v1/homes PostgreSQL', () => {
               PASSWORD,
               'SELECT',
               'joined_at',
+              'photoObjectKey',
+              'photo_object_key',
             ],
           });
 

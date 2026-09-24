@@ -18,6 +18,7 @@ describe('getHomeContext', () => {
           id: HOME_ID,
           name: 'Oak Street',
           timezone: 'America/Los_Angeles',
+          hasPhoto: false,
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
@@ -35,6 +36,7 @@ describe('getHomeContext', () => {
       id: HOME_ID,
       name: 'Oak Street',
       timezone: 'America/Los_Angeles',
+      hasPhoto: false,
     });
   });
 });

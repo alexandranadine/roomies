@@ -1056,6 +1056,13 @@
                   "kind": "scalar"
                 }
               },
+              "photoObjectKey": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "timezone": {
                 "nullable": false,
                 "type": {
@@ -1266,6 +1273,9 @@
                 },
                 "name": {
                   "column": "name"
+                },
+                "photoObjectKey": {
+                  "column": "photo_object_key"
                 },
                 "timezone": {
                   "column": "timezone"
@@ -4268,6 +4278,12 @@
               "uniques": []
             },
             "homes": {
+              "checks": [
+                {
+                  "expression": "((photo_object_key IS NULL) OR (photo_object_key ~ '^homes/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/photo/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.webp$'::text))",
+                  "name": "homes_photo_object_key_canonical_check"
+                }
+              ],
               "columns": {
                 "archived_at": {
                   "codecId": "pg/timestamptz-temporal@1",
@@ -4293,6 +4309,11 @@
                   "nativeType": "text",
                   "nullable": false
                 },
+                "photo_object_key": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
                 "timezone": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
@@ -4305,7 +4326,16 @@
                 }
               },
               "foreignKeys": [],
-              "indexes": [],
+              "indexes": [
+                {
+                  "columns": [
+                    "photo_object_key"
+                  ],
+                  "name": "homes_photo_object_key_uidx_746e59cb",
+                  "prefix": "homes_photo_object_key_uidx",
+                  "unique": true
+                }
+              ],
               "primaryKey": {
                 "columns": [
                   "id"
@@ -6727,7 +6757,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "c76976f9ed0fda7719fe337fc5eb28268dd5c36d0d9dbcaff020e80f845bab61"
+    "storageHash": "10b42e58a246ab56874f0985069a85787999dcd032a5f5fbea26067e6493e659"
   },
   "execution": {
     "executionHash": "0c0f47ccd4cd66b32552e6311fba58a0afe7d5bea262e54370c5459bb93d79b1",

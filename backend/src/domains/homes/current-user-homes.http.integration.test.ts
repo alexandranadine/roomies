@@ -271,6 +271,7 @@ void describe('GET /api/v1/me/homes HTTP integration', () => {
               name: 'Cedar House',
               timezone: 'UTC',
               role: 'ADMIN',
+              hasPhoto: false,
             },
           ]);
           assert.match(
@@ -315,6 +316,11 @@ void describe('GET /api/v1/me/homes HTTP integration', () => {
             userId: userA.id,
             role: 'ROOMMATE',
           });
+          const homeBPhotoKey = `homes/${homeBId}/photo/${randomUUID()}.webp`;
+          await database.pool.query(
+            `UPDATE homes SET photo_object_key = $2 WHERE id = $1`,
+            [homeBId, homeBPhotoKey],
+          );
 
           const activeOnly = await request({
             path: `/api/v1/me/homes?userId=${userB.id}`,
@@ -331,15 +337,20 @@ void describe('GET /api/v1/me/homes HTTP integration', () => {
               name: 'Cedar House',
               timezone: 'UTC',
               role: 'ADMIN',
+              hasPhoto: false,
             },
             {
               id: homeBId,
               name: 'Oak Street',
               timezone: 'America/Los_Angeles',
               role: 'ROOMMATE',
+              hasPhoto: true,
             },
           ]);
           assert.equal(activeOnly.text.includes(userB.id), false);
+          assert.equal(activeOnly.text.includes(homeBPhotoKey), false);
+          assert.equal(activeOnly.text.includes('photoObjectKey'), false);
+          assert.equal(activeOnly.text.includes('photo_object_key'), false);
 
           const otherUserList = await request({
             path: '/api/v1/me/homes',
@@ -352,6 +363,7 @@ void describe('GET /api/v1/me/homes HTTP integration', () => {
               name: 'Private Home',
               timezone: 'UTC',
               role: 'ADMIN',
+              hasPhoto: false,
             },
           ]);
           assert.equal(otherUserList.text.includes(homeAId), false);
@@ -411,6 +423,7 @@ void describe('GET /api/v1/me/homes HTTP integration', () => {
             id: homeAId,
             name: 'Cedar House',
             timezone: 'UTC',
+            hasPhoto: false,
           });
         });
       } finally {

@@ -24,6 +24,7 @@ void describe('getHome', () => {
             id: homeId,
             name: 'Oak Street',
             timezone: 'UTC',
+            photoObjectKey: null,
           }),
       },
     );
@@ -31,6 +32,7 @@ void describe('getHome', () => {
       id: HOME_A,
       name: 'Oak Street',
       timezone: 'UTC',
+      photoObjectKey: null,
     });
   });
 

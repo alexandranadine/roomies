@@ -6,6 +6,7 @@ const homeContextSchema = z
     id: z.string().uuid(),
     name: z.string().min(1),
     timezone: z.string().min(1),
+    hasPhoto: z.boolean(),
   })
   .strict();
 
