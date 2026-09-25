@@ -131,7 +131,7 @@ export function ActivityListPage() {
             className="m-0 flex list-none flex-col gap-1.5 p-0 lg:gap-2"
           >
             {items.map((item) => (
-              <ActivityFeedCard key={item.id} item={item} />
+              <ActivityFeedCard key={item.id} homeId={homeId} item={item} />
             ))}
           </ul>
         ) : null}

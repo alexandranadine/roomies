@@ -188,7 +188,6 @@ export function HomeOverviewPage() {
             onOpenActions={openHomeActions}
             onAddTask={openAddTask}
             onInviteRoommate={openInviteRoommate}
-            onHomePhoto={openHomePhoto}
           />
         }
         activity={

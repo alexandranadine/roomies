@@ -7,6 +7,7 @@ import { RoomiesWordmark } from '../components/roomies-wordmark.js';
 import { cn } from '../components/ui/cn.js';
 import { isHomeScopedPath } from '../homes/home-nav.js';
 import { currentUserQueryKey } from '../homes/home-query-keys.js';
+import { useWordmarkHomeHref } from '../homes/use-wordmark-home-href.js';
 import { NotificationBellLink } from '../notifications/notification-bell-link.js';
 import { getCurrentUser } from '../users/current-user-api.js';
 
@@ -54,13 +55,16 @@ export function AppShell() {
   const signedIn = meQuery.data !== undefined;
   const hideGlobalHeader =
     homeScoped || authCanvas || catchAll || !signedIn;
+  const wordmarkHref = useWordmarkHomeHref({
+    enabled: signedIn && !hideGlobalHeader,
+  });
 
   return (
     <div className="flex min-h-dvh flex-col bg-bg text-text-primary">
       {hideGlobalHeader ? null : (
         <header className="bg-bg">
           <PageContainer className="flex h-14 items-center justify-between gap-3 sm:h-16">
-            <RoomiesWordmark />
+            <RoomiesWordmark to={wordmarkHref} />
             <nav aria-label="Global" className="flex items-center gap-1">
               <NotificationBellLink />
               <NavLink

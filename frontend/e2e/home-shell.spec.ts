@@ -171,6 +171,10 @@ test.describe('Home shell Phase 1', () => {
       page.getByRole('heading', { name: 'Oak Street', level: 1 }),
     ).toBeVisible();
     await expect(page.getByText('Roomies').first()).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Roomies' })).toHaveAttribute(
+      'href',
+      `/homes/${HOME_A}`,
+    );
     await expect(page.getByTestId('house-pulse')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Add to this Home' })).toBeVisible();
     await assertNoHorizontalOverflow(page);
@@ -191,6 +195,9 @@ test.describe('Home shell Phase 1', () => {
     await expect(
       page.getByRole('button', { name: 'What’s on your mind, Roomies?' }),
     ).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: 'Maintenance', exact: true }),
+    ).toHaveAttribute('href', `/homes/${HOME_A}/maintenance`);
     await expect(
       page.getByRole('list', { name: 'Home activity' }),
     ).toBeVisible();
@@ -268,6 +275,38 @@ test.describe('Home shell Phase 1', () => {
       path: path.join(SCREENSHOT_DIR, 'home-1440.png'),
       fullPage: true,
     });
+  });
+
+  test('Roomies wordmark returns to the current Home overview', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`/homes/${HOME_A}/activity`);
+    await expect(
+      page.getByRole('heading', { name: 'Activity', level: 1 }),
+    ).toBeVisible();
+    const wordmark = page.getByRole('link', { name: 'Roomies' });
+    await wordmark.focus();
+    await expect(wordmark).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(`/homes/${HOME_A}`);
+    await expect(
+      page.getByRole('heading', { name: 'Oak Street', level: 1 }),
+    ).toBeVisible();
+  });
+
+  test('Home photo remains available from the add action sheet', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`/homes/${HOME_A}`);
+    await page.getByRole('button', { name: 'Add to this Home' }).click();
+    await expect(
+      page.getByRole('dialog', { name: 'Add to this Home' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Add Home photo' }),
+    ).toBeVisible();
   });
 
   test('Home axe scan (serious/critical)', async ({ page }) => {

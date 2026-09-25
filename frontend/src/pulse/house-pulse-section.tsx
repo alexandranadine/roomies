@@ -40,6 +40,12 @@ const actionLinkClassName = cn(
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
 );
 
+const maintenanceActionClassName = cn(
+  'inline-flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 text-xs font-semibold text-text-muted',
+  'hover:bg-subtle hover:text-brand',
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
+);
+
 /**
  * Household status glance. Renders backend Pulse metrics without
  * recomputing state or inventing unavailable counts.
@@ -51,13 +57,14 @@ export function HousePulseSection({ homeId, pulse }: HousePulseSectionProps) {
   const maintenanceHref = `/homes/${encodeURIComponent(homeId)}/maintenance`;
 
   const actions = (
-    <span className="flex shrink-0 items-center">
+    <span className="flex shrink-0 items-center gap-0.5">
       <Link
         to={maintenanceHref}
         aria-label="Open Maintenance"
-        className={actionLinkClassName}
+        className={maintenanceActionClassName}
       >
-        <Wrench className="size-4" aria-hidden="true" />
+        <Wrench className="size-4 shrink-0" aria-hidden="true" />
+        <span aria-hidden="true">Maintenance</span>
       </Link>
       <Link
         to={tasksHref}

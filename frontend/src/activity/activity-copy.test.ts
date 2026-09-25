@@ -1,16 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { presentActivity, FORMER_ROOMMATE_LABEL } from './activity-copy.js';
+import { presentActivity, FORMER_ROOMMATE_LABEL, maintenanceDetailHref } from './activity-copy.js';
 import {
   activityItem,
   FIXTURE_JOINED,
   FIXTURE_LEFT,
   FIXTURE_MAINTENANCE_CREATED,
+  FIXTURE_MAINTENANCE_PRIVATE,
   FIXTURE_MAINTENANCE_RESOLVED,
   FIXTURE_ROLE_CHANGED,
   FIXTURE_SUPPLY_GENERIC,
   FIXTURE_SUPPLY_TITLED,
   FIXTURE_TASK_GENERIC,
   FIXTURE_TASK_TITLED,
+  SOURCE_MAINTENANCE_ID,
+  SOURCE_MAINTENANCE_PRIVATE_ID,
+  TEST_HOME_A,
   TEST_MEMBERSHIP_ALEX,
   TEST_MEMBERSHIP_JAMIE,
   TEST_MEMBERSHIP_TAYLOR,
@@ -161,5 +165,33 @@ describe('Activity presentation copy', () => {
       sourceTitle: null,
     });
     expect(presentActivity(role).sentence).toBe('A home role was updated');
+  });
+});
+
+describe('Maintenance Activity detail href', () => {
+  it('uses sourceEntityId for household Maintenance', () => {
+    expect(maintenanceDetailHref(TEST_HOME_A, FIXTURE_MAINTENANCE_CREATED)).toBe(
+      `/homes/${TEST_HOME_A}/maintenance/${SOURCE_MAINTENANCE_ID}`,
+    );
+    expect(
+      maintenanceDetailHref(TEST_HOME_A, FIXTURE_MAINTENANCE_CREATED),
+    ).not.toContain('Quiet leak');
+  });
+
+  it('does not link private Maintenance or other event types', () => {
+    expect(
+      maintenanceDetailHref(TEST_HOME_A, FIXTURE_MAINTENANCE_PRIVATE),
+    ).toBeNull();
+    expect(maintenanceDetailHref(TEST_HOME_A, FIXTURE_TASK_TITLED)).toBeNull();
+    expect(maintenanceDetailHref('', FIXTURE_MAINTENANCE_CREATED)).toBeNull();
+  });
+
+  it('does not use the private sourceEntityId as a destination', () => {
+    expect(
+      maintenanceDetailHref(TEST_HOME_A, FIXTURE_MAINTENANCE_PRIVATE),
+    ).toBeNull();
+    expect(
+      JSON.stringify(FIXTURE_MAINTENANCE_PRIVATE.sourceEntityId),
+    ).toContain(SOURCE_MAINTENANCE_PRIVATE_ID);
   });
 });

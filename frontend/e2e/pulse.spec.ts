@@ -259,7 +259,12 @@ test.describe('House Pulse on Home overview', () => {
       ).toBeVisible();
       await expect(page.getByText('Overdue')).toBeVisible();
       await expect(page.getByText('Unassigned')).toBeVisible();
-      await expect(page.getByText('Maintenance', { exact: true })).toBeVisible();
+      await expect(
+        page.getByTestId('house-pulse').getByRole('list').getByText('Maintenance'),
+      ).toBeVisible();
+      await expect(
+        page.getByTestId('house-pulse').getByRole('link', { name: 'Open Maintenance' }),
+      ).toBeVisible();
       if (viewport.width >= 1024) {
         await expect(page.getByText('Due today')).toBeVisible();
         await expect(page.getByText('Supplies', { exact: true })).toBeVisible();
@@ -276,7 +281,8 @@ test.describe('House Pulse on Home overview', () => {
     const pulse = page.getByTestId('house-pulse');
     await expect(pulse.getByText('Overdue')).toBeVisible();
     await expect(pulse.getByText('Unassigned')).toBeVisible();
-    await expect(pulse.getByText('Maintenance', { exact: true })).toBeVisible();
+    await expect(pulse.getByRole('list').getByText('Maintenance')).toBeVisible();
+    await expect(pulse.getByRole('link', { name: 'Open Maintenance' })).toBeVisible();
     await expect(pulse.getByText('2026-09-14T04:00:00.000Z')).toHaveCount(0);
     await expect(pulse.getByText(/score|rank|chart|percent/i)).toHaveCount(0);
   });
@@ -319,7 +325,8 @@ test.describe('House Pulse on Home overview', () => {
     const pulse = page.getByTestId('house-pulse');
     await expect(pulse.getByText('Due today')).toBeVisible();
     await expect(pulse.getByText('Supplies', { exact: true })).toBeVisible();
-    await expect(pulse.getByText('Maintenance', { exact: true })).toBeVisible();
+    await expect(pulse.getByRole('list').getByText('Maintenance')).toBeVisible();
+    await expect(pulse.getByRole('link', { name: 'Open Maintenance' })).toBeVisible();
     await expect(pulse.getByText('Clear')).toHaveCount(0);
   });
 

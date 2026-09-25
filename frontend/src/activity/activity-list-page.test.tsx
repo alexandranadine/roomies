@@ -12,6 +12,7 @@ import {
   FIXTURE_JOINED,
   FIXTURE_LEFT,
   FIXTURE_MAINTENANCE_CREATED,
+  FIXTURE_MAINTENANCE_PRIVATE,
   FIXTURE_MAINTENANCE_RESOLVED,
   FIXTURE_ROLE_CHANGED,
   FIXTURE_SUPPLY_GENERIC,
@@ -21,6 +22,8 @@ import {
   listPage,
   notFoundBody,
   SOURCE_MAINTENANCE_ID,
+  SOURCE_MAINTENANCE_HIDDEN_ID,
+  SOURCE_MAINTENANCE_PRIVATE_ID,
   SOURCE_SUPPLY_ID,
   SOURCE_TASK_ID,
   TEST_HOME_A,
@@ -52,6 +55,8 @@ function assertNoIdentityLeaks(container: HTMLElement = document.body) {
   expect(text).not.toContain(SOURCE_TASK_ID);
   expect(text).not.toContain(SOURCE_SUPPLY_ID);
   expect(text).not.toContain(SOURCE_MAINTENANCE_ID);
+  expect(text).not.toContain(SOURCE_MAINTENANCE_PRIVATE_ID);
+  expect(text).not.toContain(SOURCE_MAINTENANCE_HIDDEN_ID);
   expect(text).not.toContain(TEST_USER_ID);
   expect(text).not.toMatch(
     /ActivityRecipient|sourceEntity|eventType|visibilityClass/i,
@@ -162,6 +167,18 @@ describe('Activity list page', () => {
     expectFeedCopy(items[8]!, ['Alex', 'resolved a maintenance item']);
     expect(screen.queryByText('Quiet leak under sink')).not.toBeInTheDocument();
     expect(list.textContent).not.toMatch(/kudos|reaction|comment/i);
+    expect(
+      within(items[7]!).getByRole('link', { name: 'View maintenance' }),
+    ).toHaveAttribute(
+      'href',
+      `/homes/${TEST_HOME_A}/maintenance/${SOURCE_MAINTENANCE_ID}`,
+    );
+    expect(
+      within(items[8]!).getByRole('link', { name: 'View maintenance' }),
+    ).toHaveAttribute(
+      'href',
+      `/homes/${TEST_HOME_A}/maintenance/${SOURCE_MAINTENANCE_ID}`,
+    );
     assertNoIdentityLeaks();
   });
 
@@ -293,6 +310,72 @@ describe('Activity list page', () => {
     expect(
       screen.queryByRole('link', { name: /maintenance item/i }),
     ).not.toBeInTheDocument();
+    expect(
+      within(items[0]!).getByRole('link', { name: 'View maintenance' }),
+    ).toBeInTheDocument();
+    assertNoIdentityLeaks();
+  });
+
+  it('links shared Maintenance Activity to the existing detail route', async () => {
+    const user = userEvent.setup();
+    stubActivityApis({
+      listByHome: {
+        [TEST_HOME_A]: listPage([FIXTURE_MAINTENANCE_CREATED]),
+      },
+    });
+    const { router } = renderApp(`/homes/${TEST_HOME_A}/activity`);
+
+    const list = await screen.findByRole('list', { name: 'Home activity' });
+    const link = within(list).getByRole('link', { name: 'View maintenance' });
+    expect(link).toHaveAttribute(
+      'href',
+      `/homes/${TEST_HOME_A}/maintenance/${SOURCE_MAINTENANCE_ID}`,
+    );
+    expect(list.textContent).not.toContain(SOURCE_MAINTENANCE_ID);
+
+    await user.click(link);
+    expect(router.state.location.pathname).toBe(
+      `/homes/${TEST_HOME_A}/maintenance/${SOURCE_MAINTENANCE_ID}`,
+    );
+    assertNoIdentityLeaks();
+  });
+
+  it('does not expose a Maintenance link for private Activity', async () => {
+    stubActivityApis({
+      listByHome: {
+        [TEST_HOME_A]: listPage([FIXTURE_MAINTENANCE_PRIVATE]),
+      },
+    });
+    renderApp(`/homes/${TEST_HOME_A}/activity`);
+
+    const list = await screen.findByRole('list', { name: 'Home activity' });
+    expectFeedCopy(within(list).getByRole('listitem'), [
+      'Alex',
+      'added a maintenance item',
+    ]);
+    expect(
+      screen.queryByRole('link', { name: 'View maintenance' }),
+    ).not.toBeInTheDocument();
+    expect(list.textContent).not.toContain(SOURCE_MAINTENANCE_PRIVATE_ID);
+    expect(screen.queryByText(/hidden|private event/i)).not.toBeInTheDocument();
+    assertNoIdentityLeaks();
+  });
+
+  it('keeps inaccessible Maintenance absent without a placeholder or link', async () => {
+    stubActivityApis({
+      listByHome: {
+        [TEST_HOME_A]: listPage([FIXTURE_TASK_TITLED]),
+      },
+    });
+    renderApp(`/homes/${TEST_HOME_A}/activity`);
+
+    const list = await screen.findByRole('list', { name: 'Home activity' });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(1);
+    expect(
+      screen.queryByRole('link', { name: 'View maintenance' }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/hidden|private event|not shown/i)).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toContain(SOURCE_MAINTENANCE_HIDDEN_ID);
     assertNoIdentityLeaks();
   });
 

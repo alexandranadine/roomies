@@ -69,7 +69,7 @@ export function HomeShellPage() {
   if (!validHomeId || isConcealedHome(contextQuery.error)) {
     return (
       <DocumentTitle title="Home unavailable · Roomies">
-        <HomeShellFallbackHeader />
+        <HomeShellFallbackHeader to="/" />
         <PageContainer>
           <div className="flex flex-col gap-4 py-6">
             <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
@@ -100,7 +100,9 @@ export function HomeShellPage() {
   if (home === undefined) {
     return (
       <DocumentTitle title="Home · Roomies">
-        <HomeShellFallbackHeader />
+        <HomeShellFallbackHeader
+          to={`/homes/${encodeURIComponent(homeId)}`}
+        />
         <PageContainer>
           <div className="flex flex-col gap-3 py-6">
             <h1 className="text-2xl font-semibold tracking-tight text-text-primary">

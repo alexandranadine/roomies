@@ -30,6 +30,10 @@ function pulseRegion() {
   return screen.getByTestId('house-pulse');
 }
 
+function pulseMetric(label: string) {
+  return within(within(pulseRegion()).getByRole('list')).getByText(label);
+}
+
 describe('House Pulse on Home overview', () => {
   it('renders House Pulse with fixed Tasks → Supplies → Maintenance order', async () => {
     stubPulseApis({
@@ -47,7 +51,10 @@ describe('House Pulse on Home overview', () => {
     expect(within(region).getByText('Overdue')).toBeInTheDocument();
     expect(within(region).getByText('Unassigned')).toBeInTheDocument();
     expect(within(region).getByText('Supplies')).toBeInTheDocument();
-    expect(within(region).getByText('Maintenance')).toBeInTheDocument();
+    expect(pulseMetric('Maintenance')).toBeInTheDocument();
+    expect(
+      within(region).getByRole('link', { name: 'Open Maintenance' }),
+    ).toHaveTextContent('Maintenance');
     expect(within(region).queryByText(/away|kudos|events/i)).not.toBeInTheDocument();
   });
 
@@ -101,9 +108,7 @@ describe('House Pulse on Home overview', () => {
     expect(within(region).getByText('Supplies').closest('li')).toHaveTextContent(
       '4',
     );
-    expect(
-      within(region).getByText('Maintenance').closest('li'),
-    ).toHaveTextContent('2');
+    expect(pulseMetric('Maintenance').closest('li')).toHaveTextContent('2');
   });
 
   it('uses singular Maintenance ACTIVE copy', async () => {
@@ -120,12 +125,9 @@ describe('House Pulse on Home overview', () => {
     });
     renderApp(`/homes/${TEST_HOME_A}`);
 
-    expect(
-      await screen.findByText('Maintenance'),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('Maintenance').closest('li'),
-    ).toHaveTextContent('1');
+    expect(await screen.findByTestId('house-pulse')).toBeInTheDocument();
+    expect(pulseMetric('Maintenance')).toBeInTheDocument();
+    expect(pulseMetric('Maintenance').closest('li')).toHaveTextContent('1');
   });
 
   it('does not prominently show generatedAt, scores, charts, or Maintenance details', async () => {
@@ -155,9 +157,7 @@ describe('House Pulse on Home overview', () => {
     expect(within(region).getByText('Overdue').closest('li')).toHaveTextContent(
       '3',
     );
-    expect(
-      within(region).getByText('Maintenance').closest('li'),
-    ).toHaveTextContent('2');
+    expect(pulseMetric('Maintenance').closest('li')).toHaveTextContent('2');
   });
 
   it('links Tasks to the existing Home Tasks destination', async () => {

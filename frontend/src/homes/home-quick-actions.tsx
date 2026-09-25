@@ -1,4 +1,4 @@
-import { Camera, CheckSquare, UserPlus, Users } from 'lucide-react';
+import { CheckSquare, UserPlus, Users, Wrench } from 'lucide-react';
 import { Link } from 'react-router';
 import { cn } from '../components/ui/cn.js';
 
@@ -8,7 +8,6 @@ export type HomeQuickActionsProps = {
   onOpenActions: () => void;
   onAddTask: () => void;
   onInviteRoommate: () => void;
-  onHomePhoto: () => void;
 };
 
 const tileClassName = cn(
@@ -27,9 +26,9 @@ export function HomeQuickActions({
   onOpenActions,
   onAddTask,
   onInviteRoommate,
-  onHomePhoto,
 }: HomeQuickActionsProps) {
   const roommatesHref = `/homes/${encodeURIComponent(homeId)}/roommates`;
+  const maintenanceHref = `/homes/${encodeURIComponent(homeId)}/maintenance`;
 
   return (
     <section aria-label="Quick actions">
@@ -65,10 +64,10 @@ export function HomeQuickActions({
               Roommates
             </Link>
           )}
-          <button type="button" className={tileClassName} onClick={onHomePhoto}>
-            <Camera className="size-5 text-brand" aria-hidden="true" />
-            Home photo
-          </button>
+          <Link to={maintenanceHref} className={tileClassName}>
+            <Wrench className="size-5 text-brand" aria-hidden="true" />
+            Maintenance
+          </Link>
         </div>
       </div>
     </section>

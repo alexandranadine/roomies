@@ -5,6 +5,7 @@ import { IconButton } from '../components/ui/index.js';
 import { NotificationBellLink } from '../notifications/notification-bell-link.js';
 import { HomeDesktopNav } from './home-desktop-nav.js';
 import { HomeSelector } from './home-selector.js';
+import { homeOverviewHref } from './wordmark-home-href.js';
 
 export type HomeShellHeaderProps = {
   home: {
@@ -32,7 +33,7 @@ export function HomeShellHeader({
       <header className="border-b border-border bg-bg">
         <PageContainer className="flex items-center gap-4">
           <div className="flex min-w-0 items-center gap-4">
-            <RoomiesWordmark />
+            <RoomiesWordmark to={homeOverviewHref(home.id)} />
             <HomeSelector
               homeId={home.id}
               homeName={home.name}
@@ -62,7 +63,7 @@ export function HomeShellHeader({
     <header className="border-b border-border bg-bg">
       <PageContainer className="flex flex-col gap-0.5 pt-2 pb-1">
         <div className="flex items-center justify-between gap-3">
-          <RoomiesWordmark />
+          <RoomiesWordmark to={homeOverviewHref(home.id)} />
           <nav aria-label="Global" className="flex items-center gap-1">
             <NotificationBellLink />
           </nav>
@@ -95,11 +96,11 @@ export function HomeShellHeader({
 }
 
 /** Wordmark + notifications while Home context is loading or unavailable. */
-export function HomeShellFallbackHeader() {
+export function HomeShellFallbackHeader({ to }: { to?: string }) {
   return (
     <header className="border-b border-border bg-bg">
       <PageContainer className="flex items-center justify-between gap-3 py-2.5">
-        <RoomiesWordmark />
+        <RoomiesWordmark to={to} />
         <nav aria-label="Global" className="flex items-center gap-1">
           <NotificationBellLink />
         </nav>

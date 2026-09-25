@@ -108,6 +108,9 @@ describe('application shell routes', () => {
     expect(screen.getByRole('main')).toBeInTheDocument();
     expect(screen.getByText('Roomies')).toBeInTheDocument();
     expect(
+      screen.queryByRole('link', { name: 'Roomies' }),
+    ).not.toBeInTheDocument();
+    expect(
       screen.queryByRole('link', { name: /notifications/i }),
     ).not.toBeInTheDocument();
   });

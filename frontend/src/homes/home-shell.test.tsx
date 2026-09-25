@@ -238,6 +238,36 @@ describe('active Home discovery and shell', () => {
     expect(homeContextQueryKey(HOME_A)).toContain(HOME_A);
   });
 
+  it('makes the Roomies wordmark a link to the current Home overview', async () => {
+    stubRoomiesApis({
+      contexts: {
+        [HOME_A]: {
+          status: 200,
+          body: {
+            id: HOME_A,
+            name: 'Oak Street',
+            timezone: 'UTC',
+            hasPhoto: false,
+          },
+        },
+      },
+    });
+    const { router } = renderApp(`/homes/${HOME_A}/activity`);
+
+    expect(
+      await screen.findByRole('heading', { name: 'Activity', level: 1 }),
+    ).toBeInTheDocument();
+
+    const wordmark = screen.getByRole('link', { name: 'Roomies' });
+    expect(wordmark).toHaveAttribute('href', `/homes/${HOME_A}`);
+
+    await userEvent.click(wordmark);
+    expect(
+      await screen.findByRole('heading', { name: 'Oak Street', level: 1 }),
+    ).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(`/homes/${HOME_A}`);
+  });
+
   it('shows a safe unavailable experience for an inaccessible Home', async () => {
     stubRoomiesApis({
       contexts: {

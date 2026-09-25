@@ -11,6 +11,7 @@ import {
   TEST_MEMBERSHIP_JAMIE,
 } from '../activity/test-fixtures.js';
 import { stubActivityApis } from '../activity/test-stub.js';
+import { stubMaintenanceApis } from '../maintenance/test-stub.js';
 import { resetApiClientForTests } from '../platform/api/index.js';
 import { stubRoommatesApis } from '../roommates/test-stub.js';
 import { renderApp } from '../test/render.js';
@@ -32,8 +33,11 @@ describe('Home quick actions and feed', () => {
     expect(screen.getByRole('button', { name: 'Add task' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Invite' })).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Home photo' }),
-    ).toBeInTheDocument();
+      screen.getByRole('link', { name: /^Maintenance$/ }),
+    ).toHaveAttribute('href', `/homes/${TEST_HOME_A}/maintenance`);
+    expect(
+      screen.queryByRole('button', { name: 'Home photo' }),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /post|event|supplies/i }),
     ).not.toBeInTheDocument();
@@ -52,8 +56,16 @@ describe('Home quick actions and feed', () => {
     expect(screen.queryByRole('button', { name: 'Invite' })).not.toBeInTheDocument();
     const roommateTiles = screen.getAllByRole('link', { name: 'Roommates' });
     expect(roommateTiles.length).toBeGreaterThan(0);
+    expect(
+      screen.getByRole('link', { name: /^Maintenance$/ }),
+    ).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Home photo' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'What’s on your mind, Roomies?' }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Add Home photo' }),
+    );
     expect(
       await screen.findByRole('dialog', { name: 'Home photo' }),
     ).toBeInTheDocument();
@@ -100,5 +112,19 @@ describe('Home quick actions and feed', () => {
         screen.queryByRole('dialog', { name: 'Add to this Home' }),
       ).not.toBeInTheDocument();
     });
+  });
+
+  it('opens Maintenance from the primary quick actions', async () => {
+    stubMaintenanceApis();
+    const { router } = renderApp(`/homes/${TEST_HOME_A}`);
+    await screen.findByRole('heading', { name: 'Oak Street', level: 1 });
+
+    await userEvent.click(screen.getByRole('link', { name: /^Maintenance$/ }));
+    expect(
+      await screen.findByRole('heading', { name: 'Maintenance', level: 1 }),
+    ).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(
+      `/homes/${TEST_HOME_A}/maintenance`,
+    );
   });
 });

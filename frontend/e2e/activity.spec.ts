@@ -511,4 +511,21 @@ test.describe('Activity authenticated UI', () => {
     await assertContentClearOfBottomNav(page);
     await assertNoSeriousAxeViolations(page, 'activity long content');
   });
+
+  test('shared Maintenance Activity links to the existing detail route', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`/homes/${HOME_A}/activity`);
+    const viewLinks = page.getByRole('link', { name: 'View maintenance' });
+    await expect(viewLinks.first()).toBeVisible();
+    await expect(viewLinks.first()).toHaveAttribute(
+      'href',
+      `/homes/${HOME_A}/maintenance/n1111111-1111-4111-8111-111111111111`,
+    );
+    await expect(page.getByText('n1111111-1111-4111-8111-111111111111')).toHaveCount(
+      0,
+    );
+    await expect(page.getByText('Quiet leak under sink')).toHaveCount(0);
+  });
 });

@@ -200,3 +200,23 @@ export function presentActivity(item: ActivityListItem): ActivityPresentation {
       );
   }
 }
+
+/**
+ * Detail href for household Maintenance Activity. Private Maintenance omits
+ * `sourceTitle` in the DTO, so a missing title must not grow a link.
+ * Uses `sourceEntityId` as the existing Maintenance entry id — never titles.
+ */
+export function maintenanceDetailHref(
+  homeId: string,
+  item: ActivityListItem,
+): string | null {
+  if (item.sourceEntityType !== 'MAINTENANCE' || homeId.length === 0) {
+    return null;
+  }
+  const title = item.sourceTitle?.trim() ?? '';
+  if (title.length === 0) {
+    return null;
+  }
+  return `/homes/${encodeURIComponent(homeId)}/maintenance/${encodeURIComponent(item.sourceEntityId)}`;
+}
+

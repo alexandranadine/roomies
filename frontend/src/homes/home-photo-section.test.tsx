@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { resetApiClientForTests } from '../platform/api/index.js';
@@ -212,7 +212,13 @@ afterEach(() => {
 describe('Home photo management', () => {
   async function openPhotoDialog() {
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Home photo' }),
+      await screen.findByRole('button', {
+        name: 'What’s on your mind, Roomies?',
+      }),
+    );
+    const sheet = await screen.findByRole('dialog', { name: 'Add to this Home' });
+    await userEvent.click(
+      within(sheet).getByRole('button', { name: /Home photo/ }),
     );
     expect(
       await screen.findByRole('heading', { name: 'Home photo' }),

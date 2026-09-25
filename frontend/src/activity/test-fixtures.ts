@@ -11,6 +11,10 @@ export const TEST_MEMBERSHIP_TAYLOR = 'm3333333-3333-4333-8333-333333333333';
 export const SOURCE_TASK_ID = 't1111111-1111-4111-8111-111111111111';
 export const SOURCE_SUPPLY_ID = 's1111111-1111-4111-8111-111111111111';
 export const SOURCE_MAINTENANCE_ID = 'n1111111-1111-4111-8111-111111111111';
+export const SOURCE_MAINTENANCE_PRIVATE_ID =
+  'n2222222-2222-4222-8222-222222222222';
+export const SOURCE_MAINTENANCE_HIDDEN_ID =
+  'n9999999-9999-4999-8999-999999999999';
 export const SOURCE_MEMBERSHIP_JAMIE = TEST_MEMBERSHIP_JAMIE;
 
 const OCCURRED = '2026-09-13T18:00:00.000Z';
@@ -71,6 +75,16 @@ export const FIXTURE_MAINTENANCE_RESOLVED = activityItem({
   sourceEntityId: SOURCE_MAINTENANCE_ID,
   sourceTitle: 'Quiet leak under sink',
   occurredAt: '2026-09-13T15:00:00.000Z',
+});
+
+/** Author-visible private Maintenance: title omitted, must not grow a link. */
+export const FIXTURE_MAINTENANCE_PRIVATE = activityItem({
+  id: 'a6565656-5555-4555-8555-555555555656',
+  eventType: ACTIVITY_EVENT_TYPES.MAINTENANCE_CREATED,
+  sourceEntityType: 'MAINTENANCE',
+  sourceEntityId: SOURCE_MAINTENANCE_PRIVATE_ID,
+  sourceTitle: null,
+  occurredAt: '2026-09-13T15:30:00.000Z',
 });
 
 export const FIXTURE_JOINED = activityItem({
