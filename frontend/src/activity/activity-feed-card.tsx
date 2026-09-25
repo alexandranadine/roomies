@@ -17,7 +17,7 @@ export type ActivityFeedCardProps = {
 };
 
 const maintenanceInlineLinkClassName = cn(
-  'text-brand underline-offset-4 hover:text-brand-hover hover:underline',
+  'text-brand underline underline-offset-4 hover:text-brand-hover',
   'focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
 );
 
