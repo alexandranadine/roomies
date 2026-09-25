@@ -24,8 +24,8 @@ export function RoommateStrip({ memberships }: RoommateStripProps) {
   }
 
   return (
-    <section aria-label="Roommates" className="min-w-0">
-      <ul className="-mx-1 flex list-none items-start gap-3 overflow-x-auto px-1 lg:gap-6">
+    <section aria-label="Roommates" className="min-w-0 w-full">
+      <ul className="-mx-1 flex w-full list-none items-start gap-3 overflow-x-auto px-1 lg:gap-8">
         {members.map((member) => {
           const isCurrent = member.membershipId === currentMembershipId;
           const caption = isCurrent ? 'You' : givenName(member.name);
@@ -34,7 +34,7 @@ export function RoommateStrip({ memberships }: RoommateStripProps) {
           return (
             <li
               key={member.membershipId}
-              className="flex w-14 shrink-0 flex-col items-center gap-1 lg:w-[4.5rem] lg:gap-1.5"
+              className="flex w-14 shrink-0 flex-col items-center gap-1 lg:w-20 lg:gap-1.5"
             >
               <InitialsAvatar
                 name={member.name}

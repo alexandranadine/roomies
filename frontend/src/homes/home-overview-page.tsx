@@ -55,8 +55,10 @@ function OverviewLayout({
 }) {
   return (
     <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(20rem,1fr)] lg:items-start lg:gap-x-8 lg:gap-y-4">
-      <div className="min-w-0 lg:col-start-1 lg:row-start-1">{strip}</div>
-      <aside className="min-w-0 lg:col-start-2 lg:row-span-3 lg:row-start-1">
+      <div className="min-w-0 lg:col-start-1 lg:row-start-1 lg:self-start">
+        {strip}
+      </div>
+      <aside className="min-w-0 lg:col-start-2 lg:row-start-1 lg:self-start">
         {pulse}
       </aside>
       <div className="min-w-0 lg:col-start-1 lg:row-start-2">{actions}</div>

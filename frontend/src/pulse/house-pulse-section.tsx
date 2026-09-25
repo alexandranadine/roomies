@@ -32,10 +32,10 @@ function PulseMetricItem({
           ·
         </span>
       )}
-      <p className="text-sm font-bold leading-none text-text-primary lg:order-2 lg:text-base">
+      <p className="text-sm font-bold leading-none text-text-primary lg:order-2 lg:text-sm">
         {metric.value}
       </p>
-      <p className="text-xs font-medium text-text-secondary lg:order-1 lg:text-sm">
+      <p className="min-w-0 truncate text-xs font-medium text-text-secondary lg:order-1 lg:flex-1">
         {metric.label}
       </p>
     </li>
@@ -94,7 +94,7 @@ export function HousePulseSection({ homeId, pulse }: HousePulseSectionProps) {
           </p>
         </div>
 
-        <ul className="mt-2 flex flex-wrap items-baseline gap-x-1.5 gap-y-1 lg:mt-3 lg:flex-col lg:items-stretch lg:gap-2">
+        <ul className="mt-2 flex flex-wrap items-baseline gap-x-1.5 gap-y-1 lg:mt-2.5 lg:grid lg:grid-cols-2 lg:gap-x-3 lg:gap-y-1">
           {glance.map((metric, index) => (
             <PulseMetricItem
               key={metric.label}
