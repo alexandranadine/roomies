@@ -24,6 +24,13 @@ describe('Button', () => {
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
 
     rerender(
+      <Button variant="danger-muted" onClick={onClick}>
+        Delete account
+      </Button>,
+    );
+    expect(screen.getByRole('button', { name: 'Delete account' })).toBeEnabled();
+
+    rerender(
       <Button variant="danger" loading onClick={onClick}>
         Save
       </Button>,

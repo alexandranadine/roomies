@@ -30,10 +30,22 @@ function stubAccountApis(
   options: {
     deleteHandler?: DeleteHandler;
     meAfterDelete?: 'unauthenticated' | 'authenticated';
+    session?: {
+      name?: string;
+      email?: string;
+      emailVerified?: boolean;
+    };
+    sendVerification?: () => Promise<Response> | Response;
   } = {},
 ) {
   let meAuthenticated = true;
   let deleteCalls = 0;
+  const sessionUser = {
+    id: USER_ID,
+    name: options.session?.name ?? 'Alexandra',
+    email: options.session?.email ?? 'alex@example.com',
+    emailVerified: options.session?.emailVerified ?? true,
+  };
 
   const fetchMock = vi
     .fn()
@@ -66,13 +78,15 @@ function stubAccountApis(
         }
         return Promise.resolve(
           jsonResponse(200, {
-            user: {
-              id: USER_ID,
-              email: 'alex@example.com',
-              emailVerified: true,
-            },
+            user: sessionUser,
           }),
         );
+      }
+
+      if (path.includes('/api/auth/send-verification-email') && method === 'POST') {
+        const result =
+          options.sendVerification?.() ?? jsonResponse(200, { status: true });
+        return Promise.resolve(result);
       }
 
       if (path.includes('/api/auth/sign-out') && method === 'POST') {
@@ -157,6 +171,115 @@ describe('Account settings deletion', () => {
       'href',
       '/account',
     );
+  });
+
+  it('renders display name, email, and verified status from the session', async () => {
+    stubAccountApis();
+    renderApp('/account');
+
+    expect(
+      await screen.findByRole('heading', { name: 'Alexandra', level: 2 }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('alex@example.com')).toBeInTheDocument();
+    expect(screen.getByText('Verified')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Alexandra' })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/name/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+  });
+
+  it('does not invent a display name when the session has none', async () => {
+    stubAccountApis({
+      session: { name: '', email: 'alex@example.com', emailVerified: true },
+    });
+    renderApp('/account');
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'alex@example.com',
+        level: 2,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Alexandra', level: 2 }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('Verified')).toBeInTheDocument();
+  });
+
+  it('wraps a long email without exposing the user id', async () => {
+    const longEmail =
+      'alexandra.nadine.lewis+roomies-household@example.com';
+    stubAccountApis({
+      session: {
+        name: 'Alexandra Nadine Lewis',
+        email: longEmail,
+        emailVerified: true,
+      },
+    });
+    renderApp('/account');
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Alexandra Nadine Lewis',
+        level: 2,
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(longEmail)).toBeInTheDocument();
+    expect(screen.queryByText(USER_ID)).not.toBeInTheDocument();
+  });
+
+  it('shows unverified status and resends without implying Roomies is blocked', async () => {
+    const user = userEvent.setup();
+    let sendCalls = 0;
+    stubAccountApis({
+      session: { emailVerified: false },
+      sendVerification: () => {
+        sendCalls += 1;
+        return jsonResponse(200, { status: true });
+      },
+    });
+    renderApp('/account');
+
+    expect(await screen.findByText('Email not verified')).toBeInTheDocument();
+    expect(screen.queryByText('Verified')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/required to use roomies/i),
+    ).not.toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Resend verification email to alex@example.com',
+      }),
+    );
+
+    await waitFor(() => {
+      expect(sendCalls).toBe(1);
+    });
+    expect(await screen.findByText(/check your email/i)).toBeInTheDocument();
+  });
+
+  it('shows a generic resend error without backend codes', async () => {
+    const user = userEvent.setup();
+    stubAccountApis({
+      session: { emailVerified: false },
+      sendVerification: () =>
+        jsonResponse(500, {
+          code: 'INTERNAL_ERROR',
+          message: 'smtp host leaked',
+        }),
+    });
+    renderApp('/account');
+
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'Resend verification email to alex@example.com',
+      }),
+    );
+
+    expect(
+      await screen.findByText(/couldn’t send a verification email/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/smtp host leaked/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/INTERNAL_ERROR/i)).not.toBeInTheDocument();
   });
 
   it('signs out and returns to the sign-in landing', async () => {

@@ -1,11 +1,21 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page, type Route } from '@playwright/test';
+import { mkdirSync } from 'node:fs';
+import path from 'node:path';
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
-
-const VIEWPORTS = [
+const LONG_EMAIL =
+  'alexandra.nadine.lewis+roomies-household@example.com';
+const DISPLAY_NAME = 'Alexandra Nadine Lewis';
+const SCREENSHOT_DIR = path.join('e2e', 'screenshots', 'account-phase-6');
+const SCREENSHOT_VIEWPORTS = [
   { name: '360', width: 360, height: 800 },
   { name: '390', width: 390, height: 844 },
+  { name: '1024', width: 1024, height: 800 },
+  { name: '1440', width: 1440, height: 900 },
+] as const;
+const VIEWPORTS = [
+  ...SCREENSHOT_VIEWPORTS,
   { name: '430', width: 430, height: 932 },
 ] as const;
 
@@ -18,17 +28,32 @@ async function json(route: Route, status: number, body: unknown) {
 }
 
 async function mockAuthenticatedAccountApis(page: Page): Promise<void> {
+  await page.route('**/api/auth/get-session', async (route) => {
+    if (route.request().method().toUpperCase() !== 'GET') {
+      await route.fallback();
+      return;
+    }
+    await json(route, 200, {
+      user: {
+        id: USER_ID,
+        name: DISPLAY_NAME,
+        email: LONG_EMAIL,
+        emailVerified: true,
+      },
+    });
+  });
+
   await page.route('**/api/v1/**', async (route) => {
     const url = new URL(route.request().url());
-    const path = url.pathname;
+    const pathName = url.pathname;
     const method = route.request().method().toUpperCase();
 
-    if (path === '/api/v1/me' && method === 'GET') {
+    if (pathName === '/api/v1/me' && method === 'GET') {
       await json(route, 200, { id: USER_ID });
       return;
     }
 
-    if (path === '/api/v1/account' && method === 'DELETE') {
+    if (pathName === '/api/v1/account' && method === 'DELETE') {
       await route.fulfill({ status: 204, body: '' });
       return;
     }
@@ -53,6 +78,45 @@ async function assertNoHorizontalOverflow(page: Page): Promise<void> {
   ).toBeLessThanOrEqual(overflow.clientWidth + 1);
 }
 
+async function assertDesktopContentWidth(page: Page): Promise<void> {
+  const width = await page.getByTestId('account-page').evaluate((element) => {
+    return element.getBoundingClientRect().width;
+  });
+  expect(width).toBeLessThanOrEqual(850);
+  expect(width).toBeGreaterThan(600);
+}
+
+async function assertBottomNavDoesNotCoverContent(page: Page): Promise<void> {
+  const nav = page.getByRole('navigation', { name: 'Home' });
+  if ((await nav.count()) === 0) {
+    return;
+  }
+
+  const position = await nav.evaluate((element) => {
+    return window.getComputedStyle(element).position;
+  });
+  if (position !== 'fixed') {
+    return;
+  }
+
+  const paddingBottom = await page
+    .getByTestId('account-page')
+    .evaluate((element) => {
+      let node: HTMLElement | null = element;
+      while (node) {
+        const value = Number.parseFloat(
+          window.getComputedStyle(node).paddingBottom,
+        );
+        if (value >= 80) {
+          return value;
+        }
+        node = node.parentElement;
+      }
+      return 0;
+    });
+  expect(paddingBottom).toBeGreaterThanOrEqual(80);
+}
+
 async function assertNoSeriousAxeViolations(
   page: Page,
   label: string,
@@ -73,7 +137,7 @@ async function assertNoSeriousAxeViolations(
   ).toEqual([]);
 }
 
-test.describe('account deletion', () => {
+test.describe('account settings', () => {
   test.beforeEach(async ({ page }) => {
     await mockAuthenticatedAccountApis(page);
   });
@@ -90,6 +154,7 @@ test.describe('account deletion', () => {
       await expect(
         page.getByRole('heading', { name: 'Account', level: 1 }),
       ).toBeVisible();
+      await expect(page.getByText(LONG_EMAIL)).toBeVisible();
       await assertNoHorizontalOverflow(page);
 
       await page.getByRole('button', { name: 'Delete account' }).click();
@@ -98,6 +163,41 @@ test.describe('account deletion', () => {
         page.getByRole('button', { name: 'Delete my account' }),
       ).toBeVisible();
       await assertNoHorizontalOverflow(page);
+    });
+  }
+
+  for (const viewport of SCREENSHOT_VIEWPORTS) {
+    test(`populated Account at ${viewport.name}px`, async ({ page }) => {
+      await page.setViewportSize({
+        width: viewport.width,
+        height: viewport.height,
+      });
+      await page.goto('/account');
+      await expect(
+        page.getByRole('heading', { name: 'Account', level: 1 }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole('heading', { name: DISPLAY_NAME, level: 2 }),
+      ).toBeVisible();
+      await expect(page.getByText(LONG_EMAIL)).toBeVisible();
+      await expect(page.getByText('Verified')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: 'Delete account' }),
+      ).toBeVisible();
+      await expect(page.getByText(USER_ID)).toHaveCount(0);
+      await assertNoHorizontalOverflow(page);
+      if (viewport.width >= 1024) {
+        await assertDesktopContentWidth(page);
+      }
+      if (viewport.width < 768) {
+        await assertBottomNavDoesNotCoverContent(page);
+      }
+      mkdirSync(SCREENSHOT_DIR, { recursive: true });
+      await page.screenshot({
+        path: path.join(SCREENSHOT_DIR, `account-${viewport.name}.png`),
+        fullPage: true,
+      });
     });
   }
 
@@ -131,6 +231,9 @@ test.describe('account deletion', () => {
     await page.goto('/account');
     await expect(
       page.getByRole('heading', { name: 'Account', level: 1 }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: DISPLAY_NAME, level: 2 }),
     ).toBeVisible();
     await assertNoSeriousAxeViolations(page, 'account settings');
   });

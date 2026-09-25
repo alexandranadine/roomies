@@ -11,6 +11,8 @@ const variantClasses = {
     'bg-transparent text-text-secondary border-transparent hover:bg-subtle hover:text-text-primary active:bg-border/50 disabled:text-text-disabled disabled:bg-transparent',
   danger:
     'bg-danger text-white hover:bg-danger/90 active:bg-danger/80 disabled:bg-subtle disabled:text-text-disabled disabled:border-border',
+  'danger-muted':
+    'border-danger-muted bg-danger-muted text-white hover:bg-danger-muted-hover hover:border-danger-muted-hover active:bg-danger-muted-hover disabled:bg-subtle disabled:text-text-disabled disabled:border-border',
 } as const;
 
 export type ButtonVariant = keyof typeof variantClasses;

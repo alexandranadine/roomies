@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { SignOutButton } from '../auth/sign-out-button.js';
 import { DocumentTitle } from '../components/document-title.js';
 import { Button } from '../components/ui/index.js';
+import { AccountProfileSection } from './account-profile-section.js';
 import { DeleteAccountDialog } from './delete-account-dialog.js';
 
 /**
@@ -13,7 +14,10 @@ export function AccountSettingsPage() {
 
   return (
     <DocumentTitle title="Account · Roomies">
-      <div className="flex flex-col gap-8">
+      <div
+        data-testid="account-page"
+        className="mx-auto flex w-full max-w-[800px] flex-col gap-6"
+      >
         <header className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
             Account
@@ -23,6 +27,8 @@ export function AccountSettingsPage() {
           </p>
         </header>
 
+        <AccountProfileSection />
+
         <section
           aria-labelledby="account-session-heading"
           className="flex flex-col gap-3"
@@ -30,7 +36,7 @@ export function AccountSettingsPage() {
           <div className="flex flex-col gap-1">
             <h2
               id="account-session-heading"
-              className="text-lg font-semibold tracking-tight text-text-primary"
+              className="text-base font-semibold tracking-tight text-text-primary"
             >
               Sign out
             </h2>
@@ -39,17 +45,17 @@ export function AccountSettingsPage() {
               same account.
             </p>
           </div>
-          <SignOutButton />
+          <SignOutButton className="self-start" />
         </section>
 
         <section
           aria-labelledby="account-danger-heading"
-          className="flex flex-col gap-3 border-t border-border pt-6"
+          className="flex flex-col gap-3 border-t border-border pt-5"
         >
           <div className="flex flex-col gap-1">
             <h2
               id="account-danger-heading"
-              className="text-lg font-semibold tracking-tight text-text-primary"
+              className="text-base font-semibold tracking-tight text-text-primary"
             >
               Delete account
             </h2>
@@ -61,7 +67,7 @@ export function AccountSettingsPage() {
           <div>
             <Button
               type="button"
-              variant="danger"
+              variant="danger-muted"
               onClick={() => {
                 setDeleteOpen(true);
               }}

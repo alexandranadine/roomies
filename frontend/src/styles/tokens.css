@@ -29,6 +29,8 @@
   /* Colors — semantic status */
   --color-danger: #a34738;
   --color-danger-soft: #f8e8e4;
+  --color-danger-muted: #b15c4e;
+  --color-danger-muted-hover: #9e5044;
   --color-success: #2f4a3c;
   --color-success-soft: #e4ede7;
   --color-warning: #6a4e10;

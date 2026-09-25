@@ -8,6 +8,7 @@ const authSessionSchema = z
         id: z.string().min(1),
         email: z.string().min(1),
         emailVerified: z.boolean(),
+        name: z.string().optional(),
       })
       .passthrough(),
   })
