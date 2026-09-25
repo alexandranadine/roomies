@@ -138,7 +138,7 @@ export function CreateMaintenanceDialog({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Popup
         title="Add maintenance"
-        description="Share upkeep that needs attention in this Home."
+        description="Log something that needs attention in this home."
         closeLabel="Close add maintenance"
         className="max-h-[min(100dvh-2rem,44rem)]"
       >

@@ -141,6 +141,26 @@ describe('Maintenance list page', () => {
     expect(within(resolvedRow).getByText('Resolved')).toBeInTheDocument();
   });
 
+  it('wraps long titles without exposing Membership IDs', async () => {
+    const longTitle =
+      'Take the overflowing recycling and compost bins from the side alley every Wednesday evening';
+    stubMaintenanceApis({
+      listByHome: {
+        [TEST_HOME_A]: listPage([
+          { ...FIXTURE_H, title: longTitle },
+          FIXTURE_A,
+        ]),
+      },
+    });
+    renderApp(`/homes/${TEST_HOME_A}/maintenance`);
+
+    expect(
+      await screen.findByRole('link', { name: new RegExp(longTitle, 'i') }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Private')).toBeInTheDocument();
+    assertNoPrivacyLeaks();
+  });
+
   it('maps All/Open/Resolved filters to the correct backend status query', async () => {
     const user = userEvent.setup();
     const fetchMock = stubMaintenanceApis({
@@ -204,16 +224,19 @@ describe('Maintenance list page', () => {
 
     expect(
       await screen.findByRole('heading', {
-        name: 'No maintenance items yet.',
+        name: 'Nothing needs attention right now.',
         level: 2,
       }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Household maintenance items will show up here.'),
     ).toBeInTheDocument();
     assertNoPrivacyLeaks();
 
     await user.click(screen.getByRole('button', { name: 'Open' }));
     expect(
       await screen.findByRole('heading', {
-        name: 'No open maintenance.',
+        name: 'Nothing needs attention right now.',
         level: 2,
       }),
     ).toBeInTheDocument();
@@ -221,7 +244,7 @@ describe('Maintenance list page', () => {
     await user.click(screen.getByRole('button', { name: 'Resolved' }));
     expect(
       await screen.findByRole('heading', {
-        name: 'No resolved maintenance.',
+        name: 'No resolved items yet.',
         level: 2,
       }),
     ).toBeInTheDocument();
@@ -283,7 +306,9 @@ describe('Maintenance list page', () => {
       }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole('heading', { name: 'No maintenance items yet.' }),
+      screen.queryByRole('heading', {
+        name: 'Nothing needs attention right now.',
+      }),
     ).not.toBeInTheDocument();
   });
 

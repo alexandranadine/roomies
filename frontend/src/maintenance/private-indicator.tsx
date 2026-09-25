@@ -1,19 +1,20 @@
 import { Lock } from 'lucide-react';
-import { Badge } from '../components/ui/index.js';
+import { cn } from '../components/ui/cn.js';
 
 /**
  * Accessible PRIVATE indicator. Icon alone is not sufficient meaning.
+ * Shown only on items the viewer is authorized to see.
  */
 export function PrivateIndicator({ className }: { className?: string }) {
   return (
-    <Badge variant="privacy" className={className}>
-      <span className="inline-flex items-center gap-1">
-        <Lock
-          className="size-3.5 shrink-0 text-privacy-icon"
-          aria-hidden="true"
-        />
-        <span>Private</span>
-      </span>
-    </Badge>
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 text-xs font-medium text-privacy-text',
+        className,
+      )}
+    >
+      <Lock className="size-3.5 shrink-0 text-privacy-icon" aria-hidden="true" />
+      <span>Private</span>
+    </span>
   );
 }

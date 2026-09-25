@@ -5,6 +5,7 @@ import { Alert, Button, Skeleton } from '../components/ui/index.js';
 import type { HomeShellOutletContext } from '../homes/home-overview-page.js';
 import { ApiError } from '../platform/api/index.js';
 import { formatMaintenanceTimestamp } from './maintenance-format.js';
+import { MaintenanceEventIcon } from './maintenance-event-icon.js';
 import { MaintenanceStatusBadge } from './maintenance-status-badge.js';
 import { PrivateIndicator } from './private-indicator.js';
 import { useMaintenanceDetail } from './use-maintenance-detail.js';
@@ -157,7 +158,10 @@ export function MaintenanceDetailPage() {
 
   return (
     <DocumentTitle title={`${entry.title} · Maintenance · Roomies`}>
-      <article className="flex flex-col gap-5">
+      <article
+        data-testid="maintenance-detail"
+        className="mx-auto flex w-full max-w-[980px] flex-col gap-5"
+      >
         <p>
           <Link
             to={`/homes/${encodeURIComponent(homeId)}/maintenance`}
@@ -168,25 +172,30 @@ export function MaintenanceDetailPage() {
         </p>
 
         <header className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <MaintenanceStatusBadge status={entry.status} />
-            {entry.visibility === 'PRIVATE' ? <PrivateIndicator /> : null}
+          <div className="flex items-start gap-3">
+            <MaintenanceEventIcon status={entry.status} />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <MaintenanceStatusBadge status={entry.status} />
+                {entry.visibility === 'PRIVATE' ? <PrivateIndicator /> : null}
+              </div>
+              <h1 className="mt-1 text-2xl font-semibold tracking-tight break-words text-text-primary">
+                {entry.title}
+              </h1>
+            </div>
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight break-words text-text-primary">
-            {entry.title}
-          </h1>
         </header>
 
         {entry.details !== null ? (
-          <div className="rounded-xl border border-border bg-surface px-4 py-3">
+          <div className="rounded-xl border border-border bg-surface px-4 py-3 shadow-card">
             <h2 className="sr-only">Details</h2>
-            <p className="whitespace-pre-wrap break-words text-base text-text-primary">
+            <p className="whitespace-pre-wrap break-words text-sm text-text-primary sm:text-base">
               {entry.details}
             </p>
           </div>
         ) : null}
 
-        <dl className="flex flex-col gap-2 text-sm text-text-muted">
+        <dl className="flex flex-col gap-1.5 text-sm text-text-muted">
           <div className="flex flex-wrap gap-x-2">
             <dt>Created</dt>
             <dd>{formatMaintenanceTimestamp(entry.createdAt)}</dd>
@@ -208,6 +217,7 @@ export function MaintenanceDetailPage() {
             <Button
               type="button"
               variant="secondary"
+              className="self-start"
               loading={resolvePending}
               disabled={resolvePending}
               aria-label="Mark resolved"
