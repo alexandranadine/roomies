@@ -9,10 +9,12 @@ import { taskKeys } from './tasks-query-keys.js';
 import {
   FIXTURE_COMPLETED,
   FIXTURE_DEFINITION_DEACTIVATED,
+  FIXTURE_DEFINITION_MONTHLY,
   FIXTURE_DEFINITION_OTHER,
   FIXTURE_DEFINITION_WEEKLY,
   FIXTURE_HOME_B_TASK,
   FIXTURE_OPEN_ASSIGNED,
+  FIXTURE_OPEN_OVERDUE,
   FIXTURE_OPEN_UNASSIGNED,
   FIXTURE_OPEN_YOURS,
   FIXTURE_RECURRING_INSTANCE,
@@ -36,12 +38,14 @@ function assertNoInternalIds(container: HTMLElement = document.body) {
   const text = container.textContent ?? '';
   expect(text).not.toContain(FIXTURE_OPEN_ASSIGNED.id);
   expect(text).not.toContain(FIXTURE_OPEN_UNASSIGNED.id);
+  expect(text).not.toContain(FIXTURE_OPEN_OVERDUE.id);
   expect(text).not.toContain(FIXTURE_COMPLETED.id);
   expect(text).not.toContain(TEST_MEMBERSHIP_A);
   expect(text).not.toContain(TEST_MEMBERSHIP_B);
   expect(text).not.toContain(TEST_ENDED_MEMBERSHIP);
   expect(text).not.toContain(TEST_REJOIN_MEMBERSHIP);
   expect(text).not.toContain(FIXTURE_DEFINITION_WEEKLY.id);
+  expect(text).not.toContain(FIXTURE_DEFINITION_MONTHLY.id);
   expect(text).not.toContain(FIXTURE_DEFINITION_OTHER.creatorMembershipId);
 }
 
@@ -73,6 +77,7 @@ describe('Tasks list page', () => {
           FIXTURE_OPEN_ASSIGNED,
           FIXTURE_OPEN_UNASSIGNED,
           FIXTURE_OPEN_YOURS,
+          FIXTURE_OPEN_OVERDUE,
           FIXTURE_RECURRING_INSTANCE,
           FIXTURE_COMPLETED,
         ],
@@ -80,6 +85,7 @@ describe('Tasks list page', () => {
       definitionsByHome: {
         [TEST_HOME_A]: [
           FIXTURE_DEFINITION_WEEKLY,
+          FIXTURE_DEFINITION_MONTHLY,
           FIXTURE_DEFINITION_DEACTIVATED,
         ],
       },
@@ -89,17 +95,25 @@ describe('Tasks list page', () => {
     expect(await screen.findByText('Take out trash')).toBeInTheDocument();
     expect(screen.getByText('Wipe counters')).toBeInTheDocument();
     expect(screen.getByText('Run dishwasher')).toBeInTheDocument();
+    expect(screen.getByText('Pay water bill')).toBeInTheDocument();
     expect(screen.getByText('Sweep hallway')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Due / upcoming' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'No due date' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Done' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Repeating' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Open 5' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Completed 1' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Repeating tasks 2' }),
+    ).toBeInTheDocument();
     expect(screen.getByText('Unassigned')).toBeInTheDocument();
     expect(screen.getAllByText('You').length).toBeGreaterThan(0);
-    expect(screen.getByText('Jamie')).toBeInTheDocument();
+    expect(screen.getAllByText('Jamie').length).toBeGreaterThan(0);
     expect(screen.getByText(FORMER_ROOMMATE_LABEL)).toBeInTheDocument();
+    expect(screen.getAllByText(/Overdue/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Every Monday/)).toBeInTheDocument();
+    expect(screen.getByText(/Every month on the 1st/)).toBeInTheDocument();
     expect(screen.queryByText('Old repeating chore')).not.toBeInTheDocument();
     expect(screen.getAllByText('Repeats').length).toBeGreaterThan(0);
+    expect(screen.queryByRole('heading', { name: 'Due / upcoming' })).not.toBeInTheDocument();
     assertNoInternalIds();
   });
 
@@ -110,11 +124,14 @@ describe('Tasks list page', () => {
     });
     renderApp(`/homes/${TEST_HOME_A}/tasks`);
 
+    expect(await screen.findByText('Nothing on the list.')).toBeInTheDocument();
     expect(
-      await screen.findByRole('heading', { name: 'No tasks yet', level: 2 }),
+      screen.getByText('Completed tasks will show up here.'),
     ).toBeInTheDocument();
     expect(
-      screen.getByText('Add something the house needs to get done.'),
+      screen.getByText(
+        'Set a chore to repeat so the house doesn’t have to remember.',
+      ),
     ).toBeInTheDocument();
     expect(
       screen.getAllByRole('button', { name: 'Add task' }).length,
@@ -141,7 +158,9 @@ describe('Tasks list page', () => {
     expect(screen.getByText(FORMER_ROOMMATE_LABEL)).toBeInTheDocument();
     expect(document.body.textContent).not.toContain(TEST_ENDED_MEMBERSHIP);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Add task' }));
+    await userEvent.click(
+      screen.getAllByRole('button', { name: 'Add task' })[0]!,
+    );
     const dialog = await screen.findByRole('dialog');
     const assignee = within(dialog).getByLabelText(/assigned to/i);
     const optionText = [...assignee.querySelectorAll('option')].map(
@@ -174,7 +193,7 @@ describe('Tasks list page', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add task' })).toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Stop repeating' }),
+      screen.queryByRole('button', { name: 'Actions for Bathroom tidy' }),
     ).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /edit task/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /delete task/i })).not.toBeInTheDocument();
@@ -189,7 +208,7 @@ describe('Tasks list page', () => {
 
     expect(await screen.findByText('Bathroom tidy')).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Stop repeating' }),
+      screen.getByRole('button', { name: 'Actions for Bathroom tidy' }),
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /edit task/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /delete task/i })).not.toBeInTheDocument();
@@ -216,7 +235,12 @@ describe('Tasks list page', () => {
     renderApp(`/homes/${TEST_HOME_A}/tasks`);
 
     expect(await screen.findByText('Weekly trash')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Stop repeating' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Actions for Weekly trash' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Stop repeating Weekly trash' }),
+    );
     const dialog = await screen.findByRole('dialog');
     await userEvent.click(
       within(dialog).getByRole('button', { name: 'Stop repeating' }),
@@ -244,7 +268,7 @@ describe('Tasks list page', () => {
 
     expect(await screen.findByText('Weekly trash')).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Stop repeating' }),
+      screen.getByRole('button', { name: 'Actions for Weekly trash' }),
     ).toBeInTheDocument();
   });
 
@@ -263,7 +287,7 @@ describe('Tasks list page', () => {
       }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole('heading', { name: 'No tasks yet' }),
+      screen.queryByText('Nothing on the list.'),
     ).not.toBeInTheDocument();
   });
 

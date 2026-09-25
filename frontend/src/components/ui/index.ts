@@ -46,8 +46,10 @@ export {
 export {
   Radio,
   RadioGroup,
+  type RadioGroupLayout,
   type RadioGroupProps,
   type RadioProps,
+  type RadioVariant,
 } from './radio-group.js';
 export {
   Sheet,

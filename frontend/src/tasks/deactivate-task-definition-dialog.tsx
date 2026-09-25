@@ -80,7 +80,6 @@ export function DeactivateTaskDefinitionDialog({
           <div className="flex flex-wrap gap-2 pt-1">
             <Button
               type="button"
-              variant="danger"
               loading={isPending}
               disabled={isPending}
               onClick={() => {

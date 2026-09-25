@@ -109,6 +109,30 @@ export function taskDueKind(
   return 'upcoming';
 }
 
+export function nextHomeLocalDate(value: string): string | null {
+  const match = HOME_LOCAL_DATE_PATTERN.exec(value);
+  if (
+    match === null ||
+    match[1] === undefined ||
+    match[2] === undefined ||
+    match[3] === undefined
+  ) {
+    return null;
+  }
+
+  const date = new Date(
+    Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])),
+  );
+  if (Number.isNaN(date.valueOf())) {
+    return null;
+  }
+  date.setUTCDate(date.getUTCDate() + 1);
+  const year = String(date.getUTCFullYear());
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export function formatTaskDueLabel(
   scheduledFor: string,
   today: string,
@@ -119,14 +143,34 @@ export function formatTaskDueLabel(
     case 'overdue':
       return `Overdue · ${dateLabel}`;
     case 'today':
-      return 'Due today';
+      return 'Today';
     case 'upcoming':
-      return `Due ${dateLabel}`;
+      if (nextHomeLocalDate(today) === scheduledFor) {
+        return 'Tomorrow';
+      }
+      return dateLabel;
   }
 }
 
 export function weekdayLabel(weekday: number): string {
   return WEEKDAY_LABELS[weekday - 1] ?? `Day ${weekday}`;
+}
+
+export function formatDayOfMonth(day: number): string {
+  const remainder = day % 100;
+  if (remainder >= 11 && remainder <= 13) {
+    return `${day}th`;
+  }
+  switch (day % 10) {
+    case 1:
+      return `${day}st`;
+    case 2:
+      return `${day}nd`;
+    case 3:
+      return `${day}rd`;
+    default:
+      return `${day}th`;
+  }
 }
 
 export function formatRecurrence(
@@ -140,11 +184,11 @@ export function formatRecurrence(
     case 'WEEKLY':
       return weekday === null
         ? 'Every week'
-        : `Every week on ${weekdayLabel(weekday)}`;
+        : `Every ${weekdayLabel(weekday)}`;
     case 'MONTHLY':
       return dayOfMonth === null
         ? 'Every month'
-        : `Every month on day ${dayOfMonth}`;
+        : `Every month on the ${formatDayOfMonth(dayOfMonth)}`;
   }
 }
 

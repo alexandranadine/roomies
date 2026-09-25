@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  formatDayOfMonth,
   formatHomeLocalDate,
   formatRecurrence,
   formatTaskDueLabel,
@@ -22,15 +23,24 @@ describe('task format', () => {
     expect(taskDueKind('2026-09-20', '2026-09-24')).toBe('overdue');
     expect(taskDueKind('2026-09-24', '2026-09-24')).toBe('today');
     expect(taskDueKind('2026-09-28', '2026-09-24')).toBe('upcoming');
-    expect(formatTaskDueLabel('2026-09-24', '2026-09-24')).toBe('Due today');
+    expect(formatTaskDueLabel('2026-09-24', '2026-09-24')).toBe('Today');
+    expect(formatTaskDueLabel('2026-09-25', '2026-09-24')).toBe('Tomorrow');
     expect(formatTaskDueLabel('2026-09-20', '2026-09-24')).toMatch(/Overdue/);
+    expect(formatTaskDueLabel('2026-09-28', '2026-09-24')).toMatch(/Sep/);
   });
 
   it('uses plain recurrence language', () => {
     expect(formatRecurrence('DAILY', null, null)).toBe('Every day');
-    expect(formatRecurrence('WEEKLY', 1, null)).toBe('Every week on Monday');
-    expect(formatRecurrence('MONTHLY', null, 15)).toBe(
-      'Every month on day 15',
+    expect(formatRecurrence('WEEKLY', 2, null)).toBe('Every Tuesday');
+    expect(formatRecurrence('WEEKLY', 1, null)).toBe('Every Monday');
+    expect(formatRecurrence('MONTHLY', null, 1)).toBe(
+      'Every month on the 1st',
     );
+    expect(formatRecurrence('MONTHLY', null, 15)).toBe(
+      'Every month on the 15th',
+    );
+    expect(formatDayOfMonth(22)).toBe('22nd');
+    expect(formatDayOfMonth(23)).toBe('23rd');
+    expect(formatDayOfMonth(11)).toBe('11th');
   });
 });

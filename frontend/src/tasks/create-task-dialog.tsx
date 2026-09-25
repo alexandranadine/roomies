@@ -20,6 +20,7 @@ import { SelectField } from './select-field.js';
 import { assigneePickerLabel, UNASSIGNED_LABEL } from './task-assignee.js';
 import {
   dayOfMonthInTimeZone,
+  formatDayOfMonth,
   isoWeekdayInTimeZone,
 } from './task-format.js';
 import { useCreateTask } from './use-create-task.js';
@@ -158,7 +159,7 @@ export function CreateTaskDialog({
       >
         <form
           id={formId}
-          className="flex flex-col gap-4"
+          className="flex flex-col gap-3"
           onSubmit={(event) => void submitCreate(event)}
           noValidate
         >
@@ -237,6 +238,7 @@ export function CreateTaskDialog({
             render={({ field }) => (
               <RadioGroup
                 label="Repeat"
+                layout="tiles"
                 value={field.value}
                 onValueChange={(next) => {
                   if (
@@ -249,10 +251,26 @@ export function CreateTaskDialog({
                   }
                 }}
               >
-                <Radio value="ONCE" disabled={isPending} label="One-time" />
-                <Radio value="DAILY" disabled={isPending} label="Every day" />
-                <Radio value="WEEKLY" disabled={isPending} label="Every week" />
                 <Radio
+                  variant="tile"
+                  value="ONCE"
+                  disabled={isPending}
+                  label="One-time"
+                />
+                <Radio
+                  variant="tile"
+                  value="DAILY"
+                  disabled={isPending}
+                  label="Every day"
+                />
+                <Radio
+                  variant="tile"
+                  value="WEEKLY"
+                  disabled={isPending}
+                  label="Every week"
+                />
+                <Radio
+                  variant="tile"
                   value="MONTHLY"
                   disabled={isPending}
                   label="Every month"
@@ -318,7 +336,7 @@ export function CreateTaskDialog({
                   {Array.from({ length: 31 }, (_, index) => index + 1).map(
                     (day) => (
                       <option key={day} value={day}>
-                        {day}
+                        {formatDayOfMonth(day)}
                       </option>
                     ),
                   )}

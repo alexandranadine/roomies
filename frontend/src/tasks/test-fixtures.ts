@@ -44,6 +44,16 @@ export const FIXTURE_OPEN_YOURS: Task = {
   ...BASE_TIMES,
 };
 
+export const FIXTURE_OPEN_OVERDUE: Task = {
+  id: 't7777777-7777-4777-8777-777777777777',
+  title: 'Pay water bill',
+  status: 'OPEN',
+  source: 'MANUAL',
+  scheduledFor: '2020-01-15',
+  assignedMembershipId: TEST_MEMBERSHIP_B,
+  ...BASE_TIMES,
+};
+
 export const FIXTURE_COMPLETED: Task = {
   id: 't4444444-4444-4444-8444-444444444444',
   title: 'Sweep hallway',
@@ -97,6 +107,34 @@ export const FIXTURE_DEFINITION_OTHER: TaskDefinition = {
   dayOfMonth: null,
   assignedMembershipId: TEST_MEMBERSHIP_B,
   creatorMembershipId: TEST_MEMBERSHIP_B,
+  nextOccurrenceDate: '2026-09-25',
+  deactivatedAt: null,
+  createdAt: '2026-09-01T12:00:00.000Z',
+  updatedAt: '2026-09-01T12:00:00.000Z',
+};
+
+export const FIXTURE_DEFINITION_MONTHLY: TaskDefinition = {
+  id: 'd4444444-4444-4444-8444-444444444444',
+  title: 'Clean kitchen',
+  frequency: 'MONTHLY',
+  weekday: null,
+  dayOfMonth: 1,
+  assignedMembershipId: null,
+  creatorMembershipId: TEST_MEMBERSHIP_A,
+  nextOccurrenceDate: '2026-10-01',
+  deactivatedAt: null,
+  createdAt: '2026-09-01T12:00:00.000Z',
+  updatedAt: '2026-09-01T12:00:00.000Z',
+};
+
+export const FIXTURE_DEFINITION_DAILY: TaskDefinition = {
+  id: 'd5555555-5555-4555-8555-555555555555',
+  title: 'Wipe stove',
+  frequency: 'DAILY',
+  weekday: null,
+  dayOfMonth: null,
+  assignedMembershipId: TEST_MEMBERSHIP_B,
+  creatorMembershipId: TEST_MEMBERSHIP_A,
   nextOccurrenceDate: '2026-09-25',
   deactivatedAt: null,
   createdAt: '2026-09-01T12:00:00.000Z',

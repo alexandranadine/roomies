@@ -8,6 +8,8 @@ import { clearHousePulse } from '../pulse/test-fixtures.js';
 import { renderApp } from '../test/render.js';
 import { taskKeys } from './tasks-query-keys.js';
 import {
+  FIXTURE_DEFINITION_DAILY,
+  FIXTURE_DEFINITION_MONTHLY,
   FIXTURE_DEFINITION_WEEKLY,
   FIXTURE_HOME_B_TASK,
   FIXTURE_OPEN_ASSIGNED,
@@ -27,7 +29,8 @@ afterEach(() => {
 });
 
 async function openCreateDialog() {
-  await userEvent.click(await screen.findByRole('button', { name: 'Add task' }));
+  const buttons = await screen.findAllByRole('button', { name: 'Add task' });
+  await userEvent.click(buttons[0]!);
   const dialog = await screen.findByRole('dialog');
   expect(
     await within(dialog).findByRole('textbox', { name: /title/i }),
@@ -233,6 +236,93 @@ describe('Tasks create UI', () => {
     });
   });
 
+  it('creates a daily repeating chore through TaskDefinitions', async () => {
+    const fetchMock = stubTasksApis({
+      listByHome: { [TEST_HOME_A]: [] },
+      createDefinitionByHome: {
+        [TEST_HOME_A]: FIXTURE_DEFINITION_DAILY,
+      },
+    });
+    renderApp(`/homes/${TEST_HOME_A}/tasks`);
+    const dialog = await openCreateDialog();
+    await userEvent.type(
+      within(dialog).getByRole('textbox', { name: /title/i }),
+      'Wipe stove',
+    );
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Every day' }));
+    expect(within(dialog).queryByLabelText(/weekday/i)).not.toBeInTheDocument();
+    expect(
+      within(dialog).queryByLabelText(/day of month/i),
+    ).not.toBeInTheDocument();
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Add task' }),
+    );
+
+    await waitFor(() => {
+      const createCalls = fetchMock.mock.calls.filter((call) => {
+        const url = String(call[0]);
+        const init = call[1] as RequestInit | undefined;
+        return (
+          url.includes('/task-definitions') &&
+          (init?.method ?? 'GET').toUpperCase() === 'POST'
+        );
+      });
+      const last = createCalls[createCalls.length - 1];
+      expect(last).toBeDefined();
+      expect(JSON.parse(String((last?.[1] as RequestInit).body))).toEqual({
+        title: 'Wipe stove',
+        frequency: 'DAILY',
+        assignedMembershipId: null,
+      });
+    });
+  });
+
+  it('creates a monthly repeating chore through TaskDefinitions', async () => {
+    const fetchMock = stubTasksApis({
+      listByHome: { [TEST_HOME_A]: [] },
+      createDefinitionByHome: {
+        [TEST_HOME_A]: FIXTURE_DEFINITION_MONTHLY,
+      },
+    });
+    renderApp(`/homes/${TEST_HOME_A}/tasks`);
+    const dialog = await openCreateDialog();
+    await userEvent.type(
+      within(dialog).getByRole('textbox', { name: /title/i }),
+      'Clean kitchen',
+    );
+    await userEvent.click(
+      within(dialog).getByRole('radio', { name: 'Every month' }),
+    );
+    await within(dialog).findByLabelText(/day of month/i);
+    expect(within(dialog).queryByLabelText(/weekday/i)).not.toBeInTheDocument();
+    await userEvent.selectOptions(
+      within(dialog).getByLabelText(/day of month/i),
+      '1',
+    );
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Add task' }),
+    );
+
+    await waitFor(() => {
+      const createCalls = fetchMock.mock.calls.filter((call) => {
+        const url = String(call[0]);
+        const init = call[1] as RequestInit | undefined;
+        return (
+          url.includes('/task-definitions') &&
+          (init?.method ?? 'GET').toUpperCase() === 'POST'
+        );
+      });
+      const last = createCalls[createCalls.length - 1];
+      expect(last).toBeDefined();
+      expect(JSON.parse(String((last?.[1] as RequestInit).body))).toEqual({
+        title: 'Clean kitchen',
+        frequency: 'MONTHLY',
+        dayOfMonth: 1,
+        assignedMembershipId: null,
+      });
+    });
+  });
+
   it('invalidates same-Home Pulse only after create', async () => {
     stubTasksApis({
       listByHome: {
@@ -344,7 +434,7 @@ describe('Tasks completion UI', () => {
         screen.queryByRole('button', { name: 'Mark Wipe counters done' }),
       ).not.toBeInTheDocument();
     });
-    expect(screen.getByRole('heading', { name: 'Done' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Completed 1' })).toBeInTheDocument();
     expect(screen.getByText('Wipe counters')).toBeInTheDocument();
     const completeCall = fetchMock.mock.calls.find((call) =>
       String(call[0]).includes(
