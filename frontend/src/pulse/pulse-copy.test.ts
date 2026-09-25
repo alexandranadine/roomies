@@ -6,7 +6,7 @@ import {
   maintenanceClearCopy,
   pulseOverallState,
   pulseStateLabel,
-  supportingPulseMetrics,
+  barPulseMetrics,
   suppliesActiveMetrics,
   suppliesClearCopy,
   tasksActiveMetrics,
@@ -112,9 +112,8 @@ describe('pulse copy', () => {
       'Unassigned',
       'Maintenance',
     ]);
-    expect(supportingPulseMetrics(pulse).map((metric) => metric.label)).toEqual([
+    expect(barPulseMetrics(pulse).map((metric) => metric.label)).toEqual([
       'Due today',
-      'Assigned to you',
       'Supplies',
     ]);
     expect(pulseOverallState(pulse)).toBe('ACTIVE');

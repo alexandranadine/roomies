@@ -261,7 +261,7 @@ test.describe('House Pulse on Home overview', () => {
       await expect(page.getByText('Unassigned')).toBeVisible();
       await expect(page.getByText('Maintenance', { exact: true })).toBeVisible();
       if (viewport.width >= 1024) {
-        await expect(page.getByText('Assigned to you')).toBeVisible();
+        await expect(page.getByText('Due today')).toBeVisible();
         await expect(page.getByText('Supplies', { exact: true })).toBeVisible();
       }
       await assertNoHorizontalOverflow(page);
@@ -317,7 +317,7 @@ test.describe('House Pulse on Home overview', () => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto(`/homes/${HOME_A}`);
     const pulse = page.getByTestId('house-pulse');
-    await expect(pulse.getByText('Assigned to you')).toBeVisible();
+    await expect(pulse.getByText('Due today')).toBeVisible();
     await expect(pulse.getByText('Supplies', { exact: true })).toBeVisible();
     await expect(pulse.getByText('Maintenance', { exact: true })).toBeVisible();
     await expect(pulse.getByText('Clear')).toHaveCount(0);

@@ -54,15 +54,11 @@ function OverviewLayout({
   activity: ReactNode;
 }) {
   return (
-    <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(20rem,1fr)] lg:items-start lg:gap-x-8 lg:gap-y-4">
-      <div className="min-w-0 lg:col-start-1 lg:row-start-1 lg:self-start">
-        {strip}
-      </div>
-      <aside className="min-w-0 lg:col-start-2 lg:row-start-1 lg:self-start">
-        {pulse}
-      </aside>
-      <div className="min-w-0 lg:col-start-1 lg:row-start-2">{actions}</div>
-      <div className="min-w-0 lg:col-start-1 lg:row-start-3">{activity}</div>
+    <div className="mx-auto flex w-full max-w-[860px] flex-col gap-3 lg:gap-4">
+      <div className="min-w-0">{strip}</div>
+      <div className="min-w-0">{pulse}</div>
+      <div className="min-w-0">{actions}</div>
+      <div className="min-w-0">{activity}</div>
     </div>
   );
 }

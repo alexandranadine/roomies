@@ -214,7 +214,9 @@ test.describe('Home shell Phase 1', () => {
     await assertNoHorizontalOverflow(page);
   });
 
-  test('Home at 1024px uses two columns and header nav', async ({ page }) => {
+  test('Home at 1024px uses a single content column and header nav', async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 1024, height: 800 });
     await page.goto(`/homes/${HOME_A}`);
     await expect(page.getByText('Roomies').first()).toBeVisible();
@@ -223,7 +225,7 @@ test.describe('Home shell Phase 1', () => {
       page.getByRole('button', { name: 'Add to this Home' }),
     ).toBeVisible();
     await expect(page.getByTestId('house-pulse')).toBeVisible();
-    await expect(page.getByText('Assigned to you')).toBeVisible();
+    await expect(page.getByText('Due today')).toBeVisible();
     await assertNoHorizontalOverflow(page);
     mkdirSync(SCREENSHOT_DIR, { recursive: true });
     await page.screenshot({
@@ -251,7 +253,7 @@ test.describe('Home shell Phase 1', () => {
     });
   });
 
-  test('Home at 1440px keeps two-column composition without overflow', async ({
+  test('Home at 1440px keeps a single content column without overflow', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
@@ -259,7 +261,7 @@ test.describe('Home shell Phase 1', () => {
     await expect(page.getByText('Roomies').first()).toBeVisible();
     await expect(page.getByRole('navigation', { name: 'Home' })).toBeVisible();
     await expect(page.getByTestId('house-pulse')).toBeVisible();
-    await expect(page.getByText('Assigned to you')).toBeVisible();
+    await expect(page.getByText('Due today')).toBeVisible();
     await assertNoHorizontalOverflow(page);
     mkdirSync(SCREENSHOT_DIR, { recursive: true });
     await page.screenshot({

@@ -71,7 +71,7 @@ describe('House Pulse on Home overview', () => {
     renderApp(`/homes/${TEST_HOME_A}`);
 
     const region = await screen.findByTestId('house-pulse');
-    expect(within(region).getByText('Assigned to you').closest('li')).toHaveTextContent(
+    expect(within(region).getByText('Overdue').closest('li')).toHaveTextContent(
       '0',
     );
     expect(within(region).getByText('Supplies').closest('li')).toHaveTextContent(
@@ -89,9 +89,6 @@ describe('House Pulse on Home overview', () => {
     renderApp(`/homes/${TEST_HOME_A}`);
 
     const region = await screen.findByTestId('house-pulse');
-    expect(within(region).getByText('Assigned to you').closest('li')).toHaveTextContent(
-      '2',
-    );
     expect(within(region).getByText('Unassigned').closest('li')).toHaveTextContent(
       '1',
     );
@@ -218,7 +215,7 @@ describe('House Pulse on Home overview', () => {
     ).toBeInTheDocument();
     expect(screen.getByTestId('house-pulse-loading')).toBeInTheDocument();
     expect(screen.queryByTestId('house-pulse')).not.toBeInTheDocument();
-    expect(screen.queryByText('Assigned to you')).not.toBeInTheDocument();
+    expect(screen.queryByText('Overdue')).not.toBeInTheDocument();
 
     expect(await screen.findByTestId('house-pulse')).toBeInTheDocument();
   });
@@ -271,7 +268,7 @@ describe('House Pulse on Home overview', () => {
       }),
     ).toBeInTheDocument();
     expect(screen.queryByTestId('house-pulse')).not.toBeInTheDocument();
-    expect(screen.queryByText('Assigned to you')).not.toBeInTheDocument();
+    expect(screen.queryByText('Overdue')).not.toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/forbidden|permission/i);
 
     clearPrivateHomeQueryState(queryClient);
@@ -288,10 +285,10 @@ describe('House Pulse on Home overview', () => {
           items: [
             clearTasksItem({
               state: 'ACTIVE',
-              assignedOpenCount: 9,
+              assignedOpenCount: 0,
               unassignedOpenCount: 0,
               dueTodayRelevantCount: 0,
-              overdueRelevantCount: 0,
+              overdueRelevantCount: 9,
             }),
             clearSuppliesItem(),
             clearMaintenanceItem(),
@@ -304,10 +301,10 @@ describe('House Pulse on Home overview', () => {
     const { router, queryClient } = renderApp(`/homes/${TEST_HOME_A}`);
 
     expect(
-      await screen.findByText('Assigned to you'),
+      await screen.findByText('Overdue'),
     ).toBeInTheDocument();
-    expect(screen.getByText('Assigned to you').closest('li')).toHaveTextContent(
-      '2',
+    expect(screen.getByText('Overdue').closest('li')).toHaveTextContent(
+      '3',
     );
     expect(queryClient.getQueryData(pulseKeys.all(TEST_HOME_A))).toEqual(
       activeHousePulse(),
@@ -324,15 +321,15 @@ describe('House Pulse on Home overview', () => {
       await screen.findByRole('heading', { name: 'Cedar House', level: 1 }),
     ).toBeInTheDocument();
     expect(
-      (await screen.findByText('Assigned to you')).closest('li'),
+      (await screen.findByText('Overdue')).closest('li'),
     ).toHaveTextContent('9');
     expect(queryClient.getQueryData(pulseKeys.all(TEST_HOME_B))).toBeDefined();
     expect(pulseKeys.all(TEST_HOME_B)).toEqual(['home', TEST_HOME_B, 'pulse']);
 
     await router.navigate(`/homes/${TEST_HOME_A}`);
     await waitFor(() => {
-      expect(screen.getByText('Assigned to you').closest('li')).toHaveTextContent(
-        '2',
+      expect(screen.getByText('Overdue').closest('li')).toHaveTextContent(
+        '3',
       );
     });
   });

@@ -40,7 +40,7 @@ export function useDesktopLayout(): boolean {
 }
 
 /**
- * True at the lg breakpoint used for two-column Home and the unified header.
+ * True at the lg breakpoint used for the unified Home header.
  */
 export function useWideLayout(): boolean {
   return useMediaQuery(WIDE_QUERY);
