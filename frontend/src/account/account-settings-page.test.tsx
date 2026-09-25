@@ -209,40 +209,6 @@ describe('Account settings deletion', () => {
     );
   });
 
-  it('shows Home shell navigation when a preferred Home is available', async () => {
-    stubAccountApis({
-      homes: [
-        {
-          id: HOME_ID,
-          name: 'Oak Street',
-          timezone: 'UTC',
-          role: 'ADMIN',
-          hasPhoto: false,
-        },
-      ],
-    });
-    renderApp('/account');
-
-    expect(
-      await screen.findByRole('heading', { name: 'Account', level: 1 }),
-    ).toBeInTheDocument();
-    await waitFor(() => {
-      expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute(
-        'href',
-        `/homes/${HOME_ID}`,
-      );
-    });
-    expect(screen.getByRole('link', { name: 'Tasks' })).toHaveAttribute(
-      'href',
-      `/homes/${HOME_ID}/tasks`,
-    );
-    expect(screen.getByRole('link', { name: 'Account' })).toHaveAttribute(
-      'href',
-      '/account',
-    );
-    expect(screen.getByRole('navigation', { name: 'Home' })).toBeInTheDocument();
-  });
-
   it('renders display name, email, and verified status from the session', async () => {
     stubAccountApis();
     renderApp('/account');

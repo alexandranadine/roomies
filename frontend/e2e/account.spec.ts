@@ -3,6 +3,7 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 
+const HOME_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 const LONG_EMAIL =
   'alexandra.nadine.lewis+roomies-household@example.com';
@@ -48,8 +49,36 @@ async function mockAuthenticatedAccountApis(page: Page): Promise<void> {
     const pathName = url.pathname;
     const method = route.request().method().toUpperCase();
 
+    if (pathName.endsWith('/api/v1/me/homes') && method === 'GET') {
+      await json(route, 200, [
+        {
+          id: HOME_A,
+          name: 'Oak Street',
+          timezone: 'UTC',
+          role: 'ADMIN',
+          hasPhoto: false,
+        },
+      ]);
+      return;
+    }
+
     if (pathName === '/api/v1/me' && method === 'GET') {
       await json(route, 200, { id: USER_ID });
+      return;
+    }
+
+    if (pathName === `/api/v1/homes/${HOME_A}` && method === 'GET') {
+      await json(route, 200, {
+        id: HOME_A,
+        name: 'Oak Street',
+        timezone: 'UTC',
+        hasPhoto: false,
+      });
+      return;
+    }
+
+    if (pathName === '/api/v1/notifications' && method === 'GET') {
+      await json(route, 200, { items: [], hasMore: false, nextCursor: null });
       return;
     }
 
@@ -200,6 +229,66 @@ test.describe('account settings', () => {
       });
     });
   }
+
+  test('uses shared authenticated desktop nav with Profile active', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto('/account');
+    await expect(
+      page.getByRole('heading', { name: 'Account', level: 1 }),
+    ).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Home' })).toHaveAttribute(
+      'href',
+      `/homes/${HOME_A}`,
+    );
+    await expect(page.getByRole('link', { name: 'Tasks' })).toHaveAttribute(
+      'href',
+      `/homes/${HOME_A}/tasks`,
+    );
+    await expect(page.getByRole('link', { name: 'Roommates' })).toHaveAttribute(
+      'href',
+      `/homes/${HOME_A}/roommates`,
+    );
+    await expect(page.getByRole('link', { name: 'Account' })).toHaveAttribute(
+      'href',
+      '/account',
+    );
+    await expect(page.getByRole('link', { name: 'Account' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    await expect(
+      page.getByRole('link', { name: /Notifications/ }),
+    ).toHaveAttribute('href', '/notifications');
+    await expect(
+      page.getByRole('button', { name: 'Add to this Home' }),
+    ).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Roomies' })).toHaveAttribute(
+      'href',
+      `/homes/${HOME_A}`,
+    );
+    await expect(page.getByTestId('account-page')).toBeVisible();
+  });
+
+  test('mobile keeps bottom nav on Account with Profile active', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/account');
+    await expect(
+      page.getByRole('heading', { name: 'Account', level: 1 }),
+    ).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Home' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Account' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    await expect(
+      page.getByRole('button', { name: 'Add to this Home' }),
+    ).toBeVisible();
+    await assertBottomNavDoesNotCoverContent(page);
+  });
 
   test('gates Delete my account behind exact DELETE confirmation', async ({
     page,
