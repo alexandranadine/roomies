@@ -5,8 +5,12 @@ import { isAuthCanvasPath } from '../auth/auth-page-layout.js';
 import { PageContainer } from '../components/page-container.js';
 import { RoomiesWordmark } from '../components/roomies-wordmark.js';
 import { cn } from '../components/ui/cn.js';
-import { isHomeScopedPath } from '../homes/home-nav.js';
+import {
+  isGlobalAuthenticatedPath,
+  isHomeScopedPath,
+} from '../homes/home-nav.js';
 import { currentUserQueryKey } from '../homes/home-query-keys.js';
+import { usePreferredHomeId } from '../homes/use-preferred-home-id.js';
 import { useWordmarkHomeHref } from '../homes/use-wordmark-home-href.js';
 import { NotificationBellLink } from '../notifications/notification-bell-link.js';
 import { getCurrentUser } from '../users/current-user-api.js';
@@ -45,6 +49,7 @@ export function AppShell() {
   const location = useLocation();
   const matches = useMatches();
   const homeScoped = isHomeScopedPath(location.pathname);
+  const globalAuthenticated = isGlobalAuthenticatedPath(location.pathname);
   const authCanvas = isAuthCanvasPath(location.pathname);
   const catchAll = hasHideAppChromeHandle(matches);
   const meQuery = useQuery({
@@ -53,11 +58,21 @@ export function AppShell() {
     retry: false,
   });
   const signedIn = meQuery.data !== undefined;
+  const preferredHomeId = usePreferredHomeId({
+    enabled: signedIn && globalAuthenticated,
+  });
+  const homeChromeOnGlobalRoute =
+    globalAuthenticated && preferredHomeId !== undefined;
   const hideGlobalHeader =
-    homeScoped || authCanvas || catchAll || !signedIn;
+    homeScoped ||
+    authCanvas ||
+    catchAll ||
+    !signedIn ||
+    homeChromeOnGlobalRoute;
   const wordmarkHref = useWordmarkHomeHref({
     enabled: signedIn && !hideGlobalHeader,
   });
+  const homeLayout = homeScoped || homeChromeOnGlobalRoute;
 
   return (
     <div className="flex min-h-dvh flex-col bg-bg text-text-primary">
@@ -80,14 +95,14 @@ export function AppShell() {
       )}
       <main
         className={
-          homeScoped
+          homeLayout
             ? 'flex min-h-0 flex-1 flex-col'
             : hideGlobalHeader
               ? 'flex flex-1 flex-col'
               : 'flex-1 py-6 sm:py-8'
         }
       >
-        {homeScoped || hideGlobalHeader ? (
+        {homeLayout || hideGlobalHeader ? (
           <Outlet />
         ) : (
           <PageContainer>

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   homeOverviewHref,
   parseHomeIdFromPath,
+  resolvePreferredHomeId,
   resolveWordmarkHomeHref,
 } from './wordmark-home-href.js';
 
@@ -72,5 +73,27 @@ describe('resolveWordmarkHomeHref', () => {
         cachedHomeContexts: [{ homeId: HOME_B, dataUpdatedAt: 200 }],
       }),
     ).toBe(homeOverviewHref(HOME_A));
+  });
+});
+
+describe('resolvePreferredHomeId', () => {
+  it('returns undefined when discovery is the only safe fallback', () => {
+    expect(
+      resolvePreferredHomeId({
+        pathname: '/account',
+        currentUserHomes: [{ id: HOME_A }, { id: HOME_B }],
+        cachedHomeContexts: [],
+      }),
+    ).toBeUndefined();
+  });
+
+  it('returns the resolved Home id on global routes', () => {
+    expect(
+      resolvePreferredHomeId({
+        pathname: '/account',
+        currentUserHomes: [{ id: HOME_A }],
+        cachedHomeContexts: [],
+      }),
+    ).toBe(HOME_A);
   });
 });

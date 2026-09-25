@@ -36,6 +36,13 @@ function stubAccountApis(
       emailVerified?: boolean;
     };
     sendVerification?: () => Promise<Response> | Response;
+    homes?: readonly {
+      id: string;
+      name: string;
+      timezone: string;
+      role: 'ADMIN' | 'ROOMMATE';
+      hasPhoto: boolean;
+    }[];
   } = {},
 ) {
   let meAuthenticated = true;
@@ -52,6 +59,10 @@ function stubAccountApis(
     .mockImplementation((url: string, init?: RequestInit) => {
       const path = String(url);
       const method = (init?.method ?? 'GET').toUpperCase();
+
+      if (path.endsWith('/api/v1/me/homes') && method === 'GET') {
+        return Promise.resolve(jsonResponse(200, options.homes ?? []));
+      }
 
       if (path.endsWith('/api/v1/me') && method === 'GET') {
         if (!meAuthenticated) {
@@ -109,6 +120,31 @@ function stubAccountApis(
           }
           return response;
         });
+      }
+
+      if (path.endsWith(`/api/v1/homes/${HOME_ID}`) && method === 'GET') {
+        const home = options.homes?.find((entry) => entry.id === HOME_ID);
+        if (home === undefined) {
+          return Promise.resolve(
+            jsonResponse(404, {
+              error: { code: 'NOT_FOUND', message: 'Not found' },
+            }),
+          );
+        }
+        return Promise.resolve(
+          jsonResponse(200, {
+            id: home.id,
+            name: home.name,
+            timezone: home.timezone,
+            hasPhoto: home.hasPhoto,
+          }),
+        );
+      }
+
+      if (path.endsWith('/api/v1/notifications') && method === 'GET') {
+        return Promise.resolve(
+          jsonResponse(200, { items: [], hasMore: false, nextCursor: null }),
+        );
       }
 
       return Promise.resolve(
@@ -171,6 +207,40 @@ describe('Account settings deletion', () => {
       'href',
       '/account',
     );
+  });
+
+  it('shows Home shell navigation when a preferred Home is available', async () => {
+    stubAccountApis({
+      homes: [
+        {
+          id: HOME_ID,
+          name: 'Oak Street',
+          timezone: 'UTC',
+          role: 'ADMIN',
+          hasPhoto: false,
+        },
+      ],
+    });
+    renderApp('/account');
+
+    expect(
+      await screen.findByRole('heading', { name: 'Account', level: 1 }),
+    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute(
+        'href',
+        `/homes/${HOME_ID}`,
+      );
+    });
+    expect(screen.getByRole('link', { name: 'Tasks' })).toHaveAttribute(
+      'href',
+      `/homes/${HOME_ID}/tasks`,
+    );
+    expect(screen.getByRole('link', { name: 'Account' })).toHaveAttribute(
+      'href',
+      '/account',
+    );
+    expect(screen.getByRole('navigation', { name: 'Home' })).toBeInTheDocument();
   });
 
   it('renders display name, email, and verified status from the session', async () => {
@@ -397,20 +467,25 @@ describe('Account settings deletion', () => {
   });
 
   it('clears private cache and leaves no protected Home content after 204', async () => {
-    const { fetchMock } = stubAccountApis();
+    const { fetchMock } = stubAccountApis({
+      homes: [
+        {
+          id: HOME_ID,
+          name: 'Oak Street',
+          timezone: 'UTC',
+          role: 'ADMIN',
+          hasPhoto: false,
+        },
+      ],
+    });
     const { queryClient } = renderApp('/account');
 
     await screen.findByRole('heading', { name: 'Account', level: 1 });
+    await waitFor(() => {
+      expect(screen.getByRole('navigation', { name: 'Home' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Delete account' })).toBeEnabled();
+    });
 
-    queryClient.setQueryData(currentUserHomesQueryKey, [
-      {
-        id: HOME_ID,
-        name: 'Oak Street',
-        timezone: 'UTC',
-        role: 'ADMIN',
-        hasPhoto: false,
-      },
-    ]);
     queryClient.setQueryData(homeContextQueryKey(HOME_ID), {
       id: HOME_ID,
       name: 'Oak Street',
@@ -490,6 +565,15 @@ describe('Account settings deletion', () => {
 
   it('routes 401 into the existing auth-loss flow without claiming success', async () => {
     stubAccountApis({
+      homes: [
+        {
+          id: HOME_ID,
+          name: 'Oak Street',
+          timezone: 'UTC',
+          role: 'ADMIN',
+          hasPhoto: false,
+        },
+      ],
       deleteHandler: () =>
         jsonResponse(401, {
           error: {
@@ -501,15 +585,10 @@ describe('Account settings deletion', () => {
 
     const { queryClient } = renderApp('/account');
     await screen.findByRole('heading', { name: 'Account', level: 1 });
-    queryClient.setQueryData(currentUserHomesQueryKey, [
-      {
-        id: HOME_ID,
-        name: 'Oak Street',
-        timezone: 'UTC',
-        role: 'ADMIN',
-        hasPhoto: false,
-      },
-    ]);
+    await waitFor(() => {
+      expect(screen.getByRole('navigation', { name: 'Home' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Delete account' })).toBeEnabled();
+    });
 
     await userEvent.click(
       screen.getByRole('button', { name: 'Delete account' }),

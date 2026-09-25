@@ -1,6 +1,7 @@
 import { createBrowserRouter, type RouteObject } from 'react-router';
 import { AccountSettingsPage } from '../account/account-settings-page.js';
 import { ActivityListPage } from '../activity/activity-list-page.js';
+import { CrossHomePageShell } from '../homes/cross-home-page-shell.js';
 import { HomeDiscoveryPage } from '../homes/home-discovery-page.js';
 import { HomeOverviewPage } from '../homes/home-overview-page.js';
 import { HomeShellPage } from '../homes/home-shell-page.js';
@@ -104,7 +105,9 @@ export function buildAppChildRoutes(includeDevRoutes: boolean): RouteObject[] {
       path: 'notifications',
       element: (
         <RequireAuth>
-          <NotificationsListPage />
+          <CrossHomePageShell>
+            <NotificationsListPage />
+          </CrossHomePageShell>
         </RequireAuth>
       ),
     },
@@ -112,7 +115,9 @@ export function buildAppChildRoutes(includeDevRoutes: boolean): RouteObject[] {
       path: 'account',
       element: (
         <RequireAuth>
-          <AccountSettingsPage />
+          <CrossHomePageShell>
+            <AccountSettingsPage />
+          </CrossHomePageShell>
         </RequireAuth>
       ),
     },

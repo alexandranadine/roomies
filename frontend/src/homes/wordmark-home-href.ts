@@ -72,6 +72,20 @@ export function resolveWordmarkHomeHref(
   return '/';
 }
 
+/**
+ * Resolve a Home id for cross-Home authenticated routes. Returns undefined
+ * when the same inputs would fall back to discovery (`/`).
+ */
+export function resolvePreferredHomeId(
+  input: WordmarkHomeResolutionInput,
+): string | undefined {
+  const href = resolveWordmarkHomeHref(input);
+  if (href === '/') {
+    return undefined;
+  }
+  return parseHomeIdFromPath(href);
+}
+
 export function collectCachedHomeContexts(
   queryClient: QueryClient,
 ): readonly CachedHomeContext[] {

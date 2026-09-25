@@ -47,3 +47,8 @@ export const HOME_NAV_DESTINATIONS: readonly HomeNavDestination[] = [
 export function isHomeScopedPath(pathname: string): boolean {
   return /^\/homes\/[^/]+/.test(pathname);
 }
+
+/** Authenticated routes outside `/homes/:homeId` that may reuse Home chrome. */
+export function isGlobalAuthenticatedPath(pathname: string): boolean {
+  return pathname === '/account' || pathname === '/notifications';
+}
