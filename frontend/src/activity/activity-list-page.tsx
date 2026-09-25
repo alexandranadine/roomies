@@ -7,7 +7,7 @@ import { clearPrivateHomeQueryState } from '../homes/clear-private-home-queries.
 import type { HomeShellOutletContext } from '../homes/home-overview-page.js';
 import { currentUserQueryKey } from '../homes/home-query-keys.js';
 import { ApiError } from '../platform/api/index.js';
-import { ActivityEventRow } from './activity-event-row.js';
+import { ActivityFeedCard } from './activity-feed-card.js';
 import { useActivityList } from './use-activity-list.js';
 
 function isUnauthenticated(error: unknown): boolean {
@@ -79,24 +79,24 @@ export function ActivityListPage() {
 
   return (
     <DocumentTitle title={`Activity · ${home.name} · Roomies`}>
-      <div className="flex flex-col gap-5">
+      <div
+        data-testid="activity-page"
+        className="mx-auto flex w-full max-w-[860px] flex-col gap-4"
+      >
         <header className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
             Activity
           </h1>
           <p className="max-w-prose text-sm text-text-secondary">
-            Recent things happening around the home.
+            What’s been happening around the house.
           </p>
         </header>
 
         {showLoading ? (
-          <div
-            className="flex flex-col overflow-hidden rounded-xl border border-border"
-            aria-busy="true"
-          >
-            <Skeleton className="h-16 w-full rounded-none" announced />
-            <Skeleton className="h-16 w-full rounded-none border-t border-border" />
-            <Skeleton className="h-16 w-full rounded-none border-t border-border" />
+          <div className="flex flex-col gap-2" aria-busy="true">
+            <Skeleton className="h-14 w-full rounded-xl" announced />
+            <Skeleton className="h-14 w-full rounded-xl" />
+            <Skeleton className="h-14 w-full rounded-xl" />
           </div>
         ) : null}
 
@@ -119,18 +119,19 @@ export function ActivityListPage() {
 
         {showEmpty ? (
           <EmptyState
-            title="No activity yet"
-            description="Updates from your home will show up here."
+            className="px-4 py-6"
+            title="Nothing here yet."
+            description="Household activity will show up here."
           />
         ) : null}
 
         {items.length > 0 ? (
           <ul
             aria-label="Home activity"
-            className="m-0 list-none divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface p-0"
+            className="m-0 flex list-none flex-col gap-1.5 p-0 lg:gap-2"
           >
             {items.map((item) => (
-              <ActivityEventRow key={item.id} item={item} />
+              <ActivityFeedCard key={item.id} item={item} />
             ))}
           </ul>
         ) : null}

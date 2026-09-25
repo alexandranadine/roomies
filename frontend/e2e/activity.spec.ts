@@ -1,20 +1,27 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page, type Route } from '@playwright/test';
+import { mkdirSync } from 'node:fs';
+import path from 'node:path';
 
 const HOME_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const HOME_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 const MEMBERSHIP_A = 'm1111111-1111-4111-8111-111111111111';
 const MEMBERSHIP_B = 'm2222222-2222-4222-8222-222222222222';
+const MEMBERSHIP_C = 'm3333333-3333-4333-8333-333333333333';
 
-const VIEWPORTS = [
+const SCREENSHOT_DIR = path.join('e2e', 'screenshots', 'activity-phase-8');
+const SCREENSHOT_VIEWPORTS = [
   { name: '360', width: 360, height: 800 },
   { name: '390', width: 390, height: 844 },
+  { name: '1024', width: 1024, height: 800 },
+  { name: '1440', width: 1440, height: 900 },
+] as const;
+const VIEWPORTS = [
+  ...SCREENSHOT_VIEWPORTS,
   { name: '430', width: 430, height: 932 },
   { name: '768', width: 768, height: 1024 },
-  { name: '1024', width: 1024, height: 800 },
   { name: '1280', width: 1280, height: 800 },
-  { name: '1440', width: 1440, height: 900 },
 ] as const;
 
 const LONG_NAME =
@@ -54,6 +61,46 @@ const PAGE_ONE = {
       subject: { membershipId: MEMBERSHIP_B, name: null },
       sourceTitle: null,
     },
+    {
+      id: 'a5555555-5555-4555-8555-555555555555',
+      eventType: 'membership.role_changed.v1',
+      sourceEntityType: 'MEMBERSHIP',
+      sourceEntityId: MEMBERSHIP_B,
+      occurredAt: '2026-09-13T12:30:00.000Z',
+      actor: { membershipId: MEMBERSHIP_C, name: 'Taylor' },
+      subject: { membershipId: MEMBERSHIP_B, name: 'Jamie' },
+      sourceTitle: null,
+    },
+    {
+      id: 'a6666666-6666-4666-8666-666666666666',
+      eventType: 'membership.started.v1',
+      sourceEntityType: 'MEMBERSHIP',
+      sourceEntityId: MEMBERSHIP_B,
+      occurredAt: '2026-09-13T12:00:00.000Z',
+      actor: { membershipId: MEMBERSHIP_B, name: 'Jamie' },
+      subject: { membershipId: MEMBERSHIP_B, name: 'Jamie' },
+      sourceTitle: null,
+    },
+    {
+      id: 'a7777777-7777-4777-8777-777777777777',
+      eventType: 'maintenance.resolved.v1',
+      sourceEntityType: 'MAINTENANCE',
+      sourceEntityId: 'n2222222-2222-4222-8222-222222222222',
+      occurredAt: '2026-09-13T11:00:00.000Z',
+      actor: { membershipId: MEMBERSHIP_A, name: 'Alex' },
+      sourceTitle: 'Quiet leak under sink',
+      subject: null,
+    },
+    {
+      id: 'a8888888-8888-4888-8888-888888888888',
+      eventType: 'task.completed.v1',
+      sourceEntityType: 'TASK',
+      sourceEntityId: 't3333333-3333-4333-8333-333333333333',
+      occurredAt: '2026-09-13T10:00:00.000Z',
+      actor: null,
+      sourceTitle: null,
+      subject: null,
+    },
   ],
   hasMore: true,
   nextCursor: 'cursor-page-2',
@@ -66,7 +113,7 @@ const PAGE_TWO = {
       eventType: 'supply.obtained.v1',
       sourceEntityType: 'SUPPLY',
       sourceEntityId: 's1111111-1111-4111-8111-111111111111',
-      occurredAt: '2026-09-13T12:00:00.000Z',
+      occurredAt: '2026-09-13T09:00:00.000Z',
       actor: { membershipId: MEMBERSHIP_A, name: 'Alex' },
       sourceTitle: 'Paper towels',
       subject: null,
@@ -248,6 +295,47 @@ async function assertNoHorizontalOverflow(page: Page): Promise<void> {
   ).toBeLessThanOrEqual(overflow.clientWidth + 1);
 }
 
+async function assertDesktopContentWidth(page: Page): Promise<void> {
+  const width = await page
+    .getByTestId('activity-page')
+    .evaluate((element) => {
+      return element.getBoundingClientRect().width;
+    });
+  expect(width).toBeLessThanOrEqual(900);
+  expect(width).toBeGreaterThan(700);
+}
+
+async function assertContentClearOfBottomNav(page: Page): Promise<void> {
+  const nav = page.getByRole('navigation', { name: 'Home' });
+  if ((await nav.count()) === 0) {
+    return;
+  }
+
+  const position = await nav.evaluate((element) => {
+    return window.getComputedStyle(element).position;
+  });
+  if (position !== 'fixed') {
+    return;
+  }
+
+  const paddingBottom = await page
+    .getByTestId('activity-page')
+    .evaluate((element) => {
+      let node: HTMLElement | null = element;
+      while (node) {
+        const value = Number.parseFloat(
+          window.getComputedStyle(node).paddingBottom,
+        );
+        if (value >= 80) {
+          return value;
+        }
+        node = node.parentElement;
+      }
+      return 0;
+    });
+  expect(paddingBottom).toBeGreaterThanOrEqual(80);
+}
+
 async function assertNoSeriousAxeViolations(
   page: Page,
   label: string,
@@ -291,12 +379,53 @@ test.describe('Activity authenticated UI', () => {
     });
   }
 
+  for (const viewport of SCREENSHOT_VIEWPORTS) {
+    test(`populated Activity at ${viewport.name}px`, async ({ page }) => {
+      await page.setViewportSize({
+        width: viewport.width,
+        height: viewport.height,
+      });
+      await page.goto(`/homes/${HOME_A}/activity`);
+      await expect(
+        page.getByRole('heading', { name: 'Activity', level: 1 }),
+      ).toBeVisible();
+      await expect(
+        page.getByText('What’s been happening around the house.'),
+      ).toBeVisible();
+      await expect(page.getByText(LONG_NAME)).toBeVisible();
+      await expect(page.getByText(LONG_TITLE)).toBeVisible();
+      await expect(page.getByText('Former roommate left the home')).toBeVisible();
+      await expect(page.getByText('Quiet leak under sink')).toHaveCount(0);
+      await expect(page.getByText(MEMBERSHIP_A)).toHaveCount(0);
+      await expect(page.getByText(MEMBERSHIP_B)).toHaveCount(0);
+      await assertNoHorizontalOverflow(page);
+      if (viewport.width >= 1024) {
+        await assertDesktopContentWidth(page);
+        const titleBox = await page.getByText(LONG_TITLE).boundingBox();
+        expect(titleBox).not.toBeNull();
+        expect(titleBox!.width).toBeGreaterThan(200);
+      }
+      if (viewport.width < 768) {
+        await assertContentClearOfBottomNav(page);
+      }
+      const nameBox = await page.getByText(LONG_NAME).boundingBox();
+      expect(nameBox).not.toBeNull();
+      expect(nameBox!.width).toBeLessThanOrEqual(viewport.width);
+      mkdirSync(SCREENSHOT_DIR, { recursive: true });
+      await page.screenshot({
+        path: path.join(SCREENSHOT_DIR, `activity-${viewport.name}.png`),
+        fullPage: true,
+      });
+    });
+  }
+
   test('list axe scan (serious/critical)', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto(`/homes/${HOME_A}/activity`);
     await expect(
       page.getByRole('heading', { name: 'Activity', level: 1 }),
     ).toBeVisible();
+    await expect(page.getByText(LONG_NAME)).toBeVisible();
     await assertNoSeriousAxeViolations(page, 'activity list');
   });
 
@@ -331,9 +460,8 @@ test.describe('Activity authenticated UI', () => {
     await loadMore.focus();
     await expect(loadMore).toBeFocused();
     await page.keyboard.press('Enter');
-    await expect(
-      page.getByText('Alex marked Paper towels obtained'),
-    ).toBeVisible();
+    await expect(page.getByText('Paper towels')).toBeVisible();
+    await expect(page.getByText('marked a supply obtained')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Load more' })).toHaveCount(
       0,
     );
@@ -356,9 +484,8 @@ test.describe('Activity authenticated UI', () => {
     await expect(page.getByText(LONG_TITLE)).toBeVisible();
 
     await page.goto(`/homes/${HOME_B}/activity`);
-    await expect(
-      page.getByText('Casey completed Water the plants'),
-    ).toBeVisible();
+    await expect(page.getByText('Water the plants')).toBeVisible();
+    await expect(page.getByText('Casey')).toBeVisible();
     await expect(page.getByText(LONG_TITLE)).toHaveCount(0);
     await expect(page.getByText('Alex added a maintenance item')).toHaveCount(
       0,
@@ -376,10 +503,12 @@ test.describe('Activity authenticated UI', () => {
     await expect(page.getByText(LONG_NAME)).toBeVisible();
     await expect(page.getByText(LONG_TITLE)).toBeVisible();
     await expect(page.getByText('Former roommate left the home')).toBeVisible();
+    await expect(page.getByText('A task was completed')).toBeVisible();
     await expect(page.getByText(MEMBERSHIP_A)).toHaveCount(0);
     await expect(page.getByText(MEMBERSHIP_B)).toHaveCount(0);
     await expect(page.getByText('Quiet leak under sink')).toHaveCount(0);
     await assertNoHorizontalOverflow(page);
+    await assertContentClearOfBottomNav(page);
     await assertNoSeriousAxeViolations(page, 'activity long content');
   });
 });

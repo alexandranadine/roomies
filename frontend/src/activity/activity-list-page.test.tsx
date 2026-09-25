@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { resetApiClientForTests } from '../platform/api/index.js';
 import { renderApp } from '../test/render.js';
+import { FORMER_ROOMMATE_LABEL } from './activity-copy.js';
+import { formatActivityTimestamp } from './activity-format.js';
 import { activityKeys } from './activity-query-keys.js';
 import {
   activityItem,
@@ -31,6 +33,9 @@ import {
 } from './test-fixtures.js';
 import { stubActivityApis } from './test-stub.js';
 
+const LONG_NAME =
+  'Jamie With An Exceptionally Long Roommate Display Name For Wrapping';
+
 afterEach(() => {
   resetApiClientForTests();
   vi.unstubAllGlobals();
@@ -52,6 +57,15 @@ function assertNoIdentityLeaks(container: HTMLElement = document.body) {
     /ActivityRecipient|sourceEntity|eventType|visibilityClass/i,
   );
   expect(text).not.toMatch(/audience|HOUSEHOLD|PRIVATE|Protected/i);
+}
+
+function expectFeedCopy(
+  item: HTMLElement,
+  parts: readonly string[],
+): void {
+  for (const part of parts) {
+    expect(item).toHaveTextContent(part);
+  }
 }
 
 describe('Activity list page', () => {
@@ -76,9 +90,8 @@ describe('Activity list page', () => {
     expect(router.state.location.pathname).toBe(
       `/homes/${TEST_HOME_A}/activity`,
     );
-    expect(
-      await screen.findByText('Alex completed Take out trash'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Take out trash')).toBeInTheDocument();
+    expect(screen.getByText('completed a task')).toBeInTheDocument();
   });
 
   it('renders the initial page in server order without client sorting', async () => {
@@ -96,16 +109,20 @@ describe('Activity list page', () => {
     const list = await screen.findByRole('list', { name: 'Home activity' });
     const items = within(list).getAllByRole('listitem');
     expect(items).toHaveLength(3);
-    expect(items[0]).toHaveTextContent('Alex completed Take out trash');
-    expect(items[1]).toHaveTextContent('Alex marked Paper towels obtained');
-    expect(items[2]).toHaveTextContent('Jamie joined the home');
+    expectFeedCopy(items[0]!, ['Alex', 'completed a task', 'Take out trash']);
+    expectFeedCopy(items[1]!, [
+      'Alex',
+      'marked a supply obtained',
+      'Paper towels',
+    ]);
+    expectFeedCopy(items[2]!, ['Jamie', 'joined the home']);
     expect(
-      screen.getByText('Recent things happening around the home.'),
+      screen.getByText('What’s been happening around the house.'),
     ).toBeInTheDocument();
     assertNoIdentityLeaks();
   });
 
-  it('renders all seven current event types', async () => {
+  it('renders all seven current event types with Home feed copy', async () => {
     stubActivityApis({
       listByHome: {
         [TEST_HOME_A]: listPage([
@@ -123,30 +140,56 @@ describe('Activity list page', () => {
     });
     renderApp(`/homes/${TEST_HOME_A}/activity`);
 
-    expect(
-      await screen.findByText('Jamie joined the home'),
-    ).toBeInTheDocument();
-    expect(screen.getByText('Jamie left the home')).toBeInTheDocument();
-    expect(
-      screen.getByText("Taylor updated Jamie's home role"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('Alex completed Take out trash'),
-    ).toBeInTheDocument();
-    expect(screen.getByText('Alex completed a task')).toBeInTheDocument();
-    expect(
-      screen.getByText('Alex marked Paper towels obtained'),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('Alex marked a supply obtained'),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('Alex added a maintenance item'),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('Alex resolved a maintenance item'),
-    ).toBeInTheDocument();
+    const list = await screen.findByRole('list', { name: 'Home activity' });
+    const items = within(list).getAllByRole('listitem');
+    expect(items).toHaveLength(9);
+    expectFeedCopy(items[0]!, ['Jamie', 'joined the home']);
+    expectFeedCopy(items[1]!, ['Jamie', 'left the home']);
+    expectFeedCopy(items[2]!, [
+      'Taylor',
+      'updated a home role',
+      "Jamie's home role",
+    ]);
+    expectFeedCopy(items[3]!, ['Alex', 'completed a task', 'Take out trash']);
+    expectFeedCopy(items[4]!, ['Alex', 'completed a task']);
+    expectFeedCopy(items[5]!, [
+      'Alex',
+      'marked a supply obtained',
+      'Paper towels',
+    ]);
+    expectFeedCopy(items[6]!, ['Alex', 'marked a supply obtained']);
+    expectFeedCopy(items[7]!, ['Alex', 'added a maintenance item']);
+    expectFeedCopy(items[8]!, ['Alex', 'resolved a maintenance item']);
     expect(screen.queryByText('Quiet leak under sink')).not.toBeInTheDocument();
+    expect(list.textContent).not.toMatch(/kudos|reaction|comment/i);
+    assertNoIdentityLeaks();
+  });
+
+  it('renders a long roommate name, context, and timestamp without colliding', async () => {
+    const occurredAt = '2026-09-13T18:00:00.000Z';
+    stubActivityApis({
+      listByHome: {
+        [TEST_HOME_A]: listPage([
+          activityItem({
+            actor: { membershipId: TEST_MEMBERSHIP_ALEX, name: LONG_NAME },
+            sourceTitle: 'Take out trash',
+            occurredAt,
+          }),
+        ]),
+      },
+    });
+    renderApp(`/homes/${TEST_HOME_A}/activity`);
+
+    const list = await screen.findByRole('list', { name: 'Home activity' });
+    const item = within(list).getByRole('listitem');
+    expect(item).toHaveTextContent(LONG_NAME);
+    expect(item).toHaveTextContent('completed a task');
+    expect(item).toHaveTextContent('Take out trash');
+    const timestamp = formatActivityTimestamp(occurredAt);
+    expect(timestamp.length).toBeGreaterThan(0);
+    const time = within(item).getByText(timestamp);
+    expect(time.tagName).toBe('TIME');
+    expect(time).toHaveAttribute('dateTime', occurredAt);
     assertNoIdentityLeaks();
   });
 
@@ -171,12 +214,44 @@ describe('Activity list page', () => {
     });
     renderApp(`/homes/${TEST_HOME_A}/activity`);
 
-    expect(
-      await screen.findByText('Former roommate completed Take out trash'),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('Former roommate joined the home'),
-    ).toBeInTheDocument();
+    const list = await screen.findByRole('list', { name: 'Home activity' });
+    const items = within(list).getAllByRole('listitem');
+    expectFeedCopy(items[0]!, [
+      FORMER_ROOMMATE_LABEL,
+      'completed a task',
+      'Take out trash',
+    ]);
+    expectFeedCopy(items[1]!, [FORMER_ROOMMATE_LABEL, 'joined the home']);
+    assertNoIdentityLeaks();
+  });
+
+  it('uses generic copy when identity is absent', async () => {
+    stubActivityApis({
+      listByHome: {
+        [TEST_HOME_A]: listPage([
+          activityItem({
+            id: 'n3333333-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            actor: null,
+            sourceTitle: null,
+          }),
+          activityItem({
+            id: 'n4444444-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            eventType: 'membership.ended.v1',
+            sourceEntityType: 'MEMBERSHIP',
+            sourceTitle: null,
+            actor: null,
+            subject: null,
+          }),
+        ]),
+      },
+    });
+    renderApp(`/homes/${TEST_HOME_A}/activity`);
+
+    const list = await screen.findByRole('list', { name: 'Home activity' });
+    const items = within(list).getAllByRole('listitem');
+    expect(items[0]).toHaveTextContent('A task was completed');
+    expect(items[1]).toHaveTextContent('A roommate left the home');
+    expect(screen.queryByText(FORMER_ROOMMATE_LABEL)).not.toBeInTheDocument();
     assertNoIdentityLeaks();
   });
 
@@ -188,7 +263,11 @@ describe('Activity list page', () => {
     });
     renderApp(`/homes/${TEST_HOME_A}/activity`);
 
-    expect(await screen.findByText('Jamie left the home')).toBeInTheDocument();
+    const list = await screen.findByRole('list', { name: 'Home activity' });
+    expectFeedCopy(within(list).getByRole('listitem'), [
+      'Jamie',
+      'left the home',
+    ]);
     expect(screen.queryByText(/removed|Taylor/)).not.toBeInTheDocument();
   });
 
@@ -203,12 +282,10 @@ describe('Activity list page', () => {
     });
     renderApp(`/homes/${TEST_HOME_A}/activity`);
 
-    expect(
-      await screen.findByText('Alex added a maintenance item'),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('Alex resolved a maintenance item'),
-    ).toBeInTheDocument();
+    const list = await screen.findByRole('list', { name: 'Home activity' });
+    const items = within(list).getAllByRole('listitem');
+    expectFeedCopy(items[0]!, ['Alex', 'added a maintenance item']);
+    expectFeedCopy(items[1]!, ['Alex', 'resolved a maintenance item']);
     expect(screen.queryByText('Quiet leak under sink')).not.toBeInTheDocument();
     expect(screen.queryByText('Private')).not.toBeInTheDocument();
     expect(screen.queryByText('HOUSEHOLD')).not.toBeInTheDocument();
@@ -219,7 +296,25 @@ describe('Activity list page', () => {
     assertNoIdentityLeaks();
   });
 
-  it('shows the empty state without sample events', async () => {
+  it('renders only authorized events with no hidden placeholders or counts', async () => {
+    stubActivityApis({
+      listByHome: {
+        [TEST_HOME_A]: listPage([FIXTURE_TASK_TITLED, FIXTURE_JOINED]),
+      },
+    });
+    renderApp(`/homes/${TEST_HOME_A}/activity`);
+
+    const list = await screen.findByRole('list', { name: 'Home activity' });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(2);
+    expect(screen.queryByText(/hidden/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/private event/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/not shown/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/unavailable to you/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\b2 of\b|\b3 events\b/i)).not.toBeInTheDocument();
+    assertNoIdentityLeaks();
+  });
+
+  it('shows the empty state without sample events or hidden-event copy', async () => {
     stubActivityApis({
       listByHome: {
         [TEST_HOME_A]: listPage([]),
@@ -228,14 +323,18 @@ describe('Activity list page', () => {
     renderApp(`/homes/${TEST_HOME_A}/activity`);
 
     expect(
-      await screen.findByRole('heading', { name: 'No activity yet', level: 2 }),
+      await screen.findByRole('heading', {
+        name: 'Nothing here yet.',
+        level: 2,
+      }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText('Updates from your home will show up here.'),
+      screen.getByText('Household activity will show up here.'),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('list', { name: 'Home activity' }),
     ).not.toBeInTheDocument();
+    expect(screen.queryByText(/hidden|private event/i)).not.toBeInTheDocument();
   });
 
   it('treats list-scope 404 as Home unavailable', async () => {
@@ -253,7 +352,7 @@ describe('Activity list page', () => {
       }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole('heading', { name: 'No activity yet' }),
+      screen.queryByRole('heading', { name: 'Nothing here yet.' }),
     ).not.toBeInTheDocument();
   });
 
@@ -273,9 +372,7 @@ describe('Activity list page', () => {
     expect(
       await screen.findByRole('heading', { name: 'Welcome back', level: 1 }),
     ).toBeInTheDocument();
-    expect(
-      screen.queryByText('Alex completed Take out trash'),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Take out trash')).not.toBeInTheDocument();
   });
 
   it('shows retry UI for an initial transient error without backend details', async () => {
@@ -309,9 +406,7 @@ describe('Activity list page', () => {
     });
     renderApp(`/homes/${TEST_HOME_A}/activity`);
 
-    expect(
-      await screen.findByText('Alex completed Take out trash'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Take out trash')).toBeInTheDocument();
 
     const stored = `${JSON.stringify(localStorage)} ${JSON.stringify(sessionStorage)}`;
     expect(stored).not.toContain('Take out trash');
@@ -342,26 +437,23 @@ describe('Activity pagination', () => {
     });
     renderApp(`/homes/${TEST_HOME_A}/activity`);
 
-    expect(
-      await screen.findByText('Alex completed Take out trash'),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByText('Alex marked Paper towels obtained'),
-    ).not.toBeInTheDocument();
+    expect(await screen.findByText('Take out trash')).toBeInTheDocument();
+    expect(screen.queryByText('Paper towels')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Load more' }));
 
-    expect(
-      await screen.findByText('Alex marked Paper towels obtained'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Paper towels')).toBeInTheDocument();
 
     const list = screen.getByRole('list', { name: 'Home activity' });
     const items = within(list).getAllByRole('listitem');
-    expect(items.map((item) => item.textContent)).toEqual([
-      expect.stringContaining('Alex completed Take out trash'),
-      expect.stringContaining('Alex marked Paper towels obtained'),
-      expect.stringContaining('Jamie joined the home'),
+    expect(items).toHaveLength(3);
+    expectFeedCopy(items[0]!, ['Alex', 'completed a task', 'Take out trash']);
+    expectFeedCopy(items[1]!, [
+      'Alex',
+      'marked a supply obtained',
+      'Paper towels',
     ]);
+    expectFeedCopy(items[2]!, ['Jamie', 'joined the home']);
 
     const loadMoreCalls = fetchMock.mock.calls.filter((call) => {
       const url = new URL(String(call[0]));
@@ -384,9 +476,7 @@ describe('Activity pagination', () => {
     });
     renderApp(`/homes/${TEST_HOME_A}/activity`);
 
-    expect(
-      await screen.findByText('Alex completed Take out trash'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Take out trash')).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Load more' }),
     ).not.toBeInTheDocument();
@@ -431,25 +521,20 @@ describe('Activity pagination', () => {
     });
     renderApp(`/homes/${TEST_HOME_A}/activity`);
 
-    expect(
-      await screen.findByText('Alex completed Take out trash'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Take out trash')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Load more' }));
 
     expect(
       await screen.findByText(/Couldn’t load more activity/i),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText('Alex completed Take out trash'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Take out trash')).toBeInTheDocument();
     expect(screen.queryByText(/invalid cursor xyz/i)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Retry' }));
 
-    expect(
-      await screen.findByText('Jamie joined the home'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('joined the home')).toBeInTheDocument();
+    expect(screen.getByText('Jamie')).toBeInTheDocument();
     const retryCalls = fetchMock.mock.calls.filter((call) => {
       const url = new URL(String(call[0]));
       return url.searchParams.get('cursor') === 'cursor-page-2';
@@ -486,7 +571,7 @@ describe('Activity pagination', () => {
     await user.click(loadMore);
 
     await waitFor(() => {
-      expect(screen.getByText('Jamie joined the home')).toBeInTheDocument();
+      expect(screen.getByText('joined the home')).toBeInTheDocument();
     });
 
     const laterCalls = fetchMock.mock.calls.filter((call) => {
@@ -509,9 +594,7 @@ describe('Activity Home isolation', () => {
     });
     const { router, queryClient } = renderApp(`/homes/${TEST_HOME_A}/activity`);
 
-    expect(
-      await screen.findByText('Alex completed Take out trash'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Take out trash')).toBeInTheDocument();
     expect(
       queryClient.getQueryData(activityKeys.list(TEST_HOME_A)),
     ).toBeDefined();
@@ -519,18 +602,12 @@ describe('Activity Home isolation', () => {
     await router.navigate(`/homes/${TEST_HOME_B}/activity`);
 
     await waitFor(() => {
-      expect(
-        screen.queryByText('Alex completed Take out trash'),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText('Take out trash')).not.toBeInTheDocument();
     });
-    expect(screen.queryByText('Take out trash')).not.toBeInTheDocument();
 
-    expect(
-      await screen.findByText('Casey completed Water the plants'),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByText('Alex completed Take out trash'),
-    ).not.toBeInTheDocument();
+    expect(await screen.findByText('Water the plants')).toBeInTheDocument();
+    expect(screen.getByText('Casey')).toBeInTheDocument();
+    expect(screen.queryByText('Take out trash')).not.toBeInTheDocument();
     expect(activityKeys.list(TEST_HOME_B)[1]).toBe(TEST_HOME_B);
   });
 
@@ -543,22 +620,14 @@ describe('Activity Home isolation', () => {
     });
     const { router, queryClient } = renderApp(`/homes/${TEST_HOME_A}/activity`);
 
-    expect(
-      await screen.findByText('Alex completed Take out trash'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Take out trash')).toBeInTheDocument();
 
     await router.navigate(`/homes/${TEST_HOME_B}/activity`);
-    expect(
-      await screen.findByText('Casey completed Water the plants'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Water the plants')).toBeInTheDocument();
 
     await router.navigate(`/homes/${TEST_HOME_A}/activity`);
-    expect(
-      await screen.findByText('Alex completed Take out trash'),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByText('Casey completed Water the plants'),
-    ).not.toBeInTheDocument();
+    expect(await screen.findByText('Take out trash')).toBeInTheDocument();
+    expect(screen.queryByText('Water the plants')).not.toBeInTheDocument();
     expect(
       queryClient.getQueryData(activityKeys.list(TEST_HOME_A)),
     ).toBeDefined();
