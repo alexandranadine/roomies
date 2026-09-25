@@ -38,11 +38,14 @@ function ActivitySentenceContent({
   maintenanceHref: string | null;
   variant: 'hierarchy' | 'standalone';
 }) {
-  const parts =
-    maintenanceHref !== null
-      ? maintenanceSentenceParts(presentation)
-      : null;
+  if (maintenanceHref === null) {
+    if (variant === 'hierarchy') {
+      return <span> {presentation.actionLabel}</span>;
+    }
+    return <>{presentation.sentence}</>;
+  }
 
+  const parts = maintenanceSentenceParts(presentation);
   if (parts === null) {
     if (variant === 'hierarchy') {
       return <span> {presentation.actionLabel}</span>;
