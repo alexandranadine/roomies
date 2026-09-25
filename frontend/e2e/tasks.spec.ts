@@ -148,6 +148,14 @@ async function mockAuthenticatedTasksApis(page: Page): Promise<void> {
       await json(route, 200, current);
       return;
     }
+    if (path === '/api/v1/notifications') {
+      await json(route, 200, { items: [], hasMore: false, nextCursor: null });
+      return;
+    }
+    if (path.endsWith('/activity')) {
+      await json(route, 200, { items: [], hasMore: false, nextCursor: null });
+      return;
+    }
     await json(route, 404, {
       error: { code: 'NOT_FOUND', message: 'Not found' },
     });

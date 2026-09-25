@@ -44,15 +44,14 @@ describe('House Pulse on Home overview', () => {
     const region = pulseRegion();
     expect(region).toHaveAttribute('aria-labelledby', 'house-pulse-heading');
 
-    const headings = within(region).getAllByRole('heading', { level: 3 });
-    expect(headings.map((node) => node.textContent)).toEqual([
-      'Tasks',
-      'Supplies',
-      'Maintenance',
-    ]);
+    expect(within(region).getByText('Assigned to you')).toBeInTheDocument();
+    expect(within(region).getByText('Unassigned')).toBeInTheDocument();
+    expect(within(region).getByText('Supplies')).toBeInTheDocument();
+    expect(within(region).getByText('Maintenance')).toBeInTheDocument();
+    expect(within(region).queryByText(/away|kudos|events/i)).not.toBeInTheDocument();
   });
 
-  it('keeps CLEAR sections rendered and does not reorder ACTIVE above CLEAR', async () => {
+  it('keeps CLEAR metrics rendered and does not invent unavailable counts', async () => {
     stubPulseApis({
       pulseByHome: {
         [TEST_HOME_A]: clearHousePulse({
@@ -72,22 +71,15 @@ describe('House Pulse on Home overview', () => {
     renderApp(`/homes/${TEST_HOME_A}`);
 
     const region = await screen.findByTestId('house-pulse');
-    const headings = within(region).getAllByRole('heading', { level: 3 });
-    expect(headings.map((node) => node.textContent)).toEqual([
-      'Tasks',
-      'Supplies',
-      'Maintenance',
-    ]);
+    expect(within(region).getByText('Assigned to you').closest('li')).toHaveTextContent(
+      '0',
+    );
+    expect(within(region).getByText('Supplies').closest('li')).toHaveTextContent(
+      '2',
+    );
     expect(
-      within(region).getByText('Nothing needs attention.'),
-    ).toBeInTheDocument();
-    expect(
-      within(region).queryByText('No open supplies.'),
+      within(region).queryByText(/4 home|1 away|kudos/i),
     ).not.toBeInTheDocument();
-    expect(within(region).getByText(/Open:/)).toBeInTheDocument();
-    expect(
-      within(region).getByText('No open maintenance visible to you.'),
-    ).toBeInTheDocument();
   });
 
   it('displays Task, Supply, and Maintenance counters from the backend DTO', async () => {
@@ -97,14 +89,24 @@ describe('House Pulse on Home overview', () => {
     renderApp(`/homes/${TEST_HOME_A}`);
 
     const region = await screen.findByTestId('house-pulse');
-    expect(region).toHaveTextContent('Assigned to you: 2');
-    expect(region).toHaveTextContent('Unassigned: 1');
-    expect(region).toHaveTextContent('Due today: 1');
-    expect(region).toHaveTextContent('Overdue: 3');
-    expect(region).toHaveTextContent('Open: 4');
-    expect(region).toHaveTextContent('Unclaimed: 2');
-    expect(region).toHaveTextContent('Claimed by you: 1');
-    expect(region).toHaveTextContent('2 open items visible to you');
+    expect(within(region).getByText('Assigned to you').closest('li')).toHaveTextContent(
+      '2',
+    );
+    expect(within(region).getByText('Unassigned').closest('li')).toHaveTextContent(
+      '1',
+    );
+    expect(within(region).getByText('Due today').closest('li')).toHaveTextContent(
+      '1',
+    );
+    expect(within(region).getByText('Overdue').closest('li')).toHaveTextContent(
+      '3',
+    );
+    expect(within(region).getByText('Supplies').closest('li')).toHaveTextContent(
+      '4',
+    );
+    expect(
+      within(region).getByText('Maintenance').closest('li'),
+    ).toHaveTextContent('2');
   });
 
   it('uses singular Maintenance ACTIVE copy', async () => {
@@ -122,8 +124,11 @@ describe('House Pulse on Home overview', () => {
     renderApp(`/homes/${TEST_HOME_A}`);
 
     expect(
-      await screen.findByText('1 open item visible to you'),
+      await screen.findByText('Maintenance'),
     ).toBeInTheDocument();
+    expect(
+      screen.getByText('Maintenance').closest('li'),
+    ).toHaveTextContent('1');
   });
 
   it('does not prominently show generatedAt, scores, charts, or Maintenance details', async () => {
@@ -148,10 +153,11 @@ describe('House Pulse on Home overview', () => {
     renderApp(`/homes/${TEST_HOME_A}`);
 
     const region = await screen.findByTestId('house-pulse');
-    expect(within(region).getAllByText('Active').length).toBe(3);
-    expect(
-      within(region).getAllByText('Active')[0]?.closest('[data-pulse-state]'),
-    ).toHaveAttribute('data-pulse-state', 'ACTIVE');
+    expect(within(region).getByText('Active')).toBeInTheDocument();
+    expect(within(region).getByText('Active')).toHaveAttribute(
+      'data-pulse-state',
+      'ACTIVE',
+    );
   });
 
   it('links Tasks to the existing Home Tasks destination', async () => {
@@ -209,7 +215,7 @@ describe('House Pulse on Home overview', () => {
     ).toBeInTheDocument();
     expect(screen.getByTestId('house-pulse-loading')).toBeInTheDocument();
     expect(screen.queryByTestId('house-pulse')).not.toBeInTheDocument();
-    expect(screen.queryByText('Assigned to you: 2')).not.toBeInTheDocument();
+    expect(screen.queryByText('Assigned to you')).not.toBeInTheDocument();
 
     expect(await screen.findByTestId('house-pulse')).toBeInTheDocument();
   });
@@ -240,7 +246,7 @@ describe('House Pulse on Home overview', () => {
       /Couldn’t load House Pulse/,
     );
     expect(
-      screen.getByRole('link', { name: 'Open Maintenance' }),
+      screen.getByRole('button', { name: 'Add task' }),
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Retry' }));
@@ -294,7 +300,12 @@ describe('House Pulse on Home overview', () => {
     });
     const { router, queryClient } = renderApp(`/homes/${TEST_HOME_A}`);
 
-    expect(await screen.findByText('Assigned to you: 2')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Assigned to you'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Assigned to you').closest('li')).toHaveTextContent(
+      '2',
+    );
     expect(queryClient.getQueryData(pulseKeys.all(TEST_HOME_A))).toEqual(
       activeHousePulse(),
     );
@@ -302,17 +313,25 @@ describe('House Pulse on Home overview', () => {
     await router.navigate(`/homes/${TEST_HOME_B}`);
 
     await waitFor(() => {
-      expect(screen.queryByText('Assigned to you: 2')).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('heading', { name: 'Oak Street', level: 1 }),
+      ).not.toBeInTheDocument();
     });
     expect(
       await screen.findByRole('heading', { name: 'Cedar House', level: 1 }),
     ).toBeInTheDocument();
-    expect(await screen.findByText('Assigned to you: 9')).toBeInTheDocument();
+    expect(
+      (await screen.findByText('Assigned to you')).closest('li'),
+    ).toHaveTextContent('9');
     expect(queryClient.getQueryData(pulseKeys.all(TEST_HOME_B))).toBeDefined();
     expect(pulseKeys.all(TEST_HOME_B)).toEqual(['home', TEST_HOME_B, 'pulse']);
 
     await router.navigate(`/homes/${TEST_HOME_A}`);
-    expect(await screen.findByText('Assigned to you: 2')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Assigned to you').closest('li')).toHaveTextContent(
+        '2',
+      );
+    });
   });
 
   it('clears Pulse with private Home cache on auth loss path', async () => {

@@ -21,13 +21,18 @@ export const HOME_PHOTO_REMOVED_MESSAGE = 'Home photo removed.';
 
 export type HomePhotoSectionProps = {
   home: HomeContext;
+  /** When true, omit the section heading (the host dialog provides it). */
+  embedded?: boolean;
 };
 
 /**
  * Compact Home-photo add/change/remove controls. Available to any active
  * Roommate or Admin — not an Admin-only surface.
  */
-export function HomePhotoSection({ home }: HomePhotoSectionProps) {
+export function HomePhotoSection({
+  home,
+  embedded = false,
+}: HomePhotoSectionProps) {
   const headingId = useId();
   const fileInputId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -94,18 +99,23 @@ export function HomePhotoSection({ home }: HomePhotoSectionProps) {
   }
 
   return (
-    <section aria-labelledby={headingId} className="flex flex-col gap-3">
-      <div className="flex flex-col gap-1">
-        <h2
-          id={headingId}
-          className="text-lg font-semibold tracking-tight text-text-primary"
-        >
-          Home photo
-        </h2>
-        <p className="max-w-prose text-sm text-text-secondary">
-          JPEG, PNG, or WebP. Up to 8 MB.
-        </p>
-      </div>
+    <section
+      aria-labelledby={embedded ? undefined : headingId}
+      className="flex flex-col gap-3"
+    >
+      {embedded ? null : (
+        <div className="flex flex-col gap-1">
+          <h2
+            id={headingId}
+            className="text-lg font-semibold tracking-tight text-text-primary"
+          >
+            Home photo
+          </h2>
+          <p className="max-w-prose text-sm text-text-secondary">
+            JPEG, PNG, or WebP. Up to 8 MB.
+          </p>
+        </div>
+      )}
 
       <div className="flex items-center gap-3">
         <HomeAvatar

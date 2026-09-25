@@ -65,7 +65,9 @@ describe('Roommates page', () => {
       await screen.findByRole('heading', { name: 'Oak Street', level: 1 }),
     ).toBeInTheDocument();
 
-    await user.click(screen.getByRole('link', { name: 'Roommates' }));
+    await user.click(
+      screen.getByRole('link', { name: 'Roommates' }),
+    );
 
     expect(
       await screen.findByRole('heading', { name: 'Roommates', level: 1 }),
@@ -151,7 +153,7 @@ describe('Roommates ADMIN UI', () => {
       await screen.findByRole('button', { name: 'Invite roommate' }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Leave Home' }),
+      await screen.findByRole('button', { name: 'Leave Home' }),
     ).toBeInTheDocument();
 
     await openRowActions(user, 'Jamie');

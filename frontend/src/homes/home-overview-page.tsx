@@ -1,19 +1,27 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { Link, useOutletContext, useParams } from 'react-router';
+import { HomeActivityFeed } from '../activity/home-activity-feed.js';
 import { DocumentTitle } from '../components/document-title.js';
-import { Alert, Button } from '../components/ui/index.js';
+import { Alert, Button, Skeleton } from '../components/ui/index.js';
 import { ApiError } from '../platform/api/index.js';
 import { HousePulseSection } from '../pulse/house-pulse-section.js';
 import { HousePulseSkeleton } from '../pulse/house-pulse-skeleton.js';
 import { useHousePulse } from '../pulse/use-house-pulse.js';
 import { clearPrivateHomeQueryState } from './clear-private-home-queries.js';
 import type { HomeContext } from './home-context-api.js';
-import { HomePhotoSection } from './home-photo-section.js';
+import { HomeQuickActions } from './home-quick-actions.js';
 import { currentUserQueryKey } from './home-query-keys.js';
+import { RoommateStrip } from './roommate-strip.js';
+import { useHomeMemberships } from './use-home-memberships.js';
 
 export type HomeShellOutletContext = {
   home: HomeContext;
+  isAdmin: boolean;
+  openAddTask: () => void;
+  openInviteRoommate: () => void;
+  openHomePhoto: () => void;
+  openHomeActions: () => void;
 };
 
 function isUnauthenticated(error: unknown): boolean {
@@ -35,7 +43,14 @@ function isTransientPulseError(error: unknown): boolean {
 }
 
 export function HomeOverviewPage() {
-  const { home } = useOutletContext<HomeShellOutletContext>();
+  const {
+    home,
+    isAdmin,
+    openAddTask,
+    openInviteRoommate,
+    openHomePhoto,
+    openHomeActions,
+  } = useOutletContext<HomeShellOutletContext>();
   const { homeId: routeHomeId = '' } = useParams();
   const queryClient = useQueryClient();
 
@@ -46,13 +61,20 @@ export function HomeOverviewPage() {
     homeId,
     enabled: homeId.length > 0,
   });
+  const membershipsQuery = useHomeMemberships({
+    homeId,
+    enabled: homeId.length > 0,
+  });
 
   useEffect(() => {
-    if (isUnauthenticated(pulseQuery.error)) {
+    if (
+      isUnauthenticated(pulseQuery.error) ||
+      isUnauthenticated(membershipsQuery.error)
+    ) {
       clearPrivateHomeQueryState(queryClient);
       void queryClient.invalidateQueries({ queryKey: currentUserQueryKey });
     }
-  }, [pulseQuery.error, queryClient]);
+  }, [membershipsQuery.error, pulseQuery.error, queryClient]);
 
   if (pulseQuery.isError && isConcealedHome(pulseQuery.error)) {
     return (
@@ -84,20 +106,28 @@ export function HomeOverviewPage() {
     pulseQuery.data !== undefined && homeId.length > 0
       ? pulseQuery.data
       : undefined;
+  const membershipsForHome =
+    membershipsQuery.data !== undefined && homeId.length > 0
+      ? membershipsQuery.data
+      : undefined;
+  const showMembershipsLoading =
+    homeId.length > 0 &&
+    membershipsQuery.isPending &&
+    membershipsQuery.data === undefined;
 
   return (
     <DocumentTitle title={`${home.name} · Roomies`}>
-      <div className="flex flex-col gap-5">
-        <div className="flex flex-col gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight text-text-primary sm:text-3xl">
-            {home.name}
-          </h1>
-          <p className="max-w-prose text-base text-text-secondary">
-            Shared life for this Home. Use Tasks for chores and Maintenance for
-            upkeep that needs attention.
-          </p>
-          <HomePhotoSection home={home} />
-        </div>
+      <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
+        {showMembershipsLoading ? (
+          <div className="flex gap-3" aria-busy="true">
+            <Skeleton className="size-12 rounded-full" announced />
+            <Skeleton className="size-12 rounded-full" />
+            <Skeleton className="size-12 rounded-full" />
+          </div>
+        ) : null}
+        {membershipsForHome !== undefined ? (
+          <RoommateStrip memberships={membershipsForHome} />
+        ) : null}
 
         {showPulseLoading ? <HousePulseSkeleton /> : null}
 
@@ -120,20 +150,16 @@ export function HomeOverviewPage() {
           <HousePulseSection homeId={homeId} pulse={pulseForHome} />
         ) : null}
 
-        <p className="flex flex-wrap gap-x-4 gap-y-2">
-          <Link
-            to={`/homes/${encodeURIComponent(home.id)}/tasks`}
-            className="font-medium text-brand underline-offset-4 hover:text-brand-hover hover:underline focus-visible:rounded-sm"
-          >
-            Open Tasks
-          </Link>
-          <Link
-            to={`/homes/${encodeURIComponent(home.id)}/maintenance`}
-            className="font-medium text-brand underline-offset-4 hover:text-brand-hover hover:underline focus-visible:rounded-sm"
-          >
-            Open Maintenance
-          </Link>
-        </p>
+        <HomeQuickActions
+          homeId={home.id}
+          isAdmin={isAdmin}
+          onOpenActions={openHomeActions}
+          onAddTask={openAddTask}
+          onInviteRoommate={openInviteRoommate}
+          onHomePhoto={openHomePhoto}
+        />
+
+        {homeId.length > 0 ? <HomeActivityFeed homeId={homeId} /> : null}
       </div>
     </DocumentTitle>
   );

@@ -25,6 +25,9 @@ export type ActivityIconName =
 export type ActivityPresentation = {
   sentence: string;
   icon: ActivityIconName;
+  actorLabel: string | null;
+  actionLabel: string;
+  contextLabel: string | null;
 };
 
 function personLabel(person: ActivityActorDisplay | null): string | null {
@@ -47,6 +50,16 @@ function titledValue(title: string | null): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function presentation(
+  icon: ActivityIconName,
+  sentence: string,
+  actorLabel: string | null,
+  actionLabel: string,
+  contextLabel: string | null = null,
+): ActivityPresentation {
+  return { icon, sentence, actorLabel, actionLabel, contextLabel };
+}
+
 /**
  * Maps a frozen Activity DTO to recipient-safe display copy.
  *
@@ -57,23 +70,37 @@ export function presentActivity(item: ActivityListItem): ActivityPresentation {
   switch (item.eventType) {
     case ACTIVITY_EVENT_TYPES.MEMBERSHIP_STARTED: {
       const subject = personLabel(item.subject);
-      return {
-        icon: 'user-plus',
-        sentence:
-          subject === null
-            ? 'A roommate joined the home'
-            : `${subject} joined the home`,
-      };
+      if (subject === null) {
+        return presentation(
+          'user-plus',
+          'A roommate joined the home',
+          null,
+          'A roommate joined the home',
+        );
+      }
+      return presentation(
+        'user-plus',
+        `${subject} joined the home`,
+        subject,
+        'joined the home',
+      );
     }
     case ACTIVITY_EVENT_TYPES.MEMBERSHIP_ENDED: {
       const subject = personLabel(item.subject);
-      return {
-        icon: 'user-minus',
-        sentence:
-          subject === null
-            ? 'A roommate left the home'
-            : `${subject} left the home`,
-      };
+      if (subject === null) {
+        return presentation(
+          'user-minus',
+          'A roommate left the home',
+          null,
+          'A roommate left the home',
+        );
+      }
+      return presentation(
+        'user-minus',
+        `${subject} left the home`,
+        subject,
+        'left the home',
+      );
     }
     case ACTIVITY_EVENT_TYPES.MEMBERSHIP_ROLE_CHANGED: {
       const actor = personLabel(item.actor);
@@ -88,7 +115,13 @@ export function presentActivity(item: ActivityListItem): ActivityPresentation {
       } else {
         sentence = 'A home role was updated';
       }
-      return { icon: 'shield', sentence };
+      return presentation(
+        'shield',
+        sentence,
+        actor,
+        actor === null ? sentence : 'updated a home role',
+        subject === null ? null : `${possessive(subject)} home role`,
+      );
     }
     case ACTIVITY_EVENT_TYPES.TASK_COMPLETED: {
       const actor = personLabel(item.actor);
@@ -103,7 +136,13 @@ export function presentActivity(item: ActivityListItem): ActivityPresentation {
       } else {
         sentence = 'A task was completed';
       }
-      return { icon: 'check', sentence };
+      return presentation(
+        'check',
+        sentence,
+        actor,
+        actor === null ? sentence : 'completed a task',
+        title,
+      );
     }
     case ACTIVITY_EVENT_TYPES.SUPPLY_OBTAINED: {
       const actor = personLabel(item.actor);
@@ -118,32 +157,46 @@ export function presentActivity(item: ActivityListItem): ActivityPresentation {
       } else {
         sentence = 'A supply was marked obtained';
       }
-      return { icon: 'package', sentence };
+      return presentation(
+        'package',
+        sentence,
+        actor,
+        actor === null ? sentence : 'marked a supply obtained',
+        title,
+      );
     }
     case ACTIVITY_EVENT_TYPES.MAINTENANCE_CREATED: {
       const actor = personLabel(item.actor);
-      return {
-        icon: 'wrench',
-        sentence:
-          actor === null
-            ? 'A maintenance item was added'
-            : `${actor} added a maintenance item`,
-      };
+      const sentence =
+        actor === null
+          ? 'A maintenance item was added'
+          : `${actor} added a maintenance item`;
+      return presentation(
+        'wrench',
+        sentence,
+        actor,
+        actor === null ? sentence : 'added a maintenance item',
+      );
     }
     case ACTIVITY_EVENT_TYPES.MAINTENANCE_RESOLVED: {
       const actor = personLabel(item.actor);
-      return {
-        icon: 'check-circle',
-        sentence:
-          actor === null
-            ? 'A maintenance item was resolved'
-            : `${actor} resolved a maintenance item`,
-      };
+      const sentence =
+        actor === null
+          ? 'A maintenance item was resolved'
+          : `${actor} resolved a maintenance item`;
+      return presentation(
+        'check-circle',
+        sentence,
+        actor,
+        actor === null ? sentence : 'resolved a maintenance item',
+      );
     }
     default:
-      return {
-        icon: 'check',
-        sentence: 'Something happened around the home',
-      };
+      return presentation(
+        'check',
+        'Something happened around the home',
+        null,
+        'Something happened around the home',
+      );
   }
 }

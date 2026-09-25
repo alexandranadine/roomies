@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { resetApiClientForTests } from '../platform/api/index.js';
 import { clearHousePulse } from '../pulse/test-fixtures.js';
 import { renderApp } from '../test/render.js';
+import { responseForCommonHomeRead } from '../test/common-home-reads.js';
 import {
   currentUserHomesQueryKey,
   homeContextQueryKey,
@@ -179,14 +180,18 @@ function stubPhotoHome(options: StubOptions) {
         path.match(new RegExp(`/api/v1/homes/${HOME_A}$`)) &&
         method === 'GET'
       ) {
-        return Promise.resolve(
-          jsonResponse(200, {
-            id: HOME_A,
-            name: 'Oak Street',
-            timezone: 'UTC',
-            hasPhoto,
-          }),
-        );
+      return Promise.resolve(
+        jsonResponse(200, {
+          id: HOME_A,
+          name: 'Oak Street',
+          timezone: 'UTC',
+          hasPhoto,
+        }),
+      );
+    }
+      const common = responseForCommonHomeRead(path, method);
+      if (common !== null) {
+        return Promise.resolve(common);
       }
       return Promise.resolve(
         jsonResponse(404, {
@@ -205,13 +210,19 @@ afterEach(() => {
 });
 
 describe('Home photo management', () => {
-  it('lets a Roommate add, change, and remove a photo without Admin-only copy', async () => {
-    stubPhotoHome({ role: 'ROOMMATE', hasPhoto: false });
-    renderApp(`/homes/${HOME_A}`);
-
+  async function openPhotoDialog() {
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Home photo' }),
+    );
     expect(
       await screen.findByRole('heading', { name: 'Home photo' }),
     ).toBeInTheDocument();
+  }
+
+  it('lets a Roommate add, change, and remove a photo without Admin-only copy', async () => {
+    stubPhotoHome({ role: 'ROOMMATE', hasPhoto: false });
+    renderApp(`/homes/${HOME_A}`);
+    await openPhotoDialog();
     expect(
       screen.getByRole('button', { name: 'Add photo' }),
     ).toBeInTheDocument();
@@ -224,6 +235,7 @@ describe('Home photo management', () => {
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:committed');
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
     renderApp(`/homes/${HOME_A}`);
+    await openPhotoDialog();
 
     expect(
       await screen.findByRole('button', { name: 'Change photo' }),
@@ -238,6 +250,7 @@ describe('Home photo management', () => {
   it('reports unsupported and oversized local files without uploading', async () => {
     const fetchMock = stubPhotoHome({ role: 'ROOMMATE', hasPhoto: false });
     renderApp(`/homes/${HOME_A}`);
+    await openPhotoDialog();
     const input = await screen.findByLabelText('Choose a Home photo');
 
     await userEvent.upload(input, photoFile('image/heic', 32, 'photo.heic'), {
@@ -265,6 +278,7 @@ describe('Home photo management', () => {
   it('disables duplicate actions while uploading', async () => {
     stubPhotoHome({ role: 'ROOMMATE', hasPhoto: false, putDelayMs: 150 });
     renderApp(`/homes/${HOME_A}`);
+    await openPhotoDialog();
     const input = await screen.findByLabelText('Choose a Home photo');
 
     await userEvent.upload(input, photoFile('image/jpeg', 16));
@@ -286,6 +300,7 @@ describe('Home photo management', () => {
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
 
     renderApp(`/homes/${HOME_A}`);
+    await openPhotoDialog();
     expect(
       await screen.findAllByRole('img', { name: 'Oak Street photo' }),
     ).not.toHaveLength(0);
@@ -314,6 +329,7 @@ describe('Home photo management', () => {
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:committed');
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
     renderApp(`/homes/${HOME_A}`);
+    await openPhotoDialog();
 
     await userEvent.click(
       await screen.findByRole('button', { name: 'Remove photo' }),
@@ -336,6 +352,7 @@ describe('Home photo management', () => {
     );
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
     const { queryClient } = renderApp(`/homes/${HOME_A}`);
+    await openPhotoDialog();
     await screen.findByLabelText('Choose a Home photo');
     queryClient.setQueryData(currentUserHomesQueryKey, [
       {
@@ -388,6 +405,7 @@ describe('Home photo management', () => {
     );
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
     renderApp(`/homes/${HOME_A}`);
+    await openPhotoDialog();
 
     expect(
       await screen.findAllByRole('img', { name: 'Oak Street photo' }),
@@ -432,6 +450,7 @@ describe('Home photo management', () => {
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:committed');
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
     const { queryClient } = renderApp(`/homes/${HOME_A}`);
+    await openPhotoDialog();
     queryClient.setQueryData(currentUserHomesQueryKey, [
       {
         id: HOME_A,

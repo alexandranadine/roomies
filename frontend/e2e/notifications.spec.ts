@@ -187,6 +187,22 @@ async function mockAuthenticatedNotificationApis(page: Page): Promise<void> {
       });
       return;
     }
+    if (path.endsWith('/memberships')) {
+      await json(route, 200, {
+        currentMembershipId: 'm1111111-1111-4111-8111-111111111111',
+        memberships: [
+          {
+            membershipId: 'm1111111-1111-4111-8111-111111111111',
+            name: 'Alex',
+          },
+        ],
+      });
+      return;
+    }
+    if (path.endsWith('/activity')) {
+      await json(route, 200, { items: [], hasMore: false, nextCursor: null });
+      return;
+    }
     await json(route, 404, {
       error: { code: 'NOT_FOUND', message: 'Not found' },
     });

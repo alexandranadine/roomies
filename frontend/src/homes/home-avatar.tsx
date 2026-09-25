@@ -1,3 +1,4 @@
+import { House } from 'lucide-react';
 import { cn } from '../components/ui/cn.js';
 import { Skeleton } from '../components/ui/index.js';
 import { useBlobObjectUrl } from './use-blob-object-url.js';
@@ -19,18 +20,9 @@ export type HomeAvatarProps = {
   className?: string;
 };
 
-function homeInitial(name: string): string {
-  const trimmed = name.trim();
-  if (trimmed.length === 0) {
-    return '?';
-  }
-  const first = Array.from(trimmed)[0];
-  return first === undefined ? '?' : first.toUpperCase();
-}
-
 /**
  * Home identity mark. Renders a fetched photo Blob as a local object URL, or
- * a compact initial fallback. Does not accept R2 URLs or object keys.
+ * a house-icon fallback. Does not accept R2 URLs or object keys.
  */
 export function HomeAvatar({
   homeId,
@@ -66,9 +58,9 @@ export function HomeAvatar({
       ) : (
         <span
           aria-hidden="true"
-          className="flex size-full items-center justify-center font-semibold"
+          className="flex size-full items-center justify-center text-brand"
         >
-          {homeInitial(name)}
+          <House className="size-[62%]" strokeWidth={2} />
         </span>
       )}
     </span>

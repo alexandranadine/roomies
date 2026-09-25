@@ -1,152 +1,13 @@
-import type { ReactNode } from 'react';
+import { CheckSquare, Package, Wrench } from 'lucide-react';
 import { Link } from 'react-router';
-import { Badge, Card } from '../components/ui/index.js';
+import { Card } from '../components/ui/index.js';
 import { cn } from '../components/ui/cn.js';
-import type {
-  HousePulseDto,
-  HousePulseSectionState,
-  MaintenancePulseItem,
-  SupplyPulseItem,
-  TaskPulseItem,
-} from './pulse-api.js';
+import type { HousePulseDto } from './pulse-api.js';
 import {
-  maintenanceActiveCopy,
-  maintenanceClearCopy,
+  compactPulseMetrics,
+  pulseOverallState,
   pulseStateLabel,
-  suppliesActiveMetrics,
-  suppliesClearCopy,
-  tasksActiveMetrics,
-  tasksClearCopy,
-  type PulseMetric,
 } from './pulse-copy.js';
-
-function MetricsList({ metrics }: { metrics: readonly PulseMetric[] }) {
-  return (
-    <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-text-secondary">
-      {metrics.map((metric) => (
-        <li key={metric.label}>{`${metric.label}: ${metric.value}`}</li>
-      ))}
-    </ul>
-  );
-}
-
-function StateBadge({ state }: { state: HousePulseSectionState }) {
-  return (
-    <Badge
-      variant={state === 'CLEAR' ? 'neutral' : 'brand'}
-      data-pulse-state={state}
-    >
-      {pulseStateLabel(state)}
-    </Badge>
-  );
-}
-
-function SectionShell({
-  title,
-  state,
-  children,
-  footer,
-}: {
-  title: string;
-  state: HousePulseSectionState;
-  children: ReactNode;
-  footer?: ReactNode;
-}) {
-  return (
-    <li className="border-t border-border px-3 py-3 first:border-t-0 sm:px-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
-        <StateBadge state={state} />
-      </div>
-      <div className="mt-1">{children}</div>
-      {footer}
-    </li>
-  );
-}
-
-function TasksSection({
-  item,
-  homeId,
-}: {
-  item: TaskPulseItem;
-  homeId: string;
-}) {
-  return (
-    <SectionShell
-      title="Tasks"
-      state={item.state}
-      footer={
-        <p className="mt-2">
-          <Link
-            to={`/homes/${encodeURIComponent(homeId)}/tasks`}
-            className={cn(
-              'inline-flex min-h-control-lg items-center text-sm font-medium text-brand',
-              'underline-offset-4 hover:text-brand-hover hover:underline',
-              'focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
-            )}
-          >
-            Open Tasks
-          </Link>
-        </p>
-      }
-    >
-      {item.state === 'CLEAR' ? (
-        <p className="text-sm text-text-secondary">{tasksClearCopy()}</p>
-      ) : (
-        <MetricsList metrics={tasksActiveMetrics(item)} />
-      )}
-    </SectionShell>
-  );
-}
-
-function SuppliesSection({ item }: { item: SupplyPulseItem }) {
-  return (
-    <SectionShell title="Supplies" state={item.state}>
-      {item.state === 'CLEAR' ? (
-        <p className="text-sm text-text-secondary">{suppliesClearCopy()}</p>
-      ) : (
-        <MetricsList metrics={suppliesActiveMetrics(item)} />
-      )}
-    </SectionShell>
-  );
-}
-
-function MaintenanceSection({
-  item,
-  homeId,
-}: {
-  item: MaintenancePulseItem;
-  homeId: string;
-}) {
-  return (
-    <SectionShell
-      title="Maintenance"
-      state={item.state}
-      footer={
-        <p className="mt-2">
-          <Link
-            to={`/homes/${encodeURIComponent(homeId)}/maintenance`}
-            className={cn(
-              'inline-flex min-h-control-lg items-center text-sm font-medium text-brand',
-              'underline-offset-4 hover:text-brand-hover hover:underline',
-              'focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
-            )}
-          >
-            Open Maintenance
-          </Link>
-        </p>
-      }
-    >
-      {item.state === 'CLEAR' ? (
-        <p className="text-sm text-text-secondary">{maintenanceClearCopy()}</p>
-      ) : (
-        <p className="text-sm text-text-secondary">
-          {maintenanceActiveCopy(item)}
-        </p>
-      )}
-    </SectionShell>
-  );
-}
 
 export type HousePulseSectionProps = {
   homeId: string;
@@ -154,11 +15,14 @@ export type HousePulseSectionProps = {
 };
 
 /**
- * Compact current-state summary. Renders fixed Tasks → Supplies → Maintenance
- * order from the backend DTO without recomputing state or reordering.
+ * Compact current-state summary. Renders backend Pulse metrics without
+ * recomputing state or inventing unavailable counts.
  */
 export function HousePulseSection({ homeId, pulse }: HousePulseSectionProps) {
-  const [tasks, supplies, maintenance] = pulse.items;
+  const metrics = compactPulseMetrics(pulse);
+  const overall = pulseOverallState(pulse);
+  const tasksHref = `/homes/${encodeURIComponent(homeId)}/tasks`;
+  const maintenanceHref = `/homes/${encodeURIComponent(homeId)}/maintenance`;
 
   return (
     <section
@@ -166,24 +30,67 @@ export function HousePulseSection({ homeId, pulse }: HousePulseSectionProps) {
       className="flex flex-col gap-2"
       data-testid="house-pulse"
     >
-      <header className="flex flex-col gap-0.5">
+      <header className="flex items-baseline justify-between gap-2">
         <h2
           id="house-pulse-heading"
-          className="text-lg font-semibold tracking-tight text-text-primary"
+          className="text-base font-semibold tracking-tight text-text-primary"
         >
           House Pulse
         </h2>
-        <p className="text-sm text-text-secondary">
-          Current snapshot for this Home.
+        <p
+          className="text-xs font-medium text-text-secondary"
+          data-pulse-state={overall}
+        >
+          {pulseStateLabel(overall)}
         </p>
       </header>
 
-      <Card className="p-0">
-        <ul className="list-none">
-          <TasksSection item={tasks} homeId={homeId} />
-          <SuppliesSection item={supplies} />
-          <MaintenanceSection item={maintenance} homeId={homeId} />
+      <Card className="p-3 sm:p-4">
+        <ul className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
+          {metrics.map((metric, index) => {
+            const Icon =
+              index < 4 ? CheckSquare : index === 4 ? Package : Wrench;
+            return (
+              <li
+                key={metric.label}
+                className="flex min-w-0 items-baseline gap-1.5"
+              >
+                <Icon
+                  className="relative top-px size-3.5 shrink-0 text-brand"
+                  aria-hidden="true"
+                />
+                <p className="text-base font-bold leading-none text-text-primary">
+                  {metric.value}
+                </p>
+                <p className="text-xs font-medium text-text-secondary">
+                  {metric.label}
+                </p>
+              </li>
+            );
+          })}
         </ul>
+        <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
+          <Link
+            to={tasksHref}
+            className={cn(
+              'inline-flex min-h-8 items-center text-sm font-medium text-brand',
+              'underline-offset-4 hover:text-brand-hover hover:underline',
+              'focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
+            )}
+          >
+            Open Tasks
+          </Link>
+          <Link
+            to={maintenanceHref}
+            className={cn(
+              'inline-flex min-h-8 items-center text-sm font-medium text-brand',
+              'underline-offset-4 hover:text-brand-hover hover:underline',
+              'focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
+            )}
+          >
+            Open Maintenance
+          </Link>
+        </p>
       </Card>
     </section>
   );

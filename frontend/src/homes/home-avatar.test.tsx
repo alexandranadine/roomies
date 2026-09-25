@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { resetApiClientForTests } from '../platform/api/index.js';
 import { clearHousePulse } from '../pulse/test-fixtures.js';
 import { renderApp } from '../test/render.js';
+import { responseForCommonHomeRead } from '../test/common-home-reads.js';
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 const HOME_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -78,6 +79,10 @@ function stubHomeWithPhoto(options: {
         }),
       );
     }
+    const common = responseForCommonHomeRead(path, 'GET');
+    if (common !== null) {
+      return Promise.resolve(common);
+    }
     return Promise.resolve(
       jsonResponse(404, { error: { code: 'NOT_FOUND', message: 'Not found' } }),
     );
@@ -125,6 +130,10 @@ describe('HomeAvatar', () => {
             hasPhoto: false,
           }),
         );
+      }
+      const common = responseForCommonHomeRead(path, 'GET');
+      if (common !== null) {
+        return Promise.resolve(common);
       }
       return Promise.resolve(
         jsonResponse(404, {

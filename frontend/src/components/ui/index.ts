@@ -26,6 +26,11 @@ export {
 } from './field.js';
 export { IconButton, type IconButtonProps } from './icon-button.js';
 export {
+  InitialsAvatar,
+  type InitialsAvatarProps,
+  type InitialsAvatarSize,
+} from './initials-avatar.js';
+export {
   Menu,
   MenuItem,
   MenuPopup,

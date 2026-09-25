@@ -3,6 +3,7 @@ import type { ActiveHome } from '../homes/homes-api.js';
 import type { ActiveHomeMemberships } from '../homes/home-memberships-api.js';
 import type { CreatedInvitation } from '../invitations/create-invitation-api.js';
 import { clearHousePulse } from '../pulse/test-fixtures.js';
+import { responseForCommonHomeRead } from '../test/common-home-reads.js';
 
 export const TEST_USER_ID = '11111111-1111-4111-8111-111111111111';
 export const TEST_HOME_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -182,6 +183,11 @@ export function stubRoommatesApis(options: RoommatesStubOptions = {}) {
             hasPhoto: false,
           }),
         );
+      }
+
+      const common = responseForCommonHomeRead(path, method);
+      if (common !== null) {
+        return Promise.resolve(common);
       }
 
       return Promise.resolve(

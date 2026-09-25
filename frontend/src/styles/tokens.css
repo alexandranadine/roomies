@@ -3,51 +3,59 @@
   Prefer these utilities over raw hex in components.
 */
 @theme {
-  /* Colors — background / surface */
-  --color-bg: #fafaf9;
-  --color-surface: #ffffff;
-  --color-subtle: #f5f5f4;
+  /* Colors — background / surface (warm cream household canvas) */
+  --color-bg: #f4efe6;
+  --color-surface: #fffdf8;
+  --color-subtle: #ebe4d8;
 
   /* Colors — text */
-  --color-text-primary: #1c1917;
-  --color-text-secondary: #44403c;
-  --color-text-muted: #6b6560;
-  --color-text-disabled: #a8a29e;
+  --color-text-primary: #2a241f;
+  --color-text-secondary: #5c534c;
+  --color-text-muted: #5c534c;
+  --color-text-disabled: #a3988c;
 
   /* Colors — borders */
-  --color-border: #e7e5e4;
-  --color-border-strong: #d6d3d1;
+  --color-border: #e4d9c8;
+  --color-border-strong: #d4c7b2;
 
-  /* Colors — brand (global; Home accents are separate and unused here) */
-  --color-brand: #4338ca;
-  --color-brand-hover: #3730a3;
-  --color-brand-active: #312e81;
-  --color-brand-soft: #eef2ff;
-  --color-brand-soft-text: #3730a3;
-  --color-focus: #4f46e5;
+  /* Colors — brand (forest green; Home accents stay in this earth family) */
+  --color-brand: #2f4a3c;
+  --color-brand-hover: #24382e;
+  --color-brand-active: #1b2b23;
+  --color-brand-soft: #e4ede7;
+  --color-brand-soft-text: #2f4a3c;
+  --color-focus: #2f4a3c;
 
   /* Colors — semantic status */
-  --color-danger: #b91c1c;
-  --color-danger-soft: #fef2f2;
-  --color-success: #047857;
-  --color-success-soft: #ecfdf5;
-  --color-warning: #a16207;
-  --color-warning-soft: #fffbeb;
-  --color-info: #0369a1;
-  --color-info-soft: #f0f9ff;
+  --color-danger: #a34738;
+  --color-danger-soft: #f8e8e4;
+  --color-success: #2f4a3c;
+  --color-success-soft: #e4ede7;
+  --color-warning: #6a4e10;
+  --color-warning-soft: #f6eed4;
+  --color-info: #4a6758;
+  --color-info-soft: #e4ede7;
 
-  /* Colors — privacy */
-  --color-privacy-soft: #f5f3ff;
-  --color-privacy-border: #ddd6fe;
-  --color-privacy-text: #5b21b6;
-  --color-privacy-icon: #6d28d9;
+  /* Colors — social / tertiary accents */
+  --color-accent-coral: #c45c4a;
+  --color-accent-coral-soft: #f8e8e4;
+  --color-accent-coral-text: #8a3a2f;
+  --color-accent-gold: #b8952c;
+  --color-accent-gold-soft: #f6eed4;
+  --color-accent-gold-text: #6a4e10;
 
-  /* Frozen Home accent palette (tokens only; not wired as global brand) */
-  --color-accent-indigo: #4338ca;
-  --color-accent-teal: #0f766e;
-  --color-accent-rose: #be123c;
-  --color-accent-amber: #b45309;
-  --color-accent-slate: #475569;
+  /* Colors — privacy (warm taupe, not purple) */
+  --color-privacy-soft: #f3eee6;
+  --color-privacy-border: #d4c7b2;
+  --color-privacy-text: #5c534c;
+  --color-privacy-icon: #7a7168;
+
+  /* Frozen Home accent palette (tokens only; earth-tone family) */
+  --color-accent-indigo: #2f4a3c;
+  --color-accent-teal: #3d6b5c;
+  --color-accent-rose: #c45c4a;
+  --color-accent-amber: #b8952c;
+  --color-accent-slate: #5c534c;
 
   /* Typography — Manrope via @fontsource (self-hosted through the npm package) */
   --font-sans:
@@ -69,4 +77,8 @@
   --spacing-control-md: 2.5rem; /* 40px */
   --spacing-control-lg: 2.75rem; /* 44px */
   --spacing-control-xl: 3rem; /* 48px */
+
+  /* Shadows — warm, restrained */
+  --shadow-card: 0 1px 2px rgb(42 36 31 / 0.06), 0 1px 3px rgb(42 36 31 / 0.04);
+  --shadow-nav: 0 -1px 3px rgb(42 36 31 / 0.06);
 }

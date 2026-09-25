@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { resetApiClientForTests } from '../platform/api/index.js';
 import { clearHousePulse } from '../pulse/test-fixtures.js';
 import { renderApp } from '../test/render.js';
+import { responseForCommonHomeRead } from '../test/common-home-reads.js';
 import {
   currentUserHomesQueryKey,
   currentUserQueryKey,
@@ -80,6 +81,10 @@ function stubRoomiesApis(options: {
         }),
       );
     }
+    const common = responseForCommonHomeRead(path, 'GET');
+    if (common !== null) {
+      return Promise.resolve(common);
+    }
     return Promise.resolve(
       jsonResponse(404, { error: { code: 'NOT_FOUND', message: 'Not found' } }),
     );
@@ -147,8 +152,12 @@ describe('active Home discovery and shell', () => {
       await screen.findByRole('heading', { name: 'Oak Street', level: 1 }),
     ).toBeInTheDocument();
     expect(router.state.location.pathname).toBe(`/homes/${HOME_A}`);
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /Current Home: Oak Street/ }),
+    );
     expect(
-      screen.getByRole('link', { name: 'Your Homes' }),
+      await screen.findByRole('menuitem', { name: 'Your Homes' }),
     ).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/owner|membership/i);
   });
@@ -342,6 +351,10 @@ describe('active Home discovery and shell', () => {
             hasPhoto: false,
           }),
         );
+      }
+      const common = responseForCommonHomeRead(path, 'GET');
+      if (common !== null) {
+        return Promise.resolve(common);
       }
       return Promise.resolve(
         jsonResponse(404, {

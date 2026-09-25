@@ -1,4 +1,5 @@
 import type {
+  HousePulseDto,
   HousePulseSectionState,
   MaintenancePulseItem,
   SupplyPulseItem,
@@ -53,4 +54,30 @@ export function maintenanceActiveCopy(item: MaintenancePulseItem): string {
     return '1 open item visible to you';
   }
   return `${count} open items visible to you`;
+}
+
+/**
+ * Compact Home-summary metrics. Only values the Pulse DTO actually provides.
+ * Does not invent people-home/away, events, or a summed task total.
+ */
+export function compactPulseMetrics(
+  pulse: HousePulseDto,
+): readonly PulseMetric[] {
+  const [tasks, supplies, maintenance] = pulse.items;
+  return [
+    { label: 'Assigned to you', value: tasks.assignedOpenCount },
+    { label: 'Unassigned', value: tasks.unassignedOpenCount },
+    { label: 'Due today', value: tasks.dueTodayRelevantCount },
+    { label: 'Overdue', value: tasks.overdueRelevantCount },
+    { label: 'Supplies', value: supplies.openCount },
+    { label: 'Maintenance', value: maintenance.openVisibleCount },
+  ];
+}
+
+export function pulseOverallState(
+  pulse: HousePulseDto,
+): HousePulseSectionState {
+  return pulse.items.some((item) => item.state === 'ACTIVE')
+    ? 'ACTIVE'
+    : 'CLEAR';
 }

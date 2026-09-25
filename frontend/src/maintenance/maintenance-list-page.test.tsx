@@ -50,7 +50,7 @@ describe('Maintenance list page', () => {
       await screen.findByRole('heading', { name: 'Oak Street', level: 1 }),
     ).toBeInTheDocument();
 
-    await user.click(screen.getByRole('link', { name: 'Maintenance' }));
+    await user.click(await screen.findByRole('link', { name: 'Open Maintenance' }));
 
     expect(
       await screen.findByRole('heading', { name: 'Maintenance', level: 1 }),

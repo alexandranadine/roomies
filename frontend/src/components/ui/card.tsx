@@ -12,13 +12,13 @@ export type CardProps = ComponentProps<'div'> & {
 };
 
 /**
- * Low-ceremony surface. Restrained border, ~16px radius, no shadow by default.
+ * Low-ceremony surface. Warm border, ~16px radius, subtle household shadow.
  */
 export function Card({ className, padding = 'md', ...props }: CardProps) {
   return (
     <div
       className={cn(
-        'rounded-xl border border-border bg-surface',
+        'rounded-xl border border-border bg-surface shadow-card',
         paddingClasses[padding],
         className,
       )}

@@ -180,6 +180,26 @@ async function mockPulseApis(
       });
       return;
     }
+    if (path === '/api/v1/notifications') {
+      await json(route, 200, { items: [], hasMore: false, nextCursor: null });
+      return;
+    }
+    if (path.endsWith('/memberships')) {
+      await json(route, 200, {
+        currentMembershipId: 'm1111111-1111-4111-8111-111111111111',
+        memberships: [
+          {
+            membershipId: 'm1111111-1111-4111-8111-111111111111',
+            name: 'Alex',
+          },
+        ],
+      });
+      return;
+    }
+    if (path.endsWith('/activity')) {
+      await json(route, 200, { items: [], hasMore: false, nextCursor: null });
+      return;
+    }
     await json(route, 404, {
       error: { code: 'NOT_FOUND', message: 'Not found' },
     });
@@ -237,15 +257,9 @@ test.describe('House Pulse on Home overview', () => {
       await expect(
         page.getByRole('heading', { name: 'House Pulse', level: 2 }),
       ).toBeVisible();
-      await expect(
-        page.getByRole('heading', { name: 'Tasks', level: 3 }),
-      ).toBeVisible();
-      await expect(
-        page.getByRole('heading', { name: 'Supplies', level: 3 }),
-      ).toBeVisible();
-      await expect(
-        page.getByRole('heading', { name: 'Maintenance', level: 3 }),
-      ).toBeVisible();
+      await expect(page.getByText('Assigned to you')).toBeVisible();
+      await expect(page.getByText('Supplies', { exact: true })).toBeVisible();
+      await expect(page.getByText('Maintenance', { exact: true })).toBeVisible();
       await assertNoHorizontalOverflow(page);
     });
   }
@@ -256,8 +270,8 @@ test.describe('House Pulse on Home overview', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`/homes/${HOME_A}`);
     const pulse = page.getByTestId('house-pulse');
-    await expect(pulse.getByText('Assigned to you: 2')).toBeVisible();
-    await expect(pulse.getByText('2 open items visible to you')).toBeVisible();
+    await expect(pulse.getByText('Assigned to you')).toBeVisible();
+    await expect(pulse.getByText('Maintenance', { exact: true })).toBeVisible();
     await expect(pulse.getByText('2026-09-14T04:00:00.000Z')).toHaveCount(0);
     await expect(pulse.getByText(/score|rank|chart|percent/i)).toHaveCount(0);
   });
@@ -284,27 +298,26 @@ test.describe('House Pulse on Home overview', () => {
     });
     await page.setViewportSize({ width: 768, height: 1024 });
     await page.goto(`/homes/${HOME_A}`);
-    await expect(page.getByText('Assigned to you: 2')).toBeVisible();
+    await expect(page.getByText('Assigned to you')).toBeVisible();
 
     await page.goto(`/homes/${HOME_B}`);
-    await expect(page.getByText('Assigned to you: 2')).toHaveCount(0);
     await expect(
       page.getByRole('heading', { name: 'Cedar House', level: 1 }),
     ).toBeVisible();
-    await expect(page.getByText('Assigned to you: 9')).toBeVisible();
+    await expect(
+      page.locator('li', { hasText: 'Assigned to you' }),
+    ).toContainText('9');
   });
 
-  test('CLEAR Pulse still shows three sections', async ({ page }) => {
+  test('CLEAR Pulse still shows compact domain metrics', async ({ page }) => {
     await mockPulseApis(page, { pulseA: CLEAR_PULSE });
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto(`/homes/${HOME_A}`);
     const pulse = page.getByTestId('house-pulse');
-    await expect(pulse.getByText('Nothing needs attention.')).toBeVisible();
-    await expect(pulse.getByText('No open supplies.')).toBeVisible();
-    await expect(
-      pulse.getByText('No open maintenance visible to you.'),
-    ).toBeVisible();
-    await expect(pulse.getByText('Clear')).toHaveCount(3);
+    await expect(pulse.getByText('Assigned to you')).toBeVisible();
+    await expect(pulse.getByText('Supplies', { exact: true })).toBeVisible();
+    await expect(pulse.getByText('Maintenance', { exact: true })).toBeVisible();
+    await expect(pulse.getByText('Clear')).toHaveCount(1);
   });
 
   test('respects reduced motion for Pulse skeleton animation class', async ({

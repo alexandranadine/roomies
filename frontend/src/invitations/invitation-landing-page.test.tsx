@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { currentUserHomesQueryKey } from '../homes/home-query-keys.js';
@@ -350,9 +350,6 @@ describe('invitation landing page', () => {
       queryClient.getQueryData(invitationPreviewQueryKey(INVITATION_ID)),
     ).toBeUndefined();
     expect(router.state.location.pathname).toBe(`/homes/${homeId}`);
-    expect(
-      queryClient.getQueryState(currentUserHomesQueryKey)?.isInvalidated,
-    ).toBe(true);
     expect(document.body.innerHTML).not.toContain(SECRET);
   });
 
@@ -479,12 +476,22 @@ describe('invitation landing page', () => {
     await waitFor(() => {
       expect(router.state.location.pathname).toBe(`/homes/${homeId}`);
     });
-    expect(
-      queryClient.getQueryState(currentUserHomesQueryKey)?.isInvalidated,
-    ).toBe(true);
+    await waitFor(() => {
+      expect(queryClient.getQueryData(currentUserHomesQueryKey)).toEqual([
+        {
+          id: homeId,
+          name: HOME_NAME,
+          timezone: 'UTC',
+          role: 'ROOMMATE',
+          hasPhoto: false,
+        },
+      ]);
+    });
 
     await userEvent.click(
-      await screen.findByRole('link', { name: 'Roommates' }),
+      within(
+        await screen.findByRole('navigation', { name: 'Home' }),
+      ).getByRole('link', { name: 'Roommates' }),
     );
 
     expect(

@@ -1,6 +1,7 @@
 import { vi } from 'vitest';
 import type { ActiveHomeMemberships } from '../homes/home-memberships-api.js';
 import { clearHousePulse } from '../pulse/test-fixtures.js';
+import { responseForCommonHomeRead } from '../test/common-home-reads.js';
 import type {
   MaintenanceDetail,
   MaintenanceListPage,
@@ -328,6 +329,11 @@ export function stubMaintenanceApis(options: MaintenanceStubOptions = {}) {
           return Promise.resolve(jsonResponse(override.status, override.body));
         }
         return Promise.resolve(jsonResponse(200, defaultContext(homeId)));
+      }
+
+      const common = responseForCommonHomeRead(path, method);
+      if (common !== null) {
+        return Promise.resolve(common);
       }
 
       return Promise.resolve(jsonResponse(404, notFoundBody()));

@@ -214,6 +214,20 @@ async function mockAuthenticatedActivityApis(page: Page): Promise<void> {
       });
       return;
     }
+    if (path === '/api/v1/notifications') {
+      await json(route, 200, { items: [], hasMore: false, nextCursor: null });
+      return;
+    }
+    if (path.endsWith('/memberships')) {
+      await json(route, 200, {
+        currentMembershipId: MEMBERSHIP_A,
+        memberships: [
+          { membershipId: MEMBERSHIP_A, name: 'Alex' },
+          { membershipId: MEMBERSHIP_B, name: 'Jamie' },
+        ],
+      });
+      return;
+    }
     await json(route, 404, {
       error: { code: 'NOT_FOUND', message: 'Not found' },
     });
@@ -356,6 +370,9 @@ test.describe('Activity authenticated UI', () => {
   }) => {
     await page.setViewportSize({ width: 360, height: 800 });
     await page.goto(`/homes/${HOME_A}/activity`);
+    await expect(
+      page.getByRole('heading', { name: 'Activity', level: 1 }),
+    ).toBeVisible();
     await expect(page.getByText(LONG_NAME)).toBeVisible();
     await expect(page.getByText(LONG_TITLE)).toBeVisible();
     await expect(page.getByText('Former roommate left the home')).toBeVisible();

@@ -60,12 +60,10 @@ describe('Notifications list page', () => {
       await screen.findByRole('heading', { name: 'Oak Street', level: 1 }),
     ).toBeInTheDocument();
 
-    const notificationsLink = screen.getByRole('link', {
-      name: 'Notifications',
+    const notificationsLink = await screen.findByRole('link', {
+      name: /Notifications/,
     });
     expect(notificationsLink).toBeInTheDocument();
-    expect(notificationsLink.textContent).not.toMatch(/\d/);
-    expect(screen.queryByText(/unread/i)).not.toBeInTheDocument();
 
     await user.click(notificationsLink);
 

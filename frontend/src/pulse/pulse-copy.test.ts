@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
+  compactPulseMetrics,
   maintenanceActiveCopy,
   maintenanceClearCopy,
+  pulseOverallState,
   pulseStateLabel,
   suppliesActiveMetrics,
   suppliesClearCopy,
   tasksActiveMetrics,
   tasksClearCopy,
 } from './pulse-copy.js';
+import type { HousePulseDto } from './pulse-api.js';
 import {
   clearMaintenanceItem,
   clearSuppliesItem,
@@ -76,5 +79,32 @@ describe('pulse copy', () => {
     expect(
       maintenanceActiveCopy(clearMaintenanceItem({ openVisibleCount: 2 })),
     ).toBe('2 open items visible to you');
+  });
+
+  it('compact metrics use only Pulse DTO fields', () => {
+    const pulse: HousePulseDto = {
+      generatedAt: '2026-09-14T04:00:00.000Z',
+      homeLocalDate: '2026-09-14',
+      items: [
+        clearTasksItem({
+          state: 'ACTIVE',
+          assignedOpenCount: 2,
+          unassignedOpenCount: 1,
+          dueTodayRelevantCount: 4,
+          overdueRelevantCount: 3,
+        }),
+        clearSuppliesItem({ state: 'ACTIVE', openCount: 5 }),
+        clearMaintenanceItem({ state: 'ACTIVE', openVisibleCount: 2 }),
+      ],
+    };
+    expect(compactPulseMetrics(pulse).map((metric) => metric.label)).toEqual([
+      'Assigned to you',
+      'Unassigned',
+      'Due today',
+      'Overdue',
+      'Supplies',
+      'Maintenance',
+    ]);
+    expect(pulseOverallState(pulse)).toBe('ACTIVE');
   });
 });
