@@ -517,15 +517,60 @@ test.describe('Activity authenticated UI', () => {
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`/homes/${HOME_A}/activity`);
-    const viewLinks = page.getByRole('link', { name: 'View maintenance' });
-    await expect(viewLinks.first()).toBeVisible();
-    await expect(viewLinks.first()).toHaveAttribute(
+    await expect(
+      page.getByRole('link', { name: 'View maintenance' }),
+    ).toHaveCount(0);
+
+    const maintenanceLinks = page.getByRole('link', { name: 'maintenance item' });
+    await expect(maintenanceLinks).toHaveCount(2);
+    await expect(maintenanceLinks.first()).toBeVisible();
+    await expect(maintenanceLinks.first()).toHaveAttribute(
       'href',
       `/homes/${HOME_A}/maintenance/n1111111-1111-4111-8111-111111111111`,
+    );
+    await expect(maintenanceLinks.nth(1)).toHaveAttribute(
+      'href',
+      `/homes/${HOME_A}/maintenance/n2222222-2222-4222-8222-222222222222`,
     );
     await expect(page.getByText('n1111111-1111-4111-8111-111111111111')).toHaveCount(
       0,
     );
     await expect(page.getByText('Quiet leak under sink')).toHaveCount(0);
+  });
+
+  test('private Maintenance Activity does not expose a Maintenance link', async ({
+    page,
+  }) => {
+    await page.route(`**/api/v1/homes/${HOME_A}/activity`, async (route) => {
+      await json(route, 200, {
+        items: [
+          {
+            id: 'a9999999-9999-4999-8999-999999999999',
+            eventType: 'maintenance.created.v1',
+            sourceEntityType: 'MAINTENANCE',
+            sourceEntityId: 'n3333333-3333-4333-8333-333333333333',
+            occurredAt: '2026-09-13T15:00:00.000Z',
+            actor: { membershipId: MEMBERSHIP_A, name: 'Alex' },
+            sourceTitle: null,
+            subject: null,
+          },
+        ],
+        hasMore: false,
+        nextCursor: null,
+      });
+    });
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`/homes/${HOME_A}/activity`);
+    await expect(page.getByText('Alex added a maintenance item')).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: 'maintenance item' }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole('link', { name: 'View maintenance' }),
+    ).toHaveCount(0);
+    await expect(page.getByText('n3333333-3333-4333-8333-333333333333')).toHaveCount(
+      0,
+    );
   });
 });

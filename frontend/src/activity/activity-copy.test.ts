@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { presentActivity, FORMER_ROOMMATE_LABEL, maintenanceDetailHref } from './activity-copy.js';
+import {
+  presentActivity,
+  FORMER_ROOMMATE_LABEL,
+  maintenanceDetailHref,
+  maintenanceSentenceParts,
+} from './activity-copy.js';
 import {
   activityItem,
   FIXTURE_JOINED,
@@ -165,6 +170,43 @@ describe('Activity presentation copy', () => {
       sourceTitle: null,
     });
     expect(presentActivity(role).sentence).toBe('A home role was updated');
+  });
+});
+
+describe('Maintenance Activity sentence parts', () => {
+  it('splits actor-led Maintenance copy around the link phrase', () => {
+    expect(
+      maintenanceSentenceParts(presentActivity(FIXTURE_MAINTENANCE_CREATED)),
+    ).toEqual({
+      prefix: 'added a ',
+      suffix: '',
+    });
+    expect(
+      maintenanceSentenceParts(presentActivity(FIXTURE_MAINTENANCE_RESOLVED)),
+    ).toEqual({
+      prefix: 'resolved a ',
+      suffix: '',
+    });
+  });
+
+  it('splits actor-less Maintenance copy around the link phrase', () => {
+    const created = activityItem({
+      eventType: 'maintenance.created.v1',
+      sourceEntityType: 'MAINTENANCE',
+      sourceTitle: 'Quiet leak under sink',
+      actor: null,
+      subject: null,
+    });
+    expect(maintenanceSentenceParts(presentActivity(created))).toEqual({
+      prefix: 'A ',
+      suffix: ' was added',
+    });
+  });
+
+  it('returns null for non-Maintenance Activity copy', () => {
+    expect(
+      maintenanceSentenceParts(presentActivity(FIXTURE_TASK_TITLED)),
+    ).toBeNull();
   });
 });
 

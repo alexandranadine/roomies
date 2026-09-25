@@ -3,6 +3,9 @@ import type { ActivityActorDisplay, ActivityListItem } from './activity-api.js';
 /** Presentation-only label for a missing historical roommate name. */
 export const FORMER_ROOMMATE_LABEL = 'Former roommate';
 
+/** Inline Maintenance Activity link text — never a raw id or source title. */
+export const MAINTENANCE_LINK_TEXT = 'maintenance item';
+
 export const ACTIVITY_EVENT_TYPES = {
   MEMBERSHIP_STARTED: 'membership.started.v1',
   MEMBERSHIP_ENDED: 'membership.ended.v1',
@@ -206,6 +209,41 @@ export function presentActivity(item: ActivityListItem): ActivityPresentation {
  * `sourceTitle` in the DTO, so a missing title must not grow a link.
  * Uses `sourceEntityId` as the existing Maintenance entry id — never titles.
  */
+export type MaintenanceSentenceParts = {
+  prefix: string;
+  suffix: string;
+};
+
+/**
+ * Splits Maintenance Activity copy around the linkable phrase so only
+ * `maintenance item` becomes the destination control.
+ */
+export function maintenanceSentenceParts(
+  presentation: ActivityPresentation,
+): MaintenanceSentenceParts | null {
+  const { actorLabel, actionLabel, sentence } = presentation;
+
+  if (actorLabel !== null) {
+    if (!actionLabel.endsWith(MAINTENANCE_LINK_TEXT)) {
+      return null;
+    }
+    return {
+      prefix: actionLabel.slice(0, -MAINTENANCE_LINK_TEXT.length),
+      suffix: '',
+    };
+  }
+
+  const lead = `A ${MAINTENANCE_LINK_TEXT}`;
+  if (!sentence.startsWith(lead)) {
+    return null;
+  }
+
+  return {
+    prefix: 'A ',
+    suffix: sentence.slice(lead.length),
+  };
+}
+
 export function maintenanceDetailHref(
   homeId: string,
   item: ActivityListItem,

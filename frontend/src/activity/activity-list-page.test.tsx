@@ -168,17 +168,20 @@ describe('Activity list page', () => {
     expect(screen.queryByText('Quiet leak under sink')).not.toBeInTheDocument();
     expect(list.textContent).not.toMatch(/kudos|reaction|comment/i);
     expect(
-      within(items[7]!).getByRole('link', { name: 'View maintenance' }),
+      within(items[7]!).getByRole('link', { name: 'maintenance item' }),
     ).toHaveAttribute(
       'href',
       `/homes/${TEST_HOME_A}/maintenance/${SOURCE_MAINTENANCE_ID}`,
     );
     expect(
-      within(items[8]!).getByRole('link', { name: 'View maintenance' }),
+      within(items[8]!).getByRole('link', { name: 'maintenance item' }),
     ).toHaveAttribute(
       'href',
       `/homes/${TEST_HOME_A}/maintenance/${SOURCE_MAINTENANCE_ID}`,
     );
+    expect(
+      screen.queryByRole('link', { name: 'View maintenance' }),
+    ).not.toBeInTheDocument();
     assertNoIdentityLeaks();
   });
 
@@ -308,11 +311,14 @@ describe('Activity list page', () => {
     expect(screen.queryByText('HOUSEHOLD')).not.toBeInTheDocument();
     expect(screen.queryByText(/audience/i)).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('link', { name: /maintenance item/i }),
-    ).not.toBeInTheDocument();
-    expect(
-      within(items[0]!).getByRole('link', { name: 'View maintenance' }),
+      within(items[0]!).getByRole('link', { name: 'maintenance item' }),
     ).toBeInTheDocument();
+    expect(
+      within(items[1]!).getByRole('link', { name: 'maintenance item' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'View maintenance' }),
+    ).not.toBeInTheDocument();
     assertNoIdentityLeaks();
   });
 
@@ -326,7 +332,10 @@ describe('Activity list page', () => {
     const { router } = renderApp(`/homes/${TEST_HOME_A}/activity`);
 
     const list = await screen.findByRole('list', { name: 'Home activity' });
-    const link = within(list).getByRole('link', { name: 'View maintenance' });
+    const link = within(list).getByRole('link', { name: 'maintenance item' });
+    expect(
+      screen.queryByRole('link', { name: 'View maintenance' }),
+    ).not.toBeInTheDocument();
     expect(link).toHaveAttribute(
       'href',
       `/homes/${TEST_HOME_A}/maintenance/${SOURCE_MAINTENANCE_ID}`,
@@ -353,6 +362,9 @@ describe('Activity list page', () => {
       'Alex',
       'added a maintenance item',
     ]);
+    expect(
+      screen.queryByRole('link', { name: 'maintenance item' }),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('link', { name: 'View maintenance' }),
     ).not.toBeInTheDocument();

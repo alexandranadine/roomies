@@ -1,6 +1,13 @@
 import { Link } from 'react-router';
+import { cn } from '../components/ui/cn.js';
 import type { ActivityListItem } from './activity-api.js';
-import { maintenanceDetailHref, presentActivity } from './activity-copy.js';
+import {
+  MAINTENANCE_LINK_TEXT,
+  maintenanceDetailHref,
+  maintenanceSentenceParts,
+  presentActivity,
+  type ActivityPresentation,
+} from './activity-copy.js';
 import { ActivityEventIcon } from './activity-event-icon.js';
 import { formatActivityTimestamp } from './activity-format.js';
 
@@ -8,6 +15,55 @@ export type ActivityFeedCardProps = {
   homeId: string;
   item: ActivityListItem;
 };
+
+const maintenanceInlineLinkClassName = cn(
+  'text-brand underline-offset-4 hover:text-brand-hover hover:underline',
+  'focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
+);
+
+function MaintenanceInlineLink({ href }: { href: string }) {
+  return (
+    <Link to={href} className={maintenanceInlineLinkClassName}>
+      {MAINTENANCE_LINK_TEXT}
+    </Link>
+  );
+}
+
+function ActivitySentenceContent({
+  presentation,
+  maintenanceHref,
+  variant,
+}: {
+  presentation: ActivityPresentation;
+  maintenanceHref: string | null;
+  variant: 'hierarchy' | 'standalone';
+}) {
+  const parts =
+    maintenanceHref !== null
+      ? maintenanceSentenceParts(presentation)
+      : null;
+
+  if (parts === null) {
+    if (variant === 'hierarchy') {
+      return <span> {presentation.actionLabel}</span>;
+    }
+    return <>{presentation.sentence}</>;
+  }
+
+  const linkedPhrase = (
+    <>
+      {parts.prefix}
+      <MaintenanceInlineLink href={maintenanceHref} />
+      {parts.suffix}
+    </>
+  );
+
+  if (variant === 'hierarchy') {
+    return <span> {linkedPhrase}</span>;
+  }
+
+  return linkedPhrase;
+}
 
 /**
  * Compact household feed card. Presentation-only — no fabricated social
@@ -28,11 +84,19 @@ export function ActivityFeedCard({ homeId, item }: ActivityFeedCardProps) {
             {showHierarchy ? (
               <p className="min-w-0 max-w-full break-words text-sm text-text-primary">
                 <span className="font-semibold">{presentation.actorLabel}</span>
-                <span> {presentation.actionLabel}</span>
+                <ActivitySentenceContent
+                  presentation={presentation}
+                  maintenanceHref={maintenanceHref}
+                  variant="hierarchy"
+                />
               </p>
             ) : (
               <p className="min-w-0 max-w-full break-words text-sm font-medium text-text-primary">
-                {presentation.sentence}
+                <ActivitySentenceContent
+                  presentation={presentation}
+                  maintenanceHref={maintenanceHref}
+                  variant="standalone"
+                />
               </p>
             )}
             {presentation.contextLabel !== null ? (
@@ -51,14 +115,6 @@ export function ActivityFeedCard({ homeId, item }: ActivityFeedCardProps) {
               </time>
             ) : null}
           </div>
-          {maintenanceHref !== null ? (
-            <Link
-              to={maintenanceHref}
-              className="w-fit text-xs font-semibold text-brand underline-offset-4 hover:text-brand-hover hover:underline focus-visible:rounded-sm"
-            >
-              View maintenance
-            </Link>
-          ) : null}
         </div>
       </article>
     </li>
