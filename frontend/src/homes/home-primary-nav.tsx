@@ -50,6 +50,14 @@ export function HomePrimaryNav({ homeId }: HomePrimaryNavProps) {
             Maintenance
           </NavLink>
         </li>
+        <li>
+          <NavLink
+            to={`${base}/roommates`}
+            className={({ isActive }) => navClassName(isActive)}
+          >
+            Roommates
+          </NavLink>
+        </li>
       </ul>
     </nav>
   );

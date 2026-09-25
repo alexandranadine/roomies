@@ -40,6 +40,32 @@ function isBackendErrorEnvelope(value: unknown): value is BackendErrorEnvelope {
   );
 }
 
+type BetterAuthErrorBody = {
+  code?: string;
+  message: string;
+};
+
+/**
+ * Better Auth credential routes return `{ code, message }` instead of the
+ * Roomies `{ error: { code, message } }` envelope. Codes are kept for
+ * presentation mapping; raw messages are never shown as product copy.
+ */
+function isBetterAuthErrorBody(value: unknown): value is BetterAuthErrorBody {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  if ('error' in value) {
+    return false;
+  }
+  if (!('message' in value) || typeof value.message !== 'string') {
+    return false;
+  }
+  if (!('code' in value)) {
+    return true;
+  }
+  return value.code === undefined || typeof value.code === 'string';
+}
+
 function joinUrl(apiOrigin: string, path: string): string {
   if (!path.startsWith('/')) {
     throw new Error('API path must start with "/"');
@@ -70,6 +96,14 @@ function toApiError(status: number, body: unknown): ApiError {
       code: body.error.code,
       message: body.error.message,
       requestId,
+    });
+  }
+
+  if (isBetterAuthErrorBody(body)) {
+    return new ApiError({
+      status,
+      code: body.code,
+      message: 'Request failed',
     });
   }
 

@@ -479,7 +479,7 @@ values.
 | Frontend           | Worker `roomies-frontend-staging` version `d0b79ff4-939b-4c21-b435-afc671428155`. Same hashed bundle on `https://roomies.casa` and `https://roomies-frontend-staging.alexandra-nadine-lewis.workers.dev` (`assets/index-COEy7YVP.js`). Live CSP `connect-src 'self' https://api.roomies.casa https://roomies-home-photos-staging.38695abd0586016d676f037d65e7a73a.r2.cloudflarestorage.com`; `img-src 'self' data: blob:`; R2 origin not in `img-src`; no `railway.app` in `connect-src`. |
 | Cookies            | Unchanged: `HttpOnly`, `Secure`, `SameSite=Lax`, host-only. `roomies.casa` and `api.roomies.casa` are same-site, so the authenticated document session works without weakening SameSite. Do not use `workers.dev` → `railway.app` for this milestone.                                                                                                                                                              |
 | Schema             | Release migration `20260924T0514_home_photo_object_key` applied. Live `homes.photo_object_key` exists with canonical check and unique index. Marker `10b42e58a246ab56874f0985069a85787999dcd032a5f5fbea26067e6493e659`. Authenticated `GET /api/v1/me/homes` and `GET /api/v1/homes/:id` 200 with `hasPhoto` and no `photo_object_key` / `photoObjectKey`. |
-| Browser smoke      | Playwright against `https://roomies.casa` + `https://api.roomies.casa` passed: empty Home, add JPEG, direct browser PUT to virtual-hosted R2 with `Content-Type` and no Roomies cookies/`Authorization`, finalize, `blob:` rendering on shell/overview/switcher, hard refresh, replace (new canonical key while `hasPhoto` stays true), remove, photoless refresh, GIF rejected locally. Home creator Admin UI has add/change/remove (not Admin-only). Roommate invite accept returned `409 EMAIL_NOT_VERIFIED` (no verified staging inbox). Unsigned canonical GET is not 200. |
+| Browser smoke      | Playwright against `https://roomies.casa` + `https://api.roomies.casa` passed: empty Home, add JPEG, direct browser PUT to virtual-hosted R2 with `Content-Type` and no Roomies cookies/`Authorization`, finalize, `blob:` rendering on shell/overview/switcher, hard refresh, replace (new canonical key while `hasPhoto` stays true), remove, photoless refresh, GIF rejected locally. Home creator Admin UI has add/change/remove (not Admin-only). Unsigned canonical GET is not 200. A later closed-alpha email smoke completed signup → verify → invite accept without `EMAIL_NOT_VERIFIED` (see Email verification). |
 
 Frontend production-build closure (M8P.5): `VITE_API_ORIGIN=https://api.example.test` and `VITE_R2_S3_ORIGIN=https://abc123.r2.cloudflarestorage.com` produced `dist/_headers` with `connect-src 'self' https://api.example.test https://abc123.r2.cloudflarestorage.com` and `img-src 'self' data: blob:` (R2 origin not in `img-src`).
 
@@ -731,9 +731,9 @@ literally named `production` with **zero** services; do not use it.
 | Cookies       | API `Set-Cookie`: `__Secure-better-auth.session_token`, `HttpOnly`, `Secure`, `SameSite=Lax`, host-only (no `Domain=`). Operator `Cookie` header reaches `/api/v1/me`. A browser document on `workers.dev` **does not** store/send that cookie to `railway.app` (cross-site / third-party). Production must use same-site hostnames (`roomies.example` + `api.roomies.example`). Do not weaken SameSite to make staging browsers work.                                                  |
 | CORS / Origin | Trusted staging frontend: `ACAO` exact origin + credentials. Hostile origin: no `ACAO`. `/api/v1` mutations: missing/hostile Origin → `403 FORBIDDEN`.                                                                                                                                                                                                                                                                                                                                  |
 | Worker/outbox | Combined process drained staging outbox (`processed_at` set, no dead rows). Activity projections created. No payload/content in outbox logs.                                                                                                                                                                                                                                                                                                                                            |
-| Invitations   | Create works without a product invitation mailer (`inviteUrl` returned once). Accept requires Better Auth `email_verified`. Verification mail uses the transactional adapter (staging may set `EMAIL_PROVIDER=fake` until a sending domain exists). Do not DB-patch `email_verified` for the production proof path.                                                                                                                                                                     |
+| Invitations   | Create works without a product invitation mailer (`inviteUrl` returned once). Accept requires Better Auth `email_verified`. Verification mail uses the Resend transactional adapter on the live staging API (`EMAIL_PROVIDER=resend`). Do not DB-patch `email_verified` for the proof path.                                                                                                                                                                     |
 
-## Email verification (M9.4)
+## Email verification (closed alpha)
 
 October transactional mail is **email verification only** (invitation
 acceptance). Password-reset delivery is **not** wired. No newsletters,
@@ -751,8 +751,10 @@ is the integration point. Tokens remain Better Auth JWTs (`expiresIn`
 ordinary Roomies use does not require a verified inbox; **invitation
 acceptance** still requires `email_verified`.
 
-Signup can send a verification email (`sendOnSignUp`). The invitation
-landing page can resend for a signed-in unverified session.
+Signup sends a verification email (`sendOnSignUp`). The signed-out
+landing and invitation page expose email/password sign-up and sign-in
+against Better Auth. Signed-in unverified sessions can resend from the
+invitation page, `/verify-email`, and the authenticated shell.
 `POST /api/auth/send-verification-email` stays on the M9.1 credential
 limiter (IP key, not email). Unauthenticated Better Auth resend already
 returns a generic success for missing/already-verified addresses.
@@ -763,22 +765,115 @@ Delivery failure: do not claim the email was sent. HTTP maps to
 `500 INTERNAL_ERROR` without provider bodies, emails, tokens, or URLs.
 Logs are `[email] verification delivery failed` only.
 
-Verification links use Better Auth's URL with `callbackURL` forced to
-`${FRONTEND_ORIGIN}/verify-email`. GET `/api/auth/verify-email`
-`originCheck` rejects callbacks outside `TRUSTED_ORIGINS`.
+Verification links keep Better Auth's token on
+`GET /api/auth/verify-email?token=…&callbackURL=…`. The backend rewrites
+that URL onto `AUTH_BASE_URL` and forces `callbackURL` to
+`${FRONTEND_ORIGIN}/verify-email`. For the current same-site topology
+that is `https://api.roomies.casa/api/auth/verify-email?…` returning
+users to `https://roomies.casa/verify-email`. GET `/api/auth/verify-email`
+`originCheck` rejects callbacks outside `TRUSTED_ORIGINS`. Do not put
+the token in logs, analytics, or the frontend document URL after Better
+Auth consumes it.
 
-### Sending-domain plan (M9.5 / operator)
+### Required backend env (names only)
 
-Do not fabricate provider DNS records before an account and domain
-exist. After Resend + the production zone exist:
+| Variable         | Local/test default | Staging / preview                         | Production              |
+| ---------------- | ------------------ | ----------------------------------------- | ----------------------- |
+| `EMAIL_PROVIDER` | `fake` if omitted  | required: `resend` or explicit `fake`     | **`resend` only**       |
+| `EMAIL_API_KEY`  | n/a for fake       | required for `resend`                     | required                |
+| `EMAIL_FROM`     | n/a for fake       | required for `resend` (`Name <email>`)    | required                |
+
+Never put `EMAIL_API_KEY`, `EMAIL_FROM`, or `EMAIL_PROVIDER` in `VITE_*`.
+Missing `EMAIL_API_KEY` / `EMAIL_FROM` with `EMAIL_PROVIDER=resend` fails
+closed at boot.
+
+### Fake provider (local / CI)
+
+`EMAIL_PROVIDER=fake` (the development/test default) captures messages
+in process memory. It never calls Resend. Unit and HTTP integration
+tests must keep this adapter; do not send real provider mail from CI.
+
+### Staging setup (live API)
+
+Keep `APP_ENV=staging`. Do not relax `email_verified` for invitation
+acceptance.
+
+Live backend (Railway project `roomies-staging`, Railway environment
+`production`, service `roomies`, application `APP_ENV=staging`):
+
+| Variable           | Staging value                                      |
+| ------------------ | -------------------------------------------------- |
+| `APP_ENV`          | `staging`                                          |
+| `AUTH_BASE_URL`    | `https://api.roomies.casa`                         |
+| `FRONTEND_ORIGIN`  | `https://roomies.casa`                             |
+| `TRUSTED_ORIGINS`  | `https://roomies.casa`                             |
+| `EMAIL_PROVIDER`   | `resend`                                           |
+| `EMAIL_FROM`       | `Roomies <noreply@roomies.casa>`                   |
+| `EMAIL_API_KEY`    | Resend send-only key (Railway secret; never in git)|
+
+Do not set these on the leftover `roomies-api` service
+(`*.up.railway.app`). That service is not the user-facing API.
+
+```bash
+railway variable set --environment production --service roomies EMAIL_PROVIDER=resend
+railway variable set --environment production --service roomies EMAIL_FROM="Roomies <noreply@roomies.casa>"
+railway variable set --environment production --service roomies EMAIL_API_KEY --stdin
+```
+
+### Sender / domain (repo vs operator)
+
+Automated repo changes: adapter, env **names**, From-address format
+validation, verification URL rewrite onto `FRONTEND_ORIGIN`.
+
+Operator / DNS / Resend dashboard (not fabricated here):
+
+- Resend account with a **send-restricted** API key in Railway
+- Domain `roomies.casa` verified in Resend for `noreply@roomies.casa`
+- Observed public DNS: TXT `resend._domainkey.roomies.casa` (DKIM)
+- Confirm in the Resend dashboard that the domain status is verified
+- Publish Resend’s **SPF** TXT on the sending domain if not already
+  present (`include:resend.com` or the records Resend shows)
+- Publish **DMARC** TXT (`v=DMARC1; p=quarantine` is a reasonable
+  starting policy)
+- Do not spoof an unverified From address
+
+`send.roomies.casa` currently CNAMEs to `send.forge.rmta.net` (not
+Resend). Do not point `EMAIL_FROM` at that hostname unless Resend has
+verified it.
+
+### Real signup / verification / invite smoke
+
+Use a real inbox the operator controls. Do not paste verification
+tokens into git, chat, or logs. Do not SQL-update `email_verified`.
+
+1. Open `https://roomies.casa` and create an account
+2. Confirm the message arrives from `Roomies <noreply@roomies.casa>`
+3. Confirm the link host is `api.roomies.casa` with callback
+   `https://roomies.casa/verify-email`
+4. Open the link; `/verify-email` shows success; session works
+5. From a separate Admin account, invite that verified inbox
+6. Open the invite URL, accept, enter the Home
+7. `/me/homes` includes the Home; Roommates lists both active members
+8. Sign out, sign in; membership remains active
+
+Closed-alpha deployed smoke (2026-09-24, `https://roomies.casa`):
+signup UI present; two new accounts received verification mail from a
+Roomies sender; links targeted `https://api.roomies.casa/api/auth/verify-email`
+with callback `https://roomies.casa/verify-email`; both accounts verified;
+Admin created a Home and invitation; invitee signed up on the invite URL,
+verified, joined; Roommates listed both members; sign-out/sign-in kept
+Home access. No database patch of `email_verified`.
+
+### Sending-domain plan (remaining operator DNS)
+
+If Resend still shows the domain as pending:
 
 - Verify the sending domain in Resend
 - Publish the provider's **SPF** TXT on the sending domain
 - Publish the provider's **DKIM** CNAMEs/TXT as instructed
 - Publish a **DMARC** TXT (`v=DMARC1; p=quarantine` is a reasonable
   starting policy for a small transactional app; tighten later)
-- `EMAIL_FROM` like `Roomies <noreply@mail.<production-site-host>>`
-  or the provider-recommended subdomain
+
 
 ## M9.5 production provisioning checklist
 

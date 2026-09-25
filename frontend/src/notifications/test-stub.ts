@@ -171,6 +171,24 @@ export function stubNotificationsApis(options: NotificationStubOptions = {}) {
         return Promise.resolve(jsonResponse(200, clearHousePulse()));
       }
 
+      const membershipsMatch = /^\/api\/v1\/homes\/([^/]+)\/memberships$/i.exec(
+        path,
+      );
+      if (membershipsMatch?.[1] !== undefined && method === 'GET') {
+        const homeId = membershipsMatch[1];
+        return Promise.resolve(
+          jsonResponse(200, {
+            currentMembershipId: 'm1111111-1111-4111-8111-111111111111',
+            memberships: [
+              {
+                membershipId: 'm1111111-1111-4111-8111-111111111111',
+                name: homeId === TEST_HOME_B ? 'Casey' : 'Alex',
+              },
+            ],
+          }),
+        );
+      }
+
       const homeMatch = /^\/api\/v1\/homes\/([^/]+)$/i.exec(path);
       if (homeMatch?.[1] !== undefined) {
         const homeId = homeMatch[1];

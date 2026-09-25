@@ -1,10 +1,16 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, type ReactNode } from 'react';
 import { useLocation } from 'react-router';
+import { CredentialForm } from '../auth/credential-form.js';
+import { UnverifiedEmailNotice } from '../auth/unverified-email-notice.js';
 import { DocumentTitle } from '../components/document-title.js';
 import { Spinner } from '../components/ui/index.js';
 import { clearPrivateHomeQueryState } from '../homes/clear-private-home-queries.js';
 import { currentUserQueryKey } from '../homes/home-query-keys.js';
+import {
+  getInvitationAuthSession,
+  invitationAuthSessionQueryKey,
+} from '../invitations/auth-session-api.js';
 import { ApiError } from '../platform/api/index.js';
 import { getCurrentUser } from '../users/current-user-api.js';
 
@@ -48,6 +54,12 @@ export function RequireAuth({ children }: { children: ReactNode }) {
     queryFn: ({ signal }) => getCurrentUser(signal),
     retry: false,
   });
+  const sessionQuery = useQuery({
+    queryKey: invitationAuthSessionQueryKey,
+    queryFn: ({ signal }) => getInvitationAuthSession(signal),
+    retry: false,
+    enabled: query.data !== undefined,
+  });
 
   const locationState =
     location.state !== null && typeof location.state === 'object'
@@ -84,6 +96,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
         <p className="max-w-prose text-base text-text-secondary">
           Sign in to see your Homes.
         </p>
+        <CredentialForm />
       </AuthLanding>
     );
   }
@@ -98,5 +111,20 @@ export function RequireAuth({ children }: { children: ReactNode }) {
     );
   }
 
-  return children;
+  const session = sessionQuery.data;
+  const unverified =
+    session !== null &&
+    session !== undefined &&
+    session.user.emailVerified === false;
+
+  return (
+    <>
+      {unverified ? (
+        <div className="mb-4">
+          <UnverifiedEmailNotice email={session.user.email} />
+        </div>
+      ) : null}
+      {children}
+    </>
+  );
 }

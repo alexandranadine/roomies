@@ -1,4 +1,5 @@
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { resetApiClientForTests } from '../platform/api/index.js';
 import { renderApp } from '../test/render.js';
@@ -65,5 +66,43 @@ describe('verify email page', () => {
       await screen.findByText(/this verification link isn’t valid/i),
     ).toBeInTheDocument();
     expect(document.body.innerHTML).not.toContain('TOKEN_EXPIRED');
+  });
+
+  it('lets an unverified session resend from the return page', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+        if (String(url).includes('/api/auth/get-session')) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                user: {
+                  id: 'user-id',
+                  email: 'roommate@example.com',
+                  emailVerified: false,
+                },
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } },
+            ),
+          );
+        }
+        if (String(url).includes('/api/auth/send-verification-email')) {
+          expect(init?.method).toBe('POST');
+          return Promise.resolve(
+            new Response(JSON.stringify({ status: true }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            }),
+          );
+        }
+        return Promise.resolve(new Response('{}', { status: 404 }));
+      }),
+    );
+
+    renderApp('/verify-email');
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Send verification email' }),
+    );
+    expect(await screen.findByText(/check your email/i)).toBeInTheDocument();
   });
 });

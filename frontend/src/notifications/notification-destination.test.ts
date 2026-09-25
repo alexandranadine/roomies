@@ -28,13 +28,13 @@ describe('notificationDestinationPath', () => {
     ).toBe(`/homes/${TEST_HOME_B}`);
   });
 
-  it('uses destination Home for Roommates', () => {
+  it('uses destination Home Roommates route for Roommates', () => {
     expect(
       notificationDestinationPath({
         type: 'ROOMMATES',
         homeId: TEST_HOME_A,
       }),
-    ).toBe(`/homes/${TEST_HOME_A}`);
+    ).toBe(`/homes/${TEST_HOME_A}/roommates`);
   });
 
   it('uses destination Home for HOME and never builds Maintenance detail', () => {

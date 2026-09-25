@@ -2,6 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { currentUserHomesQueryKey } from '../homes/home-query-keys.js';
+import { homeMembershipsKeys } from '../homes/home-memberships-query-keys.js';
 import { resetApiClientForTests } from '../platform/api/index.js';
 import { clearHousePulse } from '../pulse/test-fixtures.js';
 import { renderApp } from '../test/render.js';
@@ -80,9 +81,19 @@ describe('invitation landing page', () => {
         level: 1,
       }),
     ).toBeInTheDocument();
-    expect(screen.getByText(new RegExp(EMAIL))).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Join Home' })).toBeDisabled();
-    expect(screen.getByText(/sign in to roomies/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(`This invitation was sent to ${EMAIL}.`),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Join Home' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Create account' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: /email/i })).toHaveValue(EMAIL);
+    expect(
+      screen.getByText(/create an account or sign in/i),
+    ).toBeInTheDocument();
     expect(document.body.innerHTML).not.toContain(SECRET);
     expect(document.querySelector('img')).toBeNull();
     expect(document.body.innerHTML).not.toMatch(/r2|photo|cloudflare/i);
@@ -345,6 +356,149 @@ describe('invitation landing page', () => {
     expect(document.body.innerHTML).not.toContain(SECRET);
   });
 
+  it('invalidates a stale empty /me/homes cache after rejoin and shows only the new tenure', async () => {
+    window.history.replaceState(
+      null,
+      '',
+      `/invitations/${INVITATION_ID}#secret=${SECRET}`,
+    );
+    captureInvitationFragment();
+    const homeId = previewBody().invitation.home.id;
+    const newMembershipId = '018f1e2c-7e3a-7000-8000-1234567890ac';
+    const endedMembershipId = 'm3333333-3333-4333-8333-333333333333';
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/auth/get-session')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              user: {
+                id: '11111111-1111-4111-8111-111111111111',
+                email: EMAIL,
+                emailVerified: true,
+              },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        );
+      }
+      if (url.includes('/accept')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              membershipId: newMembershipId,
+              homeId,
+            }),
+            { status: 201, headers: { 'Content-Type': 'application/json' } },
+          ),
+        );
+      }
+      if (String(url).endsWith('/api/v1/me')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              id: '11111111-1111-4111-8111-111111111111',
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        );
+      }
+      if (String(url).includes(`/api/v1/homes/${homeId}/memberships`)) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              currentMembershipId: newMembershipId,
+              memberships: [
+                { membershipId: newMembershipId, name: 'Alex' },
+                {
+                  membershipId: 'm2222222-2222-4222-8222-222222222222',
+                  name: 'Jamie',
+                },
+              ],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        );
+      }
+      if (String(url).includes(`/api/v1/homes/${homeId}/pulse`)) {
+        return Promise.resolve(
+          new Response(JSON.stringify(clearHousePulse()), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        );
+      }
+      if (String(url).match(new RegExp(`/api/v1/homes/${homeId}$`))) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              id: homeId,
+              name: HOME_NAME,
+              timezone: 'UTC',
+              hasPhoto: false,
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        );
+      }
+      if (String(url).includes('/api/v1/me/homes')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify([
+              {
+                id: homeId,
+                name: HOME_NAME,
+                timezone: 'UTC',
+                role: 'ROOMMATE',
+                hasPhoto: false,
+              },
+            ]),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        );
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify(previewBody()), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { queryClient, router } = renderApp(`/invitations/${INVITATION_ID}`);
+    queryClient.setQueryData(currentUserHomesQueryKey, []);
+    queryClient.setQueryData(homeMembershipsKeys.all(homeId), {
+      currentMembershipId: endedMembershipId,
+      memberships: [{ membershipId: endedMembershipId, name: 'Alex' }],
+    });
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Join Home' }),
+    );
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe(`/homes/${homeId}`);
+    });
+    expect(
+      queryClient.getQueryState(currentUserHomesQueryKey)?.isInvalidated,
+    ).toBe(true);
+
+    await userEvent.click(
+      await screen.findByRole('link', { name: 'Roommates' }),
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: 'Roommates', level: 1 }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('You')).toBeInTheDocument();
+    expect(screen.getByText('Jamie')).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain(endedMembershipId);
+    expect(document.body.textContent).not.toContain(newMembershipId);
+    expect(
+      screen.queryByRole('button', { name: 'Invite roommate' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('does not attempt acceptance for wrong or unverified session email', async () => {
     for (const user of [
       { email: 'other@example.com', emailVerified: true },
@@ -438,6 +592,9 @@ describe('invitation landing page', () => {
       screen.getByRole('button', { name: 'Send verification email' }),
     );
     expect(await screen.findByText(/check your email/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/verify your email before joining this home/i),
+    ).toBeInTheDocument();
     expect(document.body.innerHTML).not.toContain(SECRET);
   });
 });

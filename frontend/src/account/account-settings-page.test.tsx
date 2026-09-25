@@ -55,6 +55,31 @@ function stubAccountApis(
         return Promise.resolve(jsonResponse(200, { id: USER_ID }));
       }
 
+      if (path.includes('/api/auth/get-session') && method === 'GET') {
+        if (!meAuthenticated) {
+          return Promise.resolve(
+            new Response('null', {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            }),
+          );
+        }
+        return Promise.resolve(
+          jsonResponse(200, {
+            user: {
+              id: USER_ID,
+              email: 'alex@example.com',
+              emailVerified: true,
+            },
+          }),
+        );
+      }
+
+      if (path.includes('/api/auth/sign-out') && method === 'POST') {
+        meAuthenticated = false;
+        return Promise.resolve(jsonResponse(200, { success: true }));
+      }
+
       if (path.endsWith('/api/v1/account') && method === 'DELETE') {
         deleteCalls += 1;
         const result = options.deleteHandler?.(init) ?? emptyResponse(204);
@@ -127,10 +152,21 @@ describe('Account settings deletion', () => {
     expect(
       screen.getByRole('button', { name: 'Delete account' }),
     ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Account' })).toHaveAttribute(
       'href',
       '/account',
     );
+  });
+
+  it('signs out and returns to the sign-in landing', async () => {
+    stubAccountApis();
+    renderApp('/account');
+    await screen.findByRole('heading', { name: 'Account', level: 1 });
+    await userEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    expect(
+      await screen.findByText(/sign in to see your homes/i),
+    ).toBeInTheDocument();
   });
 
   it('opens the confirmation dialog from Delete account', async () => {

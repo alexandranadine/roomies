@@ -463,7 +463,7 @@ describe('Notification interactions', () => {
     });
   });
 
-  it('navigates Roommates and HOME destinations to the destination Home overview', async () => {
+  it('navigates Roommates to the destination Home Roommates route and HOME to overview', async () => {
     const user = userEvent.setup();
     stubNotificationsApis({
       list: listPage([
@@ -489,7 +489,9 @@ describe('Notification interactions', () => {
       }),
     );
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe(`/homes/${TEST_HOME_B}`);
+      expect(router.state.location.pathname).toBe(
+        `/homes/${TEST_HOME_B}/roommates`,
+      );
     });
 
     await router.navigate('/notifications');

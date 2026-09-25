@@ -1,11 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router';
+import { CredentialForm } from '../auth/credential-form.js';
+import { UnverifiedEmailNotice } from '../auth/unverified-email-notice.js';
+import {
+  VERIFY_EMAIL_BEFORE_JOINING,
+  VERIFY_EMAIL_BEFORE_JOINING_TITLE,
+} from '../auth/verification-copy.js';
 import { DocumentTitle } from '../components/document-title.js';
 import { Alert, Button, Card, Spinner } from '../components/ui/index.js';
+import { homeMembershipsKeys } from '../homes/home-memberships-query-keys.js';
+import { currentUserHomesQueryKey } from '../homes/home-query-keys.js';
 import { ApiError } from '../platform/api/index.js';
 import { shouldRetryQuery } from '../platform/query/query-client.js';
-import { currentUserHomesQueryKey } from '../homes/home-query-keys.js';
 import { acceptInvitation } from './accept-api.js';
 import {
   getInvitationAuthSession,
@@ -16,7 +23,6 @@ import {
   getCapturedInvitationSecret,
 } from './capture-invitation-fragment.js';
 import { invitationPreviewQueryKey, previewInvitation } from './preview-api.js';
-import { sendVerificationEmail } from './send-verification-email-api.js';
 
 const INVITATION_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -84,16 +90,14 @@ export function InvitationLandingPage() {
       await queryClient.invalidateQueries({
         queryKey: currentUserHomesQueryKey,
       });
+      await queryClient.invalidateQueries({
+        queryKey: homeMembershipsKeys.all(result.homeId),
+      });
       void navigate(`/homes/${encodeURIComponent(result.homeId)}`, {
         replace: true,
       });
     },
   });
-  const resendVerification = useMutation({
-    mutationFn: (email: string) => sendVerificationEmail(email),
-    retry: false,
-  });
-
   if (secret === null) {
     return (
       <InvitationPageFrame title="Invitation link required · Roomies">
@@ -194,44 +198,15 @@ export function InvitationLandingPage() {
             </p>
           ) : null}
           {!sessionQuery.isPending && !signedIn ? (
-            <>
-              <Button disabled>Join Home</Button>
-              <p className="text-sm text-text-secondary">
-                Sign in to Roomies, then reopen the original invitation link.
-                The invitation secret is intentionally not saved across a page
-                reload.
-              </p>
-            </>
+            <p className="text-sm text-text-secondary">
+              Create an account or sign in with {invitation.email} on this page.
+              Stay here so the invitation link does not need to be reopened.
+            </p>
           ) : null}
           {signedIn && !session.user.emailVerified ? (
             <>
               <Button disabled>Join Home</Button>
-              <Alert variant="warning" title="Verify your email first">
-                Verify your current Roomies email, then reopen this invitation
-                link.
-              </Alert>
-              <Button
-                variant="secondary"
-                loading={resendVerification.isPending}
-                onClick={() => {
-                  resendVerification.mutate(session.user.email);
-                }}
-              >
-                Send verification email
-              </Button>
-              {resendVerification.isSuccess ? (
-                <Alert variant="success" title="Check your email">
-                  Open the verification link, then reopen this invitation link.
-                </Alert>
-              ) : null}
-              {resendVerification.isError ? (
-                <Alert
-                  variant="danger"
-                  title="Couldn’t send a verification email"
-                >
-                  Try again in a moment.
-                </Alert>
-              ) : null}
+              <UnverifiedEmailNotice email={session.user.email} />
             </>
           ) : null}
           {signedIn &&
@@ -254,9 +229,8 @@ export function InvitationLandingPage() {
             </Button>
           ) : null}
           {acceptanceError === 'EMAIL_NOT_VERIFIED' ? (
-            <Alert variant="warning" title="Verify your email first">
-              Verify your current Roomies email, then reopen this invitation
-              link.
+            <Alert variant="warning" title={VERIFY_EMAIL_BEFORE_JOINING_TITLE}>
+              {VERIFY_EMAIL_BEFORE_JOINING}
             </Alert>
           ) : null}
           {acceptanceError === 'EMAIL_MISMATCH' ? (
@@ -282,6 +256,9 @@ export function InvitationLandingPage() {
           ) : null}
         </div>
       </Card>
+      {!sessionQuery.isPending && !signedIn ? (
+        <CredentialForm defaultEmail={invitation.email} defaultMode="sign-up" />
+      ) : null}
     </InvitationPageFrame>
   );
 }

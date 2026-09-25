@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { SignOutButton } from '../auth/sign-out-button.js';
 import { DocumentTitle } from '../components/document-title.js';
 import { Button } from '../components/ui/index.js';
 import { DeleteAccountDialog } from './delete-account-dialog.js';
@@ -21,6 +22,25 @@ export function AccountSettingsPage() {
             Manage your Roomies account across your Homes.
           </p>
         </header>
+
+        <section
+          aria-labelledby="account-session-heading"
+          className="flex flex-col gap-3"
+        >
+          <div className="flex flex-col gap-1">
+            <h2
+              id="account-session-heading"
+              className="text-lg font-semibold tracking-tight text-text-primary"
+            >
+              Sign out
+            </h2>
+            <p className="max-w-prose text-sm text-text-secondary">
+              End this session on this browser. You can sign in again with the
+              same account.
+            </p>
+          </div>
+          <SignOutButton />
+        </section>
 
         <section
           aria-labelledby="account-danger-heading"

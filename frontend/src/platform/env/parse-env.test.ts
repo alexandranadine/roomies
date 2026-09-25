@@ -69,6 +69,19 @@ describe('parseFrontendEnv', () => {
     );
   });
 
+  it('does not declare email-provider secrets as Vite public env', () => {
+    const declared = Object.keys(
+      parseFrontendEnv(
+        { VITE_API_ORIGIN: 'https://api.roomies.example' },
+        { isDevelopment: false },
+      ),
+    );
+    expect(declared).toEqual(['apiOrigin']);
+    expect(declared.join(',')).not.toMatch(
+      /EMAIL_API_KEY|EMAIL_FROM|EMAIL_PROVIDER/,
+    );
+  });
+
   it('accepts an exact public R2 S3 origin', () => {
     const env = parseFrontendEnv(
       {

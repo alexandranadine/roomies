@@ -57,6 +57,32 @@ describe('API client', () => {
     } satisfies Partial<ApiError>);
   });
 
+  it('parses Better Auth credential errors without using the raw message', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            code: 'USER_ALREADY_EXISTS',
+            message: 'User already exists',
+          }),
+          { status: 422, headers: { 'Content-Type': 'application/json' } },
+        ),
+      ),
+    );
+
+    const client = createApiClient('http://localhost:3000');
+
+    await expect(
+      client.request({ path: '/api/auth/sign-up/email' }),
+    ).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 422,
+      code: 'USER_ALREADY_EXISTS',
+      message: 'Request failed',
+    } satisfies Partial<ApiError>);
+  });
+
   it('safely handles malformed or non-JSON error responses', async () => {
     vi.stubGlobal(
       'fetch',

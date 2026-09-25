@@ -827,6 +827,65 @@ void describe('parseConfig', () => {
     assert.deepEqual(config.objectStore, { provider: 'fake' });
   });
 
+  void it('fails closed when staging resend is missing EMAIL_API_KEY', () => {
+    assert.throws(
+      () =>
+        parseConfig({
+          APP_ENV: 'staging',
+          DATABASE_URL: SECRET_DATABASE_URL,
+          AUTH_SECRET: VALID_AUTH_SECRET,
+          AUTH_BASE_URL: 'https://api.roomies.casa',
+          FRONTEND_ORIGIN: 'https://roomies.casa',
+          TRUSTED_ORIGINS: 'https://roomies.casa',
+          EMAIL_PROVIDER: 'resend',
+          EMAIL_FROM: 'Roomies <noreply@roomies.casa>',
+          R2_PROVIDER: 'fake',
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof ConfigError);
+        assert.match(error.message, /EMAIL_API_KEY is required/);
+        return true;
+      },
+    );
+  });
+
+  void it('requires EMAIL_PROVIDER outside local environments', () => {
+    assert.throws(
+      () =>
+        parseConfig({
+          APP_ENV: 'staging',
+          DATABASE_URL: SECRET_DATABASE_URL,
+          AUTH_SECRET: VALID_AUTH_SECRET,
+          AUTH_BASE_URL: 'https://api.roomies.casa',
+          FRONTEND_ORIGIN: 'https://roomies.casa',
+          TRUSTED_ORIGINS: 'https://roomies.casa',
+          R2_PROVIDER: 'fake',
+        }),
+      /EMAIL_PROVIDER is required/,
+    );
+  });
+
+  void it('accepts resend mail in staging when required variables are set', () => {
+    const config = parseConfig({
+      APP_ENV: 'staging',
+      DATABASE_URL: SECRET_DATABASE_URL,
+      AUTH_SECRET: VALID_AUTH_SECRET,
+      AUTH_BASE_URL: 'https://api.roomies.casa',
+      FRONTEND_ORIGIN: 'https://roomies.casa',
+      TRUSTED_ORIGINS: 'https://roomies.casa',
+      EMAIL_PROVIDER: 'resend',
+      EMAIL_API_KEY: VALID_EMAIL_API_KEY,
+      EMAIL_FROM: 'Roomies <noreply@roomies.casa>',
+      R2_PROVIDER: 'fake',
+    });
+    assert.deepEqual(config.email, {
+      provider: 'resend',
+      apiKey: VALID_EMAIL_API_KEY,
+      from: 'Roomies <noreply@roomies.casa>',
+    });
+    assert.equal(config.frontendOrigin, 'https://roomies.casa');
+  });
+
   void it('accepts same-site production origins and rejects unrelated hosts', () => {
     const accepted = parseConfig(validProductionEnv());
     assert.equal(accepted.frontendOrigin, 'https://roomies.example');

@@ -8,6 +8,7 @@ import { InvitationLandingPage } from '../invitations/invitation-landing-page.js
 import { VerifyEmailPage } from '../invitations/verify-email-page.js';
 import { MaintenanceDetailPage } from '../maintenance/maintenance-detail-page.js';
 import { MaintenanceListPage } from '../maintenance/maintenance-list-page.js';
+import { RoommatesPage } from '../roommates/roommates-page.js';
 import { NotificationsListPage } from '../notifications/notifications-list-page.js';
 import { AppShell } from './app-shell.js';
 import { NotFoundPage } from './not-found-page.js';
@@ -26,6 +27,7 @@ export type CreateAppRouterOptions = {
  * Router foundation:
  * - `/` — authenticated active-Home discovery
  * - `/homes/:homeId` — URL-backed authorized Home shell
+ * - `/homes/:homeId/roommates` — Home-scoped roommate management
  * - `/notifications` — authenticated global Notifications inbox
  * - `/account` — authenticated Account settings (cross-Home)
  * - `/invitations/:invitationId` — signed-out invitation preview landing
@@ -83,6 +85,10 @@ export function buildAppChildRoutes(includeDevRoutes: boolean): RouteObject[] {
         {
           path: 'maintenance/:maintenanceEntryId',
           element: <MaintenanceDetailPage />,
+        },
+        {
+          path: 'roommates',
+          element: <RoommatesPage />,
         },
       ],
     },

@@ -25,8 +25,8 @@ and `POST /api/auth/sign-out` are not credential-throttled.
 `GET /health` and `GET /ready` are not limited.
 
 Password reset and email verification **sending** now have a Roomies
-transactional adapter (Resend in production, explicit `fake` in
-local/test/staging). Better Auth `requireEmailVerification` remains
+transactional adapter (Resend in staging/production, explicit `fake` in
+local/test). Better Auth `requireEmailVerification` remains
 `false`. Invitation acceptance still requires a verified email.
 `POST /api/auth/send-verification-email` (and password-reset paths)
 stay credential-limited so they cannot be hammered. Password-reset
