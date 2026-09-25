@@ -455,7 +455,7 @@ test.describe('Notifications authenticated UI', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/notifications');
     await expect(
-      page.getByRole('heading', { name: "You're all caught up.", level: 2 }),
+      page.getByRole('heading', { name: 'You’re all caught up.', level: 2 }),
     ).toBeVisible();
     await expect(
       page.getByText('Household updates will show up here.'),

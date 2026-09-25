@@ -187,7 +187,7 @@ describe('Notifications list page', () => {
 
     expect(
       await screen.findByRole('heading', {
-        name: "You're all caught up.",
+        name: 'You’re all caught up.',
         level: 2,
       }),
     ).toBeInTheDocument();

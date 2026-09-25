@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { User } from 'lucide-react';
-import { NavLink, Outlet, useLocation } from 'react-router';
+import { NavLink, Outlet, useLocation, useMatches } from 'react-router';
 import { isAuthCanvasPath } from '../auth/auth-page-layout.js';
 import { PageContainer } from '../components/page-container.js';
 import { RoomiesWordmark } from '../components/roomies-wordmark.js';
@@ -19,23 +19,41 @@ const accountNavClassName = ({ isActive }: { isActive: boolean }) =>
     isActive && 'bg-subtle text-text-primary',
   );
 
+function hasHideAppChromeHandle(
+  matches: ReturnType<typeof useMatches>,
+): boolean {
+  return matches.some((match) => {
+    const handle = match.handle;
+    return (
+      handle !== null &&
+      typeof handle === 'object' &&
+      'hideAppChrome' in handle &&
+      handle.hideAppChrome === true
+    );
+  });
+}
+
 /**
  * Application shell: semantic header/main, Roomies branding, global
  * Notifications, Account on non-Home routes, responsive page container.
- * Authenticated chrome is hidden on public auth/invitation canvases and while
- * signed out so those flows do not look like the in-app shell.
+ * Authenticated chrome is hidden on public auth/invitation canvases, the
+ * not-found canvas, and while signed out so those flows do not look like
+ * the in-app shell.
  */
 export function AppShell() {
   const location = useLocation();
+  const matches = useMatches();
   const homeScoped = isHomeScopedPath(location.pathname);
   const authCanvas = isAuthCanvasPath(location.pathname);
+  const catchAll = hasHideAppChromeHandle(matches);
   const meQuery = useQuery({
     queryKey: currentUserQueryKey,
     queryFn: ({ signal }) => getCurrentUser(signal),
     retry: false,
   });
   const signedIn = meQuery.data !== undefined;
-  const hideGlobalHeader = homeScoped || authCanvas || !signedIn;
+  const hideGlobalHeader =
+    homeScoped || authCanvas || catchAll || !signedIn;
 
   return (
     <div className="flex min-h-dvh flex-col bg-bg text-text-primary">

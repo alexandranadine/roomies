@@ -450,7 +450,7 @@ test.describe('Activity authenticated UI', () => {
       page.getByRole('heading', { name: 'Oak Street', level: 1 }),
     ).toBeVisible();
 
-    await page.getByRole('link', { name: 'Activity' }).focus();
+    await page.getByRole('link', { name: 'See all' }).focus();
     await page.keyboard.press('Enter');
     await expect(
       page.getByRole('heading', { name: 'Activity', level: 1 }),

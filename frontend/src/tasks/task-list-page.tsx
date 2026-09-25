@@ -199,7 +199,7 @@ export function TaskListPage() {
         data-testid="tasks-page"
         className="mx-auto flex w-full max-w-[980px] flex-col gap-5"
       >
-        <header className="flex items-start justify-between gap-3">
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex min-w-0 flex-col gap-1">
             <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
               Tasks
@@ -215,7 +215,7 @@ export function TaskListPage() {
           </div>
           <Button
             type="button"
-            className="shrink-0"
+            className="shrink-0 self-start"
             icon={<Plus className="size-4" aria-hidden="true" />}
             onClick={openCreate}
           >

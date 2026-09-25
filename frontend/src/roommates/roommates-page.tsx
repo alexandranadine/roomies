@@ -174,7 +174,7 @@ export function RoommatesPage() {
               Roommates
             </h1>
             <p className="text-sm text-text-secondary">
-              The people sharing this home.
+              The people sharing this Home.
             </p>
             {justYou ? (
               <p className="text-xs font-medium text-text-muted">

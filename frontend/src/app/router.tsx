@@ -135,6 +135,7 @@ export function buildAppChildRoutes(includeDevRoutes: boolean): RouteObject[] {
 
   routes.push({
     path: '*',
+    handle: { hideAppChrome: true },
     element: <NotFoundPage />,
   });
 

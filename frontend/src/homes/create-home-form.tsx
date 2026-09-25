@@ -101,7 +101,7 @@ export function CreateHomeForm() {
       />
 
       {errors.root?.message ? (
-        <Alert variant="danger" title="Couldn’t create this home">
+        <Alert variant="danger" title="Couldn’t create this Home">
           {errors.root.message}
         </Alert>
       ) : null}

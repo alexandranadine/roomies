@@ -23,7 +23,7 @@ export function HomeDiscoveryPage() {
     return (
       <DocumentTitle title="Your Homes · Roomies">
         <div className="flex flex-col gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight text-text-primary sm:text-3xl">
+          <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
             Your Homes
           </h1>
           <Spinner label="Loading your Homes" />
@@ -40,7 +40,7 @@ export function HomeDiscoveryPage() {
     return (
       <DocumentTitle title="Your Homes · Roomies">
         <div className="flex flex-col gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight text-text-primary sm:text-3xl">
+          <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
             Your Homes
           </h1>
           <p className="max-w-prose text-base text-text-secondary">
@@ -116,7 +116,7 @@ export function HomeDiscoveryPage() {
   return (
     <DocumentTitle title="Your Homes · Roomies">
       <div className="flex flex-col gap-4">
-        <h1 className="text-2xl font-semibold tracking-tight text-text-primary sm:text-3xl">
+        <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
           Your Homes
         </h1>
         <p className="max-w-prose text-base text-text-secondary">

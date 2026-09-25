@@ -125,7 +125,7 @@ export function NotificationsListPage() {
         {showEmpty ? (
           <EmptyState
             className="px-4 py-6"
-            title="You're all caught up."
+            title="You’re all caught up."
             description="Household updates will show up here."
           />
         ) : null}

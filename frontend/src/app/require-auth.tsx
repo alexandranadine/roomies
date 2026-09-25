@@ -4,8 +4,10 @@ import { useLocation } from 'react-router';
 import { AuthPageLayout } from '../auth/auth-page-layout.js';
 import { CredentialForm } from '../auth/credential-form.js';
 import { UnverifiedEmailNotice } from '../auth/unverified-email-notice.js';
+import { PageContainer } from '../components/page-container.js';
 import { Alert, Spinner } from '../components/ui/index.js';
 import { clearPrivateHomeQueryState } from '../homes/clear-private-home-queries.js';
+import { isHomeScopedPath } from '../homes/home-nav.js';
 import { currentUserQueryKey } from '../homes/home-query-keys.js';
 import {
   getInvitationAuthSession,
@@ -96,13 +98,20 @@ export function RequireAuth({ children }: { children: ReactNode }) {
     session !== null &&
     session !== undefined &&
     session.user.emailVerified === false;
+  const homeScoped = isHomeScopedPath(location.pathname);
 
   return (
     <>
       {unverified ? (
-        <div className="mb-4">
-          <UnverifiedEmailNotice email={session.user.email} />
-        </div>
+        homeScoped ? (
+          <PageContainer className="pt-3 pb-1">
+            <UnverifiedEmailNotice email={session.user.email} />
+          </PageContainer>
+        ) : (
+          <div className="mb-4">
+            <UnverifiedEmailNotice email={session.user.email} />
+          </div>
+        )
       ) : null}
       {children}
     </>

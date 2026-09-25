@@ -53,7 +53,6 @@ export function HomeActivityFeed({ homeId }: HomeActivityFeedProps) {
         </h2>
         <Link
           to={activityHref}
-          aria-label="Activity"
           className="text-sm font-medium text-brand underline-offset-4 hover:text-brand-hover hover:underline focus-visible:rounded-sm"
         >
           See all
@@ -87,8 +86,8 @@ export function HomeActivityFeed({ homeId }: HomeActivityFeedProps) {
 
       {showEmpty ? (
         <EmptyState
-          title="No activity yet"
-          description="Updates from your home will show up here."
+          title="Nothing here yet."
+          description="Household activity will show up here."
         />
       ) : null}
 
