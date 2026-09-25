@@ -154,6 +154,27 @@ describe('House Pulse on Home overview', () => {
     ).toHaveAttribute('data-pulse-state', 'ACTIVE');
   });
 
+  it('links Tasks to the existing Home Tasks destination', async () => {
+    const user = userEvent.setup();
+    stubPulseApis({
+      pulseByHome: { [TEST_HOME_A]: clearHousePulse() },
+    });
+    const { router } = renderApp(`/homes/${TEST_HOME_A}`);
+
+    const region = await screen.findByTestId('house-pulse');
+    const links = within(region).getAllByRole('link', {
+      name: 'Open Tasks',
+    });
+    expect(links).toHaveLength(1);
+    await user.click(links[0]!);
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe(
+        `/homes/${TEST_HOME_A}/tasks`,
+      );
+    });
+  });
+
   it('links Maintenance to the existing Home Maintenance destination', async () => {
     const user = userEvent.setup();
     stubPulseApis({
@@ -312,7 +333,7 @@ describe('House Pulse on Home overview', () => {
     expect(sessionStorage.length).toBe(0);
   });
 
-  it('does not invent Tasks or Supplies destinations', async () => {
+  it('does not invent Supplies destinations', async () => {
     stubPulseApis({
       pulseByHome: { [TEST_HOME_A]: activeHousePulse() },
     });
@@ -320,8 +341,8 @@ describe('House Pulse on Home overview', () => {
 
     const region = await screen.findByTestId('house-pulse');
     expect(
-      within(region).queryByRole('link', { name: /tasks/i }),
-    ).not.toBeInTheDocument();
+      within(region).getByRole('link', { name: 'Open Tasks' }),
+    ).toBeInTheDocument();
     expect(
       within(region).queryByRole('link', { name: /supplies/i }),
     ).not.toBeInTheDocument();

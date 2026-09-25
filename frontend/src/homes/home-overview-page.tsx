@@ -93,8 +93,8 @@ export function HomeOverviewPage() {
             {home.name}
           </h1>
           <p className="max-w-prose text-base text-text-secondary">
-            Shared life for this Home. Use Maintenance for household upkeep
-            items that need attention.
+            Shared life for this Home. Use Tasks for chores and Maintenance for
+            upkeep that needs attention.
           </p>
           <HomePhotoSection home={home} />
         </div>
@@ -120,7 +120,13 @@ export function HomeOverviewPage() {
           <HousePulseSection homeId={homeId} pulse={pulseForHome} />
         ) : null}
 
-        <p>
+        <p className="flex flex-wrap gap-x-4 gap-y-2">
+          <Link
+            to={`/homes/${encodeURIComponent(home.id)}/tasks`}
+            className="font-medium text-brand underline-offset-4 hover:text-brand-hover hover:underline focus-visible:rounded-sm"
+          >
+            Open Tasks
+          </Link>
           <Link
             to={`/homes/${encodeURIComponent(home.id)}/maintenance`}
             className="font-medium text-brand underline-offset-4 hover:text-brand-hover hover:underline focus-visible:rounded-sm"

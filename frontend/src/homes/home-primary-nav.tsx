@@ -36,6 +36,14 @@ export function HomePrimaryNav({ homeId }: HomePrimaryNavProps) {
         </li>
         <li>
           <NavLink
+            to={`${base}/tasks`}
+            className={({ isActive }) => navClassName(isActive)}
+          >
+            Tasks
+          </NavLink>
+        </li>
+        <li>
+          <NavLink
             to={`${base}/activity`}
             className={({ isActive }) => navClassName(isActive)}
           >

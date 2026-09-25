@@ -64,9 +64,32 @@ function SectionShell({
   );
 }
 
-function TasksSection({ item }: { item: TaskPulseItem }) {
+function TasksSection({
+  item,
+  homeId,
+}: {
+  item: TaskPulseItem;
+  homeId: string;
+}) {
   return (
-    <SectionShell title="Tasks" state={item.state}>
+    <SectionShell
+      title="Tasks"
+      state={item.state}
+      footer={
+        <p className="mt-2">
+          <Link
+            to={`/homes/${encodeURIComponent(homeId)}/tasks`}
+            className={cn(
+              'inline-flex min-h-control-lg items-center text-sm font-medium text-brand',
+              'underline-offset-4 hover:text-brand-hover hover:underline',
+              'focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
+            )}
+          >
+            Open Tasks
+          </Link>
+        </p>
+      }
+    >
       {item.state === 'CLEAR' ? (
         <p className="text-sm text-text-secondary">{tasksClearCopy()}</p>
       ) : (
@@ -157,7 +180,7 @@ export function HousePulseSection({ homeId, pulse }: HousePulseSectionProps) {
 
       <Card className="p-0">
         <ul className="list-none">
-          <TasksSection item={tasks} />
+          <TasksSection item={tasks} homeId={homeId} />
           <SuppliesSection item={supplies} />
           <MaintenanceSection item={maintenance} homeId={homeId} />
         </ul>

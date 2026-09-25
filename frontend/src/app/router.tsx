@@ -10,6 +10,7 @@ import { MaintenanceDetailPage } from '../maintenance/maintenance-detail-page.js
 import { MaintenanceListPage } from '../maintenance/maintenance-list-page.js';
 import { RoommatesPage } from '../roommates/roommates-page.js';
 import { NotificationsListPage } from '../notifications/notifications-list-page.js';
+import { TaskListPage } from '../tasks/task-list-page.js';
 import { AppShell } from './app-shell.js';
 import { NotFoundPage } from './not-found-page.js';
 import { RequireAuth } from './require-auth.js';
@@ -27,6 +28,9 @@ export type CreateAppRouterOptions = {
  * Router foundation:
  * - `/` — authenticated active-Home discovery
  * - `/homes/:homeId` — URL-backed authorized Home shell
+ * - `/homes/:homeId/tasks` — Home-scoped Tasks
+ * - `/homes/:homeId/activity` — Home-scoped Activity
+ * - `/homes/:homeId/maintenance` — Home-scoped Maintenance
  * - `/homes/:homeId/roommates` — Home-scoped roommate management
  * - `/notifications` — authenticated global Notifications inbox
  * - `/account` — authenticated Account settings (cross-Home)
@@ -77,6 +81,10 @@ export function buildAppChildRoutes(includeDevRoutes: boolean): RouteObject[] {
         {
           path: 'activity',
           element: <ActivityListPage />,
+        },
+        {
+          path: 'tasks',
+          element: <TaskListPage />,
         },
         {
           path: 'maintenance',
