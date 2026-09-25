@@ -139,6 +139,21 @@ Unchanged M8 semantics:
   `Referrer-Policy: no-referrer`, locked-down `Permissions-Policy`.
 - HSTS only when `secureAuthCookies` is true (preview/staging/production).
 
+## Home-photo object store
+
+Home photos are private R2 objects. The application uses the S3 API and
+short-lived presigned URLs only. Do not enable `r2.dev` public access, a
+public custom media hostname, or anonymous GetObject. Presigned GET/PUT
+URLs are bearer credentials: do not persist them, log them, or put them
+in `<img src>`. Frontend CSP may list the exact R2 S3 origin on
+`connect-src` only; `img-src` stays `'self' data: blob:`.
+
+Never put `R2_ACCESS_KEY_ID` or `R2_SECRET_ACCESS_KEY` in Vite env.
+Invitation preview must not request or reveal a Home photo.
+
+Operator bucket privacy, CORS, and lifecycle steps:
+[`docs/deployment.md`](deployment.md).
+
 ## Logging
 
 429s are not logged. Unexpected errors remain content-free (`requestId`,

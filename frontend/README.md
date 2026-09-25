@@ -57,6 +57,11 @@ The backend `fake` object store is an in-process test adapter. It cannot service
 
 Do not add an Express upload proxy, fake public upload server, Worker, MinIO, or multipart/form-data backend upload to make local uploads easier.
 
+Operator bucket, CORS, lifecycle, and deployment-variable steps live in
+[`docs/deployment.md`](../docs/deployment.md) (R2). Those are Cloudflare
+dashboard / Wrangler / Railway actions, not repository-controlled
+infrastructure.
+
 Production static hosting is Cloudflare Workers Static Assets (`wrangler.json`). Direct navigation to `/account`, `/homes/:id`, and `/invitations/:id` uses the SPA `not_found_handling` fallback. Document CSP and cache headers are written to `dist/_headers` at build time. Source maps are not emitted. See [`docs/deployment.md`](../docs/deployment.md).
 
 ## Typography

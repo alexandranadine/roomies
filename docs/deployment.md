@@ -26,12 +26,12 @@ re-observed as a raw container property).
 
 ## Topology
 
-| Piece    | Platform                           | Notes                                         |
-| -------- | ---------------------------------- | --------------------------------------------- |
-| Frontend | Cloudflare Workers Static Assets   | SPA. No Pages config.                         |
-| Backend  | One Railway Hobby service, US West | Combined web + worker process                 |
-| Database | Neon PostgreSQL, AWS us-west-2     | Launch if PITR/backup expectations require it |
-| Media    | Cloudflare R2                      | Later M9. Not provisioned here.               |
+| Piece    | Platform                           | Notes                                                                                                          |
+| -------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Frontend | Cloudflare Workers Static Assets   | SPA. No Pages config.                                                                                          |
+| Backend  | One Railway Hobby service, US West | Combined web + worker process                                                                                  |
+| Database | Neon PostgreSQL, AWS us-west-2     | Launch if PITR/backup expectations require it                                                                  |
+| Media    | Cloudflare R2                      | Private staging bucket `roomies-home-photos-staging`. No `r2.dev` / custom domain. Live API `R2_*` is on Railway service `roomies` (see M8P.6). |
 
 Initial HTTP topology is **one Railway service / one process**. Production
 auto-sleep must be **OFF**. Replica count is **1** until in-process rate
@@ -432,9 +432,272 @@ The in-process `fake` object store cannot service a real browser’s presigned
 PUT. Local unit/component/E2E tests mock that transfer. Manual real-browser
 upload requires `R2_PROVIDER=cloudflare`, a private dev/staging bucket, bucket
 CORS for the frontend origin, and `VITE_R2_S3_ORIGIN`. Do not add an Express
-upload proxy, fake public upload server, Worker, or MinIO for local uploads.
-Bucket provisioning and lifecycle configuration are not owned by the frontend
-Home-photo UX.
+upload proxy, fake public upload server, Worker, MinIO, sweeper worker, or
+Redis cleanup job. Do not enable public `r2.dev` access, a public custom
+media domain, anonymous GetObject, or a CDN/Worker image proxy.
+
+### Repo-controlled vs operator state
+
+This repository does **not** encode Cloudflare R2 as infrastructure-as-code
+(no Terraform/Pulumi, no committed bucket manifest, no Wrangler R2 binding
+in the frontend Worker). Wrangler is **not** an application dependency;
+operators run `npx wrangler` from `frontend/` against existing OAuth.
+
+| Kind                    | Where it lives                                                                                       |
+| ----------------------- | ---------------------------------------------------------------------------------------------------- |
+| Repo-controlled         | Env **names**, parse-time validation, S3/presign code, CSP generation from `VITE_R2_S3_ORIGIN`       |
+| Cloudflare operator     | Enable R2, bucket, privacy, CORS, `tmp/` lifecycle, R2 S3 API tokens, jurisdiction                   |
+| Railway operator        | Backend `R2_*` values (dashboard or `railway variable set`). Never commit values                     |
+| Cloudflare frontend env | `VITE_API_ORIGIN` and `VITE_R2_S3_ORIGIN` at **build** time (embedded in `dist/_headers` and the JS) |
+
+Never commit credential values, signed URLs, or a public R2 hostname.
+
+### M8P.6 status (VERIFIED LIVE 2026-09-24)
+
+Operator enabled R2 and created the private staging bucket. The Home-photo
+backend for this milestone is Railway project `roomies-staging`, service
+`roomies`, Railway environment `production`, application `APP_ENV=staging`.
+Do not change `APP_ENV`. The leftover service
+`https://roomies-api-staging.up.railway.app` is stale and is **not** the
+frontend API origin.
+
+The smoke frontend is `https://roomies.casa` (Worker
+`roomies-frontend-staging`; Cloudflare Workers environment `production` on
+that custom domain). Manual `npx wrangler deploy --name roomies-frontend-staging`
+after a local production build. There is no Worker named `roomies-frontend`.
+`VITE_*` is supplied in the local build environment only. Do not commit those
+values.
+
+| Item               | Fact                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cloudflare account | `38695abd0586016d676f037d65e7a73a`                                                                                                                                                                                                                                                                                                                                                                                  |
+| Bucket             | `roomies-home-photos-staging`, location hint `WNAM` (not a jurisdiction constraint). `r2.dev` public access **disabled**. No custom domain. Object count `0` after the completed add/replace/remove smoke (temp and canonical objects cleaned).                                                                                                                                                                     |
+| S3 origin          | Account endpoint `https://38695abd0586016d676f037d65e7a73a.r2.cloudflarestorage.com` (`R2_S3_ENDPOINT` unset). Browser presigned URLs are virtual-hosted: `https://roomies-home-photos-staging.38695abd0586016d676f037d65e7a73a.r2.cloudflarestorage.com`. `VITE_R2_S3_ORIGIN` must match that generated origin, not the account endpoint.                                                                          |
+| CORS               | Exact origins `https://roomies.casa` and `https://roomies-frontend-staging.alexandra-nadine-lewis.workers.dev`; methods `GET`,`PUT`; headers `Content-Type`; exposed `ETag`; max age `3600`; no `*`, `OPTIONS`, or `Content-Length`                                                                                                                                                                               |
+| Lifecycle          | `expire-temp-home-photo-uploads` enabled, prefix `tmp/`, expire after 1 day. No `homes/` object-expiration rule. Cloudflare default “abort incomplete multipart uploads after 7 days” remains (all prefixes; not object expiry).                                                                                                                                                                                    |
+| Live API           | `https://api.roomies.casa`. `/health` and `/ready` 200. Release `b3812aabea79bf51648b70a2fd3b2a4856c73a3a`. `R2_PROVIDER=cloudflare`, `R2_BUCKET=roomies-home-photos-staging`, R2 account/access/secret names present. `TRUSTED_ORIGINS=https://roomies.casa`. `FRONTEND_ORIGIN=https://roomies.casa`. `AUTH_BASE_URL=https://api.roomies.casa`. `INGRESS_MODE=cloudflare`.                                                                                                                                 |
+| Frontend           | Worker `roomies-frontend-staging` version `d0b79ff4-939b-4c21-b435-afc671428155`. Same hashed bundle on `https://roomies.casa` and `https://roomies-frontend-staging.alexandra-nadine-lewis.workers.dev` (`assets/index-COEy7YVP.js`). Live CSP `connect-src 'self' https://api.roomies.casa https://roomies-home-photos-staging.38695abd0586016d676f037d65e7a73a.r2.cloudflarestorage.com`; `img-src 'self' data: blob:`; R2 origin not in `img-src`; no `railway.app` in `connect-src`. |
+| Cookies            | Unchanged: `HttpOnly`, `Secure`, `SameSite=Lax`, host-only. `roomies.casa` and `api.roomies.casa` are same-site, so the authenticated document session works without weakening SameSite. Do not use `workers.dev` → `railway.app` for this milestone.                                                                                                                                                              |
+| Schema             | Release migration `20260924T0514_home_photo_object_key` applied. Live `homes.photo_object_key` exists with canonical check and unique index. Marker `10b42e58a246ab56874f0985069a85787999dcd032a5f5fbea26067e6493e659`. Authenticated `GET /api/v1/me/homes` and `GET /api/v1/homes/:id` 200 with `hasPhoto` and no `photo_object_key` / `photoObjectKey`. |
+| Browser smoke      | Playwright against `https://roomies.casa` + `https://api.roomies.casa` passed: empty Home, add JPEG, direct browser PUT to virtual-hosted R2 with `Content-Type` and no Roomies cookies/`Authorization`, finalize, `blob:` rendering on shell/overview/switcher, hard refresh, replace (new canonical key while `hasPhoto` stays true), remove, photoless refresh, GIF rejected locally. Home creator Admin UI has add/change/remove (not Admin-only). Roommate invite accept returned `409 EMAIL_NOT_VERIFIED` (no verified staging inbox). Unsigned canonical GET is not 200. |
+
+Frontend production-build closure (M8P.5): `VITE_API_ORIGIN=https://api.example.test` and `VITE_R2_S3_ORIGIN=https://abc123.r2.cloudflarestorage.com` produced `dist/_headers` with `connect-src 'self' https://api.example.test https://abc123.r2.cloudflarestorage.com` and `img-src 'self' data: blob:` (R2 origin not in `img-src`).
+
+### Enable R2 (dashboard; required before CLI)
+
+1. Cloudflare Dashboard → **R2**
+2. Complete the account enablement / billing gate the dashboard requires
+3. Re-run from `frontend/`:
+
+```bash
+npx wrangler whoami
+npx wrangler r2 bucket list
+```
+
+Do not continue until list succeeds. If the account that hosts Workers is
+not the account that should hold R2, stop rather than creating a second
+hosting provider.
+
+### Create the private staging bucket
+
+From `frontend/` (repo Wrangler config). Do not globally install Wrangler.
+
+```bash
+npx wrangler r2 bucket create roomies-home-photos-staging
+npx wrangler r2 bucket info roomies-home-photos-staging --json
+npx wrangler r2 bucket dev-url get roomies-home-photos-staging
+npx wrangler r2 bucket domain list roomies-home-photos-staging
+```
+
+Requirements:
+
+- Private by default; do **not** `dev-url enable`
+- No public custom domain
+- Record jurisdiction from `info`. If present, pass `--jurisdiction` on
+  later commands and set backend `R2_S3_ENDPOINT` / frontend
+  `VITE_R2_S3_ORIGIN` to that endpoint’s `scheme://host` (no path)
+
+### Application R2 credentials
+
+Create **Object Read & Write** S3 credentials scoped to
+`roomies-home-photos-staging` (Dashboard → R2 → **Manage R2 API tokens**).
+Do not use an account-wide Admin token for the running application.
+
+Copy Access Key ID and Secret Access Key once. Never commit them. Never
+put them in `VITE_*`.
+
+Wrangler OAuth is for operator bucket/CORS/lifecycle/list. The Node
+process uses these S3 keys only.
+
+### Bucket CORS
+
+Smallest staging policy: the deployed staging frontend origin only. No
+`*`. Do not add `OPTIONS`, `POST`, `DELETE`, `Authorization`, or
+`Content-Length`. Add `http://localhost:5173` only when local
+`R2_PROVIDER=cloudflare` browser work is intentionally required, as a
+second exact origin.
+
+Write a **temporary** JSON file (do not commit):
+
+```json
+{
+  "rules": [
+    {
+      "allowed": {
+        "origins": [
+          "https://roomies-frontend-staging.alexandra-nadine-lewis.workers.dev"
+        ],
+        "methods": ["GET", "PUT"],
+        "headers": ["Content-Type"]
+      },
+      "exposeHeaders": ["ETag"],
+      "maxAgeSeconds": 3600
+    }
+  ]
+}
+```
+
+```bash
+npx wrangler r2 bucket cors set roomies-home-photos-staging --file cors.json
+npx wrangler r2 bucket cors list roomies-home-photos-staging
+```
+
+Read the policy back. Confirm exact origin, methods `GET`+`PUT`, header
+`Content-Type`, exposed `ETag`, max age `3600`. If a real browser PUT
+demands extra headers, **stop** and fix the bucket policy; do not change
+the frozen presign contract.
+
+### Temporary-object lifecycle
+
+```bash
+npx wrangler r2 bucket lifecycle add roomies-home-photos-staging expire-tmp-home-photos tmp/ --expire-days 1
+npx wrangler r2 bucket lifecycle list roomies-home-photos-staging
+```
+
+Verify: enabled; prefix exactly `tmp/`; expiration one day; **no**
+`homes/` expiration rule. Canonical objects must not expire through this
+rule. Do not add a sweeper. Do not wait 24 hours to observe deletion.
+
+### Backend deployment variables
+
+Railway project `roomies-staging`, environment `staging`, service
+`roomies-api`:
+
+| Variable               | Staging value                                      | Class    |
+| ---------------------- | -------------------------------------------------- | -------- |
+| `R2_PROVIDER`          | `cloudflare`                                       | required |
+| `R2_ACCOUNT_ID`        | Cloudflare account id                              | required |
+| `R2_ACCESS_KEY_ID`     | bucket-scoped object token                         | secret   |
+| `R2_SECRET_ACCESS_KEY` | bucket-scoped object token                         | secret   |
+| `R2_BUCKET`            | `roomies-home-photos-staging`                      | required |
+| `R2_S3_ENDPOINT`       | omit unless jurisdiction/custom endpoint is in use | optional |
+| `R2_REGION`            | omit (`auto`) unless the bucket requires it        | optional |
+
+```bash
+railway variable set R2_PROVIDER=cloudflare R2_ACCOUNT_ID=… R2_BUCKET=roomies-home-photos-staging
+railway variable set R2_ACCESS_KEY_ID --stdin
+railway variable set R2_SECRET_ACCESS_KEY --stdin
+```
+
+Deploy **current** backend (`main` Home-photo SHA) after these are set.
+Staging `APP_ENV=staging` **requires** `R2_PROVIDER`; deploying current
+code without it fails boot. Do not set `R2_PROVIDER=fake` on this path
+if the goal is a real R2 smoke.
+
+At startup confirm: config parses; provider is not `fake`; secrets are
+absent from logs; Sharp loads under Node 24; AWS S3 packages resolve;
+`GET /health` and `GET /ready` stay 200. If Sharp/AWS native resolution
+fails, **stop** rather than changing the frozen bundling/security
+architecture.
+
+### Frontend deployment variable
+
+`VITE_R2_S3_ORIGIN` must equal the exact origin on generated presigned
+URLs (`scheme://host`, no path, wildcard, or credentials). On this
+staging API the AWS SDK mints virtual-hosted R2 URLs (`bucket.accountid.r2.cloudflarestorage.com`),
+not path-style account-endpoint URLs. Build from `frontend/`:
+
+```bash
+# PowerShell
+$env:VITE_API_ORIGIN='https://api.roomies.casa'
+$env:VITE_R2_S3_ORIGIN='https://roomies-home-photos-staging.38695abd0586016d676f037d65e7a73a.r2.cloudflarestorage.com'
+npm run build
+npx wrangler deploy --name roomies-frontend-staging
+```
+
+Use `--name roomies-frontend-staging`. `https://roomies.casa` is a custom
+domain on that Worker (Cloudflare Workers environment `production` for
+the domain mapping only). Do not deploy to a Worker named
+`roomies-frontend` — it does not exist. Do not set `VITE_API_ORIGIN` to
+`https://roomies-api-staging.up.railway.app`.
+
+Verify the live document CSP:
+
+- `connect-src`: `'self'`, staging API origin, exact R2 S3 origin
+- `img-src`: `'self' data: blob:`
+- R2 origin **not** in `img-src`
+
+### Pre-browser verification
+
+1. `GET /health` and `GET /ready` on the staging API
+2. Authenticated `POST /api/v1/homes/:homeId/photo/uploads` (session
+   cookie from the API host, `Origin` = staging frontend):
+   - 201
+   - `uploadId` UUID
+   - HTTPS signed PUT URL on the R2 S3 origin
+   - `requiredHeaders` is Content-Type only
+   - `expiresAt` ≈ 5 minutes
+   - Do not print the complete signed URL into git, docs, or logs
+3. From Origin = staging frontend, OPTIONS/PUT to that URL with
+   `Content-Type` only. No Roomies cookies. No `Authorization`.
+4. Unauthenticated GET of a canonical object URL must not return the
+   object. A still-valid presigned GET may.
+
+### Staging smoke procedure
+
+**API session (this topology):** create an active Roommate (and, for
+role checks, an Admin) via the staging API with the trusted frontend
+Origin. Exercise upload intent → direct R2 PUT → finalize → GET photo
+metadata → replacement → DELETE. Confirm key shapes with operator
+Wrangler/S3 listing (not in git):
+
+- Temp: `tmp/homes/{homeId}/photo/{uploadId}`
+- Canonical: `homes/{homeId}/photo/{generationId}.webp`
+- Canonical Content-Type `image/webp`
+- Replacement uses a new generation key
+- Best-effort temp/previous/deleted object cleanup
+- No email, name, or membership id in keys
+
+**Real browser on `workers.dev`:** document load, CSP, invitation
+preview (must not request `/photo`), and local-validation messaging can
+be checked. Authenticated Home-photo UI (cookie session, shell/switcher
+blob rendering) **cannot** complete on `workers.dev` + `railway.app`
+without weakening cookies. That is a frozen M9.3 limitation, not an R2
+defect. Same-site production (`https://roomies.casa` /
+`https://api.roomies.casa`) is the topology where browser cookies work;
+do not point it at the staging bucket.
+
+When a same-site browser session exists, check:
+
+- Empty Home: fallback avatar, Add photo, no broken image, no `/photo`
+  fetch while `hasPhoto` is false
+- JPEG under 8 MiB: intent 201, browser PUT to R2 with `credentials:
+omit` and Content-Type, no Roomies cookies, finalize, `hasPhoto:
+true`, overview/shell/switcher show the photo from `blob:` (not the
+  signed URL)
+- Hard refresh: photo persists; authorized GET `/photo` returns signed
+  download metadata; browser fetches R2; UI uses a new blob URL
+- Replacement: old photo stays until finalize; visible image changes
+- Removal: DELETE, fallback, `hasPhoto: false`, blob query cleared
+- ROOMMATE and ADMIN can add/change/remove; no Admin-only photo UI
+- GIF / HEIC / files over 8 MiB rejected before upload intent
+- Failed PUT: friendly failure, previous committed photo remains
+
+### Local `R2_PROVIDER=fake`
+
+The fake adapter is in-process. Presigned URLs it mints are not reachable
+from a real browser. Unit/component/Playwright tests mock the transfer.
+Do not add a local upload proxy to work around this.
 
 ## Backups (later M9)
 
@@ -576,6 +839,6 @@ Do **not** create these in M9.4.
 - Production Neon / Railway / Cloudflare environments (separate from staging)
 - Resend account + sending-domain DNS (SPF/DKIM/DMARC)
 - Protected production promotion workflow
-- R2 media
+- Production R2 bucket (do not reuse `roomies-home-photos-staging`)
 - Backup/PITR validation
 - Better Stack

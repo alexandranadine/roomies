@@ -15,6 +15,9 @@ dist
 dist-ssr
 *.local
 
+# Wrangler local cache (never commit)
+.wrangler
+
 # TypeScript
 *.tsbuildinfo
 
