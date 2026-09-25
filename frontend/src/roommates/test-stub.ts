@@ -64,6 +64,9 @@ export type RoommatesStubHandlers = {
   ) => Response | Promise<Response>;
   remove?: (membershipId: string) => Response | Promise<Response>;
   leave?: (membershipId: string) => Response | Promise<Response>;
+  revokeInvitation?: (
+    invitationId: string,
+  ) => Response | Promise<Response>;
 };
 
 export type RoommatesStubOptions = {
@@ -158,6 +161,18 @@ export function stubRoommatesApis(options: RoommatesStubOptions = {}) {
           return Promise.resolve(handler(leaveMatch[2]));
         }
         state.homes = [];
+        return Promise.resolve(emptyResponse(204));
+      }
+
+      const revokeMatch =
+        /^\/api\/v1\/homes\/([^/]+)\/invitations\/([^/]+)\/revoke$/i.exec(
+          path,
+        );
+      if (revokeMatch?.[2] !== undefined && method === 'POST') {
+        const handler = options.handlers?.revokeInvitation;
+        if (handler !== undefined) {
+          return Promise.resolve(handler(revokeMatch[2]));
+        }
         return Promise.resolve(emptyResponse(204));
       }
 

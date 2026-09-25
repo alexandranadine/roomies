@@ -1,17 +1,21 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { UserPlus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate, useOutletContext, useParams } from 'react-router';
 import { DocumentTitle } from '../components/document-title.js';
-import { Alert, Button, EmptyState, Skeleton } from '../components/ui/index.js';
+import { Alert, Button, Skeleton } from '../components/ui/index.js';
+import { cn } from '../components/ui/cn.js';
 import { clearPrivateHomeQueryState } from '../homes/clear-private-home-queries.js';
 import type { HomeShellOutletContext } from '../homes/home-overview-page.js';
 import { currentUserQueryKey } from '../homes/home-query-keys.js';
 import { useHomeMemberships } from '../homes/use-home-memberships.js';
+import type { CreatedInvitation } from '../invitations/create-invitation-api.js';
 import { ApiError } from '../platform/api/index.js';
 import type { MembershipRole } from './change-membership-role-api.js';
 import { changeMembershipRole } from './change-membership-role-api.js';
 import { InviteRoommateDialog } from './invite-roommate-dialog.js';
 import { LeaveHomeDialog } from './leave-home-dialog.js';
+import { PendingInvitePanel } from './pending-invite-panel.js';
 import {
   recoverStaleHomeMembershipState,
   refreshHomeMembershipSurfaces,
@@ -63,6 +67,9 @@ export function RoommatesPage() {
   const [pendingRemove, setPendingRemove] = useState<PendingRemove | null>(
     null,
   );
+  const [pendingInvite, setPendingInvite] = useState<CreatedInvitation | null>(
+    null,
+  );
   const [roleError, setRoleError] = useState<string | null>(null);
 
   const roleMutation = useMutation({
@@ -79,6 +86,14 @@ export function RoommatesPage() {
     clearPrivateHomeQueryState(queryClient);
     void queryClient.invalidateQueries({ queryKey: currentUserQueryKey });
   }
+
+  useEffect(() => {
+    setInviteOpen(false);
+    setLeaveOpen(false);
+    setPendingRemove(null);
+    setPendingInvite(null);
+    setRoleError(null);
+  }, [homeId]);
 
   useEffect(() => {
     if (isUnauthenticated(membershipsQuery.error)) {
@@ -144,35 +159,40 @@ export function RoommatesPage() {
   const currentMembershipId = membershipsQuery.data?.currentMembershipId ?? '';
   const showLoading =
     membershipsQuery.isPending && membershipsQuery.data === undefined;
-  const showEmpty =
-    membershipsQuery.isSuccess &&
-    memberships.length === 0 &&
-    !membershipsQuery.isFetching;
+  const showRoster = membershipsQuery.isSuccess && memberships.length > 0;
+  const justYou = showRoster && memberships.length === 1;
 
   return (
     <DocumentTitle title={`Roommates · ${home.name} · Roomies`}>
-      <div className="flex flex-col gap-5">
-        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+      <div
+        data-testid="roommates-page"
+        className="mx-auto flex w-full max-w-[980px] flex-col gap-5"
+      >
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex min-w-0 flex-col gap-1">
             <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
               Roommates
             </h1>
-            <p className="max-w-prose text-sm text-text-secondary">
-              People currently in this Home.
+            <p className="text-sm text-text-secondary">
+              The people sharing this home.
             </p>
+            {justYou ? (
+              <p className="text-xs font-medium text-text-muted">
+                It’s just you here for now.
+              </p>
+            ) : null}
           </div>
           {isAdmin ? (
-            <div className="w-full shrink-0 sm:w-auto">
-              <Button
-                type="button"
-                className="w-full sm:w-auto"
-                onClick={() => {
-                  setInviteOpen(true);
-                }}
-              >
-                Invite roommate
-              </Button>
-            </div>
+            <Button
+              type="button"
+              className="shrink-0 self-start"
+              icon={<UserPlus className="size-4" aria-hidden="true" />}
+              onClick={() => {
+                setInviteOpen(true);
+              }}
+            >
+              Invite roommate
+            </Button>
           ) : null}
         </header>
 
@@ -182,6 +202,19 @@ export function RoommatesPage() {
             open={inviteOpen}
             onOpenChange={setInviteOpen}
             onCreated={refreshAfterStructuralChange}
+            onInvitationCreated={setPendingInvite}
+            onStaleMembership={handleStaleMembership}
+            onUnauthenticated={handleUnauthenticated}
+          />
+        ) : null}
+
+        {isAdmin && pendingInvite !== null && !inviteOpen ? (
+          <PendingInvitePanel
+            homeId={homeId}
+            created={pendingInvite}
+            onRevoked={() => {
+              setPendingInvite(null);
+            }}
             onStaleMembership={handleStaleMembership}
             onUnauthenticated={handleUnauthenticated}
           />
@@ -190,9 +223,9 @@ export function RoommatesPage() {
         {roleError ? <Alert variant="danger">{roleError}</Alert> : null}
 
         {showLoading ? (
-          <div className="flex flex-col gap-3" aria-busy="true">
-            <Skeleton className="h-20 w-full" announced />
-            <Skeleton className="h-20 w-full" />
+          <div className="flex flex-col gap-2" aria-busy="true">
+            <Skeleton className="h-20 w-full rounded-xl" announced />
+            <Skeleton className="h-20 w-full rounded-xl" />
           </div>
         ) : null}
 
@@ -212,58 +245,69 @@ export function RoommatesPage() {
           </Alert>
         ) : null}
 
-        {showEmpty ? (
-          <EmptyState title="No roommates to show right now." />
-        ) : null}
-
-        {memberships.length > 0 ? (
-          <ul className="flex list-none flex-col gap-3 p-0">
-            {memberships.map((member) => (
-              <RoommateMemberRow
-                key={member.membershipId}
-                name={member.name}
-                isCurrent={member.membershipId === currentMembershipId}
-                currentUserRole={role}
-                showAdminActions={isAdmin}
-                actionsDisabled={roleMutation.isPending}
-                onMakeAdmin={() => {
-                  void handleChangeRole(member.membershipId, 'ADMIN');
-                }}
-                onMakeRoommate={() => {
-                  void handleChangeRole(member.membershipId, 'ROOMMATE');
-                }}
-                onRemove={() => {
-                  setPendingRemove({
-                    membershipId: member.membershipId,
-                    name: member.name,
-                  });
-                }}
-              />
-            ))}
-          </ul>
+        {showRoster ? (
+          <section aria-labelledby="roster-heading" className="flex flex-col gap-2">
+            <h2
+              id="roster-heading"
+              className="text-base font-semibold tracking-tight text-text-primary"
+            >
+              {memberships.length}{' '}
+              {memberships.length === 1 ? 'roommate' : 'roommates'}
+            </h2>
+            <ul
+              className={cn(
+                'm-0 grid list-none grid-cols-1 gap-2 p-0',
+                memberships.length > 1 && 'lg:grid-cols-2 lg:gap-3',
+              )}
+            >
+              {memberships.map((member) => (
+                <RoommateMemberRow
+                  key={member.membershipId}
+                  name={member.name}
+                  isCurrent={member.membershipId === currentMembershipId}
+                  currentUserRole={role}
+                  showAdminActions={isAdmin}
+                  actionsDisabled={roleMutation.isPending}
+                  onMakeAdmin={() => {
+                    void handleChangeRole(member.membershipId, 'ADMIN');
+                  }}
+                  onMakeRoommate={() => {
+                    void handleChangeRole(member.membershipId, 'ROOMMATE');
+                  }}
+                  onRemove={() => {
+                    setPendingRemove({
+                      membershipId: member.membershipId,
+                      name: member.name,
+                    });
+                  }}
+                />
+              ))}
+            </ul>
+          </section>
         ) : null}
 
         {currentMembershipId.length > 0 ? (
           <section
-            aria-labelledby="leave-home-heading"
-            className="flex flex-col gap-3 border-t border-border pt-6"
+            aria-labelledby="your-home-heading"
+            className="rounded-xl border border-border bg-surface px-4 py-4 shadow-card"
           >
-            <div className="flex flex-col gap-1">
-              <h2
-                id="leave-home-heading"
-                className="text-lg font-semibold tracking-tight text-text-primary"
-              >
-                Leave Home
-              </h2>
-              <p className="max-w-prose text-sm text-text-secondary">
-                You’ll lose current access to this Home. Shared household
-                history stays with the Home.
-              </p>
-            </div>
-            <div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+              <div className="flex min-w-0 flex-col gap-1">
+                <h2
+                  id="your-home-heading"
+                  className="text-base font-semibold tracking-tight text-text-primary"
+                >
+                  Your home
+                </h2>
+                <p className="max-w-prose text-sm text-text-secondary">
+                  You’ll lose current access to this Home. Shared household
+                  history stays with the Home.
+                </p>
+              </div>
               <Button
                 type="button"
-                variant="danger"
+                variant="subtle"
+                className="shrink-0 self-start px-2 text-accent-coral-text! hover:bg-transparent hover:text-accent-coral-text!"
                 onClick={() => {
                   setLeaveOpen(true);
                 }}

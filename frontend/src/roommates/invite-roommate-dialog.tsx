@@ -1,28 +1,22 @@
 import { useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
+import { useState } from 'react';
 import { Alert, Button, Dialog, TextField } from '../components/ui/index.js';
+import {
+  createHomeInvitation,
+  type CreatedInvitation,
+} from '../invitations/create-invitation-api.js';
 import { ApiError } from '../platform/api/index.js';
-import { createHomeInvitation } from '../invitations/create-invitation-api.js';
 import {
   inviteRoommateFormResolver,
   normalizeInvitationEmail,
   type InviteRoommateFormValues,
 } from './invite-roommate-form-schema.js';
+import { formatInvitationExpiration } from './invite-format.js';
 import {
   inviteRoommateErrorMessage,
   isStaleMembershipError,
 } from './roommates-errors.js';
-
-function formatExpiration(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.valueOf())) {
-    return iso;
-  }
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(date);
-}
 
 export type InviteRoommateDialogProps = {
   homeId: string;
@@ -31,6 +25,7 @@ export type InviteRoommateDialogProps = {
   onCreated: () => Promise<void>;
   onStaleMembership: () => Promise<void>;
   onUnauthenticated: () => void;
+  onInvitationCreated?: (created: CreatedInvitation) => void;
 };
 
 export function InviteRoommateDialog({
@@ -40,7 +35,9 @@ export function InviteRoommateDialog({
   onCreated,
   onStaleMembership,
   onUnauthenticated,
+  onInvitationCreated,
 }: InviteRoommateDialogProps) {
+  const [copied, setCopied] = useState(false);
   const {
     register,
     handleSubmit,
@@ -67,6 +64,7 @@ export function InviteRoommateDialog({
     if (!next) {
       reset({ email: '' });
       inviteMutation.reset();
+      setCopied(false);
     }
     onOpenChange(next);
   }
@@ -76,8 +74,12 @@ export function InviteRoommateDialog({
       return;
     }
     inviteMutation.reset();
+    setCopied(false);
     try {
-      await inviteMutation.mutateAsync(normalizeInvitationEmail(values.email));
+      const result = await inviteMutation.mutateAsync(
+        normalizeInvitationEmail(values.email),
+      );
+      onInvitationCreated?.(result);
       await onCreated();
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
@@ -94,6 +96,18 @@ export function InviteRoommateDialog({
     }
   });
 
+  async function copyLink() {
+    if (created === undefined) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(created.inviteUrl);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  }
+
   return (
     <Dialog.Root open={open} onOpenChange={handleOpenChange}>
       <Dialog.Popup
@@ -103,25 +117,28 @@ export function InviteRoommateDialog({
         showCloseButton={!isPending}
       >
         {created !== undefined ? (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3">
             <Alert variant="success" title="Invitation created">
               Sent to {created.invitation.email}. Share the invite link before{' '}
-              {formatExpiration(created.invitation.expiresAt)}.
+              {formatInvitationExpiration(created.invitation.expiresAt)}.
             </Alert>
-            <TextField
-              label="Invite link"
-              readOnly
-              value={created.inviteUrl}
-              helperText="Anyone with this link can open the invitation."
-            />
+            <div className="min-w-0 overflow-hidden">
+              <TextField
+                label="Invite link"
+                readOnly
+                value={created.inviteUrl}
+                className="truncate"
+                helperText="Anyone with this link can open the invitation."
+              />
+            </div>
             <div className="flex flex-wrap gap-2 pt-1">
               <Button
                 type="button"
                 onClick={() => {
-                  void navigator.clipboard?.writeText(created.inviteUrl);
+                  void copyLink();
                 }}
               >
-                Copy invite link
+                {copied ? 'Copied' : 'Copy invite link'}
               </Button>
               <Button
                 type="button"
@@ -136,7 +153,7 @@ export function InviteRoommateDialog({
           </div>
         ) : (
           <form
-            className="flex flex-col gap-4"
+            className="flex flex-col gap-3"
             onSubmit={(event) => {
               void submitInvite(event);
             }}

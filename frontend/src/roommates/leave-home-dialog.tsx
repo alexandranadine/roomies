@@ -77,7 +77,7 @@ export function LeaveHomeDialog({
         closeLabel="Close leave Home"
         showCloseButton={!isPending}
       >
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3">
           {errorMessage ? <Alert variant="danger">{errorMessage}</Alert> : null}
 
           <div className="flex flex-wrap gap-2 pt-1">

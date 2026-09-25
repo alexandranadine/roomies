@@ -63,3 +63,12 @@ export function leaveHomeErrorMessage(error: unknown): string {
   }
   return LEAVE_GENERIC;
 }
+
+const REVOKE_GENERIC = 'Invitation could not be revoked.';
+
+export function revokeInvitationErrorMessage(error: unknown): string {
+  if (isConcealedNotFound(error)) {
+    return 'This invitation isn’t available anymore.';
+  }
+  return REVOKE_GENERIC;
+}
