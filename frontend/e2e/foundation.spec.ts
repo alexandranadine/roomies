@@ -43,6 +43,21 @@ async function assertNoSeriousAxeViolations(
 }
 
 test.describe('foundation shell', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.route('**/api/v1/me', async (route) => {
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          error: {
+            code: 'UNAUTHENTICATED',
+            message: 'Authentication required',
+          },
+        }),
+      });
+    });
+  });
+
   for (const viewport of VIEWPORTS) {
     test(`root loads without horizontal overflow at ${viewport.name}px`, async ({
       page,
@@ -53,7 +68,7 @@ test.describe('foundation shell', () => {
       });
       await page.goto('/');
       await expect(
-        page.getByRole('heading', { name: 'Roomies', level: 1 }),
+        page.getByRole('heading', { name: 'Welcome back', level: 1 }),
       ).toBeVisible();
       await assertNoHorizontalOverflow(page);
     });
@@ -68,10 +83,11 @@ test.describe('foundation shell', () => {
   test('desktop shell renders branding at ~1280px', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
-    await expect(page.getByRole('banner')).toContainText('Roomies');
+    await expect(page.getByText('Roomies', { exact: true }).first()).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Roomies', level: 1 }),
+      page.getByRole('heading', { name: 'Welcome back', level: 1 }),
     ).toBeVisible();
+    await expect(page.getByRole('banner')).toHaveCount(0);
   });
 });
 

@@ -77,13 +77,12 @@ describe('invitation landing page', () => {
 
     expect(
       await screen.findByRole('heading', {
-        name: `You’re invited to ${HOME_NAME}`,
+        name: `You’re invited to join ${HOME_NAME}`,
         level: 1,
       }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText(`This invitation was sent to ${EMAIL}.`),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/this invitation was sent to/i)).toBeInTheDocument();
+    expect(screen.getByText(/roommate@example\.com/i)).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Join Home' }),
     ).not.toBeInTheDocument();
@@ -92,8 +91,14 @@ describe('invitation landing page', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: /email/i })).toHaveValue(EMAIL);
     expect(
-      screen.getByText(/create an account or sign in/i),
+      screen.getByText(/create an account or sign in with this email/i),
     ).toBeInTheDocument();
+    expect(
+      screen.getByText(`Create your account to join ${HOME_NAME}.`),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/start a home or join one you’ve been invited to/i),
+    ).not.toBeInTheDocument();
     expect(document.body.innerHTML).not.toContain(SECRET);
     expect(document.querySelector('img')).toBeNull();
     expect(document.body.innerHTML).not.toMatch(/r2|photo|cloudflare/i);
@@ -122,6 +127,26 @@ describe('invitation landing page', () => {
     expect(
       fetchMock.mock.calls.some((call) => String(call[0]).includes('/photo')),
     ).toBe(false);
+  });
+
+  it('contextualizes sign-in helper copy with the Home name', async () => {
+    window.history.replaceState(
+      null,
+      '',
+      `/invitations/${INVITATION_ID}#secret=${SECRET}`,
+    );
+    captureInvitationFragment();
+    stubPreview(200, previewBody());
+    renderApp(`/invitations/${INVITATION_ID}`);
+
+    await screen.findByText(`Create your account to join ${HOME_NAME}.`);
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    expect(
+      screen.getByText(`Sign in to join ${HOME_NAME}.`),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('Sign in to your home.'),
+    ).not.toBeInTheDocument();
   });
 
   it('renders a generic unavailable state', async () => {
@@ -205,7 +230,7 @@ describe('invitation landing page', () => {
 
     renderApp(`/invitations/${INVITATION_ID}`);
     await screen.findByRole('heading', {
-      name: `You’re invited to ${HOME_NAME}`,
+      name: `You’re invited to join ${HOME_NAME}`,
     });
 
     const previewCall = fetchMock.mock.calls.find(([url]) =>
@@ -534,8 +559,14 @@ describe('invitation landing page', () => {
       vi.stubGlobal('fetch', fetchMock);
       const rendered = renderApp(`/invitations/${INVITATION_ID}`);
       expect(
-        await screen.findByRole('button', { name: 'Join Home' }),
-      ).toBeDisabled();
+        await screen.findByRole('heading', {
+          name: `You’re invited to join ${HOME_NAME}`,
+          level: 1,
+        }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Join Home' }),
+      ).not.toBeInTheDocument();
       expect(
         fetchMock.mock.calls.some(([url]) => String(url).includes('/accept')),
       ).toBe(false);
@@ -593,15 +624,73 @@ describe('invitation landing page', () => {
     renderApp(`/invitations/${INVITATION_ID}`);
 
     expect(
-      await screen.findByRole('button', { name: 'Join Home' }),
-    ).toBeDisabled();
+      screen.queryByRole('button', { name: 'Join Home' }),
+    ).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Verify your email to join this home',
+        level: 2,
+      }),
+    ).toBeInTheDocument();
     await userEvent.click(
-      screen.getByRole('button', { name: 'Send verification email' }),
+      screen.getByRole('button', { name: 'Resend verification email' }),
     );
     expect(await screen.findByText(/check your email/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/verify your email before joining this home/i),
+      screen.getByText(/invitation acceptance requires a verified email/i),
     ).toBeInTheDocument();
+    expect(document.body.innerHTML).not.toContain(SECRET);
+  });
+
+  it('asks a mismatched signed-in account to use the invited email', async () => {
+    captureInvitationFragment(
+      {
+        pathname: `/invitations/${INVITATION_ID}`,
+        search: '',
+        hash: `#secret=${SECRET}`,
+      },
+      window.history,
+    );
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/api/auth/get-session')) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                user: {
+                  id: 'user-id',
+                  email: 'other@example.com',
+                  emailVerified: true,
+                },
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } },
+            ),
+          );
+        }
+        return Promise.resolve(
+          new Response(JSON.stringify(previewBody()), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        );
+      }),
+    );
+    renderApp(`/invitations/${INVITATION_ID}`);
+
+    expect(
+      await screen.findByText(/this invitation was sent to a different email/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/other@example.com/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Use another account' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Join Home' }),
+    ).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toContain(
+      previewBody().invitation.home.id,
+    );
     expect(document.body.innerHTML).not.toContain(SECRET);
   });
 });

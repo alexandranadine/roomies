@@ -1,10 +1,10 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, type ReactNode } from 'react';
 import { useLocation } from 'react-router';
+import { AuthPageLayout } from '../auth/auth-page-layout.js';
 import { CredentialForm } from '../auth/credential-form.js';
 import { UnverifiedEmailNotice } from '../auth/unverified-email-notice.js';
-import { DocumentTitle } from '../components/document-title.js';
-import { Spinner } from '../components/ui/index.js';
+import { Alert, Spinner } from '../components/ui/index.js';
 import { clearPrivateHomeQueryState } from '../homes/clear-private-home-queries.js';
 import { currentUserQueryKey } from '../homes/home-query-keys.js';
 import {
@@ -22,25 +22,6 @@ type AuthLandingLocationState = {
   accountDeleted?: boolean;
   needsFreshSignInForDeletion?: boolean;
 };
-
-function AuthLanding({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <DocumentTitle title={title}>
-      <div className="flex flex-col gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight text-text-primary sm:text-3xl">
-          Roomies
-        </h1>
-        {children}
-      </div>
-    </DocumentTitle>
-  );
-}
 
 /**
  * Session gate for product routes. Invitation landing stays outside this wrap.
@@ -74,40 +55,39 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 
   if (query.isPending) {
     return (
-      <AuthLanding title="Roomies">
-        <Spinner label="Checking your session" />
-      </AuthLanding>
+      <AuthPageLayout title="Roomies">
+        <div className="flex justify-center">
+          <Spinner label="Checking your session" />
+        </div>
+      </AuthPageLayout>
     );
   }
 
   if (isUnauthenticated(query.error)) {
     return (
-      <AuthLanding title="Sign in · Roomies">
+      <AuthPageLayout title="Sign in · Roomies">
         {locationState?.accountDeleted ? (
-          <p className="max-w-prose text-base text-text-secondary">
+          <Alert variant="info" title="Account deleted">
             Your Roomies account has been deleted.
-          </p>
+          </Alert>
         ) : null}
         {locationState?.needsFreshSignInForDeletion ? (
-          <p className="max-w-prose text-base text-text-secondary">
+          <Alert variant="info" title="Sign in again">
             Sign in again, then try deleting your account.
-          </p>
+          </Alert>
         ) : null}
-        <p className="max-w-prose text-base text-text-secondary">
-          Sign in to see your Homes.
-        </p>
         <CredentialForm />
-      </AuthLanding>
+      </AuthPageLayout>
     );
   }
 
   if (query.error !== null || query.data === undefined) {
     return (
-      <AuthLanding title="Roomies">
-        <p className="max-w-prose text-base text-text-secondary">
-          Couldn’t confirm your session. Try again in a moment.
-        </p>
-      </AuthLanding>
+      <AuthPageLayout title="Roomies">
+        <Alert variant="danger" title="Couldn’t confirm your session">
+          Try again in a moment.
+        </Alert>
+      </AuthPageLayout>
     );
   }
 

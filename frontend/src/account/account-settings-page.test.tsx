@@ -165,7 +165,7 @@ describe('Account settings deletion', () => {
     await screen.findByRole('heading', { name: 'Account', level: 1 });
     await userEvent.click(screen.getByRole('button', { name: 'Sign out' }));
     expect(
-      await screen.findByText(/sign in to see your homes/i),
+      await screen.findByRole('heading', { name: 'Welcome back', level: 1 }),
     ).toBeInTheDocument();
   });
 

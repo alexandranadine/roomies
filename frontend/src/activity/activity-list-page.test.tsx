@@ -271,7 +271,7 @@ describe('Activity list page', () => {
     renderApp(`/homes/${TEST_HOME_A}/activity`);
 
     expect(
-      await screen.findByText('Sign in to see your Homes.'),
+      await screen.findByRole('heading', { name: 'Welcome back', level: 1 }),
     ).toBeInTheDocument();
     expect(
       screen.queryByText('Alex completed Take out trash'),

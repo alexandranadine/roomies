@@ -567,7 +567,7 @@ describe('Notification interactions', () => {
     const { queryClient } = renderApp('/notifications');
 
     expect(
-      await screen.findByText('Sign in to see your Homes.'),
+      await screen.findByRole('heading', { name: 'Welcome back', level: 1 }),
     ).toBeInTheDocument();
     expect(queryClient.getQueryData(notificationKeys.list({}))).toBeUndefined();
   });

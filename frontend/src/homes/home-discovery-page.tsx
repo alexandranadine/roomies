@@ -1,8 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
+import { Home } from 'lucide-react';
 import { useState } from 'react';
 import { Link, Navigate } from 'react-router';
+import { AuthIconWell } from '../auth/auth-page-layout.js';
 import { DocumentTitle } from '../components/document-title.js';
-import { Button, Card, EmptyState, Spinner } from '../components/ui/index.js';
+import { Button, Card, Spinner } from '../components/ui/index.js';
 import { ApiError } from '../platform/api/index.js';
 import { CreateHomeForm } from './create-home-form.js';
 import { HomeAvatar } from './home-avatar.js';
@@ -53,36 +55,51 @@ export function HomeDiscoveryPage() {
 
   if (homes.length === 0) {
     return (
-      <DocumentTitle title="Your Homes · Roomies">
-        <div className="flex flex-col gap-4">
-          <h1 className="text-2xl font-semibold tracking-tight text-text-primary sm:text-3xl">
-            Your Homes
-          </h1>
-          {showCreateForm ? (
-            <Card padding="lg" className="max-w-xl">
-              <div className="flex flex-col gap-4">
+      <DocumentTitle title="Welcome to Roomies">
+        <div className="flex justify-center py-2 sm:py-6">
+          <Card
+            padding="lg"
+            className="flex w-full max-w-lg flex-col gap-5"
+          >
+            {showCreateForm ? (
+              <>
+                <AuthIconWell>
+                  <Home className="size-6" />
+                </AuthIconWell>
                 <div className="flex flex-col gap-1">
-                  <h2 className="text-lg font-semibold text-text-primary">
-                    Create a Home
-                  </h2>
+                  <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
+                    Create your home
+                  </h1>
                   <p className="text-sm text-text-secondary">
-                    Set up the Home you share with your roommates.
+                    Give your household a name. You can change it later.
                   </p>
                 </div>
                 <CreateHomeForm />
-              </div>
-            </Card>
-          ) : (
-            <EmptyState
-              title="You’re not currently in a Home"
-              description="Create a Home to start coordinating with your roommates."
-              action={
-                <Button type="button" onClick={() => setShowCreateForm(true)}>
-                  Create a Home
+              </>
+            ) : (
+              <>
+                <AuthIconWell>
+                  <Home className="size-6" />
+                </AuthIconWell>
+                <div className="flex flex-col gap-2">
+                  <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
+                    Welcome to Roomies
+                  </h1>
+                  <p className="text-sm text-text-secondary">
+                    Create a home to start coordinating with your roommates. If
+                    you were invited, open the invitation link you received.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  className="w-full"
+                  onClick={() => setShowCreateForm(true)}
+                >
+                  Create a home
                 </Button>
-              }
-            />
-          )}
+              </>
+            )}
+          </Card>
         </div>
       </DocumentTitle>
     );

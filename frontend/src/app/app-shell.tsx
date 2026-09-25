@@ -1,10 +1,14 @@
+import { useQuery } from '@tanstack/react-query';
 import { User } from 'lucide-react';
 import { NavLink, Outlet, useLocation } from 'react-router';
+import { isAuthCanvasPath } from '../auth/auth-page-layout.js';
 import { PageContainer } from '../components/page-container.js';
 import { RoomiesWordmark } from '../components/roomies-wordmark.js';
 import { cn } from '../components/ui/cn.js';
 import { isHomeScopedPath } from '../homes/home-nav.js';
+import { currentUserQueryKey } from '../homes/home-query-keys.js';
 import { NotificationBellLink } from '../notifications/notification-bell-link.js';
+import { getCurrentUser } from '../users/current-user-api.js';
 
 const accountNavClassName = ({ isActive }: { isActive: boolean }) =>
   cn(
@@ -18,14 +22,24 @@ const accountNavClassName = ({ isActive }: { isActive: boolean }) =>
 /**
  * Application shell: semantic header/main, Roomies branding, global
  * Notifications, Account on non-Home routes, responsive page container.
+ * Authenticated chrome is hidden on public auth/invitation canvases and while
+ * signed out so those flows do not look like the in-app shell.
  */
 export function AppShell() {
   const location = useLocation();
   const homeScoped = isHomeScopedPath(location.pathname);
+  const authCanvas = isAuthCanvasPath(location.pathname);
+  const meQuery = useQuery({
+    queryKey: currentUserQueryKey,
+    queryFn: ({ signal }) => getCurrentUser(signal),
+    retry: false,
+  });
+  const signedIn = meQuery.data !== undefined;
+  const hideGlobalHeader = homeScoped || authCanvas || !signedIn;
 
   return (
     <div className="flex min-h-dvh flex-col bg-bg text-text-primary">
-      {homeScoped ? null : (
+      {hideGlobalHeader ? null : (
         <header className="bg-bg">
           <PageContainer className="flex h-14 items-center justify-between gap-3 sm:h-16">
             <RoomiesWordmark />
@@ -42,8 +56,16 @@ export function AppShell() {
           </PageContainer>
         </header>
       )}
-      <main className={homeScoped ? 'flex min-h-0 flex-1 flex-col' : 'flex-1 py-6 sm:py-8'}>
-        {homeScoped ? (
+      <main
+        className={
+          homeScoped
+            ? 'flex min-h-0 flex-1 flex-col'
+            : hideGlobalHeader
+              ? 'flex flex-1 flex-col'
+              : 'flex-1 py-6 sm:py-8'
+        }
+      >
+        {homeScoped || hideGlobalHeader ? (
           <Outlet />
         ) : (
           <PageContainer>

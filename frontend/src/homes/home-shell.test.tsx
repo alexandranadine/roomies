@@ -106,15 +106,12 @@ describe('active Home discovery and shell', () => {
 
     expect(
       await screen.findByRole('heading', {
-        name: 'You’re not currently in a Home',
-        level: 2,
+        name: 'Welcome to Roomies',
+        level: 1,
       }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'Your Homes', level: 1 }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Create a Home' }),
+      screen.getByRole('button', { name: 'Create a home' }),
     ).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/owner|membership/i);
     expect(queryClient.getQueryData(currentUserQueryKey)).toEqual({
@@ -374,7 +371,7 @@ describe('active Home discovery and shell', () => {
     await queryClient.invalidateQueries({ queryKey: currentUserQueryKey });
 
     expect(
-      await screen.findByText('Sign in to see your Homes.'),
+      await screen.findByRole('heading', { name: 'Welcome back', level: 1 }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('heading', { name: 'Oak Street' }),

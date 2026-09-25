@@ -34,10 +34,10 @@ describe('application shell routes', () => {
     renderApp('/');
 
     expect(
-      await screen.findByText(/sign in to see your homes/i),
+      await screen.findByRole('heading', { name: 'Welcome back', level: 1 }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'Roomies', level: 1 }),
+      screen.getByRole('button', { name: 'Sign in' }),
     ).toBeInTheDocument();
   });
 
@@ -65,7 +65,7 @@ describe('application shell routes', () => {
     const { router } = renderApp('/homes/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
 
     expect(
-      await screen.findByRole('heading', { name: 'Roomies', level: 1 }),
+      await screen.findByRole('heading', { name: 'Welcome back', level: 1 }),
     ).toBeInTheDocument();
     expect(router.state.location.pathname).toBe(
       '/homes/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
@@ -102,10 +102,13 @@ describe('application shell routes', () => {
 
     renderApp('/');
 
-    await screen.findByRole('heading', { name: 'Roomies', level: 1 });
+    await screen.findByRole('heading', { name: 'Welcome back', level: 1 });
 
-    expect(screen.getByRole('banner')).toBeInTheDocument();
+    expect(screen.queryByRole('banner')).not.toBeInTheDocument();
     expect(screen.getByRole('main')).toBeInTheDocument();
-    expect(screen.getByRole('banner').textContent).toMatch(/Roomies/);
+    expect(screen.getByText('Roomies')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: /notifications/i }),
+    ).not.toBeInTheDocument();
   });
 });

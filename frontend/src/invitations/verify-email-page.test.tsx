@@ -36,17 +36,17 @@ describe('verify email page', () => {
 
     renderApp('/verify-email');
     expect(
-      await screen.findByText(/your email is verified/i),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', {
-        name: 'Verify your email',
+      await screen.findByRole('heading', {
+        name: 'Email verified',
         level: 1,
       }),
     ).toBeInTheDocument();
     expect(
       screen.getByText(/reopen the original invitation link/i),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Back to Roomies' }),
+    ).toHaveAttribute('href', '/');
   });
 
   it('keeps verification failures generic', async () => {
@@ -100,9 +100,62 @@ describe('verify email page', () => {
     );
 
     renderApp('/verify-email');
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Check your email',
+        level: 1,
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('roommate@example.com')).toBeInTheDocument();
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Send verification email' }),
+      screen.getByRole('button', { name: 'Resend verification email' }),
     );
-    expect(await screen.findByText(/check your email/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/open the verification link we sent/i),
+    ).toBeInTheDocument();
+  });
+
+  it('shows a calm resend failure without leaking provider details', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        if (String(url).includes('/api/auth/get-session')) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                user: {
+                  id: 'user-id',
+                  email: 'roommate@example.com',
+                  emailVerified: false,
+                },
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } },
+            ),
+          );
+        }
+        if (String(url).includes('/api/auth/send-verification-email')) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                code: 'INTERNAL_ERROR',
+                message: 'secret-provider-body token=abc',
+              }),
+              { status: 500, headers: { 'Content-Type': 'application/json' } },
+            ),
+          );
+        }
+        return Promise.resolve(new Response('{}', { status: 404 }));
+      }),
+    );
+
+    renderApp('/verify-email');
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Resend verification email' }),
+    );
+    expect(
+      await screen.findByText(/couldn’t send a verification email/i),
+    ).toBeInTheDocument();
+    expect(document.body.innerHTML).not.toContain('secret-provider-body');
+    expect(document.body.innerHTML).not.toContain('token=abc');
   });
 });

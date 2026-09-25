@@ -93,10 +93,10 @@ function stubDiscoveryApis(options: {
 async function openCreateHomeForm() {
   renderApp('/');
   await userEvent.click(
-    await screen.findByRole('button', { name: 'Create a Home' }),
+    await screen.findByRole('button', { name: 'Create a home' }),
   );
   expect(
-    screen.getByRole('heading', { name: 'Create a Home', level: 2 }),
+    screen.getByRole('heading', { name: 'Create your home', level: 1 }),
   ).toBeInTheDocument();
 }
 
@@ -114,12 +114,12 @@ describe('Create Home UX', () => {
 
     expect(
       await screen.findByRole('heading', {
-        name: 'You’re not currently in a Home',
-        level: 2,
+        name: 'Welcome to Roomies',
+        level: 1,
       }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Create a Home' }),
+      screen.getByRole('button', { name: 'Create a home' }),
     ).toBeInTheDocument();
   });
 
@@ -130,7 +130,7 @@ describe('Create Home UX', () => {
     expect(screen.getByLabelText(/home name/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/timezone/i)).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Create Home' }),
+      screen.getByRole('button', { name: 'Create home' }),
     ).toBeInTheDocument();
   });
 
@@ -158,7 +158,7 @@ describe('Create Home UX', () => {
     await userEvent.clear(timezone);
     await userEvent.type(timezone, 'America/Chicago');
     await userEvent.type(screen.getByLabelText(/home name/i), 'Lakeview');
-    await userEvent.click(screen.getByRole('button', { name: 'Create Home' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Create home' }));
 
     await screen.findByRole('heading', { name: 'Oak Street', level: 1 });
 
@@ -180,7 +180,7 @@ describe('Create Home UX', () => {
     stubDiscoveryApis({});
     await openCreateHomeForm();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Create Home' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Create home' }));
 
     expect(await screen.findByText('Enter a Home name.')).toBeInTheDocument();
   });
@@ -193,7 +193,7 @@ describe('Create Home UX', () => {
       screen.getByLabelText(/home name/i),
       'a'.repeat(HOME_NAME_MAX_LENGTH + 1),
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Create Home' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Create home' }));
 
     expect(
       await screen.findByText(
@@ -208,11 +208,11 @@ describe('Create Home UX', () => {
 
     await userEvent.type(screen.getByLabelText(/home name/i), 'Oak Street');
     await userEvent.clear(screen.getByLabelText(/timezone/i));
-    await userEvent.click(screen.getByRole('button', { name: 'Create Home' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Create home' }));
     expect(await screen.findByText('Select a timezone.')).toBeInTheDocument();
 
     await userEvent.type(screen.getByLabelText(/timezone/i), 'Not/A/Zone');
-    await userEvent.click(screen.getByRole('button', { name: 'Create Home' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Create home' }));
     expect(
       await screen.findByText('Select a valid timezone.'),
     ).toBeInTheDocument();
@@ -225,7 +225,7 @@ describe('Create Home UX', () => {
     await userEvent.type(screen.getByLabelText(/home name/i), 'Oak Street');
     await userEvent.clear(screen.getByLabelText(/timezone/i));
     await userEvent.type(screen.getByLabelText(/timezone/i), 'UTC');
-    await userEvent.click(screen.getByRole('button', { name: 'Create Home' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Create home' }));
 
     await screen.findByRole('heading', { name: 'Oak Street', level: 1 });
 
@@ -256,7 +256,7 @@ describe('Create Home UX', () => {
     await userEvent.clear(screen.getByLabelText(/timezone/i));
     await userEvent.type(screen.getByLabelText(/timezone/i), 'UTC');
 
-    const submit = screen.getByRole('button', { name: 'Create Home' });
+    const submit = screen.getByRole('button', { name: 'Create home' });
     await userEvent.click(submit);
 
     await waitFor(() => {
@@ -273,7 +273,7 @@ describe('Create Home UX', () => {
     await userEvent.clear(screen.getByLabelText(/timezone/i));
     await userEvent.type(screen.getByLabelText(/timezone/i), 'UTC');
 
-    const submit = screen.getByRole('button', { name: 'Create Home' });
+    const submit = screen.getByRole('button', { name: 'Create home' });
     await userEvent.dblClick(submit);
 
     await screen.findByRole('heading', { name: 'Oak Street', level: 1 });
@@ -328,19 +328,19 @@ describe('Create Home UX', () => {
 
     const { queryClient } = renderApp('/');
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Create a Home' }),
+      await screen.findByRole('button', { name: 'Create a home' }),
     );
     await userEvent.type(screen.getByLabelText(/home name/i), 'Oak Street');
     await userEvent.clear(screen.getByLabelText(/timezone/i));
     await userEvent.type(screen.getByLabelText(/timezone/i), 'UTC');
-    await userEvent.click(screen.getByRole('button', { name: 'Create Home' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Create home' }));
 
     expect(
-      await screen.findByText('Sign in to see your Homes.'),
+      await screen.findByRole('heading', { name: 'Welcome back', level: 1 }),
     ).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('heading', { name: 'Create a Home', level: 2 }),
+      screen.queryByRole('heading', { name: 'Create your home', level: 1 }),
     ).not.toBeInTheDocument();
     expect(createCalls).toBe(1);
     expect(queryClient.getQueryData(currentUserHomesQueryKey)).toBeUndefined();
@@ -361,7 +361,7 @@ describe('Create Home UX', () => {
     await userEvent.type(screen.getByLabelText(/home name/i), 'Oak Street');
     await userEvent.clear(screen.getByLabelText(/timezone/i));
     await userEvent.type(screen.getByLabelText(/timezone/i), 'UTC');
-    await userEvent.click(screen.getByRole('button', { name: 'Create Home' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Create home' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       /couldn’t create this home/i,
@@ -378,12 +378,12 @@ describe('Create Home UX', () => {
     const { queryClient, router } = renderApp('/');
 
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Create a Home' }),
+      await screen.findByRole('button', { name: 'Create a home' }),
     );
     await userEvent.type(screen.getByLabelText(/home name/i), 'Oak Street');
     await userEvent.clear(screen.getByLabelText(/timezone/i));
     await userEvent.type(screen.getByLabelText(/timezone/i), 'UTC');
-    await userEvent.click(screen.getByRole('button', { name: 'Create Home' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Create home' }));
 
     expect(
       await screen.findByRole('heading', { name: 'Oak Street', level: 1 }),
@@ -406,7 +406,7 @@ describe('Create Home UX', () => {
     await userEvent.type(screen.getByLabelText(/home name/i), 'Oak Street');
     await userEvent.clear(screen.getByLabelText(/timezone/i));
     await userEvent.type(screen.getByLabelText(/timezone/i), 'UTC');
-    await userEvent.click(screen.getByRole('button', { name: 'Create Home' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Create home' }));
 
     await screen.findByRole('heading', { name: 'Oak Street', level: 1 });
     expect(JSON.stringify(localStorage)).not.toMatch(/currenthomeid|homeid/i);

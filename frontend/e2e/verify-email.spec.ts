@@ -34,9 +34,11 @@ test.describe('email verification return', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/verify-email');
     await expect(
-      page.getByRole('heading', { name: 'Verify your email', level: 1 }),
+      page.getByRole('heading', { name: 'Email verified', level: 1 }),
     ).toBeVisible();
-    await expect(page.getByText(/your email is verified/i)).toBeVisible();
+    await expect(
+      page.getByText(/reopen the original invitation link/i),
+    ).toBeVisible();
 
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])

@@ -1,13 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { CircleAlert, Home } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router';
+import { AuthIconWell, AuthPageLayout } from '../auth/auth-page-layout.js';
 import { CredentialForm } from '../auth/credential-form.js';
+import { SignOutButton } from '../auth/sign-out-button.js';
 import { UnverifiedEmailNotice } from '../auth/unverified-email-notice.js';
 import {
   VERIFY_EMAIL_BEFORE_JOINING,
   VERIFY_EMAIL_BEFORE_JOINING_TITLE,
 } from '../auth/verification-copy.js';
-import { DocumentTitle } from '../components/document-title.js';
 import { Alert, Button, Card, Spinner } from '../components/ui/index.js';
 import { homeMembershipsKeys } from '../homes/home-memberships-query-keys.js';
 import { currentUserHomesQueryKey } from '../homes/home-query-keys.js';
@@ -100,10 +102,10 @@ export function InvitationLandingPage() {
   });
   if (secret === null) {
     return (
-      <InvitationPageFrame title="Invitation link required · Roomies">
-        <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
-          Use the original invitation link
-        </h1>
+      <InvitationStatusPage
+        title="Invitation link required · Roomies"
+        heading="Use the original invitation link"
+      >
         <Alert
           variant="warning"
           title="This invitation link can’t be opened here"
@@ -111,62 +113,40 @@ export function InvitationLandingPage() {
           Please use the original invitation link again. Roomies does not store
           the invitation secret after it is removed from the address bar.
         </Alert>
-      </InvitationPageFrame>
+      </InvitationStatusPage>
     );
   }
 
   if (!validInvitationId) {
     return (
-      <InvitationPageFrame title="Invitation unavailable · Roomies">
-        <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
-          Invitation unavailable
-        </h1>
-        <Alert variant="warning" title="This invitation isn’t available">
-          The invitation may have expired or is no longer valid. Ask a Home
-          Admin for a new invitation if you still need access.
-        </Alert>
-      </InvitationPageFrame>
+      <InvitationUnavailablePage title="Invitation unavailable · Roomies" />
     );
   }
 
   if (query.isPending) {
     return (
-      <InvitationPageFrame title="Invitation · Roomies">
-        <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
-          Invitation
-        </h1>
+      <InvitationStatusPage title="Invitation · Roomies" heading="Invitation">
         <p className="flex items-center gap-2 text-text-secondary">
           <Spinner label="Loading invitation" />
         </p>
-      </InvitationPageFrame>
+      </InvitationStatusPage>
     );
   }
 
   if (query.isError && isUnavailableError(query.error)) {
     return (
-      <InvitationPageFrame title="Invitation unavailable · Roomies">
-        <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
-          Invitation unavailable
-        </h1>
-        <Alert variant="warning" title="This invitation isn’t available">
-          The invitation may have expired or is no longer valid. Ask a Home
-          Admin for a new invitation if you still need access.
-        </Alert>
-      </InvitationPageFrame>
+      <InvitationUnavailablePage title="Invitation unavailable · Roomies" />
     );
   }
 
   if (query.isError || query.data === undefined) {
     return (
-      <InvitationPageFrame title="Invitation · Roomies">
-        <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
-          Invitation
-        </h1>
+      <InvitationStatusPage title="Invitation · Roomies" heading="Invitation">
         <Alert variant="danger" title="Couldn’t load this invitation">
           Something went wrong. Try the original invitation link again in a
           moment.
         </Alert>
-      </InvitationPageFrame>
+      </InvitationStatusPage>
     );
   }
 
@@ -174,24 +154,39 @@ export function InvitationLandingPage() {
   const session = sessionQuery.data;
   const signedIn = session !== null && session !== undefined;
   const sessionEmail = session?.user.email.trim().toLowerCase();
+  const invitedEmail = invitation.email.trim().toLowerCase();
   const matchingEmail =
-    signedIn && session.user.emailVerified && sessionEmail === invitation.email;
+    signedIn && session.user.emailVerified && sessionEmail === invitedEmail;
+  const emailMismatch = signedIn && sessionEmail !== invitedEmail;
+  const needsVerification =
+    signedIn && !emailMismatch && session.user.emailVerified === false;
   const acceptanceError =
     acceptance.error instanceof ApiError ? acceptance.error.code : undefined;
 
   return (
-    <InvitationPageFrame title={`${invitation.home.name} invitation · Roomies`}>
-      <Card padding="lg" className="flex max-w-lg flex-col gap-4">
-        <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
-          You’re invited to {invitation.home.name}
-        </h1>
-        <p className="text-base text-text-secondary">
-          This invitation was sent to {invitation.email}.
-        </p>
-        <p className="text-sm text-text-secondary">
-          Expires {formatExpiration(invitation.expiresAt)}.
-        </p>
-        <div className="flex flex-col gap-2">
+    <AuthPageLayout
+      title={`${invitation.home.name} invitation · Roomies`}
+      size="invite"
+    >
+      <Card padding="lg" className="flex w-full flex-col gap-3">
+        <AuthIconWell>
+          <Home className="size-6" />
+        </AuthIconWell>
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-semibold tracking-tight break-words text-text-primary">
+            You’re invited to join {invitation.home.name}
+          </h1>
+          <p className="text-sm leading-snug text-text-secondary">
+            This invitation was sent to{' '}
+            <span className="inline-block max-w-full break-words font-medium text-text-primary">
+              {invitation.email}.
+            </span>
+          </p>
+          <p className="text-sm leading-snug text-text-secondary">
+            Expires {formatExpiration(invitation.expiresAt)}.
+          </p>
+        </div>
+        <div className="flex flex-col gap-3">
           {sessionQuery.isPending ? (
             <p className="flex items-center gap-2 text-sm text-text-secondary">
               <Spinner label="Checking sign-in status" />
@@ -199,29 +194,39 @@ export function InvitationLandingPage() {
           ) : null}
           {!sessionQuery.isPending && !signedIn ? (
             <p className="text-sm text-text-secondary">
-              Create an account or sign in with {invitation.email} on this page.
-              Stay here so the invitation link does not need to be reopened.
+              Create an account or sign in with this email. Stay here so the
+              invitation link does not need to be reopened.
             </p>
           ) : null}
-          {signedIn && !session.user.emailVerified ? (
-            <>
-              <Button disabled>Join Home</Button>
-              <UnverifiedEmailNotice email={session.user.email} />
-            </>
+          {needsVerification ? (
+            <UnverifiedEmailNotice
+              email={session.user.email}
+              title={VERIFY_EMAIL_BEFORE_JOINING_TITLE}
+              description={VERIFY_EMAIL_BEFORE_JOINING}
+              layout="featured"
+              showIcon={false}
+            />
           ) : null}
-          {signedIn &&
-          session.user.emailVerified &&
-          sessionEmail !== invitation.email ? (
-            <>
-              <Button disabled>Join Home</Button>
-              <Alert variant="warning" title="Use the invited account">
-                Sign in with the verified Roomies account that received this
-                invitation.
+          {emailMismatch ? (
+            <div className="flex flex-col gap-4">
+              <Alert
+                variant="warning"
+                title="This invitation was sent to a different email."
+              >
+                You’re signed in as{' '}
+                <span className="inline-block max-w-full break-words font-medium">
+                  {session.user.email}
+                </span>
+                . Sign in with the invited email to join this home.
               </Alert>
-            </>
+              <SignOutButton className="w-full" navigateHome={false}>
+                Use another account
+              </SignOutButton>
+            </div>
           ) : null}
           {matchingEmail ? (
             <Button
+              className="w-full"
               loading={acceptance.isPending}
               onClick={() => acceptance.mutate()}
             >
@@ -234,9 +239,11 @@ export function InvitationLandingPage() {
             </Alert>
           ) : null}
           {acceptanceError === 'EMAIL_MISMATCH' ? (
-            <Alert variant="warning" title="Use the invited account">
-              Sign in with the verified Roomies account that received this
-              invitation.
+            <Alert
+              variant="warning"
+              title="This invitation was sent to a different email."
+            >
+              Sign in with the invited email to join this home.
             </Alert>
           ) : null}
           {acceptanceError === 'ALREADY_HOME_MEMBER' ? (
@@ -257,22 +264,49 @@ export function InvitationLandingPage() {
         </div>
       </Card>
       {!sessionQuery.isPending && !signedIn ? (
-        <CredentialForm defaultEmail={invitation.email} defaultMode="sign-up" />
+        <CredentialForm
+          defaultEmail={invitation.email}
+          defaultMode="sign-up"
+          headingLevel="h2"
+          signUpHelper={`Create your account to join ${invitation.home.name}.`}
+          signInHelper={`Sign in to join ${invitation.home.name}.`}
+        />
       ) : null}
-    </InvitationPageFrame>
+    </AuthPageLayout>
   );
 }
 
-function InvitationPageFrame({
+function InvitationUnavailablePage({ title }: { title: string }) {
+  return (
+    <InvitationStatusPage title={title} heading="Invitation unavailable">
+      <Alert variant="warning" title="This invitation isn’t available">
+        The invitation may have expired or is no longer valid. Ask a Home Admin
+        for a new invitation if you still need access.
+      </Alert>
+    </InvitationStatusPage>
+  );
+}
+
+function InvitationStatusPage({
   title,
+  heading,
   children,
 }: {
   title: string;
+  heading: string;
   children: ReactNode;
 }) {
   return (
-    <DocumentTitle title={title}>
-      <div className="flex flex-col gap-4">{children}</div>
-    </DocumentTitle>
+    <AuthPageLayout title={title} size="invite">
+      <Card padding="lg" className="flex w-full flex-col gap-5">
+        <AuthIconWell>
+          <CircleAlert className="size-6" />
+        </AuthIconWell>
+        <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
+          {heading}
+        </h1>
+        {children}
+      </Card>
+    </AuthPageLayout>
   );
 }

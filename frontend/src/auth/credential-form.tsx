@@ -1,7 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Alert, Button, Card, TextField } from '../components/ui/index.js';
+import { DocumentTitle } from '../components/document-title.js';
 import { currentUserQueryKey } from '../homes/home-query-keys.js';
 import { invitationAuthSessionQueryKey } from '../invitations/auth-session-api.js';
 import { signInWithEmail, signUpWithEmail } from './auth-credential-api.js';
@@ -21,17 +22,28 @@ import {
 export type CredentialFormProps = {
   defaultEmail?: string;
   defaultMode?: CredentialMode;
+  headingLevel?: 'h1' | 'h2';
+  signInHelper?: string;
+  signUpHelper?: string;
 };
+
+function modeSwitchClassName() {
+  return 'font-semibold text-brand underline-offset-4 hover:text-brand-hover hover:underline focus-visible:rounded-sm';
+}
 
 export function CredentialForm({
   defaultEmail = '',
   defaultMode = 'sign-in',
+  headingLevel = 'h1',
+  signInHelper = 'Sign in to your home.',
+  signUpHelper = 'Start a home or join one you’ve been invited to.',
 }: CredentialFormProps) {
   const queryClient = useQueryClient();
   const [mode, setMode] = useState<CredentialMode>(defaultMode);
   const modeRef = useRef(mode);
   modeRef.current = mode;
   const [signedUp, setSignedUp] = useState(false);
+  const formErrorRef = useRef<HTMLDivElement>(null);
   const {
     register,
     handleSubmit,
@@ -79,44 +91,49 @@ export function CredentialForm({
     }
   });
 
+  useEffect(() => {
+    if (errors.root?.message) {
+      formErrorRef.current?.focus();
+    }
+  }, [errors.root?.message]);
+
   const isPending = authMutation.isPending;
+  const isSignUp = mode === 'sign-up';
+
+  const switchMode = (next: CredentialMode) => {
+    setMode(next);
+    setSignedUp(false);
+    authMutation.reset();
+    reset({ name: '', email: defaultEmail, password: '' });
+  };
 
   return (
-    <Card padding="lg" className="flex max-w-lg flex-col gap-4">
-      <div className="flex gap-2" role="group" aria-label="Account action">
-        <Button
-          type="button"
-          variant={mode === 'sign-in' ? 'primary' : 'secondary'}
-          disabled={isPending}
-          onClick={() => {
-            setMode('sign-in');
-            setSignedUp(false);
-            authMutation.reset();
-            reset({ name: '', email: defaultEmail, password: '' });
-          }}
-        >
-          Use existing account
-        </Button>
-        <Button
-          type="button"
-          variant={mode === 'sign-up' ? 'primary' : 'secondary'}
-          disabled={isPending}
-          onClick={() => {
-            setMode('sign-up');
-            setSignedUp(false);
-            authMutation.reset();
-            reset({ name: '', email: defaultEmail, password: '' });
-          }}
-        >
-          New account
-        </Button>
+    <Card padding="lg" className="flex w-full flex-col gap-5">
+      {headingLevel === 'h1' ? (
+        <DocumentTitle
+          title={isSignUp ? 'Create account · Roomies' : 'Sign in · Roomies'}
+        />
+      ) : null}
+      <div className="flex flex-col gap-1">
+        {headingLevel === 'h1' ? (
+          <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
+            {isSignUp ? 'Create your account' : 'Welcome back'}
+          </h1>
+        ) : (
+          <h2 className="text-2xl font-semibold tracking-tight text-text-primary">
+            {isSignUp ? 'Create your account' : 'Welcome back'}
+          </h2>
+        )}
+        <p className="text-sm break-words text-text-secondary">
+          {isSignUp ? signUpHelper : signInHelper}
+        </p>
       </div>
       <form
         className="flex flex-col gap-4"
         onSubmit={(event) => void submitCredentials(event)}
         noValidate
       >
-        {mode === 'sign-up' ? (
+        {isSignUp ? (
           <TextField
             label="Name"
             autoComplete="name"
@@ -141,9 +158,7 @@ export function CredentialForm({
         <TextField
           label="Password"
           type="password"
-          autoComplete={
-            mode === 'sign-up' ? 'new-password' : 'current-password'
-          }
+          autoComplete={isSignUp ? 'new-password' : 'current-password'}
           required
           disabled={isPending}
           invalid={Boolean(errors.password)}
@@ -151,19 +166,52 @@ export function CredentialForm({
           {...register('password')}
         />
         {errors.root?.message ? (
-          <Alert variant="danger" title="Couldn’t continue">
-            {errors.root.message}
-          </Alert>
+          <div ref={formErrorRef} tabIndex={-1} className="outline-none">
+            <Alert variant="danger" title="Couldn’t continue">
+              {errors.root.message}
+            </Alert>
+          </div>
         ) : null}
         {signedUp ? (
           <Alert variant="success" title={VERIFICATION_EMAIL_SENT_TITLE}>
             {VERIFICATION_EMAIL_SENT}
           </Alert>
         ) : null}
-        <Button type="submit" loading={isPending}>
-          {mode === 'sign-up' ? 'Create account' : 'Sign in'}
+        <Button type="submit" className="w-full" loading={isPending}>
+          {isSignUp ? 'Create account' : 'Sign in'}
         </Button>
       </form>
+      <p className="text-center text-sm text-text-secondary">
+        {isSignUp ? (
+          <>
+            Already have an account?{' '}
+            <button
+              type="button"
+              className={modeSwitchClassName()}
+              disabled={isPending}
+              onClick={() => {
+                switchMode('sign-in');
+              }}
+            >
+              Sign in
+            </button>
+          </>
+        ) : (
+          <>
+            New to Roomies?{' '}
+            <button
+              type="button"
+              className={modeSwitchClassName()}
+              disabled={isPending}
+              onClick={() => {
+                switchMode('sign-up');
+              }}
+            >
+              Create an account
+            </button>
+          </>
+        )}
+      </p>
     </Card>
   );
 }

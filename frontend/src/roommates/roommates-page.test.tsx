@@ -518,8 +518,8 @@ describe('Roommates leave', () => {
     });
     expect(
       await screen.findByRole('heading', {
-        name: 'You’re not currently in a Home',
-        level: 2,
+        name: 'Welcome to Roomies',
+        level: 1,
       }),
     ).toBeInTheDocument();
     expect(

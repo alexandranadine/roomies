@@ -101,14 +101,19 @@ export function CreateHomeForm() {
       />
 
       {errors.root?.message ? (
-        <Alert variant="danger">{errors.root.message}</Alert>
+        <Alert variant="danger" title="Couldn’t create this home">
+          {errors.root.message}
+        </Alert>
       ) : null}
 
-      <div>
-        <Button type="submit" loading={isPending} disabled={isPending}>
-          Create Home
-        </Button>
-      </div>
+      <Button
+        type="submit"
+        className="w-full"
+        loading={isPending}
+        disabled={isPending}
+      >
+        Create home
+      </Button>
     </form>
   );
 }
