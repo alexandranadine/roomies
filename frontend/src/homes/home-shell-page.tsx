@@ -1,10 +1,9 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { Plus } from 'lucide-react';
 import { Link, Outlet, useParams } from 'react-router';
 import { DocumentTitle } from '../components/document-title.js';
 import { PageContainer } from '../components/page-container.js';
-import { IconButton, Spinner } from '../components/ui/index.js';
+import { Spinner } from '../components/ui/index.js';
 import { ApiError } from '../platform/api/index.js';
 import { InviteRoommateDialog } from '../roommates/invite-roommate-dialog.js';
 import {
@@ -17,12 +16,11 @@ import { clearPrivateHomeQueryState } from './clear-private-home-queries.js';
 import { HomeActionSheet } from './home-action-sheet.js';
 import { HomeBottomNav } from './home-bottom-nav.js';
 import { getHomeContext } from './home-context-api.js';
-import { HomeDesktopNav } from './home-desktop-nav.js';
 import type { HomeShellOutletContext } from './home-overview-page.js';
 import { HomePhotoDialog } from './home-photo-dialog.js';
 import { currentUserQueryKey, homeContextQueryKey } from './home-query-keys.js';
-import { HomeSelector } from './home-selector.js';
-import { useDesktopLayout } from './use-desktop-layout.js';
+import { HomeShellFallbackHeader, HomeShellHeader } from './home-shell-header.js';
+import { useDesktopLayout, useWideLayout } from './use-desktop-layout.js';
 
 const HOME_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -48,6 +46,7 @@ export function HomeShellPage() {
   const validHomeId = HOME_ID_PATTERN.test(homeId);
   const { isAdmin } = useCurrentHomeRole(validHomeId ? homeId : '');
   const isDesktop = useDesktopLayout();
+  const isWide = useWideLayout();
 
   const [taskOpen, setTaskOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -70,6 +69,7 @@ export function HomeShellPage() {
   if (!validHomeId || isConcealedHome(contextQuery.error)) {
     return (
       <DocumentTitle title="Home unavailable · Roomies">
+        <HomeShellFallbackHeader />
         <PageContainer>
           <div className="flex flex-col gap-4 py-6">
             <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
@@ -100,6 +100,7 @@ export function HomeShellPage() {
   if (home === undefined) {
     return (
       <DocumentTitle title="Home · Roomies">
+        <HomeShellFallbackHeader />
         <PageContainer>
           <div className="flex flex-col gap-3 py-6">
             <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
@@ -138,35 +139,17 @@ export function HomeShellPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="border-b border-border bg-bg">
-        <PageContainer className="flex items-center justify-between gap-2 py-1.5">
-          <HomeSelector
-            homeId={home.id}
-            homeName={home.name}
-            hasPhoto={home.hasPhoto}
-          />
-          {isDesktop ? (
-            <IconButton
-              variant="primary"
-              aria-label="Add to this Home"
-              className="rounded-full"
-              onClick={() => {
-                setActionsOpen(true);
-              }}
-            >
-              <Plus className="size-5" aria-hidden="true" />
-            </IconButton>
-          ) : null}
-        </PageContainer>
-        {isDesktop ? (
-          <PageContainer>
-            <HomeDesktopNav homeId={home.id} />
-          </PageContainer>
-        ) : null}
-      </div>
+      <HomeShellHeader
+        home={home}
+        isDesktop={isDesktop}
+        isWide={isWide}
+        onAdd={() => {
+          setActionsOpen(true);
+        }}
+      />
 
       <div className={isDesktop ? 'flex-1 pb-8' : 'flex-1 pb-28'}>
-        <PageContainer className="py-3 sm:py-6">
+        <PageContainer className="py-2 sm:py-4 lg:py-6">
           <Outlet context={outletContext} />
         </PageContainer>
       </div>

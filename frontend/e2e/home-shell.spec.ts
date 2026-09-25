@@ -195,9 +195,40 @@ test.describe('Home shell Phase 1', () => {
       page.getByRole('list', { name: 'Home activity' }),
     ).toBeVisible();
     await expect(page.getByRole('button', { name: 'Add to this Home' })).toBeVisible();
+    await assertNoHorizontalOverflow(page);
     mkdirSync(SCREENSHOT_DIR, { recursive: true });
     await page.screenshot({
       path: path.join(SCREENSHOT_DIR, 'home-390.png'),
+    });
+  });
+
+  test('Home at 768px stays a single wider column without overflow', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await page.goto(`/homes/${HOME_A}`);
+    await expect(page.getByText('Roomies').first()).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Home' })).toBeVisible();
+    await expect(page.getByTestId('house-pulse')).toBeVisible();
+    await expect(page.getByText('Overdue')).toBeVisible();
+    await assertNoHorizontalOverflow(page);
+  });
+
+  test('Home at 1024px uses two columns and header nav', async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 800 });
+    await page.goto(`/homes/${HOME_A}`);
+    await expect(page.getByText('Roomies').first()).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Home' })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Add to this Home' }),
+    ).toBeVisible();
+    await expect(page.getByTestId('house-pulse')).toBeVisible();
+    await expect(page.getByText('Assigned to you')).toBeVisible();
+    await assertNoHorizontalOverflow(page);
+    mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, 'home-1024.png'),
+      fullPage: true,
     });
   });
 
@@ -212,9 +243,27 @@ test.describe('Home shell Phase 1', () => {
       page.getByRole('button', { name: 'Add to this Home' }),
     ).toBeVisible();
     await expect(page.getByTestId('house-pulse')).toBeVisible();
+    await assertNoHorizontalOverflow(page);
     mkdirSync(SCREENSHOT_DIR, { recursive: true });
     await page.screenshot({
       path: path.join(SCREENSHOT_DIR, 'home-desktop.png'),
+      fullPage: true,
+    });
+  });
+
+  test('Home at 1440px keeps two-column composition without overflow', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`/homes/${HOME_A}`);
+    await expect(page.getByText('Roomies').first()).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Home' })).toBeVisible();
+    await expect(page.getByTestId('house-pulse')).toBeVisible();
+    await expect(page.getByText('Assigned to you')).toBeVisible();
+    await assertNoHorizontalOverflow(page);
+    mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, 'home-1440.png'),
       fullPage: true,
     });
   });

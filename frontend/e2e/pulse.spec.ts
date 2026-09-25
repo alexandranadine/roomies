@@ -79,7 +79,7 @@ const ACTIVE_PULSE_B = {
       assignedOpenCount: 9,
       unassignedOpenCount: 0,
       dueTodayRelevantCount: 0,
-      overdueRelevantCount: 0,
+      overdueRelevantCount: 9,
     },
     {
       type: 'SUPPLIES',
@@ -257,9 +257,13 @@ test.describe('House Pulse on Home overview', () => {
       await expect(
         page.getByRole('heading', { name: 'House Pulse', level: 2 }),
       ).toBeVisible();
-      await expect(page.getByText('Assigned to you')).toBeVisible();
-      await expect(page.getByText('Supplies', { exact: true })).toBeVisible();
+      await expect(page.getByText('Overdue')).toBeVisible();
+      await expect(page.getByText('Unassigned')).toBeVisible();
       await expect(page.getByText('Maintenance', { exact: true })).toBeVisible();
+      if (viewport.width >= 1024) {
+        await expect(page.getByText('Assigned to you')).toBeVisible();
+        await expect(page.getByText('Supplies', { exact: true })).toBeVisible();
+      }
       await assertNoHorizontalOverflow(page);
     });
   }
@@ -270,7 +274,8 @@ test.describe('House Pulse on Home overview', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`/homes/${HOME_A}`);
     const pulse = page.getByTestId('house-pulse');
-    await expect(pulse.getByText('Assigned to you')).toBeVisible();
+    await expect(pulse.getByText('Overdue')).toBeVisible();
+    await expect(pulse.getByText('Unassigned')).toBeVisible();
     await expect(pulse.getByText('Maintenance', { exact: true })).toBeVisible();
     await expect(pulse.getByText('2026-09-14T04:00:00.000Z')).toHaveCount(0);
     await expect(pulse.getByText(/score|rank|chart|percent/i)).toHaveCount(0);
@@ -298,15 +303,13 @@ test.describe('House Pulse on Home overview', () => {
     });
     await page.setViewportSize({ width: 768, height: 1024 });
     await page.goto(`/homes/${HOME_A}`);
-    await expect(page.getByText('Assigned to you')).toBeVisible();
+    await expect(page.getByText('Overdue')).toBeVisible();
 
     await page.goto(`/homes/${HOME_B}`);
     await expect(
       page.getByRole('heading', { name: 'Cedar House', level: 1 }),
     ).toBeVisible();
-    await expect(
-      page.locator('li', { hasText: 'Assigned to you' }),
-    ).toContainText('9');
+    await expect(page.locator('li', { hasText: 'Overdue' })).toContainText('9');
   });
 
   test('CLEAR Pulse still shows compact domain metrics', async ({ page }) => {
@@ -317,7 +320,7 @@ test.describe('House Pulse on Home overview', () => {
     await expect(pulse.getByText('Assigned to you')).toBeVisible();
     await expect(pulse.getByText('Supplies', { exact: true })).toBeVisible();
     await expect(pulse.getByText('Maintenance', { exact: true })).toBeVisible();
-    await expect(pulse.getByText('Clear')).toHaveCount(1);
+    await expect(pulse.getByText('Clear')).toHaveCount(0);
   });
 
   test('respects reduced motion for Pulse skeleton animation class', async ({

@@ -14,7 +14,7 @@ function givenName(name: string): string {
 
 /**
  * Horizontal identity row of active Home members. Names only — no invented
- * status, photos, or roles for other people.
+ * status, photos, or roles for other people. Height follows content.
  */
 export function RoommateStrip({ memberships }: RoommateStripProps) {
   const { currentMembershipId, memberships: members } = memberships;
@@ -25,7 +25,7 @@ export function RoommateStrip({ memberships }: RoommateStripProps) {
 
   return (
     <section aria-label="Roommates" className="min-w-0">
-      <ul className="-mx-1 flex list-none gap-3 overflow-x-auto px-1 pb-1">
+      <ul className="-mx-1 flex list-none items-start gap-3 overflow-x-auto px-1 lg:gap-6">
         {members.map((member) => {
           const isCurrent = member.membershipId === currentMembershipId;
           const caption = isCurrent ? 'You' : givenName(member.name);
@@ -34,17 +34,18 @@ export function RoommateStrip({ memberships }: RoommateStripProps) {
           return (
             <li
               key={member.membershipId}
-              className="flex w-16 shrink-0 flex-col items-center gap-1.5"
+              className="flex w-14 shrink-0 flex-col items-center gap-1 lg:w-[4.5rem] lg:gap-1.5"
             >
               <InitialsAvatar
                 name={member.name}
                 label={accessible}
-                size="lg"
+                size="md"
+                className="lg:size-16 lg:text-lg"
               />
               <p
                 aria-hidden="true"
                 className={cn(
-                  'w-full truncate text-center text-xs font-medium',
+                  'w-full truncate text-center text-xs font-medium lg:text-sm',
                   isCurrent ? 'text-brand' : 'text-text-secondary',
                 )}
               >

@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { Link, useOutletContext, useParams } from 'react-router';
 import { HomeActivityFeed } from '../activity/home-activity-feed.js';
 import { DocumentTitle } from '../components/document-title.js';
@@ -39,6 +39,29 @@ function isTransientPulseError(error: unknown): boolean {
   return !(
     error instanceof ApiError &&
     (error.status === 401 || error.status === 403 || error.status === 404)
+  );
+}
+
+function OverviewLayout({
+  strip,
+  pulse,
+  actions,
+  activity,
+}: {
+  strip: ReactNode;
+  pulse: ReactNode;
+  actions: ReactNode;
+  activity: ReactNode;
+}) {
+  return (
+    <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(20rem,1fr)] lg:items-start lg:gap-x-8 lg:gap-y-4">
+      <div className="min-w-0 lg:col-start-1 lg:row-start-1">{strip}</div>
+      <aside className="min-w-0 lg:col-start-2 lg:row-span-3 lg:row-start-1">
+        {pulse}
+      </aside>
+      <div className="min-w-0 lg:col-start-1 lg:row-start-2">{actions}</div>
+      <div className="min-w-0 lg:col-start-1 lg:row-start-3">{activity}</div>
+    </div>
   );
 }
 
@@ -115,52 +138,65 @@ export function HomeOverviewPage() {
     membershipsQuery.isPending &&
     membershipsQuery.data === undefined;
 
+  const roommateSlot = (
+    <>
+      {showMembershipsLoading ? (
+        <div className="flex gap-3" aria-busy="true">
+          <Skeleton className="size-10 rounded-full lg:size-16" announced />
+          <Skeleton className="size-10 rounded-full lg:size-16" />
+          <Skeleton className="size-10 rounded-full lg:size-16" />
+        </div>
+      ) : null}
+      {membershipsForHome !== undefined ? (
+        <RoommateStrip memberships={membershipsForHome} />
+      ) : null}
+    </>
+  );
+
+  const pulseSlot = (
+    <>
+      {showPulseLoading ? <HousePulseSkeleton /> : null}
+
+      {pulseQuery.isError && isTransientPulseError(pulseQuery.error) ? (
+        <Alert variant="danger" title="Couldn’t load House Pulse">
+          <p className="mb-3">Something went wrong. Try again.</p>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              void pulseQuery.refetch();
+            }}
+          >
+            Retry
+          </Button>
+        </Alert>
+      ) : null}
+
+      {pulseForHome !== undefined && !showPulseLoading ? (
+        <HousePulseSection homeId={homeId} pulse={pulseForHome} />
+      ) : null}
+    </>
+  );
+
   return (
     <DocumentTitle title={`${home.name} · Roomies`}>
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
-        {showMembershipsLoading ? (
-          <div className="flex gap-3" aria-busy="true">
-            <Skeleton className="size-12 rounded-full" announced />
-            <Skeleton className="size-12 rounded-full" />
-            <Skeleton className="size-12 rounded-full" />
-          </div>
-        ) : null}
-        {membershipsForHome !== undefined ? (
-          <RoommateStrip memberships={membershipsForHome} />
-        ) : null}
-
-        {showPulseLoading ? <HousePulseSkeleton /> : null}
-
-        {pulseQuery.isError && isTransientPulseError(pulseQuery.error) ? (
-          <Alert variant="danger" title="Couldn’t load House Pulse">
-            <p className="mb-3">Something went wrong. Try again.</p>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => {
-                void pulseQuery.refetch();
-              }}
-            >
-              Retry
-            </Button>
-          </Alert>
-        ) : null}
-
-        {pulseForHome !== undefined && !showPulseLoading ? (
-          <HousePulseSection homeId={homeId} pulse={pulseForHome} />
-        ) : null}
-
-        <HomeQuickActions
-          homeId={home.id}
-          isAdmin={isAdmin}
-          onOpenActions={openHomeActions}
-          onAddTask={openAddTask}
-          onInviteRoommate={openInviteRoommate}
-          onHomePhoto={openHomePhoto}
-        />
-
-        {homeId.length > 0 ? <HomeActivityFeed homeId={homeId} /> : null}
-      </div>
+      <OverviewLayout
+        strip={roommateSlot}
+        pulse={pulseSlot}
+        actions={
+          <HomeQuickActions
+            homeId={home.id}
+            isAdmin={isAdmin}
+            onOpenActions={openHomeActions}
+            onAddTask={openAddTask}
+            onInviteRoommate={openInviteRoommate}
+            onHomePhoto={openHomePhoto}
+          />
+        }
+        activity={
+          homeId.length > 0 ? <HomeActivityFeed homeId={homeId} /> : null
+        }
+      />
     </DocumentTitle>
   );
 }

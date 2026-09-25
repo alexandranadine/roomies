@@ -32,7 +32,7 @@ export function HomeSelector({
     <Menu.Root>
       <Menu.Trigger
         className={cn(
-          'flex max-w-full min-w-0 items-center gap-2 rounded-lg py-1 pr-2 text-left',
+          'flex max-w-full min-w-0 items-center gap-2 rounded-lg py-0.5 pr-2 text-left',
           'outline-none hover:bg-subtle',
           'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
         )}

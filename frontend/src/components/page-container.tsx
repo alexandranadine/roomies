@@ -6,11 +6,11 @@ type PageContainerProps = {
 };
 
 /**
- * Responsive content shell (~1024px max on desktop).
+ * Responsive content shell (~1180px max on desktop).
  * Mobile-first padding; avoids horizontal overflow at common phone widths.
  */
 export function PageContainer({ children, className }: PageContainerProps) {
-  const classes = ['mx-auto w-full max-w-[1024px] px-4 sm:px-6', className]
+  const classes = ['mx-auto w-full max-w-[1180px] px-4 sm:px-6', className]
     .filter(Boolean)
     .join(' ');
 

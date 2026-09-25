@@ -42,7 +42,7 @@ export function HomeActivityFeed({ homeId }: HomeActivityFeedProps) {
   return (
     <section
       aria-labelledby="home-activity-heading"
-      className="flex flex-col gap-3"
+      className="flex flex-col gap-2"
     >
       <header className="flex items-baseline justify-between gap-3">
         <h2
@@ -62,9 +62,9 @@ export function HomeActivityFeed({ homeId }: HomeActivityFeedProps) {
 
       {showLoading ? (
         <div className="flex flex-col gap-2" aria-busy="true">
-          <Skeleton className="h-16 w-full rounded-xl" announced />
-          <Skeleton className="h-16 w-full rounded-xl" />
-          <Skeleton className="h-16 w-full rounded-xl" />
+          <Skeleton className="h-14 w-full rounded-xl" announced />
+          <Skeleton className="h-14 w-full rounded-xl" />
+          <Skeleton className="h-14 w-full rounded-xl" />
         </div>
       ) : null}
 
@@ -95,7 +95,7 @@ export function HomeActivityFeed({ homeId }: HomeActivityFeedProps) {
       {items.length > 0 ? (
         <ul
           aria-label="Home activity"
-          className="m-0 flex list-none flex-col gap-2 p-0"
+          className="m-0 flex list-none flex-col gap-1.5 p-0 lg:gap-2"
         >
           {items.map((item) => (
             <ActivityFeedCard key={item.id} item={item} />

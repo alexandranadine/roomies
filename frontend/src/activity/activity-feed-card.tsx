@@ -17,28 +17,30 @@ export function ActivityFeedCard({ item }: ActivityFeedCardProps) {
   const showHierarchy = presentation.actorLabel !== null;
 
   return (
-    <li className="rounded-xl border border-border bg-surface p-3 shadow-card">
-      <article className="flex gap-3">
+    <li className="rounded-xl border border-border bg-surface px-3 py-2 shadow-card lg:px-4 lg:py-2.5">
+      <article className="flex gap-2.5 lg:items-baseline lg:gap-3">
         <ActivityEventIcon name={presentation.icon} framed />
-        <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 flex-1 flex-col gap-0 lg:flex-row lg:items-baseline lg:gap-3">
           {showHierarchy ? (
-            <p className="break-words text-sm text-text-primary">
+            <p className="min-w-0 break-words text-sm text-text-primary">
               <span className="font-semibold">{presentation.actorLabel}</span>
               <span> {presentation.actionLabel}</span>
             </p>
           ) : (
-            <p className="break-words text-sm font-medium text-text-primary">
+            <p className="min-w-0 break-words text-sm font-medium text-text-primary">
               {presentation.sentence}
             </p>
           )}
           {presentation.contextLabel !== null ? (
-            <p className="mt-0.5 break-words text-sm text-text-secondary">
+            <p className="min-w-0 flex-1 break-words text-sm text-text-secondary">
               {presentation.contextLabel}
             </p>
-          ) : null}
+          ) : (
+            <span className="hidden min-w-0 flex-1 lg:block" />
+          )}
           {timestamp.length > 0 ? (
             <time
-              className="mt-1 block text-xs text-text-muted"
+              className="mt-0.5 shrink-0 text-xs text-text-muted lg:mt-0 lg:ml-auto"
               dateTime={item.occurredAt}
             >
               {timestamp}

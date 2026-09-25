@@ -44,7 +44,7 @@ describe('House Pulse on Home overview', () => {
     const region = pulseRegion();
     expect(region).toHaveAttribute('aria-labelledby', 'house-pulse-heading');
 
-    expect(within(region).getByText('Assigned to you')).toBeInTheDocument();
+    expect(within(region).getByText('Overdue')).toBeInTheDocument();
     expect(within(region).getByText('Unassigned')).toBeInTheDocument();
     expect(within(region).getByText('Supplies')).toBeInTheDocument();
     expect(within(region).getByText('Maintenance')).toBeInTheDocument();
@@ -146,18 +146,21 @@ describe('House Pulse on Home overview', () => {
     expect(within(region).queryByRole('img')).not.toBeInTheDocument();
   });
 
-  it('exposes CLEAR/ACTIVE as text badges, not color-only', async () => {
+  it('exposes Pulse counts as text, not color-only status', async () => {
     stubPulseApis({
       pulseByHome: { [TEST_HOME_A]: activeHousePulse() },
     });
     renderApp(`/homes/${TEST_HOME_A}`);
 
     const region = await screen.findByTestId('house-pulse');
-    expect(within(region).getByText('Active')).toBeInTheDocument();
-    expect(within(region).getByText('Active')).toHaveAttribute(
-      'data-pulse-state',
-      'ACTIVE',
+    expect(within(region).queryByText('Active')).not.toBeInTheDocument();
+    expect(within(region).queryByText('Clear')).not.toBeInTheDocument();
+    expect(within(region).getByText('Overdue').closest('li')).toHaveTextContent(
+      '3',
     );
+    expect(
+      within(region).getByText('Maintenance').closest('li'),
+    ).toHaveTextContent('2');
   });
 
   it('links Tasks to the existing Home Tasks destination', async () => {

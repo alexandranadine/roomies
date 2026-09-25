@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   compactPulseMetrics,
+  glancePulseMetrics,
   maintenanceActiveCopy,
   maintenanceClearCopy,
   pulseOverallState,
   pulseStateLabel,
+  supportingPulseMetrics,
   suppliesActiveMetrics,
   suppliesClearCopy,
   tasksActiveMetrics,
@@ -104,6 +106,16 @@ describe('pulse copy', () => {
       'Overdue',
       'Supplies',
       'Maintenance',
+    ]);
+    expect(glancePulseMetrics(pulse).map((metric) => metric.label)).toEqual([
+      'Overdue',
+      'Unassigned',
+      'Maintenance',
+    ]);
+    expect(supportingPulseMetrics(pulse).map((metric) => metric.label)).toEqual([
+      'Due today',
+      'Assigned to you',
+      'Supplies',
     ]);
     expect(pulseOverallState(pulse)).toBe('ACTIVE');
   });

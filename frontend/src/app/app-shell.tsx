@@ -1,6 +1,7 @@
 import { User } from 'lucide-react';
 import { NavLink, Outlet, useLocation } from 'react-router';
 import { PageContainer } from '../components/page-container.js';
+import { RoomiesWordmark } from '../components/roomies-wordmark.js';
 import { cn } from '../components/ui/cn.js';
 import { isHomeScopedPath } from '../homes/home-nav.js';
 import { NotificationBellLink } from '../notifications/notification-bell-link.js';
@@ -24,19 +25,12 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-dvh flex-col bg-bg text-text-primary">
-      <header className="bg-bg">
-        <PageContainer
-          className={cn(
-            'flex items-center justify-between gap-3 pt-3',
-            homeScoped ? 'pb-0' : 'h-14 sm:h-16',
-          )}
-        >
-          <p className="font-sans text-2xl font-bold tracking-tight text-brand">
-            Roomies
-          </p>
-          <nav aria-label="Global" className="flex items-center gap-1">
-            <NotificationBellLink />
-            {homeScoped ? null : (
+      {homeScoped ? null : (
+        <header className="bg-bg">
+          <PageContainer className="flex h-14 items-center justify-between gap-3 sm:h-16">
+            <RoomiesWordmark />
+            <nav aria-label="Global" className="flex items-center gap-1">
+              <NotificationBellLink />
               <NavLink
                 to="/account"
                 aria-label="Account"
@@ -44,10 +38,10 @@ export function AppShell() {
               >
                 <User className="size-5" aria-hidden="true" />
               </NavLink>
-            )}
-          </nav>
-        </PageContainer>
-      </header>
+            </nav>
+          </PageContainer>
+        </header>
+      )}
       <main className={homeScoped ? 'flex min-h-0 flex-1 flex-col' : 'flex-1 py-6 sm:py-8'}>
         {homeScoped ? (
           <Outlet />

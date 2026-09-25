@@ -74,6 +74,30 @@ export function compactPulseMetrics(
   ];
 }
 
+/** Mobile glance: the most actionable DTO counters. */
+export function glancePulseMetrics(
+  pulse: HousePulseDto,
+): readonly PulseMetric[] {
+  const [tasks, , maintenance] = pulse.items;
+  return [
+    { label: 'Overdue', value: tasks.overdueRelevantCount },
+    { label: 'Unassigned', value: tasks.unassignedOpenCount },
+    { label: 'Maintenance', value: maintenance.openVisibleCount },
+  ];
+}
+
+/** Extra DTO counters shown in the desktop sidebar Pulse. */
+export function supportingPulseMetrics(
+  pulse: HousePulseDto,
+): readonly PulseMetric[] {
+  const [tasks, supplies] = pulse.items;
+  return [
+    { label: 'Due today', value: tasks.dueTodayRelevantCount },
+    { label: 'Assigned to you', value: tasks.assignedOpenCount },
+    { label: 'Supplies', value: supplies.openCount },
+  ];
+}
+
 export function pulseOverallState(
   pulse: HousePulseDto,
 ): HousePulseSectionState {

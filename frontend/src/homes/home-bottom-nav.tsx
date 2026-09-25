@@ -25,7 +25,7 @@ export function HomeBottomNav({ homeId, onOpenActions }: HomeBottomNavProps) {
       aria-label="Home"
       className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/95 shadow-nav backdrop-blur-sm"
     >
-      <ul className="mx-auto grid h-[4.25rem] max-w-lg grid-cols-5 items-end px-2 pb-[max(0.35rem,env(safe-area-inset-bottom))]">
+      <ul className="mx-auto grid h-16 max-w-lg grid-cols-5 items-end px-2 pb-[max(0.35rem,env(safe-area-inset-bottom))]">
         {leading.map((destination) => (
           <li key={destination.id} className="flex justify-center">
             <BottomNavLink destination={destination} homeId={homeId} />
@@ -37,7 +37,7 @@ export function HomeBottomNav({ homeId, onOpenActions }: HomeBottomNavProps) {
             aria-label="Add to this Home"
             onClick={onOpenActions}
             className={cn(
-              'mb-1 flex size-14 items-center justify-center rounded-full bg-brand text-white shadow-card',
+              'relative -top-3 mb-0 flex size-14 items-center justify-center rounded-full bg-brand text-white shadow-card',
               'outline-none hover:bg-brand-hover active:bg-brand-active',
               'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
             )}

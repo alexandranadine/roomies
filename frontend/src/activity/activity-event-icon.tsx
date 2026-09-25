@@ -54,7 +54,7 @@ export function ActivityEventIcon({
   return (
     <span
       className={cn(
-        'inline-flex size-10 shrink-0 items-center justify-center rounded-full',
+        'inline-flex size-9 shrink-0 items-center justify-center rounded-full lg:size-10',
         TONE_CLASSES[name],
       )}
       aria-hidden="true"
