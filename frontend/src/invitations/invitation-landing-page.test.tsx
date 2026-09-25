@@ -1,6 +1,7 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { currentUserHomesQueryKey } from '../homes/home-query-keys.js';
 import { resetApiClientForTests } from '../platform/api/index.js';
 import { clearHousePulse } from '../pulse/test-fixtures.js';
 import { renderApp } from '../test/render.js';
@@ -313,6 +314,7 @@ describe('invitation landing page', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const { queryClient, router } = renderApp(`/invitations/${INVITATION_ID}`);
+    queryClient.setQueryData(currentUserHomesQueryKey, []);
     const join = await screen.findByRole('button', { name: 'Join Home' });
     expect(join).toBeEnabled();
     await userEvent.click(join);
@@ -337,6 +339,9 @@ describe('invitation landing page', () => {
       queryClient.getQueryData(invitationPreviewQueryKey(INVITATION_ID)),
     ).toBeUndefined();
     expect(router.state.location.pathname).toBe(`/homes/${homeId}`);
+    expect(
+      queryClient.getQueryState(currentUserHomesQueryKey)?.isInvalidated,
+    ).toBe(true);
     expect(document.body.innerHTML).not.toContain(SECRET);
   });
 
