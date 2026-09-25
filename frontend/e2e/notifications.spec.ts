@@ -1,5 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page, type Route } from '@playwright/test';
+import { mkdirSync } from 'node:fs';
+import path from 'node:path';
 
 const HOME_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const HOME_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
@@ -7,14 +9,18 @@ const USER_ID = '11111111-1111-4111-8111-111111111111';
 const TASK_ID = 't1111111-1111-4111-8111-111111111111';
 const SUPPLY_ID = 's1111111-1111-4111-8111-111111111111';
 
-const VIEWPORTS = [
+const SCREENSHOT_DIR = path.join('e2e', 'screenshots', 'notifications-phase-5');
+const SCREENSHOT_VIEWPORTS = [
   { name: '360', width: 360, height: 800 },
   { name: '390', width: 390, height: 844 },
+  { name: '1024', width: 1024, height: 800 },
+  { name: '1440', width: 1440, height: 900 },
+] as const;
+const VIEWPORTS = [
+  ...SCREENSHOT_VIEWPORTS,
   { name: '430', width: 430, height: 932 },
   { name: '768', width: 768, height: 1024 },
-  { name: '1024', width: 1024, height: 800 },
   { name: '1280', width: 1280, height: 800 },
-  { name: '1440', width: 1440, height: 900 },
 ] as const;
 
 const LONG_NAME =
@@ -223,6 +229,47 @@ async function assertNoHorizontalOverflow(page: Page): Promise<void> {
   ).toBeLessThanOrEqual(overflow.clientWidth + 1);
 }
 
+async function assertDesktopContentWidth(page: Page): Promise<void> {
+  const width = await page
+    .getByTestId('notifications-page')
+    .evaluate((element) => {
+      return element.getBoundingClientRect().width;
+    });
+  expect(width).toBeLessThanOrEqual(900);
+  expect(width).toBeGreaterThan(700);
+}
+
+async function assertBottomNavDoesNotCoverContent(page: Page): Promise<void> {
+  const nav = page.getByRole('navigation', { name: 'Home' });
+  if ((await nav.count()) === 0) {
+    return;
+  }
+
+  const position = await nav.evaluate((element) => {
+    return window.getComputedStyle(element).position;
+  });
+  if (position !== 'fixed') {
+    return;
+  }
+
+  const paddingBottom = await page
+    .getByTestId('notifications-page')
+    .evaluate((element) => {
+      let node: HTMLElement | null = element;
+      while (node) {
+        const value = Number.parseFloat(
+          window.getComputedStyle(node).paddingBottom,
+        );
+        if (value >= 80) {
+          return value;
+        }
+        node = node.parentElement;
+      }
+      return 0;
+    });
+  expect(paddingBottom).toBeGreaterThanOrEqual(80);
+}
+
 async function assertNoSeriousAxeViolations(
   page: Page,
   label: string,
@@ -263,9 +310,45 @@ test.describe('Notifications authenticated UI', () => {
       await expect(page.getByText(LONG_NAME)).toBeVisible();
       await expect(page.getByText('Quiet leak under sink')).toHaveCount(0);
       await expect(
-        page.getByRole('link', { name: 'Notifications' }),
+        page.getByRole('link', { name: /Notifications/ }),
       ).toBeVisible();
       await assertNoHorizontalOverflow(page);
+    });
+  }
+
+  for (const viewport of SCREENSHOT_VIEWPORTS) {
+    test(`populated Notifications at ${viewport.name}px`, async ({ page }) => {
+      await page.setViewportSize({
+        width: viewport.width,
+        height: viewport.height,
+      });
+      await page.goto('/notifications');
+      await expect(
+        page.getByRole('heading', { name: 'Notifications', level: 1 }),
+      ).toBeVisible();
+      await expect(page.getByText(LONG_NAME)).toBeVisible();
+      await expect(page.getByText(LONG_TITLE)).toBeVisible();
+      await expect(
+        page.getByText('New private maintenance update'),
+      ).toBeVisible();
+      await expect(
+        page.getByText('Casey picked up a supply you added'),
+      ).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: 'Mark all as read' }),
+      ).toBeVisible();
+      await assertNoHorizontalOverflow(page);
+      if (viewport.width >= 1024) {
+        await assertDesktopContentWidth(page);
+      }
+      if (viewport.width < 768) {
+        await assertBottomNavDoesNotCoverContent(page);
+      }
+      mkdirSync(SCREENSHOT_DIR, { recursive: true });
+      await page.screenshot({
+        path: path.join(SCREENSHOT_DIR, `notifications-${viewport.name}.png`),
+        fullPage: true,
+      });
     });
   }
 
@@ -359,5 +442,28 @@ test.describe('Notifications authenticated UI', () => {
     await expect(page.getByText(/ASSIGNED_TASK_COMPLETED/)).toHaveCount(0);
     await assertNoHorizontalOverflow(page);
     await assertNoSeriousAxeViolations(page, 'notifications long content');
+  });
+
+  test('empty state axe scan (serious/critical)', async ({ page }) => {
+    await page.route('**/api/v1/notifications', async (route) => {
+      if (route.request().method().toUpperCase() === 'GET') {
+        await json(route, 200, { items: [], hasMore: false, nextCursor: null });
+        return;
+      }
+      await route.fallback();
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/notifications');
+    await expect(
+      page.getByRole('heading', { name: "You're all caught up.", level: 2 }),
+    ).toBeVisible();
+    await expect(
+      page.getByText('Household updates will show up here.'),
+    ).toBeVisible();
+    await expect(page.getByRole('list', { name: 'Notifications' })).toHaveCount(
+      0,
+    );
+    await assertNoHorizontalOverflow(page);
+    await assertNoSeriousAxeViolations(page, 'notifications empty state');
   });
 });

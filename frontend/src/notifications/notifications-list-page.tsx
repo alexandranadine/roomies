@@ -49,9 +49,12 @@ export function NotificationsListPage() {
 
   return (
     <DocumentTitle title="Notifications · Roomies">
-      <div className="flex flex-col gap-5">
+      <div
+        data-testid="notifications-page"
+        className="mx-auto flex w-full max-w-[860px] flex-col gap-4"
+      >
         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex flex-col gap-1">
+          <div className="flex min-w-0 flex-col gap-1">
             <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
               Notifications
             </h1>
@@ -63,6 +66,7 @@ export function NotificationsListPage() {
             <Button
               type="button"
               variant="secondary"
+              className="shrink-0 self-start"
               loading={readAllMutation.isPending}
               disabled={readAllMutation.isPending}
               onClick={() => {
@@ -94,13 +98,10 @@ export function NotificationsListPage() {
         ) : null}
 
         {showLoading ? (
-          <div
-            className="flex flex-col overflow-hidden rounded-xl border border-border"
-            aria-busy="true"
-          >
-            <Skeleton className="h-16 w-full rounded-none" announced />
-            <Skeleton className="h-16 w-full rounded-none border-t border-border" />
-            <Skeleton className="h-16 w-full rounded-none border-t border-border" />
+          <div className="flex flex-col gap-1.5 lg:gap-2" aria-busy="true">
+            <Skeleton className="h-14 w-full rounded-xl" announced />
+            <Skeleton className="h-14 w-full rounded-xl" />
+            <Skeleton className="h-14 w-full rounded-xl" />
           </div>
         ) : null}
 
@@ -123,15 +124,16 @@ export function NotificationsListPage() {
 
         {showEmpty ? (
           <EmptyState
-            title="No notifications yet"
-            description="When something needs your attention, it will show up here."
+            className="px-4 py-6"
+            title="You're all caught up."
+            description="Household updates will show up here."
           />
         ) : null}
 
         {items.length > 0 ? (
           <ul
             aria-label="Notifications"
-            className="m-0 list-none divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface p-0"
+            className="m-0 flex list-none flex-col gap-1.5 p-0 lg:gap-2"
           >
             {items.map((item) => (
               <NotificationRow key={item.id} item={item} />

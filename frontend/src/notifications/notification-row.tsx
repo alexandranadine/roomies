@@ -83,38 +83,41 @@ export function NotificationRow({ item }: NotificationRowProps) {
           void handleActivate();
         }}
         className={cn(
-          'flex w-full min-h-control-lg gap-3 px-4 py-3 text-left',
+          'flex w-full min-h-control-lg gap-2.5 rounded-xl border border-border bg-surface px-3 py-2 text-left shadow-card hover:bg-subtle/50 lg:gap-3 lg:px-4 lg:py-2.5',
           'outline-none transition-colors',
-          'focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-focus',
+          'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
           'disabled:cursor-wait',
-          unread ? 'bg-subtle' : 'bg-surface hover:bg-subtle/60',
         )}
       >
         <NotificationIcon name={presentation.icon} />
         <div className="min-w-0 flex-1">
           <p
             className={cn(
-              'break-words text-sm sm:text-base',
-              unread
-                ? 'font-medium text-text-primary'
-                : 'font-normal text-text-primary',
+              'min-w-0 break-words text-sm text-text-primary',
+              unread ? 'font-semibold' : 'font-normal',
             )}
           >
             {unread ? <VisuallyHidden>Unread</VisuallyHidden> : null}
             {presentation.message}
           </p>
           {presentation.sourceTitle !== null ? (
-            <p className="mt-0.5 break-words text-sm text-text-secondary">
+            <p className="mt-0.5 min-w-0 break-words text-sm text-text-secondary">
               {presentation.sourceTitle}
             </p>
           ) : null}
-          <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm text-text-muted">
+          <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs text-text-muted">
             <span className="min-w-0 break-words">{item.home.name}</span>
             {timestamp.length > 0 ? (
               <time dateTime={item.occurredAt}>{timestamp}</time>
             ) : null}
           </p>
         </div>
+        {unread ? (
+          <span
+            className="mt-1.5 size-2 shrink-0 rounded-full bg-brand"
+            aria-hidden="true"
+          />
+        ) : null}
       </button>
     </li>
   );

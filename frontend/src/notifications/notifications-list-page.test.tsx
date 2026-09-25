@@ -105,9 +105,7 @@ describe('Notifications list page', () => {
     );
     expect(items[7]).toHaveTextContent('Cedar House');
     expect(items[0]).toHaveTextContent('Oak Street');
-    expect(
-      screen.queryByText(/3 unread|0 unread|All caught up/i),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/3 unread|0 unread/i)).not.toBeInTheDocument();
     assertNoIdentityLeaks();
   });
 
@@ -119,11 +117,68 @@ describe('Notifications list page', () => {
 
     const list = await screen.findByRole('list', { name: 'Notifications' });
     const items = within(list).getAllByRole('listitem');
+    expect(items).toHaveLength(2);
     expect(items[0]?.textContent).toMatch(/Unread/);
     expect(items[1]?.textContent).not.toMatch(/Unread/);
     expect(
+      screen.getByRole('button', {
+        name: 'Unread. Alex completed a task assigned to you',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', {
+        name: /^Alex completed a task assigned to you$/,
+      }),
+    ).toBeInTheDocument();
+    expect(items[0]?.querySelector('time')).toHaveAttribute(
+      'dateTime',
+      FIXTURE_TASK_TITLED.occurredAt,
+    );
+    expect(items[1]?.querySelector('time')).toHaveAttribute(
+      'dateTime',
+      FIXTURE_READ_TASK.occurredAt,
+    );
+    expect(
       screen.queryByText(/unread count|3 unread/i),
     ).not.toBeInTheDocument();
+  });
+
+  it('wraps long notification copy without fabricating extra context', async () => {
+    const longName =
+      'Jamie With An Exceptionally Long Roommate Display Name For Wrapping';
+    const longTitle =
+      'Take out the overflowing recycling and compost bins from the side alley every Wednesday evening';
+    stubNotificationsApis({
+      list: listPage([
+        notificationItem({
+          actor: { name: longName },
+          source: { type: 'TASK', title: longTitle },
+        }),
+      ]),
+    });
+    renderApp('/notifications');
+
+    expect(
+      await screen.findByText(`${longName} completed a task assigned to you`),
+    ).toBeInTheDocument();
+    expect(screen.getByText(longTitle)).toBeInTheDocument();
+    expect(screen.getByText('Oak Street')).toBeInTheDocument();
+    assertNoIdentityLeaks();
+  });
+
+  it('keeps the global bell unread count in sync with the inbox', async () => {
+    stubNotificationsApis({
+      list: listPage([
+        FIXTURE_TASK_TITLED,
+        FIXTURE_ROLE_CHANGED,
+        FIXTURE_READ_TASK,
+      ]),
+    });
+    renderApp('/notifications');
+
+    expect(
+      await screen.findByRole('link', { name: 'Notifications, 2 unread' }),
+    ).toBeInTheDocument();
   });
 
   it('shows empty state without implying hidden notifications', async () => {
@@ -132,9 +187,12 @@ describe('Notifications list page', () => {
 
     expect(
       await screen.findByRole('heading', {
-        name: 'No notifications yet',
+        name: "You're all caught up.",
         level: 2,
       }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Household updates will show up here.'),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('list', { name: 'Notifications' }),
@@ -142,6 +200,9 @@ describe('Notifications list page', () => {
     expect(
       screen.queryByRole('button', { name: 'Mark all as read' }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Notifications' }),
+    ).toBeInTheDocument();
   });
 
   it('shows retry UI for an initial transient error without backend details', async () => {
