@@ -378,6 +378,155 @@ describe('invitation landing page', () => {
     expect(document.body.innerHTML).not.toContain(SECRET);
   });
 
+  it('navigates immediately without waiting for homes or memberships refetch', async () => {
+    window.history.replaceState(
+      null,
+      '',
+      `/invitations/${INVITATION_ID}#secret=${SECRET}`,
+    );
+    captureInvitationFragment();
+    const homeId = previewBody().invitation.home.id;
+    const newMembershipId = '018f1e2c-7e3a-7000-8000-1234567890ac';
+    let homesFetchCount = 0;
+    let releaseHomesRefetch: ((response: Response) => void) | undefined;
+    let homesRefetchPending = false;
+
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/auth/get-session')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              user: {
+                id: '11111111-1111-4111-8111-111111111111',
+                email: EMAIL,
+                emailVerified: true,
+              },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        );
+      }
+      if (url.includes('/accept')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              membershipId: newMembershipId,
+              homeId,
+            }),
+            { status: 201, headers: { 'Content-Type': 'application/json' } },
+          ),
+        );
+      }
+      if (String(url).endsWith('/api/v1/me')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              id: '11111111-1111-4111-8111-111111111111',
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        );
+      }
+      if (String(url).includes('/api/v1/me/homes')) {
+        homesFetchCount += 1;
+        homesRefetchPending = true;
+        return new Promise<Response>((resolve) => {
+          releaseHomesRefetch = resolve;
+        });
+      }
+      if (String(url).includes(`/api/v1/homes/${homeId}/memberships`)) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              currentMembershipId: newMembershipId,
+              memberships: [{ membershipId: newMembershipId, name: 'Alex' }],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        );
+      }
+      if (String(url).includes(`/api/v1/homes/${homeId}/pulse`)) {
+        return Promise.resolve(
+          new Response(JSON.stringify(clearHousePulse()), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        );
+      }
+      if (String(url).match(new RegExp(`/api/v1/homes/${homeId}$`))) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              id: homeId,
+              name: HOME_NAME,
+              timezone: 'UTC',
+              hasPhoto: false,
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        );
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify(previewBody()), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { queryClient, router } = renderApp(`/invitations/${INVITATION_ID}`);
+    queryClient.setQueryData(currentUserHomesQueryKey, []);
+    queryClient.setQueryData(homeMembershipsKeys.all(homeId), {
+      currentMembershipId: 'm3333333-3333-4333-8333-333333333333',
+      memberships: [{ membershipId: 'm3333333-3333-4333-8333-333333333333', name: 'Alex' }],
+    });
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Join Home' }),
+    );
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe(`/homes/${homeId}`);
+    });
+    expect(
+      queryClient.getQueryData(invitationPreviewQueryKey(INVITATION_ID)),
+    ).toBeUndefined();
+    expect(queryClient.getQueryData(currentUserHomesQueryKey)).toEqual([]);
+    expect(homesFetchCount).toBeGreaterThanOrEqual(1);
+    expect(homesRefetchPending).toBe(true);
+    expect(
+      await screen.findByRole('heading', { name: HOME_NAME, level: 1 }),
+    ).toBeInTheDocument();
+
+    releaseHomesRefetch?.(
+      new Response(
+        JSON.stringify([
+          {
+            id: homeId,
+            name: HOME_NAME,
+            timezone: 'UTC',
+            role: 'ROOMMATE',
+            hasPhoto: false,
+          },
+        ]),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+
+    await waitFor(() => {
+      expect(queryClient.getQueryData(currentUserHomesQueryKey)).toEqual([
+        {
+          id: homeId,
+          name: HOME_NAME,
+          timezone: 'UTC',
+          role: 'ROOMMATE',
+          hasPhoto: false,
+        },
+      ]);
+    });
+  });
+
   it('invalidates a stale empty /me/homes cache after rejoin and shows only the new tenure', async () => {
     window.history.replaceState(
       null,

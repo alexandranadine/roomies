@@ -86,20 +86,20 @@ export function InvitationLandingPage() {
       return acceptInvitation({ invitationId, secret });
     },
     retry: false,
-    onSuccess: async (result) => {
+    onSuccess: (result) => {
       clearCapturedInvitationSecret();
       queryClient.removeQueries({
         queryKey: invitationPreviewQueryKey(invitationId),
         exact: true,
       });
-      await queryClient.invalidateQueries({
-        queryKey: currentUserHomesQueryKey,
-      });
-      await queryClient.invalidateQueries({
-        queryKey: homeMembershipsKeys.all(result.homeId),
-      });
       void navigate(`/homes/${encodeURIComponent(result.homeId)}`, {
         replace: true,
+      });
+      void queryClient.invalidateQueries({
+        queryKey: currentUserHomesQueryKey,
+      });
+      void queryClient.invalidateQueries({
+        queryKey: homeMembershipsKeys.all(result.homeId),
       });
     },
   });
