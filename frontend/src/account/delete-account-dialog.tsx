@@ -87,7 +87,7 @@ export function DeleteAccountDialog({
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         clearPrivateHomeQueryState(queryClient);
-        void queryClient.invalidateQueries({ queryKey: currentUserQueryKey });
+        queryClient.removeQueries({ queryKey: currentUserQueryKey });
         void navigate('/', {
           replace: true,
           state: { needsFreshSignInForDeletion: true },

@@ -61,6 +61,16 @@ function stubAccountApis(
       const method = (init?.method ?? 'GET').toUpperCase();
 
       if (path.endsWith('/api/v1/me/homes') && method === 'GET') {
+        if (!meAuthenticated) {
+          return Promise.resolve(
+            jsonResponse(401, {
+              error: {
+                code: 'UNAUTHENTICATED',
+                message: 'Authentication required',
+              },
+            }),
+          );
+        }
         return Promise.resolve(jsonResponse(200, options.homes ?? []));
       }
 
@@ -564,12 +574,17 @@ describe('Account settings deletion', () => {
     await userEvent.click(submitButton(dialog));
 
     expect(
+      await screen.findByRole('heading', { name: 'Welcome back', level: 1 }),
+    ).toBeInTheDocument();
+    expect(
       await screen.findByText(/sign in again, then try deleting your account/i),
     ).toBeInTheDocument();
     expect(
       screen.queryByText(/your roomies account has been deleted/i),
     ).not.toBeInTheDocument();
-    expect(queryClient.getQueryData(currentUserHomesQueryKey)).toBeUndefined();
+    await waitFor(() => {
+      expect(queryClient.getQueryData(currentUserHomesQueryKey)).toBeUndefined();
+    });
   });
 
   it('does not claim success for 400, 403, or 5xx', async () => {
