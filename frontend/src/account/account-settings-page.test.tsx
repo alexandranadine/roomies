@@ -6,6 +6,7 @@ import {
   currentUserQueryKey,
   homeContextQueryKey,
 } from '../homes/home-query-keys.js';
+import { invitationAuthSessionQueryKey } from '../invitations/auth-session-api.js';
 import { notificationKeys } from '../notifications/notifications-query-keys.js';
 import { resetApiClientForTests } from '../platform/api/index.js';
 import { renderApp } from '../test/render.js';
@@ -472,6 +473,14 @@ describe('Account settings deletion', () => {
       pages: [{ items: [], hasMore: false, nextCursor: null }],
       pageParams: [undefined],
     });
+    queryClient.setQueryData(invitationAuthSessionQueryKey, {
+      user: {
+        id: USER_ID,
+        name: 'Alexandra',
+        email: 'alex@example.com',
+        emailVerified: true,
+      },
+    });
 
     await userEvent.click(
       screen.getByRole('button', { name: 'Delete account' }),
@@ -493,6 +502,9 @@ describe('Account settings deletion', () => {
     ).toBeUndefined();
     expect(queryClient.getQueryData(notificationKeys.list({}))).toBeUndefined();
     expect(queryClient.getQueryData(currentUserQueryKey)).toBeUndefined();
+    expect(
+      queryClient.getQueryData(invitationAuthSessionQueryKey),
+    ).toBeUndefined();
     expect(
       fetchMock.mock.calls.some((call) => {
         const init = call[1] as RequestInit | undefined;
@@ -518,6 +530,15 @@ describe('Account settings deletion', () => {
     const { queryClient } = renderApp('/account');
     await screen.findByRole('heading', { name: 'Account', level: 1 });
     queryClient.setQueryData(currentUserQueryKey, { id: USER_ID });
+    const authSession = {
+      user: {
+        id: USER_ID,
+        name: 'Alexandra',
+        email: 'alex@example.com',
+        emailVerified: true,
+      },
+    };
+    queryClient.setQueryData(invitationAuthSessionQueryKey, authSession);
 
     await userEvent.click(
       screen.getByRole('button', { name: 'Delete account' }),
@@ -536,6 +557,9 @@ describe('Account settings deletion', () => {
     expect(queryClient.getQueryData(currentUserQueryKey)).toEqual({
       id: USER_ID,
     });
+    expect(queryClient.getQueryData(invitationAuthSessionQueryKey)).toEqual(
+      authSession,
+    );
     expect(getDeleteCalls()).toBe(1);
   });
 
@@ -565,6 +589,14 @@ describe('Account settings deletion', () => {
       expect(screen.getByRole('navigation', { name: 'Home' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Delete account' })).toBeEnabled();
     });
+    queryClient.setQueryData(invitationAuthSessionQueryKey, {
+      user: {
+        id: USER_ID,
+        name: 'Alexandra',
+        email: 'alex@example.com',
+        emailVerified: false,
+      },
+    });
 
     await userEvent.click(
       screen.getByRole('button', { name: 'Delete account' }),
@@ -585,6 +617,9 @@ describe('Account settings deletion', () => {
     await waitFor(() => {
       expect(queryClient.getQueryData(currentUserHomesQueryKey)).toBeUndefined();
       expect(queryClient.getQueryData(currentUserQueryKey)).toBeUndefined();
+      expect(
+        queryClient.getQueryData(invitationAuthSessionQueryKey),
+      ).toBeUndefined();
     });
   });
 
@@ -616,6 +651,15 @@ describe('Account settings deletion', () => {
       const { queryClient, unmount } = renderApp('/account');
       await screen.findByRole('heading', { name: 'Account', level: 1 });
       queryClient.setQueryData(currentUserQueryKey, { id: USER_ID });
+      const authSession = {
+        user: {
+          id: USER_ID,
+          name: 'Alexandra',
+          email: 'alex@example.com',
+          emailVerified: true,
+        },
+      };
+      queryClient.setQueryData(invitationAuthSessionQueryKey, authSession);
 
       await userEvent.click(
         screen.getByRole('button', { name: 'Delete account' }),
@@ -631,6 +675,9 @@ describe('Account settings deletion', () => {
       expect(queryClient.getQueryData(currentUserQueryKey)).toEqual({
         id: USER_ID,
       });
+      expect(queryClient.getQueryData(invitationAuthSessionQueryKey)).toEqual(
+        authSession,
+      );
       unmount();
     }
   });
@@ -645,6 +692,15 @@ describe('Account settings deletion', () => {
     const { queryClient } = renderApp('/account');
     await screen.findByRole('heading', { name: 'Account', level: 1 });
     queryClient.setQueryData(currentUserQueryKey, { id: USER_ID });
+    const authSession = {
+      user: {
+        id: USER_ID,
+        name: 'Alexandra',
+        email: 'alex@example.com',
+        emailVerified: true,
+      },
+    };
+    queryClient.setQueryData(invitationAuthSessionQueryKey, authSession);
 
     await userEvent.click(
       screen.getByRole('button', { name: 'Delete account' }),
@@ -660,6 +716,9 @@ describe('Account settings deletion', () => {
     expect(queryClient.getQueryData(currentUserQueryKey)).toEqual({
       id: USER_ID,
     });
+    expect(queryClient.getQueryData(invitationAuthSessionQueryKey)).toEqual(
+      authSession,
+    );
     expect(
       screen.queryByText(/your roomies account has been deleted/i),
     ).not.toBeInTheDocument();

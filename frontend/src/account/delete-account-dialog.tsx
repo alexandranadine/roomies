@@ -1,8 +1,13 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  useMutation,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { Alert, Button, Dialog, TextField } from '../components/ui/index.js';
 import { handlePassiveAuthLoss } from '../homes/clear-private-home-queries.js';
+import { invitationAuthSessionQueryKey } from '../invitations/auth-session-api.js';
 import { ApiError } from '../platform/api/index.js';
 import { deleteAccount } from '../users/delete-account-api.js';
 
@@ -56,6 +61,12 @@ export function DeleteAccountDialog({
     deleteMutation.reset();
   }
 
+  /** Match explicit sign-out: drop session projection after auth is gone. */
+  function clearAuthStateAfterDeletion(queryClient: QueryClient) {
+    handlePassiveAuthLoss(queryClient);
+    queryClient.removeQueries({ queryKey: invitationAuthSessionQueryKey });
+  }
+
   function handleOpenChange(next: boolean) {
     if (isPending && !next) {
       return;
@@ -77,14 +88,14 @@ export function DeleteAccountDialog({
 
     try {
       await deleteMutation.mutateAsync();
-      handlePassiveAuthLoss(queryClient);
+      clearAuthStateAfterDeletion(queryClient);
       void navigate('/', {
         replace: true,
         state: { accountDeleted: true },
       });
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
-        handlePassiveAuthLoss(queryClient);
+        clearAuthStateAfterDeletion(queryClient);
         void navigate('/', {
           replace: true,
           state: { needsFreshSignInForDeletion: true },
