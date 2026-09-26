@@ -24,14 +24,10 @@ export function SignOutButton({
   const signOut = useMutation({
     mutationFn: signOutSession,
     retry: false,
-    onSuccess: async () => {
+    onSuccess: () => {
       clearPrivateHomeQueryState(queryClient);
       queryClient.removeQueries({ queryKey: currentUserQueryKey });
       queryClient.removeQueries({ queryKey: invitationAuthSessionQueryKey });
-      await queryClient.invalidateQueries({ queryKey: currentUserQueryKey });
-      await queryClient.invalidateQueries({
-        queryKey: invitationAuthSessionQueryKey,
-      });
       if (navigateHome) {
         void navigate('/', { replace: true });
       }
