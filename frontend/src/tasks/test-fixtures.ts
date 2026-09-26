@@ -143,7 +143,7 @@ export const FIXTURE_DEFINITION_DAILY: TaskDefinition = {
 
 export const FIXTURE_DEFINITION_DEACTIVATED: TaskDefinition = {
   id: 'd3333333-3333-4333-8333-333333333333',
-  title: 'Old repeating chore',
+  title: 'Old repeating task',
   frequency: 'MONTHLY',
   weekday: null,
   dayOfMonth: 1,

@@ -111,7 +111,7 @@ describe('Tasks list page', () => {
     expect(screen.getAllByText(/Overdue/).length).toBeGreaterThan(0);
     expect(screen.getByText(/Every Monday/)).toBeInTheDocument();
     expect(screen.getByText(/Every month on the 1st/)).toBeInTheDocument();
-    expect(screen.queryByText('Old repeating chore')).not.toBeInTheDocument();
+    expect(screen.queryByText('Old repeating task')).not.toBeInTheDocument();
     expect(screen.getAllByText('Repeats').length).toBeGreaterThan(0);
     expect(screen.queryByRole('heading', { name: 'Due / upcoming' })).not.toBeInTheDocument();
     assertNoInternalIds();
@@ -130,7 +130,7 @@ describe('Tasks list page', () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        'Set a chore to repeat so the house doesn’t have to remember.',
+        'Set a task to repeat so the house doesn’t have to remember.',
       ),
     ).toBeInTheDocument();
     expect(

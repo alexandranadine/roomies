@@ -319,7 +319,7 @@ export function TaskListPage() {
 
         {definitionsQuery.isError &&
         isTransientListError(definitionsQuery.error) ? (
-          <Alert variant="danger" title="Couldn’t load repeating chores">
+          <Alert variant="danger" title="Couldn’t load repeating tasks">
             <p className="mb-3">Something went wrong. Try again.</p>
             <Button
               type="button"
@@ -346,7 +346,7 @@ export function TaskListPage() {
             {activeDefinitions.length === 0 ? (
               <SectionEmpty
                 title="No repeating tasks yet."
-                description="Set a chore to repeat so the house doesn’t have to remember."
+                description="Set a task to repeat so the house doesn’t have to remember."
               />
             ) : (
               <ul className="m-0 flex list-none flex-col gap-1.5 p-0 lg:gap-2">

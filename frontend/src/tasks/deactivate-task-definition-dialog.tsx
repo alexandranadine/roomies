@@ -4,7 +4,7 @@ import { ApiError } from '../platform/api/index.js';
 import { useDeactivateTaskDefinition } from './use-deactivate-task-definition.js';
 
 const DEACTIVATE_ERROR =
-  'Couldn’t stop this repeating chore. Try again.';
+  'Couldn’t stop repeating task. Try again.';
 const DEACTIVATE_UNAVAILABLE_ERROR =
   'This Home isn’t available right now. Try again later.';
 

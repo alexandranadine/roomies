@@ -347,7 +347,7 @@ export function CreateTaskDialog({
 
           {repeat !== 'ONCE' ? (
             <p className="text-sm text-text-secondary">
-              Repeating chores are added when they’re due. Existing tasks stay
+              Repeating tasks are added when they’re due. Existing tasks stay
               as they are.
             </p>
           ) : null}
