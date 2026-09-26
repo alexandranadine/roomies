@@ -6,8 +6,8 @@ import { Spinner } from '../components/ui/index.js';
 import { ApiError } from '../platform/api/index.js';
 import { InviteRoommateDialog } from '../roommates/invite-roommate-dialog.js';
 import {
+  reconcileHomeMembershipSurfaces,
   recoverStaleHomeMembershipState,
-  refreshHomeMembershipSurfaces,
 } from '../roommates/refresh-home-membership-surfaces.js';
 import { useCurrentHomeRole } from '../roommates/use-current-home-role.js';
 import { CreateTaskDialog } from '../tasks/create-task-dialog.js';
@@ -184,7 +184,9 @@ export function HomeChromeLayout({ homeId, children }: HomeChromeLayoutProps) {
           homeId={home.id}
           open={inviteOpen}
           onOpenChange={setInviteOpen}
-          onCreated={() => refreshHomeMembershipSurfaces(queryClient, home.id)}
+          onCreated={() => {
+            reconcileHomeMembershipSurfaces(queryClient, home.id);
+          }}
           onStaleMembership={() =>
             recoverStaleHomeMembershipState(queryClient, home.id)
           }

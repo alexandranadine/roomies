@@ -22,7 +22,7 @@ export type InviteRoommateDialogProps = {
   homeId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreated: () => Promise<void>;
+  onCreated: () => void;
   onStaleMembership: () => Promise<void>;
   onUnauthenticated: () => void;
   onInvitationCreated?: (created: CreatedInvitation) => void;
@@ -80,7 +80,7 @@ export function InviteRoommateDialog({
         normalizeInvitationEmail(values.email),
       );
       onInvitationCreated?.(result);
-      await onCreated();
+      onCreated();
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         onUnauthenticated();

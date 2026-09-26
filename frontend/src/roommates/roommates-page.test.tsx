@@ -13,6 +13,7 @@ import { renderApp } from '../test/render.js';
 import {
   CURRENT_MEMBERSHIP_ID,
   defaultCreatedInvitation,
+  defaultMemberships,
   emptyResponse,
   ENDED_MEMBERSHIP_ID,
   errorBody,
@@ -318,6 +319,154 @@ describe('Roommates ADMIN UI', () => {
     });
     expect(revokeCall).toBeDefined();
     expect(document.body.textContent).not.toContain(INVITATION_ID);
+  });
+});
+
+describe('Roommates mutation responsiveness', () => {
+  it('settles invite dialog without waiting for /me/homes refetch', async () => {
+    let homesFetchCount = 0;
+    let releaseHomesRefetch: ((response: Response) => void) | undefined;
+    let homesRefetchPending = false;
+    const created = defaultCreatedInvitation();
+    const { fetchMock } = stubRoommatesApis({
+      handlers: {
+        createInvitation: () => jsonResponse(201, created),
+      },
+    });
+    const baseFetch = fetchMock.getMockImplementation();
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url =
+        typeof input === 'string'
+          ? new URL(input)
+          : input instanceof URL
+            ? input
+            : new URL(input.url);
+      const path = url.pathname;
+      const method = (init?.method ?? 'GET').toUpperCase();
+
+      if (path.endsWith('/api/v1/me/homes') && method === 'GET') {
+        homesFetchCount += 1;
+        const response = jsonResponse(200, [
+          {
+            id: TEST_HOME_A,
+            name: 'Oak Street',
+            timezone: 'UTC',
+            hasPhoto: false,
+            role: 'ADMIN',
+          },
+        ]);
+        if (homesFetchCount > 1) {
+          homesRefetchPending = true;
+          return new Promise<Response>((resolve) => {
+            releaseHomesRefetch = resolve;
+          });
+        }
+        return Promise.resolve(response);
+      }
+
+      return baseFetch?.(input, init) ?? Promise.resolve(new Response(null, { status: 404 }));
+    });
+
+    const user = userEvent.setup();
+    renderApp(`/homes/${TEST_HOME_A}/roommates`);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Invite roommate' }),
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Invite roommate',
+    });
+    await user.type(within(dialog).getByLabelText(/email/i), 'jamie@example.com');
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Send invitation' }),
+    );
+
+    expect(
+      await within(dialog).findByText(/Invitation created/i),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole('button', { name: 'Copy invite link' }),
+    ).not.toBeDisabled();
+    expect(homesFetchCount).toBeGreaterThanOrEqual(1);
+    expect(homesRefetchPending).toBe(true);
+
+    releaseHomesRefetch?.(
+      jsonResponse(200, [
+        {
+          id: TEST_HOME_A,
+          name: 'Oak Street',
+          timezone: 'UTC',
+          hasPhoto: false,
+          role: 'ADMIN',
+        },
+      ]),
+    );
+  });
+
+  it('settles remove dialog without waiting for memberships refetch', async () => {
+    let membershipsFetchCount = 0;
+    let releaseMembershipsRefetch: ((response: Response) => void) | undefined;
+    let membershipsRefetchPending = false;
+
+    const { fetchMock } = stubRoommatesApis();
+    const baseFetch = fetchMock.getMockImplementation();
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url =
+        typeof input === 'string'
+          ? new URL(input)
+          : input instanceof URL
+            ? input
+            : new URL(input.url);
+      const path = url.pathname;
+      const method = (init?.method ?? 'GET').toUpperCase();
+
+      if (
+        path.endsWith(`/api/v1/homes/${TEST_HOME_A}/memberships`) &&
+        method === 'GET'
+      ) {
+        membershipsFetchCount += 1;
+        const response = jsonResponse(200, defaultMemberships());
+        if (membershipsFetchCount > 1) {
+          membershipsRefetchPending = true;
+          return new Promise<Response>((resolve) => {
+            releaseMembershipsRefetch = resolve;
+          });
+        }
+        return Promise.resolve(response);
+      }
+
+      return baseFetch?.(input, init) ?? Promise.resolve(new Response(null, { status: 404 }));
+    });
+
+    const user = userEvent.setup();
+    renderApp(`/homes/${TEST_HOME_A}/roommates`);
+
+    expect(await screen.findByText('Jamie')).toBeInTheDocument();
+    await openRowActions(user, 'Jamie');
+    await user.click(
+      screen.getByRole('menuitem', { name: 'Remove from Home' }),
+    );
+
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Remove from Home',
+    });
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Remove from Home' }),
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByText('Jamie')).not.toBeInTheDocument();
+    });
+    expect(screen.queryByRole('dialog', { name: 'Remove from Home' })).toBeNull();
+    expect(membershipsFetchCount).toBe(2);
+    expect(membershipsRefetchPending).toBe(true);
+
+    releaseMembershipsRefetch?.(
+      jsonResponse(200, {
+        currentMembershipId: CURRENT_MEMBERSHIP_ID,
+        memberships: [{ membershipId: CURRENT_MEMBERSHIP_ID, name: 'Alex' }],
+      }),
+    );
   });
 });
 

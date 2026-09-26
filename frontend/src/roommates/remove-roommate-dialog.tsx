@@ -14,7 +14,7 @@ export type RemoveRoommateDialogProps = {
   roommateName: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onRemoved: () => Promise<void>;
+  onRemoved: () => void;
   onStaleMembership: () => Promise<void>;
   onUnauthenticated: () => void;
 };
@@ -56,7 +56,7 @@ export function RemoveRoommateDialog({
     removeMutation.reset();
     try {
       await removeMutation.mutateAsync();
-      await onRemoved();
+      onRemoved();
       onOpenChange(false);
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {

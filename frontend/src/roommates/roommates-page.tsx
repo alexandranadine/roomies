@@ -19,8 +19,10 @@ import { InviteRoommateDialog } from './invite-roommate-dialog.js';
 import { LeaveHomeDialog } from './leave-home-dialog.js';
 import { PendingInvitePanel } from './pending-invite-panel.js';
 import {
+  patchCurrentUserHomeRole,
+  reconcileHomeMembershipSurfaces,
   recoverStaleHomeMembershipState,
-  refreshHomeMembershipSurfaces,
+  removeMembershipFromHomeCache,
 } from './refresh-home-membership-surfaces.js';
 import { RemoveRoommateDialog } from './remove-roommate-dialog.js';
 import { RoommateMemberRow } from './roommate-member-row.js';
@@ -106,10 +108,6 @@ export function RoommatesPage() {
     await recoverStaleHomeMembershipState(queryClient, homeId);
   }
 
-  async function refreshAfterStructuralChange() {
-    await refreshHomeMembershipSurfaces(queryClient, homeId);
-  }
-
   async function handleChangeRole(
     membershipId: string,
     nextRole: MembershipRole,
@@ -120,7 +118,10 @@ export function RoommatesPage() {
     setRoleError(null);
     try {
       await roleMutation.mutateAsync({ membershipId, role: nextRole });
-      await refreshAfterStructuralChange();
+      if (membershipId === currentMembershipId) {
+        patchCurrentUserHomeRole(queryClient, homeId, nextRole);
+      }
+      reconcileHomeMembershipSurfaces(queryClient, homeId);
     } catch (error) {
       if (isUnauthenticated(error)) {
         handleUnauthenticated();
@@ -129,7 +130,7 @@ export function RoommatesPage() {
       if (isConcealedScope(error)) {
         await handleStaleMembership();
       } else if (error instanceof ApiError && error.status === 403) {
-        await refreshAfterStructuralChange();
+        reconcileHomeMembershipSurfaces(queryClient, homeId);
       }
       setRoleError(changeRoleErrorMessage(error));
     }
@@ -201,7 +202,9 @@ export function RoommatesPage() {
             homeId={homeId}
             open={inviteOpen}
             onOpenChange={setInviteOpen}
-            onCreated={refreshAfterStructuralChange}
+            onCreated={() => {
+              reconcileHomeMembershipSurfaces(queryClient, homeId);
+            }}
             onInvitationCreated={setPendingInvite}
             onStaleMembership={handleStaleMembership}
             onUnauthenticated={handleUnauthenticated}
@@ -339,7 +342,14 @@ export function RoommatesPage() {
                 setPendingRemove(null);
               }
             }}
-            onRemoved={refreshAfterStructuralChange}
+            onRemoved={() => {
+              removeMembershipFromHomeCache(
+                queryClient,
+                homeId,
+                pendingRemove.membershipId,
+              );
+              reconcileHomeMembershipSurfaces(queryClient, homeId);
+            }}
             onStaleMembership={handleStaleMembership}
             onUnauthenticated={handleUnauthenticated}
           />
