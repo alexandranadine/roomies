@@ -71,7 +71,7 @@ export function NotificationsListPage() {
                 if (readAllMutation.isPending) {
                   return;
                 }
-                void readAllMutation.mutateAsync();
+                readAllMutation.mutate();
               }}
             >
               Mark all as read
@@ -87,7 +87,7 @@ export function NotificationsListPage() {
               variant="secondary"
               loading={readAllMutation.isPending}
               onClick={() => {
-                void readAllMutation.mutateAsync();
+                readAllMutation.mutate();
               }}
             >
               Retry

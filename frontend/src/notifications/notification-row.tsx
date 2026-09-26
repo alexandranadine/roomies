@@ -12,6 +12,7 @@ import {
   markNotificationRead,
   type NotificationListItem,
 } from './notifications-api.js';
+import { markNotificationReadInCache } from './notifications-list-cache.js';
 import { notificationKeys } from './notifications-query-keys.js';
 
 export type NotificationRowProps = {
@@ -28,10 +29,10 @@ function isConcealedNotFound(error: unknown): boolean {
 /**
  * Activate behavior (deterministic):
  * - Already read: navigate using destination.homeId immediately (no mark-one).
- * - Unread: await mark-one (no optimistic read). On success, invalidate the
- *   global Notification cache, then navigate. On concealed 404, invalidate and
- *   do not navigate. On other errors, still navigate so a transient mark
- *   failure does not trap the user.
+ * - Unread: await mark-one (no optimistic read). On success, update the cached
+ *   row, invalidate Notifications in the background, then navigate. On concealed
+ *   404, invalidate and do not navigate. On other errors, still navigate so a
+ *   transient mark failure does not trap the user.
  */
 export function NotificationRow({ item }: NotificationRowProps) {
   const navigate = useNavigate();
@@ -55,11 +56,12 @@ export function NotificationRow({ item }: NotificationRowProps) {
     setPending(true);
     try {
       await markNotificationRead(item.id);
-      await queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+      markNotificationReadInCache(queryClient, item.id);
+      void queryClient.invalidateQueries({ queryKey: notificationKeys.all });
       void navigate(destinationPath);
     } catch (error) {
       if (isConcealedNotFound(error)) {
-        await queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+        void queryClient.invalidateQueries({ queryKey: notificationKeys.all });
         return;
       }
       void navigate(destinationPath);

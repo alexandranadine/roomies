@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { resetApiClientForTests } from '../platform/api/index.js';
 import { currentUserQueryKey } from '../homes/home-query-keys.js';
 import { renderApp } from '../test/render.js';
+import { READ_IN_CACHE_PLACEHOLDER } from './notifications-list-cache.js';
 import { notificationKeys } from './notifications-query-keys.js';
 import {
   FIXTURE_HOME_B_TASK,
@@ -403,7 +404,8 @@ describe('Notification interactions', () => {
         return { status: 204 };
       },
     });
-    const { router } = renderApp('/notifications');
+    const { router, queryClient } = renderApp('/notifications');
+    vi.spyOn(queryClient, 'invalidateQueries').mockResolvedValue(undefined);
 
     expect(
       await screen.findByText('Alex completed a task assigned to you'),
@@ -419,6 +421,10 @@ describe('Notification interactions', () => {
       expect(router.state.location.pathname).toBe(`/homes/${TEST_HOME_A}`);
     });
     expect(markOneCalls).toBe(1);
+    const cached = queryClient.getQueryData<{
+      pages: { items: { id: string; readAt: string | null }[] }[];
+    }>(notificationKeys.list({}));
+    expect(cached?.pages[0]?.items[0]?.readAt).toBe(READ_IN_CACHE_PLACEHOLDER);
 
     const markCalls = fetchMock.mock.calls.filter((call) => {
       const url = new URL(String(call[0]));
@@ -568,32 +574,16 @@ describe('Notification interactions', () => {
 
   it('invokes read-all without optimistic mass mutation or affected count', async () => {
     const user = userEvent.setup();
-    let listCalls = 0;
     let readAllCalls = 0;
     stubNotificationsApis({
-      list: () => {
-        listCalls += 1;
-        if (listCalls === 1) {
-          return listPage([FIXTURE_TASK_TITLED, FIXTURE_ROLE_CHANGED]);
-        }
-        return listPage([
-          notificationItem({
-            ...FIXTURE_TASK_TITLED,
-            readAt: '2026-09-13T18:10:00.000Z',
-          }),
-          notificationItem({
-            ...FIXTURE_ROLE_CHANGED,
-            readAt: '2026-09-13T18:10:00.000Z',
-          }),
-        ]);
-      },
+      list: () => listPage([FIXTURE_TASK_TITLED, FIXTURE_ROLE_CHANGED]),
       readAll: () => {
         readAllCalls += 1;
         expect(screen.getAllByText(/Unread/i).length).toBeGreaterThan(0);
         return { status: 204 };
       },
     });
-    renderApp('/notifications');
+    const { queryClient } = renderApp('/notifications');
 
     expect(
       await screen.findByRole('button', { name: 'Mark all as read' }),
@@ -601,6 +591,10 @@ describe('Notification interactions', () => {
     expect(
       screen.queryByText(/\d+\s+unread|affected/i),
     ).not.toBeInTheDocument();
+
+    const invalidateSpy = vi
+      .spyOn(queryClient, 'invalidateQueries')
+      .mockResolvedValue(undefined);
 
     await user.click(screen.getByRole('button', { name: 'Mark all as read' }));
 
@@ -612,9 +606,123 @@ describe('Notification interactions', () => {
         screen.queryByRole('button', { name: 'Mark all as read' }),
       ).not.toBeInTheDocument();
     });
+    expect(screen.queryByText(/Unread/i)).not.toBeInTheDocument();
     expect(
       screen.queryByText(/2 notifications|affected/i),
     ).not.toBeInTheDocument();
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: notificationKeys.all,
+    });
+  });
+
+  it('updates the bell count immediately after marking one notification read', async () => {
+    const user = userEvent.setup();
+    stubNotificationsApis({
+      list: listPage([FIXTURE_TASK_TITLED, FIXTURE_ROLE_CHANGED]),
+      markOne: () => ({ status: 204 }),
+    });
+    const { queryClient } = renderApp('/notifications');
+    vi.spyOn(queryClient, 'invalidateQueries').mockResolvedValue(undefined);
+
+    expect(
+      await screen.findByRole('link', { name: 'Notifications, 2 unread' }),
+    ).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Unread. Alex completed a task assigned to you',
+      }),
+    );
+
+    expect(
+      await screen.findByRole('link', { name: 'Notifications, 1 unread' }),
+    ).toBeInTheDocument();
+  });
+
+  it('updates the bell count immediately after read-all', async () => {
+    const user = userEvent.setup();
+    stubNotificationsApis({
+      list: listPage([FIXTURE_TASK_TITLED, FIXTURE_ROLE_CHANGED]),
+    });
+    const { queryClient } = renderApp('/notifications');
+    vi.spyOn(queryClient, 'invalidateQueries').mockResolvedValue(undefined);
+
+    expect(
+      await screen.findByRole('link', { name: 'Notifications, 2 unread' }),
+    ).toBeInTheDocument();
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Mark all as read' }),
+    );
+
+    expect(
+      await screen.findByRole('link', { name: 'Notifications' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: /unread/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('does not change cached read state when read-all fails', async () => {
+    const user = userEvent.setup();
+    stubNotificationsApis({
+      list: listPage([FIXTURE_TASK_TITLED, FIXTURE_ROLE_CHANGED]),
+      readAll: () => ({
+        status: 500,
+        body: {
+          error: { code: 'INTERNAL', message: 'Internal server error' },
+        },
+      }),
+    });
+    const { queryClient } = renderApp('/notifications');
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Mark all as read' }),
+    );
+
+    expect(
+      await screen.findByText(/Couldn’t mark notifications as read/i),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText(/Unread/i).length).toBeGreaterThan(0);
+    expect(
+      screen.getByRole('button', { name: 'Mark all as read' }),
+    ).toBeInTheDocument();
+
+    const cached = queryClient.getQueryData<{
+      pages: { items: { readAt: string | null }[] }[];
+    }>(notificationKeys.list({}));
+    expect(cached?.pages[0]?.items.every((item) => item.readAt === null)).toBe(
+      true,
+    );
+  });
+
+  it('does not change cached read state when mark-one fails', async () => {
+    const user = userEvent.setup();
+    stubNotificationsApis({
+      list: listPage([FIXTURE_TASK_TITLED]),
+      markOne: () => ({
+        status: 500,
+        body: {
+          error: { code: 'INTERNAL', message: 'Internal server error' },
+        },
+      }),
+    });
+    const { queryClient, router } = renderApp('/notifications');
+
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'Unread. Alex completed a task assigned to you',
+      }),
+    );
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe(`/homes/${TEST_HOME_A}`);
+    });
+
+    const cached = queryClient.getQueryData<{
+      pages: { items: { id: string; readAt: string | null }[] }[];
+    }>(notificationKeys.list({}));
+    expect(cached?.pages[0]?.items[0]?.readAt).toBeNull();
   });
 
   it('routes list 401 into the existing auth-loss flow and clears Notification cache', async () => {
