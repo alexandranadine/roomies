@@ -8,10 +8,9 @@ import { ApiError } from '../platform/api/index.js';
 import { HousePulseSection } from '../pulse/house-pulse-section.js';
 import { HousePulseSkeleton } from '../pulse/house-pulse-skeleton.js';
 import { useHousePulse } from '../pulse/use-house-pulse.js';
-import { clearPrivateHomeQueryState } from './clear-private-home-queries.js';
+import { handlePassiveAuthLoss } from './clear-private-home-queries.js';
 import type { HomeContext } from './home-context-api.js';
 import { HomeQuickActions } from './home-quick-actions.js';
-import { currentUserQueryKey } from './home-query-keys.js';
 import { RoommateStrip } from './roommate-strip.js';
 import { useHomeMemberships } from './use-home-memberships.js';
 
@@ -92,8 +91,7 @@ export function HomeOverviewPage() {
       isUnauthenticated(pulseQuery.error) ||
       isUnauthenticated(membershipsQuery.error)
     ) {
-      clearPrivateHomeQueryState(queryClient);
-      void queryClient.invalidateQueries({ queryKey: currentUserQueryKey });
+      handlePassiveAuthLoss(queryClient);
     }
   }, [membershipsQuery.error, pulseQuery.error, queryClient]);
 

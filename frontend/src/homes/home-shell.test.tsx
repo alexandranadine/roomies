@@ -5,6 +5,7 @@ import { resetApiClientForTests } from '../platform/api/index.js';
 import { clearHousePulse } from '../pulse/test-fixtures.js';
 import { renderApp } from '../test/render.js';
 import { responseForCommonHomeRead } from '../test/common-home-reads.js';
+import { handlePassiveAuthLoss } from './clear-private-home-queries.js';
 import {
   currentUserHomesQueryKey,
   currentUserQueryKey,
@@ -398,7 +399,7 @@ describe('active Home discovery and shell', () => {
     expect(queryClient.getQueryData(homeContextQueryKey(HOME_A))).toBeDefined();
 
     meStatus = 401;
-    await queryClient.invalidateQueries({ queryKey: currentUserQueryKey });
+    handlePassiveAuthLoss(queryClient);
 
     expect(
       await screen.findByRole('heading', { name: 'Welcome back', level: 1 }),
@@ -410,5 +411,6 @@ describe('active Home discovery and shell', () => {
       queryClient.getQueryData(homeContextQueryKey(HOME_A)),
     ).toBeUndefined();
     expect(queryClient.getQueryData(currentUserHomesQueryKey)).toBeUndefined();
+    expect(queryClient.getQueryData(currentUserQueryKey)).toBeUndefined();
   });
 });

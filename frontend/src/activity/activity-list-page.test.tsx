@@ -1,6 +1,10 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  currentUserHomesQueryKey,
+  currentUserQueryKey,
+} from '../homes/home-query-keys.js';
 import { resetApiClientForTests } from '../platform/api/index.js';
 import { renderApp } from '../test/render.js';
 import { FORMER_ROOMMATE_LABEL } from './activity-copy.js';
@@ -462,12 +466,14 @@ describe('Activity list page', () => {
         },
       },
     });
-    renderApp(`/homes/${TEST_HOME_A}/activity`);
+    const { queryClient } = renderApp(`/homes/${TEST_HOME_A}/activity`);
 
     expect(
       await screen.findByRole('heading', { name: 'Welcome back', level: 1 }),
     ).toBeInTheDocument();
     expect(screen.queryByText('Take out trash')).not.toBeInTheDocument();
+    expect(queryClient.getQueryData(currentUserQueryKey)).toBeUndefined();
+    expect(queryClient.getQueryData(currentUserHomesQueryKey)).toBeUndefined();
   });
 
   it('shows retry UI for an initial transient error without backend details', async () => {

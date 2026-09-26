@@ -2,8 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { Alert, Button, Dialog, TextField } from '../components/ui/index.js';
-import { clearPrivateHomeQueryState } from '../homes/clear-private-home-queries.js';
-import { currentUserQueryKey } from '../homes/home-query-keys.js';
+import { handlePassiveAuthLoss } from '../homes/clear-private-home-queries.js';
 import { ApiError } from '../platform/api/index.js';
 import { deleteAccount } from '../users/delete-account-api.js';
 
@@ -78,16 +77,14 @@ export function DeleteAccountDialog({
 
     try {
       await deleteMutation.mutateAsync();
-      clearPrivateHomeQueryState(queryClient);
-      queryClient.removeQueries({ queryKey: currentUserQueryKey });
+      handlePassiveAuthLoss(queryClient);
       void navigate('/', {
         replace: true,
         state: { accountDeleted: true },
       });
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
-        clearPrivateHomeQueryState(queryClient);
-        queryClient.removeQueries({ queryKey: currentUserQueryKey });
+        handlePassiveAuthLoss(queryClient);
         void navigate('/', {
           replace: true,
           state: { needsFreshSignInForDeletion: true },

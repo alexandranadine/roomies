@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { resetApiClientForTests } from '../platform/api/index.js';
+import { currentUserQueryKey } from '../homes/home-query-keys.js';
 import { renderApp } from '../test/render.js';
 import { notificationKeys } from './notifications-query-keys.js';
 import {
@@ -631,6 +632,7 @@ describe('Notification interactions', () => {
       await screen.findByRole('heading', { name: 'Welcome back', level: 1 }),
     ).toBeInTheDocument();
     expect(queryClient.getQueryData(notificationKeys.list({}))).toBeUndefined();
+    expect(queryClient.getQueryData(currentUserQueryKey)).toBeUndefined();
   });
 
   it('does not request Maintenance detail while rendering PRIVATE rows', async () => {

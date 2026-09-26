@@ -11,13 +11,13 @@ import {
 } from '../roommates/refresh-home-membership-surfaces.js';
 import { useCurrentHomeRole } from '../roommates/use-current-home-role.js';
 import { CreateTaskDialog } from '../tasks/create-task-dialog.js';
-import { clearPrivateHomeQueryState } from './clear-private-home-queries.js';
+import { handlePassiveAuthLoss } from './clear-private-home-queries.js';
 import { HomeActionSheet } from './home-action-sheet.js';
 import { HomeBottomNav } from './home-bottom-nav.js';
 import { getHomeContext } from './home-context-api.js';
 import type { HomeShellOutletContext } from './home-overview-page.js';
 import { HomePhotoDialog } from './home-photo-dialog.js';
-import { currentUserQueryKey, homeContextQueryKey } from './home-query-keys.js';
+import { homeContextQueryKey } from './home-query-keys.js';
 import { HomeShellFallbackHeader, HomeShellHeader } from './home-shell-header.js';
 import { homeOverviewHref } from './wordmark-home-href.js';
 import { useDesktopLayout, useWideLayout } from './use-desktop-layout.js';
@@ -61,8 +61,7 @@ export function HomeChromeLayout({ homeId, children }: HomeChromeLayoutProps) {
 
   useEffect(() => {
     if (isUnauthenticated(contextQuery.error)) {
-      clearPrivateHomeQueryState(queryClient);
-      void queryClient.invalidateQueries({ queryKey: currentUserQueryKey });
+      handlePassiveAuthLoss(queryClient);
     }
   }, [contextQuery.error, queryClient]);
 
@@ -111,8 +110,7 @@ export function HomeChromeLayout({ homeId, children }: HomeChromeLayoutProps) {
   }
 
   function handleUnauthenticated() {
-    clearPrivateHomeQueryState(queryClient);
-    void queryClient.invalidateQueries({ queryKey: currentUserQueryKey });
+    handlePassiveAuthLoss(queryClient);
   }
 
   const outletContext: HomeShellOutletContext = {

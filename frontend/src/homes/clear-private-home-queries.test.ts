@@ -4,7 +4,10 @@ import { createAppQueryClient } from '../platform/query/query-client.js';
 import { pulseKeys } from '../pulse/pulse-query-keys.js';
 import { clearHousePulse } from '../pulse/test-fixtures.js';
 import { taskKeys } from '../tasks/tasks-query-keys.js';
-import { clearPrivateHomeQueryState } from './clear-private-home-queries.js';
+import {
+  clearPrivateHomeQueryState,
+  handlePassiveAuthLoss,
+} from './clear-private-home-queries.js';
 import {
   currentUserHomesQueryKey,
   currentUserQueryKey,
@@ -60,5 +63,40 @@ describe('clearPrivateHomeQueryState', () => {
     expect(queryClient.getQueryData(currentUserQueryKey)).toEqual({
       id: HOME_ID,
     });
+  });
+});
+
+describe('handlePassiveAuthLoss', () => {
+  it('clears private Home state and removes current-user identity immediately', () => {
+    const queryClient = createAppQueryClient();
+    queryClient.setQueryData(currentUserQueryKey, { id: HOME_ID });
+    queryClient.setQueryData(currentUserHomesQueryKey, [
+      {
+        id: HOME_ID,
+        name: 'Oak Street',
+        timezone: 'UTC',
+        role: 'ADMIN',
+        hasPhoto: false,
+      },
+    ]);
+    queryClient.setQueryData(homeContextQueryKey(HOME_ID), {
+      id: HOME_ID,
+      name: 'Oak Street',
+      timezone: 'UTC',
+      hasPhoto: false,
+    });
+    queryClient.setQueryData(notificationKeys.list({}), {
+      pages: [{ items: [], hasMore: false, nextCursor: null }],
+      pageParams: [undefined],
+    });
+
+    handlePassiveAuthLoss(queryClient);
+
+    expect(queryClient.getQueryData(currentUserQueryKey)).toBeUndefined();
+    expect(queryClient.getQueryData(currentUserHomesQueryKey)).toBeUndefined();
+    expect(
+      queryClient.getQueryData(homeContextQueryKey(HOME_ID)),
+    ).toBeUndefined();
+    expect(queryClient.getQueryData(notificationKeys.list({}))).toBeUndefined();
   });
 });

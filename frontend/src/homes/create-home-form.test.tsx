@@ -344,6 +344,7 @@ describe('Create Home UX', () => {
     ).not.toBeInTheDocument();
     expect(createCalls).toBe(1);
     expect(queryClient.getQueryData(currentUserHomesQueryKey)).toBeUndefined();
+    expect(queryClient.getQueryData(currentUserQueryKey)).toBeUndefined();
     expect(queryClient.getQueryState(currentUserQueryKey)?.error).toMatchObject(
       { status: 401 },
     );

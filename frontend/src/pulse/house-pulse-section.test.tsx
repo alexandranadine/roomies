@@ -1,8 +1,10 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { clearPrivateHomeQueryState } from '../homes/clear-private-home-queries.js';
-import { currentUserQueryKey } from '../homes/home-query-keys.js';
+import {
+  clearPrivateHomeQueryState,
+  handlePassiveAuthLoss,
+} from '../homes/clear-private-home-queries.js';
 import { resetApiClientForTests } from '../platform/api/index.js';
 import { renderApp } from '../test/render.js';
 import { pulseKeys } from './pulse-query-keys.js';
@@ -342,8 +344,7 @@ describe('House Pulse on Home overview', () => {
     expect(await screen.findByTestId('house-pulse')).toBeInTheDocument();
     expect(queryClient.getQueryData(pulseKeys.all(TEST_HOME_A))).toBeDefined();
 
-    clearPrivateHomeQueryState(queryClient);
-    void queryClient.invalidateQueries({ queryKey: currentUserQueryKey });
+    handlePassiveAuthLoss(queryClient);
 
     expect(
       queryClient.getQueryData(pulseKeys.all(TEST_HOME_A)),

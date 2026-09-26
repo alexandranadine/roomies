@@ -2,8 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { DocumentTitle } from '../components/document-title.js';
 import { Alert, Button, EmptyState, Skeleton } from '../components/ui/index.js';
-import { clearPrivateHomeQueryState } from '../homes/clear-private-home-queries.js';
-import { currentUserQueryKey } from '../homes/home-query-keys.js';
+import { handlePassiveAuthLoss } from '../homes/clear-private-home-queries.js';
 import { ApiError } from '../platform/api/index.js';
 import { NotificationRow } from './notification-row.js';
 import { useNotificationsList } from './use-notifications-list.js';
@@ -27,8 +26,7 @@ export function NotificationsListPage() {
 
   useEffect(() => {
     if (isUnauthenticated(listQuery.error)) {
-      clearPrivateHomeQueryState(queryClient);
-      void queryClient.invalidateQueries({ queryKey: currentUserQueryKey });
+      handlePassiveAuthLoss(queryClient);
     }
   }, [listQuery.error, queryClient]);
 

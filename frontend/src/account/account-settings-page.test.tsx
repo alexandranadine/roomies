@@ -584,6 +584,7 @@ describe('Account settings deletion', () => {
     ).not.toBeInTheDocument();
     await waitFor(() => {
       expect(queryClient.getQueryData(currentUserHomesQueryKey)).toBeUndefined();
+      expect(queryClient.getQueryData(currentUserQueryKey)).toBeUndefined();
     });
   });
 

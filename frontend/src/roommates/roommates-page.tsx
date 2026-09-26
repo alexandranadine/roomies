@@ -5,9 +5,11 @@ import { useNavigate, useOutletContext, useParams } from 'react-router';
 import { DocumentTitle } from '../components/document-title.js';
 import { Alert, Button, Skeleton } from '../components/ui/index.js';
 import { cn } from '../components/ui/cn.js';
-import { clearPrivateHomeQueryState } from '../homes/clear-private-home-queries.js';
+import {
+  clearPrivateHomeQueryState,
+  handlePassiveAuthLoss,
+} from '../homes/clear-private-home-queries.js';
 import type { HomeShellOutletContext } from '../homes/home-overview-page.js';
-import { currentUserQueryKey } from '../homes/home-query-keys.js';
 import { useHomeMemberships } from '../homes/use-home-memberships.js';
 import type { CreatedInvitation } from '../invitations/create-invitation-api.js';
 import { ApiError } from '../platform/api/index.js';
@@ -83,8 +85,7 @@ export function RoommatesPage() {
   });
 
   function handleUnauthenticated() {
-    clearPrivateHomeQueryState(queryClient);
-    void queryClient.invalidateQueries({ queryKey: currentUserQueryKey });
+    handlePassiveAuthLoss(queryClient);
   }
 
   useEffect(() => {
@@ -97,8 +98,7 @@ export function RoommatesPage() {
 
   useEffect(() => {
     if (isUnauthenticated(membershipsQuery.error)) {
-      clearPrivateHomeQueryState(queryClient);
-      void queryClient.invalidateQueries({ queryKey: currentUserQueryKey });
+      handlePassiveAuthLoss(queryClient);
     }
   }, [membershipsQuery.error, queryClient]);
 

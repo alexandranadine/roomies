@@ -9,11 +9,8 @@ import {
   type CreateHomeFormValues,
   toCreateHomeRequest,
 } from './create-home-form-schema.js';
-import { clearPrivateHomeQueryState } from './clear-private-home-queries.js';
-import {
-  currentUserHomesQueryKey,
-  currentUserQueryKey,
-} from './home-query-keys.js';
+import { handlePassiveAuthLoss } from './clear-private-home-queries.js';
+import { currentUserHomesQueryKey } from './home-query-keys.js';
 import { getDefaultBrowserTimeZone } from './supported-timezones.js';
 import { TimezoneField } from './timezone-field.js';
 
@@ -56,8 +53,7 @@ export function CreateHomeForm() {
       await createHomeMutation.mutateAsync(toCreateHomeRequest(values));
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
-        clearPrivateHomeQueryState(queryClient);
-        void queryClient.invalidateQueries({ queryKey: currentUserQueryKey });
+        handlePassiveAuthLoss(queryClient);
         return;
       }
       setError('root', { type: 'server', message: CREATE_HOME_FORM_ERROR });
