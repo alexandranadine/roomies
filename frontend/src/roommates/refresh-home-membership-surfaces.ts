@@ -31,6 +31,32 @@ export function refreshHomeMembershipSurfaces(
 }
 
 /**
+ * After a confirmed role change (204): patch the known target membership
+ * role so the roster label matches the request result before refetch.
+ */
+export function patchHomeMembershipRole(
+  queryClient: QueryClient,
+  homeId: string,
+  membershipId: string,
+  role: MembershipRole,
+): void {
+  queryClient.setQueryData(
+    homeMembershipsKeys.all(homeId),
+    (data: ActiveHomeMemberships | undefined) => {
+      if (data === undefined) {
+        return data;
+      }
+      return {
+        ...data,
+        memberships: data.memberships.map((row) =>
+          row.membershipId === membershipId ? { ...row, role } : row,
+        ),
+      };
+    },
+  );
+}
+
+/**
  * After a confirmed current-user role change (204): patch /me/homes role
  * immediately so Admin controls do not linger until refetch.
  */

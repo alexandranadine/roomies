@@ -5,6 +5,7 @@ import { currentUserHomesQueryKey } from '../homes/home-query-keys.js';
 import type { ActiveHome } from '../homes/homes-api.js';
 import {
   patchCurrentUserHomeRole,
+  patchHomeMembershipRole,
   reconcileHomeMembershipSurfaces,
   removeMembershipFromHomeCache,
 } from './refresh-home-membership-surfaces.js';
@@ -63,13 +64,41 @@ describe('refresh home membership surfaces', () => {
     ]);
   });
 
+  it('patchHomeMembershipRole updates only the matching roster row', () => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(homeMembershipsKeys.all(TEST_HOME_A), {
+      currentMembershipId: CURRENT_MEMBERSHIP_ID,
+      memberships: [
+        { membershipId: CURRENT_MEMBERSHIP_ID, name: 'Alex', role: 'ADMIN' },
+        { membershipId: OTHER_MEMBERSHIP_ID, name: 'Jamie', role: 'ROOMMATE' },
+      ],
+    });
+
+    patchHomeMembershipRole(
+      queryClient,
+      TEST_HOME_A,
+      OTHER_MEMBERSHIP_ID,
+      'ADMIN',
+    );
+
+    expect(queryClient.getQueryData(homeMembershipsKeys.all(TEST_HOME_A))).toEqual(
+      {
+        currentMembershipId: CURRENT_MEMBERSHIP_ID,
+        memberships: [
+          { membershipId: CURRENT_MEMBERSHIP_ID, name: 'Alex', role: 'ADMIN' },
+          { membershipId: OTHER_MEMBERSHIP_ID, name: 'Jamie', role: 'ADMIN' },
+        ],
+      },
+    );
+  });
+
   it('removeMembershipFromHomeCache drops one roster row', () => {
     const queryClient = new QueryClient();
     queryClient.setQueryData(homeMembershipsKeys.all(TEST_HOME_A), {
       currentMembershipId: CURRENT_MEMBERSHIP_ID,
       memberships: [
-        { membershipId: CURRENT_MEMBERSHIP_ID, name: 'Alex' },
-        { membershipId: OTHER_MEMBERSHIP_ID, name: 'Jamie' },
+        { membershipId: CURRENT_MEMBERSHIP_ID, name: 'Alex', role: 'ADMIN' },
+        { membershipId: OTHER_MEMBERSHIP_ID, name: 'Jamie', role: 'ROOMMATE' },
       ],
     });
 
@@ -82,7 +111,9 @@ describe('refresh home membership surfaces', () => {
     expect(queryClient.getQueryData(homeMembershipsKeys.all(TEST_HOME_A))).toEqual(
       {
         currentMembershipId: CURRENT_MEMBERSHIP_ID,
-        memberships: [{ membershipId: CURRENT_MEMBERSHIP_ID, name: 'Alex' }],
+        memberships: [
+          { membershipId: CURRENT_MEMBERSHIP_ID, name: 'Alex', role: 'ADMIN' },
+        ],
       },
     );
   });

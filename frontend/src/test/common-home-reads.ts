@@ -17,10 +17,12 @@ export const DEFAULT_STRIP_MEMBERSHIPS = {
     {
       membershipId: 'm1111111-1111-4111-8111-111111111111',
       name: 'Alex',
+      role: 'ADMIN',
     },
     {
       membershipId: 'm2222222-2222-4222-8222-222222222222',
       name: 'Jamie',
+      role: 'ROOMMATE',
     },
   ],
 } as const;

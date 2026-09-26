@@ -530,7 +530,9 @@ describe('invitation landing page', () => {
           new Response(
             JSON.stringify({
               currentMembershipId: newMembershipId,
-              memberships: [{ membershipId: newMembershipId, name: 'Alex' }],
+              memberships: [
+                { membershipId: newMembershipId, name: 'Alex', role: 'ROOMMATE' },
+              ],
             }),
             { status: 200, headers: { 'Content-Type': 'application/json' } },
           ),
@@ -570,7 +572,13 @@ describe('invitation landing page', () => {
     queryClient.setQueryData(currentUserHomesQueryKey, []);
     queryClient.setQueryData(homeMembershipsKeys.all(homeId), {
       currentMembershipId: 'm3333333-3333-4333-8333-333333333333',
-      memberships: [{ membershipId: 'm3333333-3333-4333-8333-333333333333', name: 'Alex' }],
+      memberships: [
+        {
+          membershipId: 'm3333333-3333-4333-8333-333333333333',
+          name: 'Alex',
+          role: 'ROOMMATE',
+        },
+      ],
     });
 
     await userEvent.click(
@@ -670,10 +678,11 @@ describe('invitation landing page', () => {
             JSON.stringify({
               currentMembershipId: newMembershipId,
               memberships: [
-                { membershipId: newMembershipId, name: 'Alex' },
+                { membershipId: newMembershipId, name: 'Alex', role: 'ROOMMATE' },
                 {
                   membershipId: 'm2222222-2222-4222-8222-222222222222',
                   name: 'Jamie',
+                  role: 'ROOMMATE',
                 },
               ],
             }),
@@ -731,7 +740,9 @@ describe('invitation landing page', () => {
     queryClient.setQueryData(currentUserHomesQueryKey, []);
     queryClient.setQueryData(homeMembershipsKeys.all(homeId), {
       currentMembershipId: endedMembershipId,
-      memberships: [{ membershipId: endedMembershipId, name: 'Alex' }],
+      memberships: [
+        { membershipId: endedMembershipId, name: 'Alex', role: 'ROOMMATE' },
+      ],
     });
 
     await userEvent.click(

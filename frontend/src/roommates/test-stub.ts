@@ -29,12 +29,22 @@ export function errorBody(code: string, message: string) {
   return { error: { code, message, requestId: 'req_test' } };
 }
 
-export function defaultMemberships(): ActiveHomeMemberships {
+export function defaultMemberships(
+  currentRole: ActiveHome['role'] = 'ADMIN',
+): ActiveHomeMemberships {
   return {
     currentMembershipId: CURRENT_MEMBERSHIP_ID,
     memberships: [
-      { membershipId: CURRENT_MEMBERSHIP_ID, name: 'Alex' },
-      { membershipId: OTHER_MEMBERSHIP_ID, name: 'Jamie' },
+      {
+        membershipId: CURRENT_MEMBERSHIP_ID,
+        name: 'Alex',
+        role: currentRole,
+      },
+      {
+        membershipId: OTHER_MEMBERSHIP_ID,
+        name: 'Jamie',
+        role: 'ROOMMATE',
+      },
     ],
   };
 }
@@ -80,7 +90,7 @@ export type RoommatesStubOptions = {
 export function stubRoommatesApis(options: RoommatesStubOptions = {}) {
   const state: RoommatesStubState = {
     role: options.role ?? 'ADMIN',
-    memberships: options.memberships ?? defaultMemberships(),
+    memberships: options.memberships ?? defaultMemberships(options.role ?? 'ADMIN'),
     homes: options.homes ?? [
       {
         id: TEST_HOME_A,
@@ -133,6 +143,31 @@ export function stubRoommatesApis(options: RoommatesStubOptions = {}) {
         const handler = options.handlers?.changeRole;
         if (handler !== undefined) {
           return Promise.resolve(handler(roleMatch[2], init?.body));
+        }
+        let nextRole: ActiveHome['role'] | undefined;
+        try {
+          const parsed = JSON.parse(String(init?.body ?? '{}')) as {
+            role?: unknown;
+          };
+          if (parsed.role === 'ADMIN' || parsed.role === 'ROOMMATE') {
+            nextRole = parsed.role;
+          }
+        } catch {
+          nextRole = undefined;
+        }
+        if (nextRole !== undefined) {
+          const membershipId = roleMatch[2];
+          state.memberships = {
+            ...state.memberships,
+            memberships: state.memberships.memberships.map((row) =>
+              row.membershipId === membershipId
+                ? { ...row, role: nextRole }
+                : row,
+            ),
+          };
+          if (membershipId === state.memberships.currentMembershipId) {
+            state.role = nextRole;
+          }
         }
         return Promise.resolve(emptyResponse(204));
       }

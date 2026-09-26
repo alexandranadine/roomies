@@ -224,11 +224,18 @@ void describe('list active Home Memberships PostgreSQL', () => {
         );
         assert.equal('userId' in listed[0]!, false);
         assert.equal('email' in listed[0]!, false);
-        assert.equal('role' in listed[0]!, false);
+        assert.deepEqual(
+          listed.map((row) => row.role),
+          ['ROOMMATE', 'ADMIN', 'ROOMMATE', 'ADMIN'],
+        );
 
         const homeBList = await reader.listActiveByHome(homeB);
         assert.deepEqual(homeBList, [
-          { membershipId: membershipTaylor, name: 'Taylor' },
+          {
+            membershipId: membershipTaylor,
+            name: 'Taylor',
+            role: 'ROOMMATE',
+          },
         ]);
       } finally {
         await database.pool.query(

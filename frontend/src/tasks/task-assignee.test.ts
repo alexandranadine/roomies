@@ -4,6 +4,7 @@ import {
   ASSIGNED_FALLBACK_LABEL,
   assigneeDisplayName,
   assigneePickerLabel,
+  type AssigneeLookup,
   CURRENT_USER_ASSIGNEE_LABEL,
   UNASSIGNED_LABEL,
 } from './task-assignee.js';
@@ -14,12 +15,12 @@ import {
   TEST_REJOIN_MEMBERSHIP,
 } from './test-fixtures.js';
 
-const lookup = {
+const lookup: AssigneeLookup = {
   currentMembershipId: TEST_MEMBERSHIP_A,
   memberships: [
-    { membershipId: TEST_MEMBERSHIP_A, name: 'Alex' },
-    { membershipId: TEST_MEMBERSHIP_B, name: 'Jamie' },
-    { membershipId: TEST_REJOIN_MEMBERSHIP, name: 'Alex' },
+    { membershipId: TEST_MEMBERSHIP_A, name: 'Alex', role: 'ADMIN' },
+    { membershipId: TEST_MEMBERSHIP_B, name: 'Jamie', role: 'ROOMMATE' },
+    { membershipId: TEST_REJOIN_MEMBERSHIP, name: 'Alex', role: 'ROOMMATE' },
   ],
   membershipsReady: true,
 };
@@ -53,19 +54,19 @@ describe('task assignee labels', () => {
   it('labels picker options without exposing membership IDs', () => {
     expect(
       assigneePickerLabel(
-        { membershipId: TEST_MEMBERSHIP_A, name: 'Alex' },
+        { membershipId: TEST_MEMBERSHIP_A, name: 'Alex', role: 'ADMIN' },
         TEST_MEMBERSHIP_A,
       ),
     ).toBe(CURRENT_USER_ASSIGNEE_LABEL);
     expect(
       assigneePickerLabel(
-        { membershipId: TEST_MEMBERSHIP_B, name: 'Jamie' },
+        { membershipId: TEST_MEMBERSHIP_B, name: 'Jamie', role: 'ROOMMATE' },
         TEST_MEMBERSHIP_A,
       ),
     ).toBe('Jamie');
     expect(
       assigneePickerLabel(
-        { membershipId: TEST_MEMBERSHIP_B, name: 'Jamie' },
+        { membershipId: TEST_MEMBERSHIP_B, name: 'Jamie', role: 'ROOMMATE' },
         TEST_MEMBERSHIP_A,
       ),
     ).not.toContain(TEST_MEMBERSHIP_B);

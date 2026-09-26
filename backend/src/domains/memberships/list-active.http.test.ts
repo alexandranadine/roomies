@@ -86,8 +86,8 @@ function buildApp(
             return options.listActiveHomeMemberships(input);
           }
           return [
-            { membershipId: MEMBERSHIP_ID, name: 'Alex' },
-            { membershipId: OTHER_MEMBERSHIP_ID, name: 'Jamie' },
+            { membershipId: MEMBERSHIP_ID, name: 'Alex', role: 'ROOMMATE' },
+            { membershipId: OTHER_MEMBERSHIP_ID, name: 'Jamie', role: 'ADMIN' },
           ];
         },
       }),
@@ -108,8 +108,6 @@ const leakSentinels = [
   'joinedAt',
   'ended_at',
   'joined_at',
-  'ROOMMATE',
-  'ADMIN',
   'capabilities',
   'invitation',
   'session',
@@ -118,6 +116,8 @@ const leakSentinels = [
   'SELECT',
   'stack',
 ];
+
+const concealedLeakSentinels = [...leakSentinels, 'ROOMMATE', 'ADMIN'];
 
 void describe('GET /api/v1/homes/:homeId/memberships', () => {
   void it('returns 401 without a session and does not list', async () => {
@@ -154,7 +154,7 @@ void describe('GET /api/v1/homes/:homeId/memberships', () => {
     assertNoForbiddenLeak({
       context: 'concealed membership list',
       text: res.text,
-      forbidden: leakSentinels,
+      forbidden: concealedLeakSentinels,
     });
   });
 
@@ -165,8 +165,8 @@ void describe('GET /api/v1/homes/:homeId/memberships', () => {
     assert.deepEqual(res.json(), {
       currentMembershipId: MEMBERSHIP_ID,
       memberships: [
-        { membershipId: MEMBERSHIP_ID, name: 'Alex' },
-        { membershipId: OTHER_MEMBERSHIP_ID, name: 'Jamie' },
+        { membershipId: MEMBERSHIP_ID, name: 'Alex', role: 'ROOMMATE' },
+        { membershipId: OTHER_MEMBERSHIP_ID, name: 'Jamie', role: 'ADMIN' },
       ],
     });
     assert.equal(res.headers.get('cache-control'), 'private, no-store');
@@ -187,7 +187,7 @@ void describe('GET /api/v1/homes/:homeId/memberships', () => {
     assert.equal(res.status, 200);
     const body = res.json() as {
       currentMembershipId: string;
-      memberships: { membershipId: string; name: string }[];
+      memberships: { membershipId: string; name: string; role: string }[];
     };
     assert.equal(body.currentMembershipId, MEMBERSHIP_ID);
     assert.deepEqual(Object.keys(body).sort(), [
@@ -197,7 +197,10 @@ void describe('GET /api/v1/homes/:homeId/memberships', () => {
     assert.deepEqual(Object.keys(body.memberships[0]!).sort(), [
       'membershipId',
       'name',
+      'role',
     ]);
+    assert.equal(body.memberships[0]?.role, 'ROOMMATE');
+    assert.equal(body.memberships[1]?.role, 'ADMIN');
     assert.equal(calls[0]?.actor.role, 'ADMIN');
     assertNoForbiddenLeak({
       context: 'admin membership list body',

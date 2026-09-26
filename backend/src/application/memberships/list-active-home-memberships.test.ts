@@ -26,6 +26,7 @@ function row(
   return {
     membershipId: MEMBERSHIP,
     name: 'Alex',
+    role: 'ROOMMATE',
     ...overrides,
   };
 }
@@ -33,7 +34,7 @@ function row(
 void describe('listActiveHomeMemberships', () => {
   void it('returns the repository order including the caller and other active roles', async () => {
     const rows = [
-      row({ membershipId: OTHER_MEMBERSHIP, name: 'Jamie' }),
+      row({ membershipId: OTHER_MEMBERSHIP, name: 'Jamie', role: 'ADMIN' }),
       row(),
     ];
     const listed = await listActiveHomeMemberships(

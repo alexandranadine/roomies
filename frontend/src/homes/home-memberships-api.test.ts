@@ -29,8 +29,8 @@ describe('home memberships API', () => {
     const payload = {
       currentMembershipId: CURRENT,
       memberships: [
-        { membershipId: CURRENT, name: 'Alex' },
-        { membershipId: OTHER, name: 'Jamie' },
+        { membershipId: CURRENT, name: 'Alex', role: 'ADMIN' },
+        { membershipId: OTHER, name: 'Jamie', role: 'ROOMMATE' },
       ],
     };
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, payload));
@@ -46,7 +46,7 @@ describe('home memberships API', () => {
     expect(activeHomeMembershipsSchema.safeParse(result).success).toBe(true);
   });
 
-  it('rejects broadened membership DTOs', async () => {
+  it('requires role and rejects leaked identity fields', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse(200, {
         currentMembershipId: CURRENT,
@@ -59,6 +59,18 @@ describe('home memberships API', () => {
             userId: 'u1',
           },
         ],
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(listHomeMemberships(HOME_A)).rejects.toThrow();
+  });
+
+  it('rejects a membership row without role', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(200, {
+        currentMembershipId: CURRENT,
+        memberships: [{ membershipId: CURRENT, name: 'Alex' }],
       }),
     );
     vi.stubGlobal('fetch', fetchMock);

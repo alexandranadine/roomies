@@ -80,8 +80,14 @@ describe('Roommates page', () => {
     expect(await screen.findByText('Alex')).toBeInTheDocument();
     expect(screen.getByText('Jamie')).toBeInTheDocument();
     expect(screen.getByText('You')).toBeInTheDocument();
-    expect(screen.getByText('Home Admin')).toBeInTheDocument();
-    expect(screen.getByText('Household member')).toBeInTheDocument();
+    expect(
+      within(screen.getByText('Alex').closest('li')!).getByText('Home Admin'),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByText('Jamie').closest('li')!).getByText(
+        'Household member',
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '2 roommates' })).toBeInTheDocument();
     expect(screen.queryByText('Morgan')).not.toBeInTheDocument();
     expect(
@@ -97,8 +103,16 @@ describe('Roommates page', () => {
       memberships: {
         currentMembershipId: REJOIN_MEMBERSHIP_ID,
         memberships: [
-          { membershipId: REJOIN_MEMBERSHIP_ID, name: 'Alex' },
-          { membershipId: OTHER_MEMBERSHIP_ID, name: 'Jamie' },
+          {
+            membershipId: REJOIN_MEMBERSHIP_ID,
+            name: 'Alex',
+            role: 'ROOMMATE',
+          },
+          {
+            membershipId: OTHER_MEMBERSHIP_ID,
+            name: 'Jamie',
+            role: 'ROOMMATE',
+          },
         ],
       },
     });
@@ -106,8 +120,8 @@ describe('Roommates page', () => {
     queryClient.setQueryData(homeMembershipsKeys.all(TEST_HOME_A), {
       currentMembershipId: ENDED_MEMBERSHIP_ID,
       memberships: [
-        { membershipId: ENDED_MEMBERSHIP_ID, name: 'Alex' },
-        { membershipId: OTHER_MEMBERSHIP_ID, name: 'Morgan' },
+        { membershipId: ENDED_MEMBERSHIP_ID, name: 'Alex', role: 'ROOMMATE' },
+        { membershipId: OTHER_MEMBERSHIP_ID, name: 'Morgan', role: 'ROOMMATE' },
       ],
     });
     await queryClient.invalidateQueries({
@@ -125,7 +139,9 @@ describe('Roommates page', () => {
     stubRoommatesApis({
       memberships: {
         currentMembershipId: CURRENT_MEMBERSHIP_ID,
-        memberships: [{ membershipId: CURRENT_MEMBERSHIP_ID, name: 'Alex' }],
+        memberships: [
+          { membershipId: CURRENT_MEMBERSHIP_ID, name: 'Alex', role: 'ADMIN' },
+        ],
       },
     });
     renderApp(`/homes/${TEST_HOME_A}/roommates`);
@@ -148,8 +164,9 @@ describe('Roommates page', () => {
           {
             membershipId: CURRENT_MEMBERSHIP_ID,
             name: 'Alexandra Nadine Lewis',
+            role: 'ADMIN',
           },
-          { membershipId: OTHER_MEMBERSHIP_ID, name: 'Jamie' },
+          { membershipId: OTHER_MEMBERSHIP_ID, name: 'Jamie', role: 'ROOMMATE' },
         ],
       },
     });
@@ -164,12 +181,45 @@ describe('Roommates page', () => {
 });
 
 describe('Roommates ROOMMATE UI', () => {
+  it('renders another active admin as Home Admin from the roster', async () => {
+    stubRoommatesApis({
+      role: 'ROOMMATE',
+      memberships: {
+        currentMembershipId: CURRENT_MEMBERSHIP_ID,
+        memberships: [
+          {
+            membershipId: CURRENT_MEMBERSHIP_ID,
+            name: 'Alex',
+            role: 'ROOMMATE',
+          },
+          { membershipId: OTHER_MEMBERSHIP_ID, name: 'Jamie', role: 'ADMIN' },
+        ],
+      },
+    });
+    renderApp(`/homes/${TEST_HOME_A}/roommates`);
+
+    expect(await screen.findByText('Jamie')).toBeInTheDocument();
+    expect(
+      within(screen.getByText('Alex').closest('li')!).getByText(
+        'Household member',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByText('Jamie').closest('li')!).getByText('Home Admin'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Actions for Jamie' }),
+    ).not.toBeInTheDocument();
+    assertNoInternalIds();
+  });
+
   it('can view roommates without Admin structural controls and can leave', async () => {
     stubRoommatesApis({ role: 'ROOMMATE' });
     renderApp(`/homes/${TEST_HOME_A}/roommates`);
 
     expect(await screen.findByText('Jamie')).toBeInTheDocument();
-    expect(screen.getByText('Roommate')).toBeInTheDocument();
+    expect(screen.getAllByText('Household member').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Home Admin')).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Invite roommate' }),
     ).not.toBeInTheDocument();
@@ -210,8 +260,8 @@ describe('Roommates ADMIN UI', () => {
       screen.getByRole('menuitem', { name: 'Make admin' }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('menuitem', { name: 'Make roommate' }),
-    ).toBeInTheDocument();
+      screen.queryByRole('menuitem', { name: 'Make roommate' }),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole('menuitem', { name: 'Remove from Home' }),
     ).toBeInTheDocument();
@@ -464,7 +514,9 @@ describe('Roommates mutation responsiveness', () => {
     releaseMembershipsRefetch?.(
       jsonResponse(200, {
         currentMembershipId: CURRENT_MEMBERSHIP_ID,
-        memberships: [{ membershipId: CURRENT_MEMBERSHIP_ID, name: 'Alex' }],
+        memberships: [
+          { membershipId: CURRENT_MEMBERSHIP_ID, name: 'Alex', role: 'ADMIN' },
+        ],
       }),
     );
   });
@@ -499,6 +551,14 @@ describe('Roommates role change', () => {
     expect(resolveRole).toBeDefined();
 
     state.role = 'ROOMMATE';
+    state.memberships = {
+      ...state.memberships,
+      memberships: state.memberships.memberships.map((row) =>
+        row.membershipId === CURRENT_MEMBERSHIP_ID
+          ? { ...row, role: 'ROOMMATE' }
+          : row,
+      ),
+    };
     resolveRole?.(emptyResponse(204));
 
     await waitFor(() => {
@@ -506,7 +566,9 @@ describe('Roommates role change', () => {
         screen.queryByRole('button', { name: 'Invite roommate' }),
       ).not.toBeInTheDocument();
     });
-    expect(screen.getByText('Roommate')).toBeInTheDocument();
+    const alexRow = screen.getByText('Alex').closest('li');
+    expect(alexRow).not.toBeNull();
+    expect(within(alexRow!).getByText('Household member')).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Actions for Jamie' }),
     ).not.toBeInTheDocument();
@@ -564,10 +626,97 @@ describe('Roommates role change', () => {
       ).toBe(true);
     });
     expect(screen.getByText('Jamie')).toBeInTheDocument();
+    const jamieRow = screen.getByText('Jamie').closest('li');
+    expect(jamieRow).not.toBeNull();
+    expect(within(jamieRow!).getByText('Home Admin')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Invite roommate' }),
     ).toBeInTheDocument();
+    await openRowActions(user, 'Jamie');
+    expect(
+      screen.getByRole('menuitem', { name: 'Make roommate' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('menuitem', { name: 'Make admin' }),
+    ).not.toBeInTheDocument();
     assertNoInternalIds();
+  });
+
+  it('demotes another admin and updates the visible roster role', async () => {
+    const user = userEvent.setup();
+    stubRoommatesApis({
+      role: 'ADMIN',
+      memberships: {
+        currentMembershipId: CURRENT_MEMBERSHIP_ID,
+        memberships: [
+          { membershipId: CURRENT_MEMBERSHIP_ID, name: 'Alex', role: 'ADMIN' },
+          { membershipId: OTHER_MEMBERSHIP_ID, name: 'Jamie', role: 'ADMIN' },
+        ],
+      },
+    });
+    renderApp(`/homes/${TEST_HOME_A}/roommates`);
+
+    expect(await screen.findByText('Jamie')).toBeInTheDocument();
+    expect(
+      within(screen.getByText('Jamie').closest('li')!).getByText('Home Admin'),
+    ).toBeInTheDocument();
+    await openRowActions(user, 'Jamie');
+    expect(
+      screen.getByRole('menuitem', { name: 'Make roommate' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('menuitem', { name: 'Make admin' }),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole('menuitem', { name: 'Make roommate' }));
+
+    await waitFor(() => {
+      expect(
+        within(screen.getByText('Jamie').closest('li')!).getByText(
+          'Household member',
+        ),
+      ).toBeInTheDocument();
+    });
+    await openRowActions(user, 'Jamie');
+    expect(
+      screen.getByRole('menuitem', { name: 'Make admin' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('menuitem', { name: 'Make roommate' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('does not change the displayed role when a promotion fails', async () => {
+    stubRoommatesApis({
+      role: 'ADMIN',
+      handlers: {
+        changeRole: () =>
+          jsonResponse(
+            409,
+            errorBody('LAST_ADMIN_REQUIRED', 'Last admin required'),
+          ),
+      },
+    });
+    const user = userEvent.setup();
+    renderApp(`/homes/${TEST_HOME_A}/roommates`);
+
+    expect(await screen.findByText('Jamie')).toBeInTheDocument();
+    expect(
+      within(screen.getByText('Jamie').closest('li')!).getByText(
+        'Household member',
+      ),
+    ).toBeInTheDocument();
+    await openRowActions(user, 'Jamie');
+    await user.click(screen.getByRole('menuitem', { name: 'Make admin' }));
+
+    expect(
+      await screen.findByText(/needs at least one Home admin/i),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByText('Jamie').closest('li')!).getByText(
+        'Household member',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('ROOMMATE')).not.toBeInTheDocument();
   });
 });
 

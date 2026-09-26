@@ -4,3 +4,8 @@ import type { ActiveHome } from './homes-api.js';
 export function homeRoleLabel(role: ActiveHome['role']): string {
   return role === 'ADMIN' ? 'Home Admin' : 'Roommate';
 }
+
+/** Roommates roster copy for the current Membership tenure. */
+export function roommateRosterRoleLabel(role: ActiveHome['role']): string {
+  return role === 'ADMIN' ? 'Home Admin' : 'Household member';
+}

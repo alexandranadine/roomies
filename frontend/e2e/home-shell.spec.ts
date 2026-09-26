@@ -52,8 +52,8 @@ async function mockHomeApis(page: Page): Promise<void> {
       await json(route, 200, {
         currentMembershipId: MEMBERSHIP_A,
         memberships: [
-          { membershipId: MEMBERSHIP_A, name: 'Alex' },
-          { membershipId: MEMBERSHIP_B, name: 'Jamie' },
+          { membershipId: MEMBERSHIP_A, name: 'Alex', role: 'ADMIN' },
+          { membershipId: MEMBERSHIP_B, name: 'Jamie', role: 'ROOMMATE' },
         ],
       });
       return;

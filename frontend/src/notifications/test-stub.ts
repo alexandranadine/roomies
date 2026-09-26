@@ -184,6 +184,7 @@ export function stubNotificationsApis(options: NotificationStubOptions = {}) {
               {
                 membershipId: 'm1111111-1111-4111-8111-111111111111',
                 name: homeId === TEST_HOME_B ? 'Casey' : 'Alex',
+                role: 'ADMIN',
               },
             ],
           }),

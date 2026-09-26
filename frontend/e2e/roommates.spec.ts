@@ -19,7 +19,11 @@ const VIEWPORTS = [
   { name: '1440', width: 1440, height: 900 },
 ] as const;
 
-type MemberRow = { membershipId: string; name: string };
+type MemberRow = {
+  membershipId: string;
+  name: string;
+  role: 'ADMIN' | 'ROOMMATE';
+};
 
 async function json(route: Route, status: number, body: unknown) {
   await route.fulfill({
@@ -33,15 +37,17 @@ async function mockAuthenticatedRoommatesApis(
   page: Page,
   options: {
     role?: 'ADMIN' | 'ROOMMATE';
+    currentMembershipId?: string;
     members?: MemberRow[];
     inviteUrl?: string;
   } = {},
 ): Promise<{ members: MemberRow[] }> {
   const members = (options.members ?? [
-    { membershipId: MEMBERSHIP_A, name: 'Alexandra Nadine Lewis' },
-    { membershipId: MEMBERSHIP_B, name: 'Jamie' },
+    { membershipId: MEMBERSHIP_A, name: 'Alexandra Nadine Lewis', role: 'ADMIN' },
+    { membershipId: MEMBERSHIP_B, name: 'Jamie', role: 'ROOMMATE' },
   ]).map((row) => ({ ...row }));
   const role = options.role ?? 'ADMIN';
+  const currentMembershipId = options.currentMembershipId ?? MEMBERSHIP_A;
   const inviteUrl = options.inviteUrl ?? LONG_INVITE_URL;
 
   await page.route('**/api/v1/**', async (route) => {
@@ -89,6 +95,11 @@ async function mockAuthenticatedRoommatesApis(
       pathName === `/api/v1/homes/${HOME_A}/memberships/${MEMBERSHIP_B}/role` &&
       method === 'PATCH'
     ) {
+      const body = request.postDataJSON() as { role?: 'ADMIN' | 'ROOMMATE' };
+      const jamie = members.find((row) => row.membershipId === MEMBERSHIP_B);
+      if (jamie !== undefined && (body.role === 'ADMIN' || body.role === 'ROOMMATE')) {
+        jamie.role = body.role;
+      }
       await route.fulfill({ status: 204, body: '' });
       return;
     }
@@ -116,7 +127,7 @@ async function mockAuthenticatedRoommatesApis(
     }
     if (pathName === `/api/v1/homes/${HOME_A}/memberships` && method === 'GET') {
       await json(route, 200, {
-        currentMembershipId: MEMBERSHIP_A,
+        currentMembershipId,
         memberships: [...members],
       });
       return;
@@ -279,14 +290,17 @@ test.describe('Roommates management', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await mockAuthenticatedRoommatesApis(page, {
       members: [
-        { membershipId: MEMBERSHIP_A, name: 'Alex' },
-        { membershipId: MEMBERSHIP_B, name: 'Jamie' },
+        { membershipId: MEMBERSHIP_A, name: 'Alex', role: 'ADMIN' },
+        { membershipId: MEMBERSHIP_B, name: 'Jamie', role: 'ROOMMATE' },
       ],
     });
     await page.goto(`/homes/${HOME_A}/roommates`);
 
     await expect(page.getByText('Jamie')).toBeVisible();
     await expect(page.getByText('You', { exact: true })).toBeVisible();
+    await expect(
+      page.locator('li').filter({ hasText: 'Jamie' }).getByText('Household member'),
+    ).toBeVisible();
     await expect(page.getByText(MEMBERSHIP_A)).toHaveCount(0);
     await expect(page.getByText(MEMBERSHIP_B)).toHaveCount(0);
     await expect(page.getByText(USER_ID)).toHaveCount(0);
@@ -321,8 +335,13 @@ test.describe('Roommates management', () => {
 
     await page.getByRole('button', { name: 'Actions for Jamie' }).click();
     await assertMenuFitsViewport(page);
+    await expect(page.getByRole('menuitem', { name: 'Make admin' })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: 'Make roommate' })).toHaveCount(0);
     await page.getByRole('menuitem', { name: 'Make admin' }).click();
     await expect(page.getByText('Jamie')).toBeVisible();
+    await expect(
+      page.locator('li').filter({ hasText: 'Jamie' }).getByText('Home Admin'),
+    ).toBeVisible();
 
     await page.getByRole('button', { name: 'Actions for Jamie' }).click();
     await page.getByRole('menuitem', { name: 'Remove from Home' }).click();
@@ -343,13 +362,19 @@ test.describe('Roommates management', () => {
     await mockAuthenticatedRoommatesApis(page, {
       role: 'ROOMMATE',
       members: [
-        { membershipId: MEMBERSHIP_A, name: 'Alex' },
-        { membershipId: MEMBERSHIP_B, name: 'Jamie' },
+        { membershipId: MEMBERSHIP_A, name: 'Alex', role: 'ROOMMATE' },
+        { membershipId: MEMBERSHIP_B, name: 'Jamie', role: 'ADMIN' },
       ],
     });
     await page.goto(`/homes/${HOME_A}/roommates`);
 
     await expect(page.getByText('Jamie')).toBeVisible();
+    await expect(
+      page.locator('li').filter({ hasText: 'Alex' }).getByText('Household member'),
+    ).toBeVisible();
+    await expect(
+      page.locator('li').filter({ hasText: 'Jamie' }).getByText('Home Admin'),
+    ).toBeVisible();
     await expect(
       page.getByRole('button', { name: 'Invite roommate' }),
     ).toHaveCount(0);
@@ -357,6 +382,33 @@ test.describe('Roommates management', () => {
       page.getByRole('button', { name: 'Actions for Jamie' }),
     ).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Leave Home' })).toBeVisible();
+  });
+
+  test('promoted roommate still sees the other admin as Home Admin', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockAuthenticatedRoommatesApis(page, {
+      role: 'ADMIN',
+      currentMembershipId: MEMBERSHIP_B,
+      members: [
+        { membershipId: MEMBERSHIP_A, name: 'Alex', role: 'ADMIN' },
+        { membershipId: MEMBERSHIP_B, name: 'Jamie', role: 'ADMIN' },
+      ],
+    });
+    await page.goto(`/homes/${HOME_A}/roommates`);
+
+    await expect(
+      page.locator('li').filter({ hasText: 'Alex' }).getByText('Home Admin'),
+    ).toBeVisible();
+    await expect(
+      page.locator('li').filter({ hasText: 'Jamie' }).getByText('You', {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      page.locator('li').filter({ hasText: 'Jamie' }).getByText('Home Admin'),
+    ).toBeVisible();
   });
 
   test('populated roster axe scan (serious/critical)', async ({ page }) => {

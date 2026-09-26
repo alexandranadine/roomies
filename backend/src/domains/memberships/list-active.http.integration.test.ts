@@ -348,7 +348,12 @@ void describe('GET /api/v1/homes/:homeId/memberships PostgreSQL', () => {
           assert.deepEqual(Object.keys(roommateBody.memberships[0]!).sort(), [
             'membershipId',
             'name',
+            'role',
           ]);
+          assert.deepEqual(
+            roommateBody.memberships.map((row) => row.role),
+            ['ROOMMATE', 'ADMIN', 'ROOMMATE', 'ADMIN'],
+          );
           assert.equal(
             roommateBody.memberships.some(
               (row) => row.membershipId === membershipSamEnded,
@@ -378,8 +383,6 @@ void describe('GET /api/v1/homes/:homeId/memberships PostgreSQL', () => {
               'userId',
               'endedAt',
               'joinedAt',
-              'ROOMMATE',
-              'ADMIN',
               'capabilities',
               'invitation',
               'session',

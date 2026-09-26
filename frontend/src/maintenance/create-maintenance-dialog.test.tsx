@@ -189,8 +189,8 @@ describe('Maintenance create UI', () => {
         [TEST_HOME_A]: {
           currentMembershipId: TEST_MEMBERSHIP_A,
           memberships: [
-            { membershipId: TEST_MEMBERSHIP_A, name: 'Alex' },
-            { membershipId: TEST_MEMBERSHIP_B, name: 'Jamie' },
+            { membershipId: TEST_MEMBERSHIP_A, name: 'Alex', role: 'ADMIN' },
+            { membershipId: TEST_MEMBERSHIP_B, name: 'Jamie', role: 'ROOMMATE' },
           ],
         },
       },
@@ -291,7 +291,9 @@ describe('Maintenance create UI', () => {
       membershipsByHome: {
         [TEST_HOME_A]: {
           currentMembershipId: TEST_MEMBERSHIP_A,
-          memberships: [{ membershipId: TEST_MEMBERSHIP_A, name: 'Alex' }],
+          memberships: [
+            { membershipId: TEST_MEMBERSHIP_A, name: 'Alex', role: 'ADMIN' },
+          ],
         },
       },
       createByHome: {
@@ -564,17 +566,18 @@ describe('Maintenance create UI', () => {
         [TEST_HOME_A]: {
           currentMembershipId: TEST_MEMBERSHIP_A,
           memberships: [
-            { membershipId: TEST_MEMBERSHIP_A, name: 'Alex' },
-            { membershipId: TEST_MEMBERSHIP_B, name: 'Jamie' },
+            { membershipId: TEST_MEMBERSHIP_A, name: 'Alex', role: 'ADMIN' },
+            { membershipId: TEST_MEMBERSHIP_B, name: 'Jamie', role: 'ROOMMATE' },
           ],
         },
         [TEST_HOME_B]: {
           currentMembershipId: TEST_MEMBERSHIP_B,
           memberships: [
-            { membershipId: TEST_MEMBERSHIP_B, name: 'Casey' },
+            { membershipId: TEST_MEMBERSHIP_B, name: 'Casey', role: 'ADMIN' },
             {
               membershipId: 'm3333333-3333-4333-8333-333333333333',
               name: 'Drew',
+              role: 'ROOMMATE',
             },
           ],
         },
@@ -626,8 +629,8 @@ describe('Maintenance create UI', () => {
         [TEST_HOME_A]: {
           currentMembershipId: TEST_MEMBERSHIP_A,
           memberships: [
-            { membershipId: TEST_MEMBERSHIP_A, name: 'Alex' },
-            { membershipId: TEST_MEMBERSHIP_B, name: 'Jamie' },
+            { membershipId: TEST_MEMBERSHIP_A, name: 'Alex', role: 'ADMIN' },
+            { membershipId: TEST_MEMBERSHIP_B, name: 'Jamie', role: 'ROOMMATE' },
           ],
         },
       },

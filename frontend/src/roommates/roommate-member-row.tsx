@@ -1,13 +1,13 @@
 import { EllipsisHorizontalIcon } from '@heroicons/react/20/solid';
 import { IconButton, InitialsAvatar, Menu } from '../components/ui/index.js';
 import { cn } from '../components/ui/cn.js';
-import { homeRoleLabel } from '../homes/home-role-label.js';
+import { roommateRosterRoleLabel } from '../homes/home-role-label.js';
 import type { ActiveHome } from '../homes/homes-api.js';
 
 export type RoommateMemberRowProps = {
   name: string;
   isCurrent: boolean;
-  currentUserRole: ActiveHome['role'] | undefined;
+  role: ActiveHome['role'];
   showAdminActions: boolean;
   actionsDisabled: boolean;
   onMakeAdmin: () => void;
@@ -17,12 +17,12 @@ export type RoommateMemberRowProps = {
 
 /**
  * Active roommate card. Membership ids stay in React state — never rendered.
- * Other roommates never receive a role label; the DTO does not expose it.
+ * Role labels come from the roster DTO, not a client-side default.
  */
 export function RoommateMemberRow({
   name,
   isCurrent,
-  currentUserRole,
+  role,
   showAdminActions,
   actionsDisabled,
   onMakeAdmin,
@@ -31,8 +31,11 @@ export function RoommateMemberRow({
 }: RoommateMemberRowProps) {
   const showSelfDemote = showAdminActions && isCurrent;
   const showOtherAdminActions = showAdminActions && !isCurrent;
-  const hasMenu = showSelfDemote || showOtherAdminActions;
+  const showMakeAdmin = showOtherAdminActions && role === 'ROOMMATE';
+  const showMakeRoommate = showOtherAdminActions && role === 'ADMIN';
+  const hasMenu = showSelfDemote || showMakeAdmin || showMakeRoommate;
   const avatarLabel = isCurrent ? `${name} (you)` : name;
+  const roleLabel = roommateRosterRoleLabel(role);
 
   return (
     <li
@@ -56,15 +59,11 @@ export function RoommateMemberRow({
             {isCurrent ? (
               <>
                 <span className="text-brand">You</span>
-                {currentUserRole !== undefined ? (
-                  <>
-                    <span aria-hidden="true"> · </span>
-                    {homeRoleLabel(currentUserRole)}
-                  </>
-                ) : null}
+                <span aria-hidden="true"> · </span>
+                {roleLabel}
               </>
             ) : (
-              'Household member'
+              roleLabel
             )}
           </p>
         </div>
@@ -84,7 +83,7 @@ export function RoommateMemberRow({
               }
             />
             <Menu.Popup>
-              {showOtherAdminActions ? (
+              {showMakeAdmin ? (
                 <Menu.Item
                   disabled={actionsDisabled}
                   onClick={() => {
@@ -94,14 +93,16 @@ export function RoommateMemberRow({
                   Make admin
                 </Menu.Item>
               ) : null}
-              <Menu.Item
-                disabled={actionsDisabled}
-                onClick={() => {
-                  onMakeRoommate();
-                }}
-              >
-                Make roommate
-              </Menu.Item>
+              {showSelfDemote || showMakeRoommate ? (
+                <Menu.Item
+                  disabled={actionsDisabled}
+                  onClick={() => {
+                    onMakeRoommate();
+                  }}
+                >
+                  Make roommate
+                </Menu.Item>
+              ) : null}
               {showOtherAdminActions ? (
                 <>
                   <Menu.Separator />

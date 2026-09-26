@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MEMBERSHIP_ROLES } from '../../platform/authz/context.js';
 import type { ActiveHomeMembershipListItem } from './active-home-membership-list.js';
 
 /** Explicit GET /homes/:homeId/memberships row whitelist. */
@@ -6,6 +7,7 @@ export const activeHomeMembershipDtoSchema = z
   .object({
     membershipId: z.string().min(1),
     name: z.string().min(1),
+    role: z.enum(MEMBERSHIP_ROLES),
   })
   .strict();
 
@@ -36,6 +38,7 @@ export function toActiveHomeMembershipsDto(input: {
     memberships: input.memberships.map((row) => ({
       membershipId: row.membershipId,
       name: row.name,
+      role: row.role,
     })),
   });
 }

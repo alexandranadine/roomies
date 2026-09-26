@@ -1,15 +1,18 @@
+import { isMembershipRole } from '../../platform/authz/context.js';
 import { AuthorizationIntegrityError } from '../../platform/authz/errors.js';
 import type { ActiveHomeMembershipListItem } from './active-home-membership-list.js';
 
 /**
  * Home-scoped active Membership list. AuthIdentity.name is the approved
- * display field. Ordered by name ASC, membershipId ASC for a stable picker.
- * No invitation join and no historical tenures.
+ * display field. Role is the current Membership tenure. Ordered by name ASC,
+ * membershipId ASC for a stable picker. No invitation join and no historical
+ * tenures.
  */
 export const LIST_ACTIVE_HOME_MEMBERSHIPS_SQL = `
 SELECT
   m.id AS membership_id,
-  i.name AS name
+  i.name AS name,
+  m.role AS role
 FROM memberships AS m
 INNER JOIN auth_identities AS i
   ON i.id = m.user_id
@@ -34,6 +37,7 @@ export type ActiveHomeMembershipsReader = {
 type ActiveHomeMembershipRow = {
   membership_id: unknown;
   name: unknown;
+  role: unknown;
 };
 
 const UUID_PATTERN =
@@ -78,6 +82,7 @@ export function createActiveHomeMembershipsReader(
           !isUuid(row.membership_id) ||
           typeof row.name !== 'string' ||
           row.name.length === 0 ||
+          !isMembershipRole(row.role) ||
           seen.has(row.membership_id)
         ) {
           logIntegrityFailure('row');
@@ -88,6 +93,7 @@ export function createActiveHomeMembershipsReader(
           Object.freeze({
             membershipId: row.membership_id,
             name: row.name,
+            role: row.role,
           }),
         );
       }

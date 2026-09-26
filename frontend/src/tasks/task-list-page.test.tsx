@@ -146,8 +146,8 @@ describe('Tasks list page', () => {
         [TEST_HOME_A]: {
           currentMembershipId: TEST_REJOIN_MEMBERSHIP,
           memberships: [
-            { membershipId: TEST_REJOIN_MEMBERSHIP, name: 'Alex' },
-            { membershipId: TEST_MEMBERSHIP_B, name: 'Jamie' },
+            { membershipId: TEST_REJOIN_MEMBERSHIP, name: 'Alex', role: 'ADMIN' },
+            { membershipId: TEST_MEMBERSHIP_B, name: 'Jamie', role: 'ROOMMATE' },
           ],
         },
       },

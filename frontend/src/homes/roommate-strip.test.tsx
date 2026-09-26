@@ -36,23 +36,28 @@ describe('Home roommate strip', () => {
           {
             membershipId: CURRENT_MEMBERSHIP_ID,
             name: 'Alexandra With A Very Long Display Name',
+            role: 'ADMIN',
           },
-          { membershipId: OTHER_MEMBERSHIP_ID, name: 'Jamie' },
+          { membershipId: OTHER_MEMBERSHIP_ID, name: 'Jamie', role: 'ROOMMATE' },
           {
             membershipId: 'm5555555-5555-4555-8555-555555555555',
             name: 'Morgan',
+            role: 'ROOMMATE',
           },
           {
             membershipId: 'm6666666-6666-4666-8666-666666666666',
             name: 'Riley',
+            role: 'ROOMMATE',
           },
           {
             membershipId: 'm7777777-7777-4777-8777-777777777777',
             name: 'Sam',
+            role: 'ROOMMATE',
           },
           {
             membershipId: 'm8888888-8888-4888-8888-888888888888',
             name: 'Quinn',
+            role: 'ROOMMATE',
           },
         ],
       },

@@ -26,7 +26,7 @@ void describe('LIST_ACTIVE_HOME_MEMBERSHIPS_SQL', () => {
     );
     assert.doesNotMatch(LIST_ACTIVE_HOME_MEMBERSHIPS_SQL, /invitations/i);
     assert.doesNotMatch(LIST_ACTIVE_HOME_MEMBERSHIPS_SQL, /\bemail\b/);
-    assert.doesNotMatch(LIST_ACTIVE_HOME_MEMBERSHIPS_SQL, /\brole\b/);
+    assert.match(LIST_ACTIVE_HOME_MEMBERSHIPS_SQL, /m\.role AS role/);
     assert.doesNotMatch(
       LIST_ACTIVE_HOME_MEMBERSHIPS_SQL,
       /ended_at IS NOT NULL/,
@@ -49,8 +49,8 @@ void describe('createActiveHomeMembershipsReader', () => {
         calls.push({ text, values });
         return Promise.resolve({
           rows: [
-            { membership_id: MEMBERSHIP_A, name: 'Alex' },
-            { membership_id: MEMBERSHIP_B, name: 'Jamie' },
+            { membership_id: MEMBERSHIP_A, name: 'Alex', role: 'ADMIN' },
+            { membership_id: MEMBERSHIP_B, name: 'Jamie', role: 'ROOMMATE' },
           ] as T[],
         });
       },
@@ -59,8 +59,8 @@ void describe('createActiveHomeMembershipsReader', () => {
 
     const listed = await reader.listActiveByHome(HOME);
     assert.deepEqual(listed, [
-      { membershipId: MEMBERSHIP_A, name: 'Alex' },
-      { membershipId: MEMBERSHIP_B, name: 'Jamie' },
+      { membershipId: MEMBERSHIP_A, name: 'Alex', role: 'ADMIN' },
+      { membershipId: MEMBERSHIP_B, name: 'Jamie', role: 'ROOMMATE' },
     ]);
     assert.equal(calls.length, 1);
     assert.equal(calls[0]?.text, LIST_ACTIVE_HOME_MEMBERSHIPS_SQL);
@@ -92,8 +92,8 @@ void describe('createActiveHomeMembershipsReader', () => {
       query<T>() {
         return Promise.resolve({
           rows: [
-            { membership_id: MEMBERSHIP_A, name: 'Alex' },
-            { membership_id: MEMBERSHIP_A, name: 'Alex' },
+            { membership_id: MEMBERSHIP_A, name: 'Alex', role: 'ADMIN' },
+            { membership_id: MEMBERSHIP_A, name: 'Alex', role: 'ADMIN' },
           ] as T[],
         });
       },
@@ -106,7 +106,7 @@ void describe('createActiveHomeMembershipsReader', () => {
     const emptyName: ActiveHomeMembershipsQueryable = {
       query<T>() {
         return Promise.resolve({
-          rows: [{ membership_id: MEMBERSHIP_A, name: '' }] as T[],
+          rows: [{ membership_id: MEMBERSHIP_A, name: '', role: 'ADMIN' }] as T[],
         });
       },
     };
@@ -118,12 +118,27 @@ void describe('createActiveHomeMembershipsReader', () => {
     const malformed: ActiveHomeMembershipsQueryable = {
       query<T>() {
         return Promise.resolve({
-          rows: [{ membership_id: 'nope', name: 'Alex' }] as T[],
+          rows: [{ membership_id: 'nope', name: 'Alex', role: 'ADMIN' }] as T[],
         });
       },
     };
     await assert.rejects(
       () => createActiveHomeMembershipsReader(malformed).listActiveByHome(HOME),
+      AuthorizationIntegrityError,
+    );
+
+    const invalidRole: ActiveHomeMembershipsQueryable = {
+      query<T>() {
+        return Promise.resolve({
+          rows: [
+            { membership_id: MEMBERSHIP_A, name: 'Alex', role: 'OWNER' },
+          ] as T[],
+        });
+      },
+    };
+    await assert.rejects(
+      () =>
+        createActiveHomeMembershipsReader(invalidRole).listActiveByHome(HOME),
       AuthorizationIntegrityError,
     );
   });

@@ -162,16 +162,20 @@ export function defaultMemberships(
     return {
       currentMembershipId: TEST_MEMBERSHIP_B,
       memberships: [
-        { membershipId: TEST_MEMBERSHIP_B, name: 'Casey' },
-        { membershipId: 'm3333333-3333-4333-8333-333333333333', name: 'Drew' },
+        { membershipId: TEST_MEMBERSHIP_B, name: 'Casey', role: 'ADMIN' },
+        {
+          membershipId: 'm3333333-3333-4333-8333-333333333333',
+          name: 'Drew',
+          role: 'ROOMMATE',
+        },
       ],
     };
   }
   return {
     currentMembershipId: TEST_MEMBERSHIP_A,
     memberships: [
-      { membershipId: TEST_MEMBERSHIP_A, name: 'Alex' },
-      { membershipId: TEST_MEMBERSHIP_B, name: 'Jamie' },
+      { membershipId: TEST_MEMBERSHIP_A, name: 'Alex', role: 'ADMIN' },
+      { membershipId: TEST_MEMBERSHIP_B, name: 'Jamie', role: 'ROOMMATE' },
     ],
   };
 }

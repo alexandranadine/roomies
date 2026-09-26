@@ -20,6 +20,7 @@ import { LeaveHomeDialog } from './leave-home-dialog.js';
 import { PendingInvitePanel } from './pending-invite-panel.js';
 import {
   patchCurrentUserHomeRole,
+  patchHomeMembershipRole,
   reconcileHomeMembershipSurfaces,
   recoverStaleHomeMembershipState,
   removeMembershipFromHomeCache,
@@ -64,7 +65,7 @@ export function RoommatesPage() {
     homeId,
     enabled: homeId.length > 0,
   });
-  const { role, isAdmin } = useCurrentHomeRole(homeId);
+  const { isAdmin } = useCurrentHomeRole(homeId);
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
@@ -118,6 +119,7 @@ export function RoommatesPage() {
     setRoleError(null);
     try {
       await roleMutation.mutateAsync({ membershipId, role: nextRole });
+      patchHomeMembershipRole(queryClient, homeId, membershipId, nextRole);
       if (membershipId === currentMembershipId) {
         patchCurrentUserHomeRole(queryClient, homeId, nextRole);
       }
@@ -268,7 +270,7 @@ export function RoommatesPage() {
                   key={member.membershipId}
                   name={member.name}
                   isCurrent={member.membershipId === currentMembershipId}
-                  currentUserRole={role}
+                  role={member.role}
                   showAdminActions={isAdmin}
                   actionsDisabled={roleMutation.isPending}
                   onMakeAdmin={() => {
