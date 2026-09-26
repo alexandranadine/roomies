@@ -23,13 +23,21 @@ function stubUnauthenticatedLanding(handlers: {
   afterAuth?: {
     emailVerified?: boolean;
   };
+  blockAuthRefetchesAfterSuccess?: boolean;
 }) {
   let authenticated = false;
+  let authRefetchesBlocked = false;
   const fetchMock = vi
     .fn()
     .mockImplementation(async (url: string, init?: RequestInit) => {
       const path = String(url);
       const method = (init?.method ?? 'GET').toUpperCase();
+      if (
+        authRefetchesBlocked &&
+        (path.endsWith('/api/v1/me') || path.includes('/api/auth/get-session'))
+      ) {
+        return new Promise<Response>(() => {});
+      }
       if (path.endsWith('/api/v1/me') && method === 'GET') {
         if (!authenticated) {
           return jsonResponse(401, {
@@ -44,6 +52,9 @@ function stubUnauthenticatedLanding(handlers: {
         });
       }
       if (path.includes('/api/auth/sign-in/email') && method === 'POST') {
+        if (handlers.blockAuthRefetchesAfterSuccess) {
+          authRefetchesBlocked = true;
+        }
         if (handlers.signIn) {
           const response = await Promise.resolve(handlers.signIn(init));
           if (response.ok) {
@@ -55,6 +66,9 @@ function stubUnauthenticatedLanding(handlers: {
         return jsonResponse(200, { token: 'session', user: { id: 'user-id' } });
       }
       if (path.includes('/api/auth/sign-up/email') && method === 'POST') {
+        if (handlers.blockAuthRefetchesAfterSuccess) {
+          authRefetchesBlocked = true;
+        }
         if (handlers.signUp) {
           const response = await Promise.resolve(handlers.signUp(init));
           if (response.ok) {
@@ -291,6 +305,86 @@ describe('credential form', () => {
         String(url).includes('/api/auth/sign-in/email'),
       ),
     ).toBe(true);
+    expect(
+      fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/api/v1/me'))
+        .length,
+    ).toBeGreaterThanOrEqual(2);
+    expect(
+      fetchMock.mock.calls.filter(([url]) =>
+        String(url).includes('/api/auth/get-session'),
+      ).length,
+    ).toBeGreaterThanOrEqual(1);
+  });
+
+  it('ends sign-in pending when the POST completes, not when auth refetches settle', async () => {
+    let resolveSignIn: ((value: Response) => void) | undefined;
+    stubUnauthenticatedLanding({
+      blockAuthRefetchesAfterSuccess: true,
+      signIn: () =>
+        new Promise<Response>((resolve) => {
+          resolveSignIn = resolve;
+        }),
+    });
+    renderApp('/');
+
+    await screen.findByRole('heading', { name: 'Welcome back', level: 1 });
+    await userEvent.type(
+      screen.getByRole('textbox', { name: /email/i }),
+      'roommate@example.com',
+    );
+    await userEvent.type(
+      screen.getByLabelText(/password/i),
+      'test-password-only',
+    );
+    const signInButton = screen.getByRole('button', { name: 'Sign in' });
+    await userEvent.click(signInButton);
+    await waitFor(() => {
+      expect(signInButton).toHaveAttribute('aria-busy', 'true');
+    });
+
+    resolveSignIn?.(
+      jsonResponse(200, { token: 'session', user: { id: 'user-id' } }),
+    );
+
+    await waitFor(() => {
+      expect(signInButton).not.toHaveAttribute('aria-busy', 'true');
+    });
+    expect(screen.getByText('Checking your session')).toBeInTheDocument();
+  });
+
+  it('does not invalidate auth queries after failed sign-in', async () => {
+    const fetchMock = stubUnauthenticatedLanding({
+      signIn: () =>
+        jsonResponse(401, {
+          code: 'INVALID_EMAIL_OR_PASSWORD',
+          message: 'Invalid email or password',
+        }),
+    });
+    renderApp('/');
+
+    await screen.findByRole('heading', { name: 'Welcome back', level: 1 });
+    await userEvent.type(
+      screen.getByRole('textbox', { name: /email/i }),
+      'roommate@example.com',
+    );
+    await userEvent.type(
+      screen.getByLabelText(/password/i),
+      'wrong-password',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+
+    expect(
+      await screen.findByText('Email or password is incorrect.'),
+    ).toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/api/v1/me'))
+        .length,
+    ).toBe(1);
+    expect(
+      fetchMock.mock.calls.filter(([url]) =>
+        String(url).includes('/api/auth/get-session'),
+      ).length,
+    ).toBe(0);
   });
 
   it('shows a useful unverified message after sign-up without blocking the app', async () => {
@@ -353,5 +447,55 @@ describe('credential form', () => {
         String(url).includes('/api/auth/sign-up/email'),
       ),
     ).toBe(true);
+    expect(
+      fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/api/v1/me'))
+        .length,
+    ).toBeGreaterThanOrEqual(2);
+    expect(
+      fetchMock.mock.calls.filter(([url]) =>
+        String(url).includes('/api/auth/get-session'),
+      ).length,
+    ).toBeGreaterThanOrEqual(1);
+  });
+
+  it('ends sign-up pending when the POST completes, not when auth refetches settle', async () => {
+    let resolveSignUp: ((value: Response) => void) | undefined;
+    stubUnauthenticatedLanding({
+      blockAuthRefetchesAfterSuccess: true,
+      afterAuth: { emailVerified: false },
+      signUp: () =>
+        new Promise<Response>((resolve) => {
+          resolveSignUp = resolve;
+        }),
+    });
+    renderApp('/');
+
+    await screen.findByRole('heading', { name: 'Welcome back', level: 1 });
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Create an account' }),
+    );
+    await userEvent.type(screen.getByRole('textbox', { name: /name/i }), 'Alex');
+    await userEvent.type(
+      screen.getByRole('textbox', { name: /email/i }),
+      'roommate@example.com',
+    );
+    await userEvent.type(
+      screen.getByLabelText(/password/i),
+      'test-password-only',
+    );
+    const createButton = screen.getByRole('button', { name: 'Create account' });
+    await userEvent.click(createButton);
+    await waitFor(() => {
+      expect(createButton).toHaveAttribute('aria-busy', 'true');
+    });
+
+    resolveSignUp?.(
+      jsonResponse(200, { token: 'session', user: { id: 'user-id' } }),
+    );
+
+    await waitFor(() => {
+      expect(createButton).not.toHaveAttribute('aria-busy', 'true');
+    });
+    expect(screen.getByText('Checking your session')).toBeInTheDocument();
   });
 });

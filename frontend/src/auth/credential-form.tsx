@@ -70,6 +70,12 @@ export function CredentialForm({
       await signInWithEmail(toSignInRequest(values));
     },
     retry: false,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: currentUserQueryKey });
+      void queryClient.invalidateQueries({
+        queryKey: invitationAuthSessionQueryKey,
+      });
+    },
   });
 
   const submitCredentials = handleSubmit(async (values) => {
@@ -80,10 +86,6 @@ export function CredentialForm({
       if (mode === 'sign-up') {
         setSignedUp(true);
       }
-      await queryClient.invalidateQueries({ queryKey: currentUserQueryKey });
-      await queryClient.invalidateQueries({
-        queryKey: invitationAuthSessionQueryKey,
-      });
     } catch (error) {
       setError('root', {
         type: 'server',

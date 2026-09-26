@@ -129,6 +129,97 @@ describe('invitation landing page', () => {
     ).toBe(false);
   });
 
+  it('signs in through the invite credential form and returns to join state', async () => {
+    window.history.replaceState(
+      null,
+      '',
+      `/invitations/${INVITATION_ID}#secret=${SECRET}`,
+    );
+    captureInvitationFragment();
+    let authenticated = false;
+    const fetchMock = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      const path = String(url);
+      const method = (init?.method ?? 'GET').toUpperCase();
+      if (path.includes('/api/auth/sign-in/email') && method === 'POST') {
+        authenticated = true;
+        return Promise.resolve(
+          new Response(JSON.stringify({ token: 'session', user: { id: 'user-id' } }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        );
+      }
+      if (path.includes('/api/auth/get-session')) {
+        if (!authenticated) {
+          return Promise.resolve(
+            new Response('null', {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            }),
+          );
+        }
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              user: {
+                id: '11111111-1111-4111-8111-111111111111',
+                email: EMAIL,
+                emailVerified: true,
+              },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        );
+      }
+      if (path.includes('/preview')) {
+        return Promise.resolve(
+          new Response(JSON.stringify(previewBody()), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        );
+      }
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            error: { code: 'NOT_FOUND', message: 'Not found' },
+          }),
+          { status: 404, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderApp(`/invitations/${INVITATION_ID}`);
+    await screen.findByRole('heading', {
+      name: `You’re invited to join ${HOME_NAME}`,
+      level: 1,
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    expect(screen.getByRole('textbox', { name: /email/i })).toHaveValue(EMAIL);
+    await userEvent.type(
+      screen.getByLabelText(/password/i),
+      'test-password-only',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+
+    expect(
+      await screen.findByRole('button', { name: 'Join Home' }),
+    ).toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.filter(([url]) =>
+        String(url).includes('/api/auth/get-session'),
+      ).length,
+    ).toBeGreaterThanOrEqual(2);
+    expect(
+      fetchMock.mock.calls.some(([url]) =>
+        String(url).includes('/api/auth/sign-in/email'),
+      ),
+    ).toBe(true);
+    expect(window.location.pathname).toBe(`/invitations/${INVITATION_ID}`);
+    expect(document.body.innerHTML).not.toContain(SECRET);
+  });
+
   it('contextualizes sign-in helper copy with the Home name', async () => {
     window.history.replaceState(
       null,
