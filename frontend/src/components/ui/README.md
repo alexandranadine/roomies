@@ -25,6 +25,11 @@ Rationale: React 19–ready, unstyled/headless, modular imports, focus managemen
 
 Sheet is a positioned Dialog variant (same focus foundation), not a second focus system.
 
+Overlay behavior (provided by Base UI, covered by unit/e2e tests):
+
+- **Dialog / Sheet:** modal focus trap, Escape dismiss, backdrop/outside click dismiss (default `disablePointerDismissal: false`), focus restore to trigger on Escape, and page scroll lock via Base UI (`overflow: hidden` on the viewport scroller; may also set `data-base-ui-scroll-locked` on `<html>` depending on browser). Pointer dismiss closes the dialog but does not restore trigger focus — that is Base UI’s default; Escape is the keyboard path that returns focus.
+- **Menu:** keyboard navigation, Escape close, and focus return to the trigger.
+
 ## Icons
 
 **`@heroicons/react`** — import icons directly where needed; there is no Roomies icon wrapper layer. Use the official React packages and pick the family intentionally:

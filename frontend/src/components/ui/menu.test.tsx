@@ -35,4 +35,35 @@ describe('Menu', () => {
       expect(screen.queryByRole('menu')).not.toBeInTheDocument();
     });
   });
+
+  it('returns focus to the trigger after Escape closes the menu', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Menu.Root>
+        <Menu.Trigger render={<Button>Actions</Button>} />
+        <Menu.Popup>
+          <Menu.Item>Edit</Menu.Item>
+          <Menu.Item>Archive</Menu.Item>
+        </Menu.Popup>
+      </Menu.Root>,
+    );
+
+    const trigger = screen.getByRole('button', { name: 'Actions' });
+    expect(trigger).not.toHaveFocus();
+
+    trigger.focus();
+    expect(trigger).toHaveFocus();
+
+    await user.keyboard('{Enter}');
+    expect(await screen.findByRole('menu')).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Edit' })).toHaveFocus();
+
+    await user.keyboard('{Escape}');
+
+    await waitFor(() => {
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    });
+    expect(trigger).toHaveFocus();
+  });
 });

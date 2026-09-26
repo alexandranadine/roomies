@@ -179,6 +179,127 @@ test.describe('dev UI fixture', () => {
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('Escape');
     await expect(edit).toBeHidden();
+    await expect(trigger).toBeFocused();
+  });
+
+  test('Dialog closes on backdrop click', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.getByRole('button', { name: 'Open dialog' }).click();
+
+    const dialog = page.getByRole('dialog', { name: 'Example dialog' });
+    await expect(dialog).toBeVisible();
+
+    // Click the viewport outside the popup — the z-40 backdrop sits under the
+    // z-50 viewport and is not reachable in real browsers.
+    const viewport = page.locator(
+      '[role="presentation"].fixed.inset-0.z-50',
+    );
+    await viewport.click({ position: { x: 8, y: 8 } });
+    await expect(dialog).toBeHidden();
+  });
+
+  test('Dialog locks page scroll while open', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.getByRole('button', { name: 'Open dialog' }).click();
+    await expect(
+      page.getByRole('dialog', { name: 'Example dialog' }),
+    ).toBeVisible();
+
+    const lockState = await page.evaluate(() => {
+      const html = document.documentElement;
+      const body = document.body;
+      return {
+        locked: html.hasAttribute('data-base-ui-scroll-locked'),
+        htmlOverflow: getComputedStyle(html).overflowY,
+        bodyOverflow: getComputedStyle(body).overflowY,
+        htmlStyleOverflow: html.style.overflowY,
+        bodyStyleOverflow: body.style.overflowY,
+      };
+    });
+
+    expect(
+      lockState.locked ||
+        lockState.htmlOverflow === 'hidden' ||
+        lockState.bodyOverflow === 'hidden' ||
+        lockState.htmlStyleOverflow === 'hidden' ||
+        lockState.bodyStyleOverflow === 'hidden',
+    ).toBe(true);
+
+    await page.keyboard.press('Escape');
+    await expect(
+      page.getByRole('dialog', { name: 'Example dialog' }),
+    ).toBeHidden();
+
+    await expect
+      .poll(async () => {
+        const state = await page.evaluate(() => {
+          const html = document.documentElement;
+          const body = document.body;
+          return {
+            locked: html.hasAttribute('data-base-ui-scroll-locked'),
+            htmlOverflow:
+              html.style.overflowY || getComputedStyle(html).overflowY,
+            bodyOverflow:
+              body.style.overflowY || getComputedStyle(body).overflowY,
+          };
+        });
+        return (
+          !state.locked &&
+          state.htmlOverflow !== 'hidden' &&
+          state.bodyOverflow !== 'hidden'
+        );
+      })
+      .toBe(true);
+  });
+
+  test('Sheet locks page scroll while open', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.getByRole('button', { name: 'Open sheet' }).click();
+    await expect(page.getByRole('dialog', { name: 'Example sheet' })).toBeVisible();
+
+    const lockState = await page.evaluate(() => {
+      const html = document.documentElement;
+      const body = document.body;
+      return {
+        locked: html.hasAttribute('data-base-ui-scroll-locked'),
+        htmlOverflow: getComputedStyle(html).overflowY,
+        bodyOverflow: getComputedStyle(body).overflowY,
+        htmlStyleOverflow: html.style.overflowY,
+        bodyStyleOverflow: body.style.overflowY,
+      };
+    });
+
+    expect(
+      lockState.locked ||
+        lockState.htmlOverflow === 'hidden' ||
+        lockState.bodyOverflow === 'hidden' ||
+        lockState.htmlStyleOverflow === 'hidden' ||
+        lockState.bodyStyleOverflow === 'hidden',
+    ).toBe(true);
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog', { name: 'Example sheet' })).toBeHidden();
+
+    await expect
+      .poll(async () => {
+        const state = await page.evaluate(() => {
+          const html = document.documentElement;
+          const body = document.body;
+          return {
+            locked: html.hasAttribute('data-base-ui-scroll-locked'),
+            htmlOverflow:
+              html.style.overflowY || getComputedStyle(html).overflowY,
+            bodyOverflow:
+              body.style.overflowY || getComputedStyle(body).overflowY,
+          };
+        });
+        return (
+          !state.locked &&
+          state.htmlOverflow !== 'hidden' &&
+          state.bodyOverflow !== 'hidden'
+        );
+      })
+      .toBe(true);
   });
 
   test('Tabs keyboard interaction works', async ({ page }) => {
