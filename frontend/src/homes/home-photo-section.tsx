@@ -4,8 +4,10 @@ import { Alert, Button } from '../components/ui/index.js';
 import type { HomeContext } from './home-context-api.js';
 import { deleteHomePhoto, uploadHomePhoto } from './home-photo-api.js';
 import {
-  clearHomePhotoAfterDelete,
-  syncHomePhotoCaches,
+  patchHomePhotoCachesAfterDelete,
+  patchHomePhotoCachesAfterUpload,
+  reconcileHomePhotoCachesAfterDelete,
+  reconcileHomePhotoCachesAfterUpload,
 } from './home-photo-cache.js';
 import { homePhotoErrorMessage } from './home-photo-errors.js';
 import {
@@ -46,9 +48,10 @@ export function HomePhotoSection({
 
   const uploadMutation = useMutation({
     mutationFn: (file: File) => uploadHomePhoto({ homeId: home.id, file }),
-    onSuccess: async (nextHome) => {
+    onSuccess: (nextHome) => {
       setPreviewFile(null);
-      await syncHomePhotoCaches(queryClient, nextHome);
+      patchHomePhotoCachesAfterUpload(queryClient, nextHome);
+      reconcileHomePhotoCachesAfterUpload(queryClient, nextHome);
       setFeedback({ kind: 'success', text: HOME_PHOTO_UPDATED_MESSAGE });
     },
     onError: (error) => {
@@ -59,8 +62,9 @@ export function HomePhotoSection({
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteHomePhoto(home.id),
-    onSuccess: async () => {
-      await clearHomePhotoAfterDelete(queryClient, home.id);
+    onSuccess: () => {
+      patchHomePhotoCachesAfterDelete(queryClient, home.id);
+      reconcileHomePhotoCachesAfterDelete(queryClient);
       setFeedback({ kind: 'success', text: HOME_PHOTO_REMOVED_MESSAGE });
     },
     onError: (error) => {

@@ -26,32 +26,44 @@ function patchHomesList(
 }
 
 /**
- * After a successful photo mutate: update Home identity, refresh /me/homes,
- * and force the photo Blob query to change even when `hasPhoto` stays true.
+ * Synchronous authoritative cache patches after successful photo upload/finalize.
  */
-export async function syncHomePhotoCaches(
+export function patchHomePhotoCachesAfterUpload(
   queryClient: QueryClient,
   home: HomeContext,
-): Promise<void> {
+): void {
   queryClient.setQueryData(homeContextQueryKey(home.id), home);
   patchHomesList(queryClient, home.id, {
     hasPhoto: home.hasPhoto,
     name: home.name,
     timezone: home.timezone,
   });
-  await queryClient.invalidateQueries({ queryKey: currentUserHomesQueryKey });
+}
+
+/**
+ * Background reconciliation and photo-blob refresh after upload success.
+ * resetQueries clears stale Blobs synchronously; refetch runs without blocking UI.
+ */
+export function reconcileHomePhotoCachesAfterUpload(
+  queryClient: QueryClient,
+  home: HomeContext,
+): void {
+  void queryClient.invalidateQueries({ queryKey: currentUserHomesQueryKey });
   if (home.hasPhoto) {
-    await queryClient.resetQueries({ queryKey: homePhotoQueryKey(home.id) });
+    void queryClient.resetQueries({ queryKey: homePhotoQueryKey(home.id) });
     return;
   }
   queryClient.setQueryData(homePhotoQueryKey(home.id), null);
   queryClient.removeQueries({ queryKey: homePhotoQueryKey(home.id) });
 }
 
-export async function clearHomePhotoAfterDelete(
+/**
+ * Synchronous authoritative cache patches after successful photo delete.
+ */
+export function patchHomePhotoCachesAfterDelete(
   queryClient: QueryClient,
   homeId: string,
-): Promise<void> {
+): void {
   queryClient.setQueryData(
     homeContextQueryKey(homeId),
     (current: HomeContext | undefined) =>
@@ -59,6 +71,12 @@ export async function clearHomePhotoAfterDelete(
   );
   patchHomesList(queryClient, homeId, { hasPhoto: false });
   queryClient.setQueryData(homePhotoQueryKey(homeId), null);
-  await queryClient.invalidateQueries({ queryKey: currentUserHomesQueryKey });
   queryClient.removeQueries({ queryKey: homePhotoQueryKey(homeId) });
+}
+
+/** Background /me/homes reconciliation after photo delete success. */
+export function reconcileHomePhotoCachesAfterDelete(
+  queryClient: QueryClient,
+): void {
+  void queryClient.invalidateQueries({ queryKey: currentUserHomesQueryKey });
 }

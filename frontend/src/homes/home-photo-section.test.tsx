@@ -451,6 +451,300 @@ describe('Home photo management', () => {
     expect(photoGetsAfter).toBeGreaterThan(photoGetsBefore);
   });
 
+  it('settles upload UI without waiting for /me/homes refetch', async () => {
+    let homesFetchCount = 0;
+    let releaseHomesRefetch: ((response: Response) => void) | undefined;
+    let homesRefetchPending = false;
+
+    const fetchMock = vi
+      .fn()
+      .mockImplementation((url: string, init?: RequestInit) => {
+        const path = String(url);
+        const method = (init?.method ?? 'GET').toUpperCase();
+
+        if (path.endsWith('/api/v1/me')) {
+          return Promise.resolve(jsonResponse(200, { id: USER_ID }));
+        }
+        if (path.includes('/api/v1/me/homes') && method === 'GET') {
+          homesFetchCount += 1;
+          const body = [
+            {
+              id: HOME_A,
+              name: 'Oak Street',
+              timezone: 'UTC',
+              hasPhoto: homesFetchCount > 1,
+              role: 'ROOMMATE',
+            },
+          ];
+          const response = jsonResponse(200, body);
+          if (homesFetchCount > 1) {
+            homesRefetchPending = true;
+            return new Promise<Response>((resolve) => {
+              releaseHomesRefetch = resolve;
+            });
+          }
+          return Promise.resolve(response);
+        }
+        if (path.includes(`/api/v1/homes/${HOME_A}/pulse`)) {
+          return Promise.resolve(jsonResponse(200, clearHousePulse()));
+        }
+        if (
+          path.includes(`/api/v1/homes/${HOME_A}/photo/uploads`) &&
+          method === 'POST'
+        ) {
+          return Promise.resolve(
+            jsonResponse(201, {
+              uploadId: UPLOAD_ID,
+              uploadUrl: SIGNED_PUT,
+              expiresAt: '2026-09-24T00:05:00.000Z',
+              requiredHeaders: { 'Content-Type': 'image/jpeg' },
+            }),
+          );
+        }
+        if (path === SIGNED_PUT && method === 'PUT') {
+          return Promise.resolve(new Response(null, { status: 200 }));
+        }
+        if (
+          path.includes(`/api/v1/homes/${HOME_A}/photo`) &&
+          method === 'POST' &&
+          !path.includes('/uploads')
+        ) {
+          return Promise.resolve(
+            jsonResponse(200, {
+              id: HOME_A,
+              name: 'Oak Street',
+              timezone: 'UTC',
+              hasPhoto: true,
+            }),
+          );
+        }
+        if (path.includes(`/api/v1/homes/${HOME_A}/photo`) && method === 'GET') {
+          return Promise.resolve(
+            jsonResponse(200, {
+              downloadUrl: SIGNED_GET_V1,
+              contentType: 'image/webp',
+              expiresAt: '2026-09-24T00:01:00.000Z',
+            }),
+          );
+        }
+        if (path === SIGNED_GET_V1) {
+          return Promise.resolve(
+            new Response(new Uint8Array([1, 2, 3, 4]), {
+              status: 200,
+              headers: { 'Content-Type': 'image/webp' },
+            }),
+          );
+        }
+        if (
+          path.match(new RegExp(`/api/v1/homes/${HOME_A}$`)) &&
+          method === 'GET'
+        ) {
+          return Promise.resolve(
+            jsonResponse(200, {
+              id: HOME_A,
+              name: 'Oak Street',
+              timezone: 'UTC',
+              hasPhoto: false,
+            }),
+          );
+        }
+        const common = responseForCommonHomeRead(path, method);
+        if (common !== null) {
+          return Promise.resolve(common);
+        }
+        return Promise.resolve(
+          jsonResponse(404, {
+            error: { code: 'NOT_FOUND', message: 'Not found' },
+          }),
+        );
+      });
+    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(URL, 'createObjectURL').mockImplementation(
+      (blob) => `blob:size:${(blob as Blob).size}`,
+    );
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+
+    const { queryClient } = renderApp(`/homes/${HOME_A}`);
+    await openPhotoDialog();
+    queryClient.setQueryData(currentUserHomesQueryKey, [
+      {
+        id: HOME_A,
+        name: 'Oak Street',
+        timezone: 'UTC',
+        hasPhoto: false,
+        role: 'ROOMMATE' as const,
+      },
+    ]);
+
+    await userEvent.upload(
+      await screen.findByLabelText('Choose a Home photo'),
+      photoFile('image/jpeg', 16),
+    );
+
+    expect(
+      await screen.findByText(HOME_PHOTO_UPDATED_MESSAGE),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Change photo' })).not.toBeDisabled();
+    expect(
+      queryClient.getQueryData(homeContextQueryKey(HOME_A)),
+    ).toMatchObject({ hasPhoto: true });
+    expect(queryClient.getQueryData(currentUserHomesQueryKey)).toEqual([
+      expect.objectContaining({ id: HOME_A, hasPhoto: true }),
+    ]);
+    expect(homesFetchCount).toBe(2);
+    expect(homesRefetchPending).toBe(true);
+
+    releaseHomesRefetch?.(
+      jsonResponse(200, [
+        {
+          id: HOME_A,
+          name: 'Oak Street',
+          timezone: 'UTC',
+          hasPhoto: true,
+          role: 'ROOMMATE',
+        },
+      ]),
+    );
+
+    await waitFor(() => {
+      expect(homesRefetchPending).toBe(true);
+      expect(homesFetchCount).toBe(2);
+    });
+  });
+
+  it('settles delete UI without waiting for /me/homes refetch', async () => {
+    let homesFetchCount = 0;
+    let releaseHomesRefetch: ((response: Response) => void) | undefined;
+    let homesRefetchPending = false;
+
+    const fetchMock = vi
+      .fn()
+      .mockImplementation((url: string, init?: RequestInit) => {
+        const path = String(url);
+        const method = (init?.method ?? 'GET').toUpperCase();
+
+        if (path.endsWith('/api/v1/me')) {
+          return Promise.resolve(jsonResponse(200, { id: USER_ID }));
+        }
+        if (path.includes('/api/v1/me/homes') && method === 'GET') {
+          homesFetchCount += 1;
+          const body = [
+            {
+              id: HOME_A,
+              name: 'Oak Street',
+              timezone: 'UTC',
+              hasPhoto: homesFetchCount === 1,
+              role: 'ROOMMATE',
+            },
+          ];
+          const response = jsonResponse(200, body);
+          if (homesFetchCount > 1) {
+            homesRefetchPending = true;
+            return new Promise<Response>((resolve) => {
+              releaseHomesRefetch = resolve;
+            });
+          }
+          return Promise.resolve(response);
+        }
+        if (path.includes(`/api/v1/homes/${HOME_A}/pulse`)) {
+          return Promise.resolve(jsonResponse(200, clearHousePulse()));
+        }
+        if (
+          path.includes(`/api/v1/homes/${HOME_A}/photo`) &&
+          method === 'DELETE'
+        ) {
+          return Promise.resolve(new Response(null, { status: 204 }));
+        }
+        if (path.includes(`/api/v1/homes/${HOME_A}/photo`) && method === 'GET') {
+          if (homesFetchCount > 1) {
+            return Promise.resolve(new Response(null, { status: 204 }));
+          }
+          return Promise.resolve(
+            jsonResponse(200, {
+              downloadUrl: SIGNED_GET_V1,
+              contentType: 'image/webp',
+              expiresAt: '2026-09-24T00:01:00.000Z',
+            }),
+          );
+        }
+        if (path === SIGNED_GET_V1) {
+          return Promise.resolve(
+            new Response(new Uint8Array([1, 2, 3, 4]), {
+              status: 200,
+              headers: { 'Content-Type': 'image/webp' },
+            }),
+          );
+        }
+        if (
+          path.match(new RegExp(`/api/v1/homes/${HOME_A}$`)) &&
+          method === 'GET'
+        ) {
+          return Promise.resolve(
+            jsonResponse(200, {
+              id: HOME_A,
+              name: 'Oak Street',
+              timezone: 'UTC',
+              hasPhoto: true,
+            }),
+          );
+        }
+        const common = responseForCommonHomeRead(path, method);
+        if (common !== null) {
+          return Promise.resolve(common);
+        }
+        return Promise.resolve(
+          jsonResponse(404, {
+            error: { code: 'NOT_FOUND', message: 'Not found' },
+          }),
+        );
+      });
+    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:committed');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+
+    const { queryClient } = renderApp(`/homes/${HOME_A}`);
+    await openPhotoDialog();
+    queryClient.setQueryData(currentUserHomesQueryKey, [
+      {
+        id: HOME_A,
+        name: 'Oak Street',
+        timezone: 'UTC',
+        hasPhoto: true,
+        role: 'ROOMMATE' as const,
+      },
+    ]);
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Remove photo' }),
+    );
+
+    expect(
+      await screen.findByText(HOME_PHOTO_REMOVED_MESSAGE),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add photo' })).not.toBeDisabled();
+    expect(
+      queryClient.getQueryData(homeContextQueryKey(HOME_A)),
+    ).toMatchObject({ hasPhoto: false });
+    expect(queryClient.getQueryData(currentUserHomesQueryKey)).toEqual([
+      expect.objectContaining({ id: HOME_A, hasPhoto: false }),
+    ]);
+    expect(queryClient.getQueryData(homePhotoQueryKey(HOME_A)) ?? null).toBeNull();
+    expect(homesFetchCount).toBe(2);
+    expect(homesRefetchPending).toBe(true);
+
+    releaseHomesRefetch?.(
+      jsonResponse(200, [
+        {
+          id: HOME_A,
+          name: 'Oak Street',
+          timezone: 'UTC',
+          hasPhoto: false,
+          role: 'ROOMMATE',
+        },
+      ]),
+    );
+  });
+
   it('clears the photo after a successful delete', async () => {
     stubPhotoHome({ role: 'ROOMMATE', hasPhoto: true });
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:committed');
