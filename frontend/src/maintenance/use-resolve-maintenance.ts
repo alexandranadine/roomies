@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { activityKeys } from '../activity/activity-query-keys.js';
 import { ApiError } from '../platform/api/index.js';
 import { pulseKeys } from '../pulse/pulse-query-keys.js';
 import {
@@ -17,7 +18,7 @@ export type ResolveMaintenanceVariables = {
  * Resolves a visible OPEN Maintenance entry.
  * On 404: clears the detail cache so protected content cannot linger.
  * On success: seeds detail + list caches from the response and invalidates
- * same-Home lists + Pulse in the background.
+ * same-Home lists, Pulse, and Activity in the background.
  */
 export function useResolveMaintenance() {
   const queryClient = useQueryClient();
@@ -40,6 +41,9 @@ export function useResolveMaintenance() {
       });
       void queryClient.invalidateQueries({
         queryKey: pulseKeys.all(variables.homeId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: activityKeys.list(variables.homeId),
       });
     },
     onError: (error, variables) => {

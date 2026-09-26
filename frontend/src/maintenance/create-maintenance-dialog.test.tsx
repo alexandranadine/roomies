@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { homeMembershipsKeys } from '../homes/home-memberships-query-keys.js';
 import { resetApiClientForTests } from '../platform/api/index.js';
+import { activityKeys } from '../activity/activity-query-keys.js';
 import { pulseKeys } from '../pulse/pulse-query-keys.js';
 import { clearHousePulse } from '../pulse/test-fixtures.js';
 import { renderApp } from '../test/render.js';
@@ -447,6 +448,10 @@ describe('Maintenance create UI', () => {
       },
     });
     const { queryClient } = renderApp(`/homes/${TEST_HOME_A}/maintenance`);
+    queryClient.setQueryData(activityKeys.list(TEST_HOME_A), {
+      pages: [],
+      pageParams: [],
+    });
     await openCreateDialog();
     const dialog = screen.getByRole('dialog');
     await userEvent.type(
@@ -463,9 +468,12 @@ describe('Maintenance create UI', () => {
       maintenanceKeys.list(TEST_HOME_A, {}),
     );
     expect(list?.pages.flatMap((page) => page.items)).toEqual([]);
+    expect(
+      queryClient.getQueryState(activityKeys.list(TEST_HOME_A))?.isInvalidated,
+    ).not.toBe(true);
   });
 
-  it('invalidates same-Home list and Pulse only and has no Admin PRIVATE special case', async () => {
+  it('invalidates same-Home list, Pulse, and Activity only and has no Admin PRIVATE special case', async () => {
     const created = detailFromListItem(
       { ...FIXTURE_H, id: CREATED_ID, title: 'Created' },
       null,
@@ -492,6 +500,17 @@ describe('Maintenance create UI', () => {
     queryClient.setQueryData(pulseKeys.all(TEST_HOME_B), clearHousePulse());
     const otherPulseBefore = queryClient.getQueryState(
       pulseKeys.all(TEST_HOME_B),
+    )?.dataUpdatedAt;
+    queryClient.setQueryData(activityKeys.list(TEST_HOME_A), {
+      pages: [],
+      pageParams: [],
+    });
+    queryClient.setQueryData(activityKeys.list(TEST_HOME_B), {
+      pages: [],
+      pageParams: [],
+    });
+    const otherActivityBefore = queryClient.getQueryState(
+      activityKeys.list(TEST_HOME_B),
     )?.dataUpdatedAt;
 
     await openCreateDialog();
@@ -521,12 +540,21 @@ describe('Maintenance create UI', () => {
       expect(
         queryClient.getQueryState(pulseKeys.all(TEST_HOME_A))?.isInvalidated,
       ).toBe(true);
+      expect(
+        queryClient.getQueryState(activityKeys.list(TEST_HOME_A))?.isInvalidated,
+      ).toBe(true);
     });
     expect(
       queryClient.getQueryState(pulseKeys.all(TEST_HOME_B))?.dataUpdatedAt,
     ).toBe(otherPulseBefore);
     expect(
       queryClient.getQueryState(pulseKeys.all(TEST_HOME_B))?.isInvalidated,
+    ).not.toBe(true);
+    expect(
+      queryClient.getQueryState(activityKeys.list(TEST_HOME_B))?.dataUpdatedAt,
+    ).toBe(otherActivityBefore);
+    expect(
+      queryClient.getQueryState(activityKeys.list(TEST_HOME_B))?.isInvalidated,
     ).not.toBe(true);
   });
 

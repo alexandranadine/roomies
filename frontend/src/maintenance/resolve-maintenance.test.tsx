@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { resetApiClientForTests } from '../platform/api/index.js';
+import { activityKeys } from '../activity/activity-query-keys.js';
 import { pulseKeys } from '../pulse/pulse-query-keys.js';
 import { clearHousePulse } from '../pulse/test-fixtures.js';
 import { renderApp } from '../test/render.js';
@@ -59,7 +60,7 @@ describe('Maintenance resolve UI', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('POSTs resolve with {} and updates detail + same-Home lists and Pulse only', async () => {
+  it('POSTs resolve with {} and updates detail + same-Home lists, Pulse, and Activity only', async () => {
     const resolved = detailFromListItem(
       {
         ...FIXTURE_H,
@@ -114,6 +115,17 @@ describe('Maintenance resolve UI', () => {
     const otherPulseBefore = queryClient.getQueryState(
       pulseKeys.all(TEST_HOME_B),
     )?.dataUpdatedAt;
+    queryClient.setQueryData(activityKeys.list(TEST_HOME_A), {
+      pages: [],
+      pageParams: [],
+    });
+    queryClient.setQueryData(activityKeys.list(TEST_HOME_B), {
+      pages: [],
+      pageParams: [],
+    });
+    const otherActivityBefore = queryClient.getQueryState(
+      activityKeys.list(TEST_HOME_B),
+    )?.dataUpdatedAt;
 
     const button = await screen.findByRole('button', { name: 'Mark resolved' });
     await userEvent.click(button);
@@ -141,12 +153,21 @@ describe('Maintenance resolve UI', () => {
       expect(
         queryClient.getQueryState(pulseKeys.all(TEST_HOME_A))?.isInvalidated,
       ).toBe(true);
+      expect(
+        queryClient.getQueryState(activityKeys.list(TEST_HOME_A))?.isInvalidated,
+      ).toBe(true);
     });
     expect(
       queryClient.getQueryState(pulseKeys.all(TEST_HOME_B))?.dataUpdatedAt,
     ).toBe(otherPulseBefore);
     expect(
       queryClient.getQueryState(pulseKeys.all(TEST_HOME_B))?.isInvalidated,
+    ).not.toBe(true);
+    expect(
+      queryClient.getQueryState(activityKeys.list(TEST_HOME_B))?.dataUpdatedAt,
+    ).toBe(otherActivityBefore);
+    expect(
+      queryClient.getQueryState(activityKeys.list(TEST_HOME_B))?.isInvalidated,
     ).not.toBe(true);
     expect(
       screen.queryByRole('button', { name: 'Mark resolved' }),

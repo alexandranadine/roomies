@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { activityKeys } from '../activity/activity-query-keys.js';
 import { pulseKeys } from '../pulse/pulse-query-keys.js';
 import {
   createMaintenanceEntry,
@@ -16,7 +17,7 @@ export type CreateMaintenanceVariables = {
 /**
  * Creates a Maintenance entry for one Home.
  * On success: seeds detail + list caches from the response and invalidates
- * same-Home lists + Pulse in the background.
+ * same-Home lists, Pulse, and Activity in the background.
  */
 export function useCreateMaintenance() {
   const queryClient = useQueryClient();
@@ -39,6 +40,9 @@ export function useCreateMaintenance() {
       });
       void queryClient.invalidateQueries({
         queryKey: pulseKeys.all(variables.homeId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: activityKeys.list(variables.homeId),
       });
     },
     retry: false,
