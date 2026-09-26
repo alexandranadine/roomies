@@ -6,6 +6,7 @@ import {
   currentUserQueryKey,
 } from '../homes/home-query-keys.js';
 import { resetApiClientForTests } from '../platform/api/index.js';
+import { holdMatchingFetches } from '../test/hold-matching-fetch.js';
 import { renderApp } from '../test/render.js';
 import { FORMER_ROOMMATE_LABEL } from './activity-copy.js';
 import { formatActivityTimestamp } from './activity-format.js';
@@ -669,6 +670,10 @@ describe('Activity pagination', () => {
     const loadMore = await screen.findByRole('button', { name: 'Load more' });
     await user.click(loadMore);
     expect(loadMore).toBeDisabled();
+    expect(screen.getByText('Take out trash')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('status', { name: 'Loading' }),
+    ).not.toBeInTheDocument();
     await user.click(loadMore);
 
     await waitFor(() => {
@@ -735,5 +740,151 @@ describe('Activity Home isolation', () => {
     expect(
       queryClient.getQueryData(activityKeys.list(TEST_HOME_B)),
     ).toBeDefined();
+  });
+});
+
+function isHomeActivityList(url: URL, method: string): boolean {
+  return (
+    method === 'GET' &&
+    /^\/api\/v1\/homes\/[^/]+\/activity$/i.test(url.pathname)
+  );
+}
+
+describe('Activity empty vs background refetch', () => {
+  it('shows an announced skeleton on initial load, not the empty state', async () => {
+    const fetchMock = stubActivityApis({
+      listByHome: {
+        [TEST_HOME_A]: listPage([]),
+      },
+    });
+    const hold = holdMatchingFetches(fetchMock, isHomeActivityList, {
+      fromCall: 1,
+    });
+    renderApp(`/homes/${TEST_HOME_A}/activity`);
+
+    expect(
+      await screen.findByRole('status', { name: 'Loading' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Nothing here yet.' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('list', { name: 'Home activity' }),
+    ).not.toBeInTheDocument();
+
+    hold.releaseHold();
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Nothing here yet.',
+        level: 2,
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the empty state visible during a background refetch', async () => {
+    const fetchMock = stubActivityApis({
+      listByHome: {
+        [TEST_HOME_A]: listPage([]),
+      },
+    });
+    const hold = holdMatchingFetches(fetchMock, isHomeActivityList);
+    const { queryClient } = renderApp(`/homes/${TEST_HOME_A}/activity`);
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Nothing here yet.',
+        level: 2,
+      }),
+    ).toBeInTheDocument();
+
+    void queryClient.invalidateQueries({
+      queryKey: activityKeys.list(TEST_HOME_A),
+    });
+    await waitFor(() => {
+      expect(hold.matchingCalls).toBeGreaterThan(1);
+    });
+
+    expect(
+      screen.getByRole('heading', { name: 'Nothing here yet.', level: 2 }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Household activity will show up here.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('status', { name: 'Loading' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('list', { name: 'Home activity' }),
+    ).not.toBeInTheDocument();
+
+    hold.releaseHold();
+  });
+
+  it('keeps existing rows visible during a background refetch', async () => {
+    const fetchMock = stubActivityApis({
+      listByHome: {
+        [TEST_HOME_A]: listPage([FIXTURE_TASK_TITLED]),
+      },
+    });
+    const hold = holdMatchingFetches(fetchMock, isHomeActivityList);
+    const { queryClient } = renderApp(`/homes/${TEST_HOME_A}/activity`);
+
+    expect(await screen.findByText('Take out trash')).toBeInTheDocument();
+
+    void queryClient.invalidateQueries({
+      queryKey: activityKeys.list(TEST_HOME_A),
+    });
+    await waitFor(() => {
+      expect(hold.matchingCalls).toBeGreaterThan(1);
+    });
+
+    expect(screen.getByText('Take out trash')).toBeInTheDocument();
+    expect(
+      screen.getByRole('list', { name: 'Home activity' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('status', { name: 'Loading' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Nothing here yet.' }),
+    ).not.toBeInTheDocument();
+
+    hold.releaseHold();
+  });
+
+  it('keeps cached rows visible when a background refetch fails', async () => {
+    let listCalls = 0;
+    stubActivityApis({
+      listByHome: {
+        [TEST_HOME_A]: () => {
+          listCalls += 1;
+          if (listCalls > 1) {
+            return {
+              status: 500,
+              body: {
+                error: {
+                  code: 'INTERNAL_ERROR',
+                  message: 'cursor abc123 leaked',
+                },
+              },
+            };
+          }
+          return listPage([FIXTURE_TASK_TITLED]);
+        },
+      },
+    });
+    const { queryClient } = renderApp(`/homes/${TEST_HOME_A}/activity`);
+
+    expect(await screen.findByText('Take out trash')).toBeInTheDocument();
+
+    await queryClient.invalidateQueries({
+      queryKey: activityKeys.list(TEST_HOME_A),
+    });
+
+    expect(
+      await screen.findByText(/Couldn’t load activity/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Take out trash')).toBeInTheDocument();
+    expect(screen.queryByText(/cursor abc123 leaked/i)).not.toBeInTheDocument();
   });
 });

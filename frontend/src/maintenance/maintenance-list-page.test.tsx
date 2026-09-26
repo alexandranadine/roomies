@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { resetApiClientForTests } from '../platform/api/index.js';
+import { holdMatchingFetches } from '../test/hold-matching-fetch.js';
 import { renderApp } from '../test/render.js';
 import { maintenanceKeys } from './maintenance-query-keys.js';
 import {
@@ -420,6 +421,209 @@ describe('Maintenance list page', () => {
     expect(await screen.findByText('Private')).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: /Quiet leak under sink/i }),
+    ).toBeInTheDocument();
+  });
+});
+
+function isMaintenanceList(url: URL, method: string): boolean {
+  return (
+    method === 'GET' &&
+    /^\/api\/v1\/homes\/[^/]+\/maintenance$/i.test(url.pathname)
+  );
+}
+
+describe('Maintenance empty vs background refetch', () => {
+  it('shows an announced skeleton on initial load, not the empty state', async () => {
+    const fetchMock = stubMaintenanceApis({
+      listByHome: {
+        [TEST_HOME_A]: listPage([]),
+      },
+    });
+    const hold = holdMatchingFetches(fetchMock, isMaintenanceList, {
+      fromCall: 1,
+    });
+    renderApp(`/homes/${TEST_HOME_A}/maintenance`);
+
+    expect(
+      await screen.findByRole('status', { name: 'Loading' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', {
+        name: 'Nothing needs attention right now.',
+      }),
+    ).not.toBeInTheDocument();
+
+    hold.releaseHold();
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Nothing needs attention right now.',
+        level: 2,
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the empty state visible during a background refetch', async () => {
+    const fetchMock = stubMaintenanceApis({
+      listByHome: {
+        [TEST_HOME_A]: listPage([]),
+      },
+    });
+    const hold = holdMatchingFetches(fetchMock, isMaintenanceList);
+    const { queryClient } = renderApp(`/homes/${TEST_HOME_A}/maintenance`);
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Nothing needs attention right now.',
+        level: 2,
+      }),
+    ).toBeInTheDocument();
+
+    void queryClient.invalidateQueries({
+      queryKey: [...maintenanceKeys.all(TEST_HOME_A), 'list'],
+    });
+    await waitFor(() => {
+      expect(hold.matchingCalls).toBeGreaterThan(1);
+    });
+
+    expect(
+      screen.getByRole('heading', {
+        name: 'Nothing needs attention right now.',
+        level: 2,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Household maintenance items will show up here.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('status', { name: 'Loading' }),
+    ).not.toBeInTheDocument();
+
+    hold.releaseHold();
+  });
+
+  it('keeps existing rows visible during a background refetch', async () => {
+    const fetchMock = stubMaintenanceApis({
+      listByHome: {
+        [TEST_HOME_A]: listPage([FIXTURE_H]),
+      },
+    });
+    const hold = holdMatchingFetches(fetchMock, isMaintenanceList);
+    const { queryClient } = renderApp(`/homes/${TEST_HOME_A}/maintenance`);
+
+    expect(
+      await screen.findByRole('link', { name: /Replace furnace filter/i }),
+    ).toBeInTheDocument();
+
+    void queryClient.invalidateQueries({
+      queryKey: [...maintenanceKeys.all(TEST_HOME_A), 'list'],
+    });
+    await waitFor(() => {
+      expect(hold.matchingCalls).toBeGreaterThan(1);
+    });
+
+    expect(
+      screen.getByRole('link', { name: /Replace furnace filter/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('status', { name: 'Loading' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', {
+        name: 'Nothing needs attention right now.',
+      }),
+    ).not.toBeInTheDocument();
+
+    hold.releaseHold();
+  });
+
+  it('keeps cached rows visible when a background refetch fails', async () => {
+    let listCalls = 0;
+    stubMaintenanceApis({
+      listByHome: {
+        [TEST_HOME_A]: () => {
+          listCalls += 1;
+          if (listCalls > 1) {
+            return {
+              status: 500,
+              body: {
+                error: {
+                  code: 'INTERNAL_ERROR',
+                  message: 'PRIVATE audience membership leaked',
+                },
+              },
+            };
+          }
+          return listPage([FIXTURE_H]);
+        },
+      },
+    });
+    const { queryClient } = renderApp(`/homes/${TEST_HOME_A}/maintenance`);
+
+    expect(
+      await screen.findByRole('link', { name: /Replace furnace filter/i }),
+    ).toBeInTheDocument();
+
+    await queryClient.invalidateQueries({
+      queryKey: [...maintenanceKeys.all(TEST_HOME_A), 'list'],
+    });
+
+    expect(
+      await screen.findByText(/Couldn’t load maintenance/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /Replace furnace filter/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/PRIVATE audience membership leaked/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps loaded rows visible while Load more is pending', async () => {
+    const user = userEvent.setup();
+    const fetchMock = stubMaintenanceApis({
+      listByHome: {
+        [TEST_HOME_A]: (url) => {
+          const cursor = url.searchParams.get('cursor');
+          if (cursor === 'cursor-page-2') {
+            return listPage([FIXTURE_R], { hasMore: false, nextCursor: null });
+          }
+          return listPage([FIXTURE_H], {
+            hasMore: true,
+            nextCursor: 'cursor-page-2',
+          });
+        },
+      },
+    });
+    const hold = holdMatchingFetches(
+      fetchMock,
+      (url, method) =>
+        isMaintenanceList(url, method) && url.searchParams.has('cursor'),
+      { fromCall: 1 },
+    );
+    renderApp(`/homes/${TEST_HOME_A}/maintenance`);
+
+    expect(
+      await screen.findByRole('link', { name: /Replace furnace filter/i }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Load more' }));
+    await waitFor(() => {
+      expect(hold.matchingCalls).toBeGreaterThan(0);
+    });
+
+    expect(
+      screen.getByRole('link', { name: /Replace furnace filter/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Load more' }),
+    ).toBeDisabled();
+    expect(
+      screen.queryByRole('status', { name: 'Loading' }),
+    ).not.toBeInTheDocument();
+
+    hold.releaseHold();
+    expect(
+      await screen.findByRole('link', { name: /Fixed hallway light/i }),
     ).toBeInTheDocument();
   });
 });

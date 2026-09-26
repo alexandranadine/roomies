@@ -30,8 +30,8 @@ export function HomeActivityFeed({ homeId }: HomeActivityFeedProps) {
       : listQuery.data.pages.flatMap((page) => page.items);
 
   const showLoading = listQuery.isPending && listQuery.data === undefined;
-  const showEmpty =
-    listQuery.isSuccess && items.length === 0 && !listQuery.isFetching;
+  // Successful empty stays visible during background refetch (`isFetching`).
+  const showEmpty = listQuery.isSuccess && items.length === 0;
   const lastPage =
     listQuery.data?.pages[listQuery.data.pages.length - 1] ?? undefined;
   const canLoadMore =

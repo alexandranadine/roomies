@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { resetApiClientForTests } from '../platform/api/index.js';
 import { currentUserQueryKey } from '../homes/home-query-keys.js';
+import { holdMatchingFetches } from '../test/hold-matching-fetch.js';
 import { renderApp } from '../test/render.js';
 import { READ_IN_CACHE_PLACEHOLDER } from './notifications-list-cache.js';
 import { notificationKeys } from './notifications-query-keys.js';
@@ -761,5 +762,191 @@ describe('Notification interactions', () => {
     );
     expect(maintenanceCalls).toHaveLength(0);
     assertNoIdentityLeaks();
+  });
+});
+
+function isNotificationsList(url: URL, method: string): boolean {
+  return method === 'GET' && url.pathname === '/api/v1/notifications';
+}
+
+describe('Notifications empty vs background refetch', () => {
+  it('shows an announced skeleton on initial load, not the empty state', async () => {
+    const fetchMock = stubNotificationsApis({ list: listPage([]) });
+    const hold = holdMatchingFetches(fetchMock, isNotificationsList, {
+      fromCall: 1,
+    });
+    renderApp('/notifications');
+
+    expect(
+      await screen.findByRole('status', { name: 'Loading' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'You’re all caught up.' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('list', { name: 'Notifications' }),
+    ).not.toBeInTheDocument();
+
+    hold.releaseHold();
+    expect(
+      await screen.findByRole('heading', {
+        name: 'You’re all caught up.',
+        level: 2,
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the empty inbox visible during a background refetch', async () => {
+    const fetchMock = stubNotificationsApis({ list: listPage([]) });
+    const hold = holdMatchingFetches(fetchMock, isNotificationsList);
+    const { queryClient } = renderApp('/notifications');
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'You’re all caught up.',
+        level: 2,
+      }),
+    ).toBeInTheDocument();
+
+    void queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+    await waitFor(() => {
+      expect(hold.matchingCalls).toBeGreaterThan(1);
+    });
+
+    expect(
+      screen.getByRole('heading', { name: 'You’re all caught up.', level: 2 }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Household updates will show up here.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('status', { name: 'Loading' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('list', { name: 'Notifications' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Notifications' }),
+    ).toBeInTheDocument();
+
+    hold.releaseHold();
+  });
+
+  it('keeps existing rows and bell count visible during a background refetch', async () => {
+    const fetchMock = stubNotificationsApis({
+      list: listPage([FIXTURE_TASK_TITLED, FIXTURE_ROLE_CHANGED, FIXTURE_READ_TASK]),
+    });
+    const hold = holdMatchingFetches(fetchMock, isNotificationsList);
+    const { queryClient } = renderApp('/notifications');
+
+    const list = await screen.findByRole('list', { name: 'Notifications' });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(3);
+    expect(
+      screen.getByRole('link', { name: 'Notifications, 2 unread' }),
+    ).toBeInTheDocument();
+
+    void queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+    await waitFor(() => {
+      expect(hold.matchingCalls).toBeGreaterThan(1);
+    });
+
+    expect(within(list).getAllByRole('listitem')).toHaveLength(3);
+    expect(
+      screen.getByRole('link', { name: 'Notifications, 2 unread' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('status', { name: 'Loading' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'You’re all caught up.' }),
+    ).not.toBeInTheDocument();
+
+    hold.releaseHold();
+  });
+
+  it('keeps cached rows visible when a background refetch fails', async () => {
+    let listCalls = 0;
+    stubNotificationsApis({
+      list: () => {
+        listCalls += 1;
+        if (listCalls > 1) {
+          return {
+            status: 500,
+            body: {
+              error: {
+                code: 'INTERNAL_ERROR',
+                message: 'cursor abc123 leaked',
+              },
+            },
+          };
+        }
+        return listPage([FIXTURE_TASK_TITLED]);
+      },
+    });
+    const { queryClient } = renderApp('/notifications');
+
+    expect(
+      await screen.findByText('Alex completed a task assigned to you'),
+    ).toBeInTheDocument();
+
+    await queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+
+    expect(
+      await screen.findByText(/Couldn’t load notifications/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Alex completed a task assigned to you'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/cursor abc123 leaked/i)).not.toBeInTheDocument();
+  });
+
+  it('keeps loaded rows visible while Load more is pending', async () => {
+    const user = userEvent.setup();
+    const fetchMock = stubNotificationsApis({
+      list: (url) => {
+        const cursor = url.searchParams.get('cursor');
+        if (cursor === 'cursor-page-2') {
+          return listPage([FIXTURE_SUPPLY_TITLED], {
+            hasMore: false,
+            nextCursor: null,
+          });
+        }
+        return listPage([FIXTURE_TASK_TITLED], {
+          hasMore: true,
+          nextCursor: 'cursor-page-2',
+        });
+      },
+    });
+    const hold = holdMatchingFetches(
+      fetchMock,
+      (url, method) =>
+        isNotificationsList(url, method) && url.searchParams.has('cursor'),
+      { fromCall: 1 },
+    );
+    renderApp('/notifications');
+
+    expect(
+      await screen.findByText('Alex completed a task assigned to you'),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Load more' }));
+    await waitFor(() => {
+      expect(hold.matchingCalls).toBeGreaterThan(0);
+    });
+
+    expect(
+      screen.getByText('Alex completed a task assigned to you'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Load more' }),
+    ).toBeDisabled();
+    expect(
+      screen.queryByRole('status', { name: 'Loading' }),
+    ).not.toBeInTheDocument();
+
+    hold.releaseHold();
+    expect(
+      await screen.findByText('Alex picked up a supply you added'),
+    ).toBeInTheDocument();
   });
 });
