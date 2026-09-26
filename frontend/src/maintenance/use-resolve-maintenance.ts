@@ -5,6 +5,7 @@ import {
   resolveMaintenanceEntry,
   type MaintenanceDetail,
 } from './maintenance-api.js';
+import { seedMaintenanceListCachesAfterResolve } from './maintenance-list-cache.js';
 import { maintenanceKeys } from './maintenance-query-keys.js';
 
 export type ResolveMaintenanceVariables = {
@@ -15,7 +16,8 @@ export type ResolveMaintenanceVariables = {
 /**
  * Resolves a visible OPEN Maintenance entry.
  * On 404: clears the detail cache so protected content cannot linger.
- * On success: invalidates same-Home lists + Pulse.
+ * On success: seeds detail + list caches from the response and invalidates
+ * same-Home lists + Pulse in the background.
  */
 export function useResolveMaintenance() {
   const queryClient = useQueryClient();
@@ -26,6 +28,11 @@ export function useResolveMaintenance() {
     onSuccess: (resolved: MaintenanceDetail, variables) => {
       queryClient.setQueryData(
         maintenanceKeys.detail(variables.homeId, variables.maintenanceEntryId),
+        resolved,
+      );
+      seedMaintenanceListCachesAfterResolve(
+        queryClient,
+        variables.homeId,
         resolved,
       );
       void queryClient.invalidateQueries({

@@ -1,10 +1,11 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { resetApiClientForTests } from '../platform/api/index.js';
 import { pulseKeys } from '../pulse/pulse-query-keys.js';
 import { clearHousePulse } from '../pulse/test-fixtures.js';
 import { renderApp } from '../test/render.js';
+import type { MaintenanceListInfiniteData } from './maintenance-list-cache.js';
 import { maintenanceKeys } from './maintenance-query-keys.js';
 import {
   detailFromListItem,
@@ -94,6 +95,13 @@ describe('Maintenance resolve UI', () => {
     const { queryClient } = renderApp(
       `/homes/${TEST_HOME_A}/maintenance/${FIXTURE_H.id}`,
     );
+    queryClient.setQueryData<MaintenanceListInfiniteData>(
+      maintenanceKeys.list(TEST_HOME_A, {}),
+      {
+        pages: [listPage([FIXTURE_H])],
+        pageParams: [undefined],
+      },
+    );
     await queryClient.fetchQuery({
       queryKey: maintenanceKeys.list(TEST_HOME_B, {}),
       queryFn: () => Promise.resolve(listPage([])),
@@ -119,6 +127,12 @@ describe('Maintenance resolve UI', () => {
         maintenanceKeys.detail(TEST_HOME_A, FIXTURE_H.id),
       ),
     ).toEqual(resolved);
+    const list = queryClient.getQueryData<MaintenanceListInfiniteData>(
+      maintenanceKeys.list(TEST_HOME_A, {}),
+    );
+    expect(
+      list?.pages[0]?.items.find((row) => row.id === FIXTURE_H.id)?.status,
+    ).toBe('RESOLVED');
     expect(
       queryClient.getQueryState(maintenanceKeys.list(TEST_HOME_B, {}))
         ?.dataUpdatedAt,
@@ -225,6 +239,51 @@ describe('Maintenance resolve UI', () => {
         maintenanceKeys.detail(TEST_HOME_A, FIXTURE_A.id),
       ),
     ).toBeUndefined();
+  });
+
+  it('reflects resolve on the list page before list refetch completes', async () => {
+    const user = userEvent.setup();
+    const resolved = detailFromListItem(
+      {
+        ...FIXTURE_H,
+        status: 'RESOLVED',
+        resolvedAt: '2026-09-13T12:00:00.000Z',
+        resolvedByMembershipId: FIXTURE_H.createdByMembershipId,
+        updatedAt: '2026-09-13T12:00:00.000Z',
+      },
+      null,
+    );
+    stubMaintenanceApis({
+      listByHome: {
+        [TEST_HOME_A]: listPage([FIXTURE_H]),
+      },
+      detailByKey: {
+        [detailCacheKey(TEST_HOME_A, FIXTURE_H.id)]: detailFromListItem(
+          FIXTURE_H,
+          null,
+        ),
+      },
+      resolveByKey: {
+        [detailCacheKey(TEST_HOME_A, FIXTURE_H.id)]: resolved,
+      },
+      listDelayMs: 2_000,
+    });
+    const { router } = renderApp(`/homes/${TEST_HOME_A}/maintenance`);
+    await user.click(
+      await screen.findByRole('link', { name: /Replace furnace filter/i }, {
+        timeout: 5_000,
+      }),
+    );
+    await user.click(
+      await screen.findByRole('button', { name: 'Mark resolved' }),
+    );
+    await screen.findByText('Resolved');
+
+    await router.navigate(`/homes/${TEST_HOME_A}/maintenance`);
+    const row = await screen.findByRole('link', {
+      name: /Replace furnace filter/i,
+    });
+    expect(within(row).getByText('Resolved')).toBeInTheDocument();
   });
 
   it('does not role-gate Resolve or disclose audience', async () => {

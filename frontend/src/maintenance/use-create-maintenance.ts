@@ -5,6 +5,7 @@ import {
   type CreateMaintenanceBody,
   type MaintenanceDetail,
 } from './maintenance-api.js';
+import { seedMaintenanceListCachesAfterCreate } from './maintenance-list-cache.js';
 import { maintenanceKeys } from './maintenance-query-keys.js';
 
 export type CreateMaintenanceVariables = {
@@ -14,7 +15,8 @@ export type CreateMaintenanceVariables = {
 
 /**
  * Creates a Maintenance entry for one Home.
- * On success: seeds detail cache and invalidates same-Home lists + Pulse.
+ * On success: seeds detail + list caches from the response and invalidates
+ * same-Home lists + Pulse in the background.
  */
 export function useCreateMaintenance() {
   const queryClient = useQueryClient();
@@ -25,6 +27,11 @@ export function useCreateMaintenance() {
     onSuccess: (created: MaintenanceDetail, variables) => {
       queryClient.setQueryData(
         maintenanceKeys.detail(variables.homeId, created.id),
+        created,
+      );
+      seedMaintenanceListCachesAfterCreate(
+        queryClient,
+        variables.homeId,
         created,
       );
       void queryClient.invalidateQueries({

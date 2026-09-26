@@ -6,6 +6,7 @@ import { resetApiClientForTests } from '../platform/api/index.js';
 import { pulseKeys } from '../pulse/pulse-query-keys.js';
 import { clearHousePulse } from '../pulse/test-fixtures.js';
 import { renderApp } from '../test/render.js';
+import type { MaintenanceListInfiniteData } from './maintenance-list-cache.js';
 import { maintenanceKeys } from './maintenance-query-keys.js';
 import {
   detailFromListItem,
@@ -391,6 +392,77 @@ describe('Maintenance create UI', () => {
       within(dialog).getByRole('textbox', { name: /details/i }),
     ).toHaveValue('Draft notes');
     expect(lastCreateBody(fetchMock).title).toBe('Keep me');
+  });
+
+  it('shows the created row immediately without waiting for list refetch', async () => {
+    const created = detailFromListItem(
+      { ...FIXTURE_H, id: CREATED_ID, title: 'Created fast' },
+      null,
+    );
+    stubMaintenanceApis({
+      listByHome: {
+        [TEST_HOME_A]: listPage([]),
+      },
+      createByHome: { [TEST_HOME_A]: created },
+      listDelayMs: 2_000,
+    });
+    renderApp(`/homes/${TEST_HOME_A}/maintenance`);
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Nothing needs attention right now.',
+        level: 2,
+      }, { timeout: 5_000 }),
+    ).toBeInTheDocument();
+
+    await openCreateDialog();
+    const dialog = screen.getByRole('dialog');
+    await userEvent.type(
+      within(dialog).getByRole('textbox', { name: /title/i }),
+      'Created fast',
+    );
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Add maintenance' }),
+    );
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    expect(
+      await screen.findByRole('link', { name: /Created fast/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('does not seed list cache when create fails', async () => {
+    stubMaintenanceApis({
+      listByHome: {
+        [TEST_HOME_A]: listPage([]),
+      },
+      createByHome: {
+        [TEST_HOME_A]: {
+          status: 400,
+          body: {
+            error: { code: 'INVALID_REQUEST', message: 'bad' },
+          },
+        },
+      },
+    });
+    const { queryClient } = renderApp(`/homes/${TEST_HOME_A}/maintenance`);
+    await openCreateDialog();
+    const dialog = screen.getByRole('dialog');
+    await userEvent.type(
+      within(dialog).getByRole('textbox', { name: /title/i }),
+      'Nope',
+    );
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Add maintenance' }),
+    );
+    expect(
+      await screen.findByText(/Couldn’t create this item/),
+    ).toBeInTheDocument();
+    const list = queryClient.getQueryData<MaintenanceListInfiniteData>(
+      maintenanceKeys.list(TEST_HOME_A, {}),
+    );
+    expect(list?.pages.flatMap((page) => page.items)).toEqual([]);
   });
 
   it('invalidates same-Home list and Pulse only and has no Admin PRIVATE special case', async () => {
