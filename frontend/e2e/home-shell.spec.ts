@@ -309,6 +309,24 @@ test.describe('Home shell Phase 1', () => {
     ).toBeVisible();
   });
 
+  test('Maintenance is available from the add action sheet', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`/homes/${HOME_A}`);
+    await page.getByRole('button', { name: 'Add to this Home' }).click();
+    const sheet = page.getByRole('dialog', { name: 'Add to this Home' });
+    const maintenance = sheet.getByRole('link', { name: 'Maintenance' });
+    await expect(maintenance).toBeVisible();
+    await expect(maintenance).toHaveAttribute(
+      'href',
+      `/homes/${HOME_A}/maintenance`,
+    );
+    await maintenance.click();
+    await expect(page).toHaveURL(`/homes/${HOME_A}/maintenance`);
+    await expect(
+      page.getByRole('heading', { name: 'Maintenance', level: 1 }),
+    ).toBeVisible();
+  });
+
   test('Home axe scan (serious/critical)', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`/homes/${HOME_A}`);

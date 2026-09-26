@@ -114,7 +114,6 @@ describe('pulse copy', () => {
     ]);
     expect(barPulseMetrics(pulse).map((metric) => metric.label)).toEqual([
       'Due today',
-      'Supplies',
     ]);
     expect(pulseOverallState(pulse)).toBe('ACTIVE');
   });

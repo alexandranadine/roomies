@@ -2,13 +2,16 @@ import {
   CameraIcon,
   ClipboardDocumentCheckIcon,
   UserPlusIcon,
+  WrenchScrewdriverIcon,
 } from '@heroicons/react/20/solid';
+import { Link } from 'react-router';
 import { Sheet } from '../components/ui/index.js';
 import type { HeroIcon } from './home-nav.js';
 
 export type HomeActionSheetProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  homeId: string;
   isAdmin: boolean;
   hasPhoto: boolean;
   onAddTask: () => void;
@@ -16,18 +19,24 @@ export type HomeActionSheetProps = {
   onHomePhoto: () => void;
 };
 
+const actionRowClassName =
+  'flex min-h-control-lg w-full items-center gap-3 rounded-lg px-2 text-left text-sm font-medium text-text-primary outline-none hover:bg-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus';
+
 /**
  * Lightweight action sheet of currently allowed Home actions.
  */
 export function HomeActionSheet({
   open,
   onOpenChange,
+  homeId,
   isAdmin,
   hasPhoto,
   onAddTask,
   onInviteRoommate,
   onHomePhoto,
 }: HomeActionSheetProps) {
+  const maintenanceHref = `/homes/${encodeURIComponent(homeId)}/maintenance`;
+
   return (
     <Sheet.Root open={open} onOpenChange={onOpenChange}>
       <Sheet.Popup
@@ -44,6 +53,16 @@ export function HomeActionSheet({
               onClick={() => {
                 onOpenChange(false);
                 onAddTask();
+              }}
+            />
+          </li>
+          <li>
+            <ActionLinkRow
+              icon={WrenchScrewdriverIcon}
+              label="Maintenance"
+              to={maintenanceHref}
+              onNavigate={() => {
+                onOpenChange(false);
               }}
             />
           </li>
@@ -85,13 +104,28 @@ function ActionRow({
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex min-h-control-lg w-full items-center gap-3 rounded-lg px-2 text-left text-sm font-medium text-text-primary outline-none hover:bg-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-    >
+    <button type="button" onClick={onClick} className={actionRowClassName}>
       <Icon className="size-5 text-brand" aria-hidden="true" />
       {label}
     </button>
+  );
+}
+
+function ActionLinkRow({
+  icon: Icon,
+  label,
+  to,
+  onNavigate,
+}: {
+  icon: HeroIcon;
+  label: string;
+  to: string;
+  onNavigate: () => void;
+}) {
+  return (
+    <Link to={to} onClick={onNavigate} className={actionRowClassName}>
+      <Icon className="size-5 text-brand" aria-hidden="true" />
+      {label}
+    </Link>
   );
 }

@@ -161,6 +161,7 @@ export function HomeChromeLayout({ homeId, children }: HomeChromeLayoutProps) {
       <HomeActionSheet
         open={actionsOpen}
         onOpenChange={setActionsOpen}
+        homeId={home.id}
         isAdmin={isAdmin}
         hasPhoto={home.hasPhoto}
         onAddTask={() => {

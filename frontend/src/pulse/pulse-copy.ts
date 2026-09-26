@@ -86,15 +86,12 @@ export function glancePulseMetrics(
   ];
 }
 
-/** Extra DTO counters on the desktop horizontal Pulse bar. */
+/** Extra task counters on the desktop horizontal Pulse bar. */
 export function barPulseMetrics(
   pulse: HousePulseDto,
 ): readonly PulseMetric[] {
-  const [tasks, supplies] = pulse.items;
-  return [
-    { label: 'Due today', value: tasks.dueTodayRelevantCount },
-    { label: 'Supplies', value: supplies.openCount },
-  ];
+  const [tasks] = pulse.items;
+  return [{ label: 'Due today', value: tasks.dueTodayRelevantCount }];
 }
 
 export function pulseOverallState(

@@ -270,7 +270,9 @@ test.describe('House Pulse on Home overview', () => {
       ).toHaveText('Tasks');
       if (viewport.width >= 1024) {
         await expect(page.getByText('Due today')).toBeVisible();
-        await expect(page.getByText('Supplies', { exact: true })).toBeVisible();
+        await expect(
+          page.getByTestId('house-pulse').getByText('Supplies', { exact: true }),
+        ).toHaveCount(0);
       }
       await assertNoHorizontalOverflow(page);
     });
@@ -327,7 +329,7 @@ test.describe('House Pulse on Home overview', () => {
     await page.goto(`/homes/${HOME_A}`);
     const pulse = page.getByTestId('house-pulse');
     await expect(pulse.getByText('Due today')).toBeVisible();
-    await expect(pulse.getByText('Supplies', { exact: true })).toBeVisible();
+    await expect(pulse.getByText('Supplies', { exact: true })).toHaveCount(0);
     await expect(pulse.getByRole('list').getByText('Maintenance')).toBeVisible();
     await expect(pulse.getByRole('link', { name: 'Open Maintenance' })).toBeVisible();
     await expect(pulse.getByText('Clear')).toHaveCount(0);

@@ -37,7 +37,7 @@ function pulseMetric(label: string) {
 }
 
 describe('House Pulse on Home overview', () => {
-  it('renders House Pulse with fixed Tasks → Supplies → Maintenance order', async () => {
+  it('renders House Pulse with task and maintenance metrics', async () => {
     stubPulseApis({
       pulseByHome: { [TEST_HOME_A]: activeHousePulse() },
     });
@@ -52,7 +52,7 @@ describe('House Pulse on Home overview', () => {
 
     expect(within(region).getByText('Overdue')).toBeInTheDocument();
     expect(within(region).getByText('Unassigned tasks')).toBeInTheDocument();
-    expect(within(region).getByText('Supplies')).toBeInTheDocument();
+    expect(within(region).queryByText('Supplies')).not.toBeInTheDocument();
     expect(pulseMetric('Maintenance')).toBeInTheDocument();
     expect(
       within(region).getByRole('link', { name: 'Open Maintenance' }),
@@ -83,15 +83,13 @@ describe('House Pulse on Home overview', () => {
     expect(within(region).getByText('Overdue').closest('li')).toHaveTextContent(
       '0',
     );
-    expect(within(region).getByText('Supplies').closest('li')).toHaveTextContent(
-      '2',
-    );
+    expect(within(region).queryByText('Supplies')).not.toBeInTheDocument();
     expect(
       within(region).queryByText(/4 home|1 away|kudos/i),
     ).not.toBeInTheDocument();
   });
 
-  it('displays Task, Supply, and Maintenance counters from the backend DTO', async () => {
+  it('displays Task and Maintenance counters from the backend DTO', async () => {
     stubPulseApis({
       pulseByHome: { [TEST_HOME_A]: activeHousePulse() },
     });
@@ -107,9 +105,7 @@ describe('House Pulse on Home overview', () => {
     expect(within(region).getByText('Overdue').closest('li')).toHaveTextContent(
       '3',
     );
-    expect(within(region).getByText('Supplies').closest('li')).toHaveTextContent(
-      '4',
-    );
+    expect(within(region).queryByText('Supplies')).not.toBeInTheDocument();
     expect(pulseMetric('Maintenance').closest('li')).toHaveTextContent('2');
   });
 
@@ -358,13 +354,14 @@ describe('House Pulse on Home overview', () => {
     expect(sessionStorage.length).toBe(0);
   });
 
-  it('does not invent Supplies destinations', async () => {
+  it('does not show Supplies until a destination exists', async () => {
     stubPulseApis({
       pulseByHome: { [TEST_HOME_A]: activeHousePulse() },
     });
     renderApp(`/homes/${TEST_HOME_A}`);
 
     const region = await screen.findByTestId('house-pulse');
+    expect(within(region).queryByText('Supplies')).not.toBeInTheDocument();
     expect(
       within(region).getByRole('link', { name: 'Open Tasks' }),
     ).toBeInTheDocument();

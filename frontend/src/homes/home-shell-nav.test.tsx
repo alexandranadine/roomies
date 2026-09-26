@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { stubMaintenanceApis } from '../maintenance/test-stub.js';
 import { resetApiClientForTests } from '../platform/api/index.js';
 import { stubPulseApis } from '../pulse/test-stub.js';
 import { TEST_HOME_A } from '../pulse/test-fixtures.js';
@@ -74,6 +75,9 @@ describe('Home shell navigation', () => {
       within(sheet).getByRole('button', { name: 'Add task' }),
     ).toBeInTheDocument();
     expect(
+      within(sheet).getByRole('link', { name: 'Maintenance' }),
+    ).toHaveAttribute('href', `/homes/${ROOMMATE_HOME}/maintenance`);
+    expect(
       within(sheet).getByRole('button', { name: 'Invite roommate' }),
     ).toBeInTheDocument();
     expect(
@@ -122,7 +126,36 @@ describe('Home shell navigation', () => {
       within(sheet).getByRole('button', { name: 'Add task' }),
     ).toBeInTheDocument();
     expect(
+      within(sheet).getByRole('link', { name: 'Maintenance' }),
+    ).toHaveAttribute('href', `/homes/${ROOMMATE_HOME}/maintenance`);
+    expect(
       within(sheet).queryByRole('button', { name: 'Invite roommate' }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(sheet).getByRole('button', { name: 'Add Home photo' }),
+    ).toBeInTheDocument();
+  });
+
+  it('routes Maintenance from the center + sheet to the existing list', async () => {
+    const user = userEvent.setup();
+    stubMaintenanceApis();
+    const { router } = renderApp(`/homes/${TEST_HOME_A}`);
+    await screen.findByRole('heading', { name: 'Oak Street', level: 1 });
+
+    await user.click(screen.getByRole('button', { name: 'Add to this Home' }));
+    const sheet = await screen.findByRole('dialog', { name: 'Add to this Home' });
+    await user.click(within(sheet).getByRole('link', { name: 'Maintenance' }));
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe(
+        `/homes/${TEST_HOME_A}/maintenance`,
+      );
+    });
+    expect(
+      await screen.findByRole('heading', { name: 'Maintenance', level: 1 }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('dialog', { name: 'Add to this Home' }),
     ).not.toBeInTheDocument();
   });
 });
