@@ -47,7 +47,7 @@ export function HomeQuickActions({
             'focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-focus',
           )}
         >
-          What’s on your mind, Roomies?
+          What needs doing?
         </button>
         <div className="grid grid-cols-3 divide-x divide-border">
           <button type="button" className={tileClassName} onClick={onAddTask}>

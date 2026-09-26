@@ -193,7 +193,7 @@ test.describe('Home shell Phase 1', () => {
     await expect(page.getByRole('region', { name: 'Roommates' })).toBeVisible();
     await expect(page.getByTestId('house-pulse')).toBeVisible();
     await expect(
-      page.getByRole('button', { name: 'What’s on your mind, Roomies?' }),
+      page.getByRole('button', { name: 'What needs doing?' }),
     ).toBeVisible();
     await expect(
       page.getByRole('link', { name: 'Maintenance', exact: true }),

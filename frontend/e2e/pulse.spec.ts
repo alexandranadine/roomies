@@ -258,13 +258,16 @@ test.describe('House Pulse on Home overview', () => {
         page.getByRole('heading', { name: 'House Pulse', level: 2 }),
       ).toBeVisible();
       await expect(page.getByText('Overdue')).toBeVisible();
-      await expect(page.getByText('Unassigned')).toBeVisible();
+      await expect(page.getByText('Unassigned tasks')).toBeVisible();
       await expect(
         page.getByTestId('house-pulse').getByRole('list').getByText('Maintenance'),
       ).toBeVisible();
       await expect(
         page.getByTestId('house-pulse').getByRole('link', { name: 'Open Maintenance' }),
       ).toBeVisible();
+      await expect(
+        page.getByTestId('house-pulse').getByRole('link', { name: 'Open Tasks' }),
+      ).toHaveText('Tasks');
       if (viewport.width >= 1024) {
         await expect(page.getByText('Due today')).toBeVisible();
         await expect(page.getByText('Supplies', { exact: true })).toBeVisible();
@@ -280,7 +283,7 @@ test.describe('House Pulse on Home overview', () => {
     await page.goto(`/homes/${HOME_A}`);
     const pulse = page.getByTestId('house-pulse');
     await expect(pulse.getByText('Overdue')).toBeVisible();
-    await expect(pulse.getByText('Unassigned')).toBeVisible();
+    await expect(pulse.getByText('Unassigned tasks')).toBeVisible();
     await expect(pulse.getByRole('list').getByText('Maintenance')).toBeVisible();
     await expect(pulse.getByRole('link', { name: 'Open Maintenance' })).toBeVisible();
     await expect(pulse.getByText('2026-09-14T04:00:00.000Z')).toHaveCount(0);

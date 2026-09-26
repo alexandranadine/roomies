@@ -46,7 +46,7 @@ export const HOME_NAV_DESTINATIONS: readonly HomeNavDestination[] = [
   },
   {
     id: 'house',
-    label: 'House',
+    label: 'Roommates',
     accessibleName: 'Roommates',
     iconOutline: UserGroupIconOutline,
     iconSolid: UserGroupIconSolid,
@@ -54,7 +54,7 @@ export const HOME_NAV_DESTINATIONS: readonly HomeNavDestination[] = [
   },
   {
     id: 'profile',
-    label: 'Profile',
+    label: 'Account',
     accessibleName: 'Account',
     iconOutline: UserIconOutline,
     iconSolid: UserIconSolid,

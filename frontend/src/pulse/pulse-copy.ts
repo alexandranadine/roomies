@@ -81,7 +81,7 @@ export function glancePulseMetrics(
   const [tasks, , maintenance] = pulse.items;
   return [
     { label: 'Overdue', value: tasks.overdueRelevantCount },
-    { label: 'Unassigned', value: tasks.unassignedOpenCount },
+    { label: 'Unassigned tasks', value: tasks.unassignedOpenCount },
     { label: 'Maintenance', value: maintenance.openVisibleCount },
   ];
 }

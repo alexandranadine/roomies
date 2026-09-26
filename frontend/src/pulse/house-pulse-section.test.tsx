@@ -51,7 +51,7 @@ describe('House Pulse on Home overview', () => {
     expect(region).toHaveAttribute('aria-labelledby', 'house-pulse-heading');
 
     expect(within(region).getByText('Overdue')).toBeInTheDocument();
-    expect(within(region).getByText('Unassigned')).toBeInTheDocument();
+    expect(within(region).getByText('Unassigned tasks')).toBeInTheDocument();
     expect(within(region).getByText('Supplies')).toBeInTheDocument();
     expect(pulseMetric('Maintenance')).toBeInTheDocument();
     expect(
@@ -98,9 +98,9 @@ describe('House Pulse on Home overview', () => {
     renderApp(`/homes/${TEST_HOME_A}`);
 
     const region = await screen.findByTestId('house-pulse');
-    expect(within(region).getByText('Unassigned').closest('li')).toHaveTextContent(
-      '1',
-    );
+    expect(
+      within(region).getByText('Unassigned tasks').closest('li'),
+    ).toHaveTextContent('1');
     expect(within(region).getByText('Due today').closest('li')).toHaveTextContent(
       '1',
     );
@@ -162,7 +162,7 @@ describe('House Pulse on Home overview', () => {
     expect(pulseMetric('Maintenance').closest('li')).toHaveTextContent('2');
   });
 
-  it('links Tasks to the existing Home Tasks destination', async () => {
+  it('links Tasks to the existing Home Tasks destination as a separate control', async () => {
     const user = userEvent.setup();
     stubPulseApis({
       pulseByHome: { [TEST_HOME_A]: clearHousePulse() },
@@ -170,11 +170,16 @@ describe('House Pulse on Home overview', () => {
     const { router } = renderApp(`/homes/${TEST_HOME_A}`);
 
     const region = await screen.findByTestId('house-pulse');
-    const links = within(region).getAllByRole('link', {
+    const tasksLink = within(region).getByRole('link', {
       name: 'Open Tasks',
     });
-    expect(links).toHaveLength(1);
-    await user.click(links[0]!);
+    const maintenanceLink = within(region).getByRole('link', {
+      name: 'Open Maintenance',
+    });
+    expect(tasksLink).toHaveTextContent('Tasks');
+    expect(maintenanceLink).toHaveTextContent('Maintenance');
+    expect(tasksLink).not.toBe(maintenanceLink);
+    await user.click(tasksLink);
 
     await waitFor(() => {
       expect(router.state.location.pathname).toBe(

@@ -28,7 +28,7 @@ describe('Home quick actions and feed', () => {
     renderApp(`/homes/${TEST_HOME_A}`);
 
     expect(
-      await screen.findByRole('button', { name: 'What’s on your mind, Roomies?' }),
+      await screen.findByRole('button', { name: 'What needs doing?' }),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add task' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Invite' })).toBeInTheDocument();
@@ -61,7 +61,7 @@ describe('Home quick actions and feed', () => {
     ).toBeInTheDocument();
 
     await userEvent.click(
-      screen.getByRole('button', { name: 'What’s on your mind, Roomies?' }),
+      screen.getByRole('button', { name: 'What needs doing?' }),
     );
     await userEvent.click(
       screen.getByRole('button', { name: 'Add Home photo' }),
@@ -92,15 +92,30 @@ describe('Home quick actions and feed', () => {
     expect(feed.textContent).not.toMatch(/kudos|reaction|comment/i);
   });
 
+  it('does not use social-composer wording on Home', async () => {
+    stubActivityApis({ listByHome: { [TEST_HOME_A]: listPage([]) } });
+    stubRoommatesApis({ role: 'ADMIN' });
+    renderApp(`/homes/${TEST_HOME_A}`);
+    await screen.findByRole('button', { name: 'What needs doing?' });
+
+    expect(
+      screen.queryByRole('button', { name: /on your mind|post|compose/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Activity' })).toBeInTheDocument();
+    expect(
+      await screen.findByText('Household activity will show up here.'),
+    ).toBeInTheDocument();
+  });
+
   it('opens the action sheet from the prompt and supports keyboard dismissal', async () => {
     stubRoommatesApis({ role: 'ADMIN' });
     renderApp(`/homes/${TEST_HOME_A}`);
     await screen.findByRole('button', {
-      name: 'What’s on your mind, Roomies?',
+      name: 'What needs doing?',
     });
 
     await userEvent.click(
-      screen.getByRole('button', { name: 'What’s on your mind, Roomies?' }),
+      screen.getByRole('button', { name: 'What needs doing?' }),
     );
     expect(
       await screen.findByRole('dialog', { name: 'Add to this Home' }),

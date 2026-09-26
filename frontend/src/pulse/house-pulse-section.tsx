@@ -1,6 +1,8 @@
 import { ChartBarIcon } from '@heroicons/react/20/solid';
-import { ChevronRightIcon } from '@heroicons/react/16/solid';
-import { WrenchScrewdriverIcon } from '@heroicons/react/24/outline';
+import {
+  ClipboardDocumentCheckIcon,
+  WrenchScrewdriverIcon,
+} from '@heroicons/react/24/outline';
 import { Link } from 'react-router';
 import { cn } from '../components/ui/cn.js';
 import type { HousePulseDto } from './pulse-api.js';
@@ -36,13 +38,7 @@ function PulseMetricItem({
   );
 }
 
-const actionLinkClassName = cn(
-  'inline-flex size-8 items-center justify-center rounded-md text-text-muted',
-  'hover:bg-subtle hover:text-brand',
-  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
-);
-
-const maintenanceActionClassName = cn(
+const pulseActionClassName = cn(
   'inline-flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 text-xs font-semibold text-text-muted',
   'hover:bg-subtle hover:text-brand',
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
@@ -59,21 +55,25 @@ export function HousePulseSection({ homeId, pulse }: HousePulseSectionProps) {
   const maintenanceHref = `/homes/${encodeURIComponent(homeId)}/maintenance`;
 
   const actions = (
-    <span className="flex shrink-0 items-center gap-0.5">
-      <Link
-        to={maintenanceHref}
-        aria-label="Open Maintenance"
-        className={maintenanceActionClassName}
-      >
-        <WrenchScrewdriverIcon className="size-4 shrink-0" aria-hidden="true" />
-        <span aria-hidden="true">Maintenance</span>
-      </Link>
+    <span className="flex shrink-0 items-center gap-1">
       <Link
         to={tasksHref}
         aria-label="Open Tasks"
-        className={actionLinkClassName}
+        className={pulseActionClassName}
       >
-        <ChevronRightIcon className="size-5" aria-hidden="true" />
+        <ClipboardDocumentCheckIcon
+          className="size-4 shrink-0"
+          aria-hidden="true"
+        />
+        <span aria-hidden="true">Tasks</span>
+      </Link>
+      <Link
+        to={maintenanceHref}
+        aria-label="Open Maintenance"
+        className={pulseActionClassName}
+      >
+        <WrenchScrewdriverIcon className="size-4 shrink-0" aria-hidden="true" />
+        <span aria-hidden="true">Maintenance</span>
       </Link>
     </span>
   );

@@ -109,7 +109,7 @@ describe('pulse copy', () => {
     ]);
     expect(glancePulseMetrics(pulse).map((metric) => metric.label)).toEqual([
       'Overdue',
-      'Unassigned',
+      'Unassigned tasks',
       'Maintenance',
     ]);
     expect(barPulseMetrics(pulse).map((metric) => metric.label)).toEqual([

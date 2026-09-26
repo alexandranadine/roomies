@@ -213,7 +213,7 @@ describe('Home photo management', () => {
   async function openPhotoDialog() {
     await userEvent.click(
       await screen.findByRole('button', {
-        name: 'What’s on your mind, Roomies?',
+        name: 'What needs doing?',
       }),
     );
     const sheet = await screen.findByRole('dialog', { name: 'Add to this Home' });

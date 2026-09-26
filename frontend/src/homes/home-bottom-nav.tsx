@@ -9,7 +9,7 @@ export type HomeBottomNavProps = {
 };
 
 /**
- * Mobile application bar: Home, Tasks, center +, House, Profile.
+ * Mobile application bar: Home, Tasks, center +, Roommates, Account.
  * Hidden from md breakpoint up (desktop nav lives in the header).
  */
 export function HomeBottomNav({ homeId, onOpenActions }: HomeBottomNavProps) {

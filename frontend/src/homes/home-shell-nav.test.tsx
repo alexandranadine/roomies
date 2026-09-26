@@ -14,7 +14,7 @@ afterEach(() => {
 });
 
 describe('Home shell navigation', () => {
-  it('exposes Home, Tasks, House, and Profile destinations', async () => {
+  it('exposes Home, Tasks, Roommates, and Account destinations', async () => {
     stubPulseApis();
     const { router } = renderApp(`/homes/${TEST_HOME_A}`);
 
@@ -30,14 +30,15 @@ describe('Home shell navigation', () => {
       'href',
       `/homes/${TEST_HOME_A}/tasks`,
     );
-    expect(screen.getByRole('link', { name: 'Roommates' })).toHaveAttribute(
+    const roommatesLink = screen.getByRole('link', { name: 'Roommates' });
+    expect(roommatesLink).toHaveAttribute(
       'href',
       `/homes/${TEST_HOME_A}/roommates`,
     );
-    expect(screen.getByRole('link', { name: 'Account' })).toHaveAttribute(
-      'href',
-      '/account',
-    );
+    expect(roommatesLink).toHaveTextContent('Roommates');
+    const accountLink = screen.getByRole('link', { name: 'Account' });
+    expect(accountLink).toHaveAttribute('href', '/account');
+    expect(accountLink).toHaveTextContent('Account');
     expect(
       screen.getByRole('link', { name: 'Notifications' }),
     ).toHaveAttribute('href', '/notifications');
