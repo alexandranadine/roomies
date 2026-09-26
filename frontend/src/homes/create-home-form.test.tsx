@@ -374,8 +374,77 @@ describe('Create Home UX', () => {
     );
   });
 
-  it('invalidates active Home discovery and navigates on success', async () => {
-    const { fetchMock } = stubDiscoveryApis({});
+  it('seeds /me/homes, navigates immediately, and reconciles in the background', async () => {
+    let homesFetchCount = 0;
+    let releaseRefetch: ((response: Response) => void) | undefined;
+    let refetchPending = false;
+    const fetchMock = vi
+      .fn()
+      .mockImplementation((url: string, init?: RequestInit) => {
+        const path = String(url);
+        if (
+          path.includes('/api/v1/me/homes') &&
+          (init?.method ?? 'GET') === 'GET'
+        ) {
+          homesFetchCount += 1;
+          const body =
+            homesFetchCount === 1
+              ? []
+              : [
+                  {
+                    id: HOME_ID,
+                    name: 'Oak Street',
+                    timezone: 'America/New_York',
+                    hasPhoto: false,
+                    role: 'ADMIN',
+                  },
+                ];
+          const response = jsonResponse(200, body);
+          if (homesFetchCount > 1) {
+            refetchPending = true;
+            return new Promise<Response>((resolve) => {
+              releaseRefetch = resolve;
+            });
+          }
+          return Promise.resolve(response);
+        }
+        if (path.endsWith('/api/v1/me')) {
+          return Promise.resolve(jsonResponse(200, { id: USER_ID }));
+        }
+        if (path.endsWith('/api/v1/homes') && init?.method === 'POST') {
+          return Promise.resolve(
+            jsonResponse(201, {
+              home: {
+                id: HOME_ID,
+                name: 'Oak Street',
+                timezone: 'America/New_York',
+                hasPhoto: false,
+              },
+              membership: { id: MEMBERSHIP_ID, role: 'ADMIN' },
+            }),
+          );
+        }
+        if (path.includes(`/api/v1/homes/${HOME_ID}/pulse`)) {
+          return Promise.resolve(jsonResponse(200, clearHousePulse()));
+        }
+        if (path.match(new RegExp(`/api/v1/homes/${HOME_ID}$`))) {
+          return Promise.resolve(
+            jsonResponse(200, {
+              id: HOME_ID,
+              name: 'Oak Street',
+              timezone: 'America/New_York',
+              hasPhoto: false,
+            }),
+          );
+        }
+        return Promise.resolve(
+          jsonResponse(404, {
+            error: { code: 'NOT_FOUND', message: 'Not found' },
+          }),
+        );
+      });
+    vi.stubGlobal('fetch', fetchMock);
+
     const { queryClient, router } = renderApp('/');
 
     await userEvent.click(
@@ -390,14 +459,62 @@ describe('Create Home UX', () => {
       await screen.findByRole('heading', { name: 'Oak Street', level: 1 }),
     ).toBeInTheDocument();
     expect(router.state.location.pathname).toBe(`/homes/${HOME_ID}`);
+    expect(queryClient.getQueryData(currentUserHomesQueryKey)).toEqual([
+      {
+        id: HOME_ID,
+        name: 'Oak Street',
+        timezone: 'America/New_York',
+        hasPhoto: false,
+        role: 'ADMIN',
+      },
+    ]);
+    expect(homesFetchCount).toBe(2);
+    expect(refetchPending).toBe(true);
+
+    releaseRefetch?.(
+      jsonResponse(200, [
+        {
+          id: HOME_ID,
+          name: 'Oak Street',
+          timezone: 'America/New_York',
+          hasPhoto: false,
+          role: 'ADMIN',
+        },
+      ]),
+    );
 
     await waitFor(() => {
-      const homesRequests = fetchMock.mock.calls.filter(([url]) =>
-        String(url).includes('/api/v1/me/homes'),
-      );
-      expect(homesRequests.length).toBeGreaterThan(1);
+      expect(queryClient.getQueryData(currentUserHomesQueryKey)).toEqual([
+        {
+          id: HOME_ID,
+          name: 'Oak Street',
+          timezone: 'America/New_York',
+          hasPhoto: false,
+          role: 'ADMIN',
+        },
+      ]);
     });
-    expect(queryClient.getQueryData(currentUserHomesQueryKey)).toBeDefined();
+  });
+
+  it('does not write /me/homes cache on server failure', async () => {
+    stubDiscoveryApis({
+      createStatus: 400,
+      createBody: {
+        error: { code: 'INVALID_REQUEST', message: 'Invalid Home name' },
+      },
+    });
+    const { queryClient } = renderApp('/');
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Create a home' }),
+    );
+    await userEvent.type(screen.getByLabelText(/home name/i), 'Oak Street');
+    await userEvent.clear(screen.getByLabelText(/timezone/i));
+    await userEvent.type(screen.getByLabelText(/timezone/i), 'UTC');
+    await userEvent.click(screen.getByRole('button', { name: 'Create home' }));
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(queryClient.getQueryData(currentUserHomesQueryKey)).toEqual([]);
   });
 
   it('does not introduce currentHomeId or localStorage Home authority', async () => {

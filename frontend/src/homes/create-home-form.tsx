@@ -10,6 +10,7 @@ import {
   toCreateHomeRequest,
 } from './create-home-form-schema.js';
 import { handlePassiveAuthLoss } from './clear-private-home-queries.js';
+import { seedCurrentUserHomesCacheAfterCreate } from './home-list-cache.js';
 import { currentUserHomesQueryKey } from './home-query-keys.js';
 import { getDefaultBrowserTimeZone } from './supported-timezones.js';
 import { TimezoneField } from './timezone-field.js';
@@ -37,13 +38,11 @@ export function CreateHomeForm() {
   const createHomeMutation = useMutation({
     mutationFn: createHome,
     onSuccess: (created) => {
-      void queryClient
-        .invalidateQueries({
-          queryKey: currentUserHomesQueryKey,
-        })
-        .then(() => {
-          void navigate(`/homes/${created.home.id}`, { replace: true });
-        });
+      seedCurrentUserHomesCacheAfterCreate(queryClient, created);
+      void navigate(`/homes/${created.home.id}`, { replace: true });
+      void queryClient.invalidateQueries({
+        queryKey: currentUserHomesQueryKey,
+      });
     },
   });
 
