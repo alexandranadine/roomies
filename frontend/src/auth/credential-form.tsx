@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { Link } from 'react-router';
 import { Alert, Button, Card, TextField } from '../components/ui/index.js';
 import { DocumentTitle } from '../components/document-title.js';
 import { currentUserQueryKey } from '../homes/home-query-keys.js';
@@ -165,6 +166,13 @@ export function CredentialForm({
           errorText={errors.password?.message}
           {...register('password')}
         />
+        {isSignUp ? null : (
+          <p className="-mt-1 text-right text-sm">
+            <Link to="/forgot-password" className={modeSwitchClassName()}>
+              Forgot password?
+            </Link>
+          </p>
+        )}
         {errors.root?.message ? (
           <div ref={formErrorRef} tabIndex={-1} className="outline-none">
             <Alert variant="danger" title="Couldn’t continue">

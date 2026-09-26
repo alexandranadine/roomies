@@ -1,6 +1,8 @@
 import { createBrowserRouter, type RouteObject } from 'react-router';
 import { AccountSettingsPage } from '../account/account-settings-page.js';
 import { ActivityListPage } from '../activity/activity-list-page.js';
+import { ForgotPasswordPage } from '../auth/forgot-password-page.js';
+import { ResetPasswordPage } from '../auth/reset-password-page.js';
 import { CrossHomePageShell } from '../homes/cross-home-page-shell.js';
 import { HomeDiscoveryPage } from '../homes/home-discovery-page.js';
 import { HomeOverviewPage } from '../homes/home-overview-page.js';
@@ -37,6 +39,8 @@ export type CreateAppRouterOptions = {
  * - `/account` — authenticated Account settings (cross-Home)
  * - `/invitations/:invitationId` — signed-out invitation preview landing
  * - `/verify-email` — Better Auth verification return
+ * - `/forgot-password` — Better Auth password-reset request
+ * - `/reset-password` — Better Auth password-reset return
  * - `/__dev/ui` — development visual QA fixture (never in production)
  * - `*` — not-found
  *
@@ -128,6 +132,14 @@ export function buildAppChildRoutes(includeDevRoutes: boolean): RouteObject[] {
     {
       path: 'verify-email',
       element: <VerifyEmailPage />,
+    },
+    {
+      path: 'forgot-password',
+      element: <ForgotPasswordPage />,
+    },
+    {
+      path: 'reset-password',
+      element: <ResetPasswordPage />,
     },
   ];
 

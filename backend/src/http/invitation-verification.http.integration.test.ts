@@ -475,6 +475,9 @@ void describe('signup → verification email → invitation acceptance', () => {
           }
           return Promise.reject(new Error('secret-provider-body token=abc'));
         },
+        sendPasswordResetEmail() {
+          return Promise.resolve();
+        },
       };
       const database = createDatabasePool(config);
       const db = createDb(database.pool);

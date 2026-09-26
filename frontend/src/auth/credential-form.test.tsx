@@ -113,6 +113,9 @@ describe('credential form', () => {
       screen.getByRole('button', { name: 'Create an account' }),
     ).toBeInTheDocument();
     expect(
+      screen.getByRole('link', { name: 'Forgot password?' }),
+    ).toHaveAttribute('href', '/forgot-password');
+    expect(
       screen.queryByRole('textbox', { name: /name/i }),
     ).not.toBeInTheDocument();
     expect(
@@ -148,6 +151,9 @@ describe('credential form', () => {
       screen.getByRole('button', { name: 'Create account' }),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Forgot password?' }),
+    ).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(

@@ -48,6 +48,13 @@ const normalizeEmailBeforeValidation = createAuthMiddleware((context) => {
   ) {
     fields['newEmail'] = normalizeAuthEmail(fields['newEmail']);
   }
+
+  if (
+    context.path === '/request-password-reset' &&
+    typeof fields['email'] === 'string'
+  ) {
+    fields['email'] = normalizeAuthEmail(fields['email']);
+  }
   return Promise.resolve();
 });
 
@@ -70,6 +77,15 @@ export type CreateAuthRuntimeOptions = Readonly<{
     token: string;
   }) => Promise<void>;
   /**
+   * Better Auth password-reset hook. When omitted, reset sending stays
+   * disabled. The callback must not log tokens or reset URLs.
+   */
+  sendResetPassword?: (data: {
+    user: { email: string };
+    url: string;
+    token: string;
+  }) => Promise<void>;
+  /**
    * Content-free operational sink. Better Auth messages and metadata are not
    * forwarded because they may contain SQL or authentication material.
    */
@@ -86,6 +102,11 @@ function createOptions(input: CreateAuthRuntimeOptions): BetterAuthOptions {
     emailAndPassword: {
       enabled: true,
       requireEmailVerification: false,
+      revokeSessionsOnPasswordReset: true,
+      resetPasswordTokenExpiresIn: 60 * 60,
+      ...(input.sendResetPassword
+        ? { sendResetPassword: input.sendResetPassword }
+        : {}),
     },
     emailVerification: input.sendVerificationEmail
       ? {

@@ -119,10 +119,17 @@ void describe('createAuthRuntime', () => {
       typeof auth.options.databaseHooks?.user?.update?.before,
       'function',
     );
-    assert.deepEqual(auth.options.emailAndPassword, {
-      enabled: true,
-      requireEmailVerification: false,
-    });
+    assert.equal(auth.options.emailAndPassword?.enabled, true);
+    assert.equal(auth.options.emailAndPassword?.requireEmailVerification, false);
+    assert.equal(
+      auth.options.emailAndPassword?.revokeSessionsOnPasswordReset,
+      true,
+    );
+    assert.equal(
+      auth.options.emailAndPassword?.resetPasswordTokenExpiresIn,
+      3600,
+    );
+    assert.equal(auth.options.emailAndPassword?.sendResetPassword, undefined);
     assert.equal(auth.options.emailVerification, undefined);
     assert.deepEqual(auth.options.account?.accountLinking, {
       enabled: false,
@@ -146,6 +153,7 @@ void describe('createAuthRuntime', () => {
       undefined,
     );
     assert.equal(auth.options.advanced?.disableOriginCheck, false);
+    assert.equal(auth.options.advanced?.backgroundTasks, undefined);
     assert.deepEqual(auth.options.plugins, []);
     assert.equal(auth.options.rateLimit?.enabled, false);
   });
@@ -175,6 +183,36 @@ void describe('createAuthRuntime', () => {
       auth.options.advanced?.defaultCookieAttributes &&
         'domain' in auth.options.advanced.defaultCookieAttributes,
       false,
+    );
+    assert.equal(sent.length, 0);
+  });
+
+  void it('wires native password reset with session revocation', () => {
+    const caller = callerOwnedPool();
+    const sent: string[] = [];
+    const auth = createAuthRuntime({
+      pool: caller.pool,
+      baseURL: 'https://api.example.test',
+      trustedOrigins: ['https://app.example.test'],
+      secret: TEST_SECRET,
+      secureCookies: true,
+      sendResetPassword: ({ user, url, token }) => {
+        sent.push(user.email, url, token);
+        return Promise.resolve();
+      },
+    });
+
+    assert.equal(
+      auth.options.emailAndPassword?.revokeSessionsOnPasswordReset,
+      true,
+    );
+    assert.equal(
+      auth.options.emailAndPassword?.resetPasswordTokenExpiresIn,
+      3600,
+    );
+    assert.equal(
+      typeof auth.options.emailAndPassword?.sendResetPassword,
+      'function',
     );
     assert.equal(sent.length, 0);
   });
@@ -227,6 +265,10 @@ void describe('createAuthRuntime', () => {
     assert.match(source, /\btoNodeHandler\b/);
     assert.match(source, /\bfromNodeHeaders\b/);
     assert.match(source, /\bgetSession\b/);
+    assert.match(source, /revokeSessionsOnPasswordReset:\s*true/);
+    assert.match(source, /sendResetPassword/);
+    assert.match(source, /\/request-password-reset/);
+    assert.doesNotMatch(source, /console\.(?:log|info|debug)\(/);
     assert.equal(
       Object.values(packageJson.scripts ?? {}).some((script) =>
         /\b(migrate|generate|schema)\b/i.test(script),

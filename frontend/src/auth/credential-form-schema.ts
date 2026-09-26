@@ -3,8 +3,10 @@ import { z } from 'zod';
 
 const MAX_EMAIL_LENGTH = 254;
 const MAX_NAME_LENGTH = 80;
-const MIN_PASSWORD_LENGTH = 8;
-const MAX_PASSWORD_LENGTH = 128;
+/** Better Auth 1.7.4 default `minPasswordLength`. */
+export const MIN_PASSWORD_LENGTH = 8;
+/** Better Auth 1.7.4 default `maxPasswordLength`. */
+export const MAX_PASSWORD_LENGTH = 128;
 const LOCAL_PART_PATTERN = /^[a-z0-9!#$%&'*+/=?^_`{|}~.-]+$/;
 const DOMAIN_LABEL_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 const FINAL_DOMAIN_LABEL_PATTERN = /^[a-z]{2,63}$/;

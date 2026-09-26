@@ -3,6 +3,10 @@ import { useEffect, type ReactNode } from 'react';
 import { useLocation } from 'react-router';
 import { AuthPageLayout } from '../auth/auth-page-layout.js';
 import { CredentialForm } from '../auth/credential-form.js';
+import {
+  PASSWORD_RESET_SUCCESS_BODY,
+  PASSWORD_RESET_SUCCESS_TITLE,
+} from '../auth/password-reset-copy.js';
 import { UnverifiedEmailNotice } from '../auth/unverified-email-notice.js';
 import { PageContainer } from '../components/page-container.js';
 import { Alert, Spinner } from '../components/ui/index.js';
@@ -23,6 +27,7 @@ function isUnauthenticated(error: unknown): boolean {
 type AuthLandingLocationState = {
   accountDeleted?: boolean;
   needsFreshSignInForDeletion?: boolean;
+  passwordReset?: boolean;
 };
 
 /**
@@ -68,6 +73,11 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   if (isUnauthenticated(query.error)) {
     return (
       <AuthPageLayout title="Sign in · Roomies">
+        {locationState?.passwordReset ? (
+          <Alert variant="success" title={PASSWORD_RESET_SUCCESS_TITLE}>
+            {PASSWORD_RESET_SUCCESS_BODY}
+          </Alert>
+        ) : null}
         {locationState?.accountDeleted ? (
           <Alert variant="info" title="Account deleted">
             Your Roomies account has been deleted.

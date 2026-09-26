@@ -37,14 +37,7 @@ export function AuthPageLayout({
           <div className="mb-3 flex justify-center">
             <RoomiesWordmark />
           </div>
-          <div
-            className={cn(
-              'flex flex-col',
-              size === 'invite' ? 'gap-3' : undefined,
-            )}
-          >
-            {children}
-          </div>
+          <div className="flex flex-col gap-3">{children}</div>
         </div>
       </div>
     </DocumentTitle>
@@ -53,7 +46,10 @@ export function AuthPageLayout({
 
 export function isAuthCanvasPath(pathname: string): boolean {
   return (
-    pathname === '/verify-email' || pathname.startsWith('/invitations/')
+    pathname === '/verify-email' ||
+    pathname === '/forgot-password' ||
+    pathname === '/reset-password' ||
+    pathname.startsWith('/invitations/')
   );
 }
 

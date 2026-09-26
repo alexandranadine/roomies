@@ -5,10 +5,13 @@ import {
 import type { Pool } from 'pg';
 import type { AppConfig } from '../config/index.js';
 import {
+  EMAIL_PASSWORD_RESET_EXPIRES_IN_SECONDS,
   EMAIL_VERIFICATION_EXPIRES_IN_SECONDS,
   TransactionalEmailDeliveryError,
+  constrainPasswordResetUrl,
   constrainVerificationUrl,
   createTransactionalEmailSender,
+  passwordResetCallbackUrl,
   verificationCallbackUrl,
   type TransactionalEmailSender,
 } from '../email/index.js';
@@ -19,8 +22,12 @@ export type CreateAuthRuntimeCompositionOptions = Readonly<{
   emailSender?: TransactionalEmailSender;
 }>;
 
-function logDeliveryFailure(): void {
+function logVerificationDeliveryFailure(): void {
   console.error('[email] verification delivery failed');
+}
+
+function logPasswordResetDeliveryFailure(): void {
+  console.error('[email] password-reset delivery failed');
 }
 
 /**
@@ -34,6 +41,7 @@ export function createAuthRuntime(
 ): AuthRuntime {
   const sender = options.emailSender ?? createTransactionalEmailSender(config);
   const callbackUrl = verificationCallbackUrl(config.frontendOrigin);
+  const resetCallbackUrl = passwordResetCallbackUrl(config.frontendOrigin);
 
   return createIsolatedAuthRuntime({
     pool,
@@ -54,11 +62,29 @@ export function createAuthRuntime(
           verificationUrl,
         });
       } catch (error) {
-        logDeliveryFailure();
+        logVerificationDeliveryFailure();
         if (error instanceof TransactionalEmailDeliveryError) {
           throw error;
         }
         throw new TransactionalEmailDeliveryError();
+      }
+    },
+    async sendResetPassword({ user, url, token }) {
+      try {
+        const resetUrl = constrainPasswordResetUrl({
+          url,
+          token,
+          authBaseUrl: config.authBaseUrl,
+          callbackUrl: resetCallbackUrl,
+        });
+        await sender.sendPasswordResetEmail({
+          to: user.email,
+          resetUrl,
+        });
+      } catch {
+        // Public forgot-password must stay enumeration-safe: delivery failure
+        // is operational, not a signal that the account exists.
+        logPasswordResetDeliveryFailure();
       }
     },
     log(level) {
@@ -73,3 +99,6 @@ export function createAuthRuntime(
 
 export const AUTH_EMAIL_VERIFICATION_EXPIRES_IN_SECONDS =
   EMAIL_VERIFICATION_EXPIRES_IN_SECONDS;
+
+export const AUTH_PASSWORD_RESET_EXPIRES_IN_SECONDS =
+  EMAIL_PASSWORD_RESET_EXPIRES_IN_SECONDS;
