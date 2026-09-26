@@ -1,23 +1,23 @@
 import {
-  Check,
-  CircleCheck,
-  Package,
-  Shield,
-  UserMinus,
-  UserPlus,
-  Wrench,
-} from 'lucide-react';
+  ArchiveBoxIcon,
+  CheckCircleIcon,
+  CheckIcon,
+  ShieldCheckIcon,
+  UserMinusIcon,
+  UserPlusIcon,
+  WrenchScrewdriverIcon,
+} from '@heroicons/react/20/solid';
 import { cn } from '../components/ui/cn.js';
 import type { ActivityIconName } from './activity-copy.js';
 
 const ICONS = {
-  'user-plus': UserPlus,
-  'user-minus': UserMinus,
-  shield: Shield,
-  check: Check,
-  package: Package,
-  wrench: Wrench,
-  'check-circle': CircleCheck,
+  'user-plus': UserPlusIcon,
+  'user-minus': UserMinusIcon,
+  shield: ShieldCheckIcon,
+  check: CheckIcon,
+  package: ArchiveBoxIcon,
+  wrench: WrenchScrewdriverIcon,
+  'check-circle': CheckCircleIcon,
 } as const;
 
 const TONE_CLASSES: Record<ActivityIconName, string> = {

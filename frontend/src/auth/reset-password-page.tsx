@@ -1,5 +1,9 @@
 import { useMutation } from '@tanstack/react-query';
-import { CircleAlert, CircleCheck, KeyRound } from 'lucide-react';
+import {
+  CheckCircleIcon,
+  ExclamationCircleIcon,
+  KeyIcon,
+} from '@heroicons/react/24/outline';
 import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate, useSearchParams } from 'react-router';
@@ -91,7 +95,7 @@ export function ResetPasswordPage() {
         {view === 'success' ? (
           <>
             <AuthIconWell>
-              <CircleCheck className="size-6" />
+              <CheckCircleIcon className="size-6" />
             </AuthIconWell>
             <div className="flex flex-col gap-1">
               <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
@@ -115,7 +119,7 @@ export function ResetPasswordPage() {
         {view === 'invalid' ? (
           <>
             <AuthIconWell>
-              <CircleAlert className="size-6" />
+              <ExclamationCircleIcon className="size-6" />
             </AuthIconWell>
             <div className="flex flex-col gap-1">
               <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
@@ -144,7 +148,7 @@ export function ResetPasswordPage() {
         {view === 'form' ? (
           <>
             <AuthIconWell>
-              <KeyRound className="size-6" />
+              <KeyIcon className="size-6" />
             </AuthIconWell>
             <div className="flex flex-col gap-1">
               <h1 className="text-2xl font-semibold tracking-tight text-text-primary">

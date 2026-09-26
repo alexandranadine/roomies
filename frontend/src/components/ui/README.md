@@ -27,7 +27,21 @@ Sheet is a positioned Dialog variant (same focus foundation), not a second focus
 
 ## Icons
 
-**`lucide-react`** — tree-shakeable line icons. Import icons directly where needed; there is no Roomies icon wrapper layer.
+**`@heroicons/react`** — import icons directly where needed; there is no Roomies icon wrapper layer. Use the official React packages and pick the family intentionally:
+
+| Package | Use |
+| ------- | --- |
+| `@heroicons/react/24/outline` | Standard/default UI icons; inactive navigation |
+| `@heroicons/react/24/solid` | Active navigation; stronger emphasis |
+| `@heroicons/react/20/solid` | Compact cards, event bubbles, menus, statuses |
+| `@heroicons/react/16/solid` | Tiny metadata, chevrons, compact status indicators |
+
+Conventions:
+
+- Icons inherit `currentColor` — style with semantic text/color utilities, not hardcoded fills.
+- Decorative SVGs: `aria-hidden="true"`.
+- Icon-only controls: an explicit accessible name on the button/link (do not rely on SVG titles).
+- Active nav: outline when inactive, solid when active — but text treatment and `aria-current` remain the primary active-state cues; icon fill alone must not communicate selection.
 
 ## Class composition
 

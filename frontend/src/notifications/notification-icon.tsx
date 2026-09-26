@@ -1,21 +1,21 @@
 import {
-  Bell,
-  Check,
-  CircleCheck,
-  Package,
-  Shield,
-  Wrench,
-} from 'lucide-react';
+  ArchiveBoxIcon,
+  BellIcon,
+  CheckCircleIcon,
+  CheckIcon,
+  ShieldCheckIcon,
+  WrenchScrewdriverIcon,
+} from '@heroicons/react/20/solid';
 import { cn } from '../components/ui/cn.js';
 import type { NotificationIconName } from './notification-copy.js';
 
 const ICONS = {
-  shield: Shield,
-  check: Check,
-  package: Package,
-  wrench: Wrench,
-  'check-circle': CircleCheck,
-  bell: Bell,
+  shield: ShieldCheckIcon,
+  check: CheckIcon,
+  package: ArchiveBoxIcon,
+  wrench: WrenchScrewdriverIcon,
+  'check-circle': CheckCircleIcon,
+  bell: BellIcon,
 } as const;
 
 const TONE_CLASSES: Record<NotificationIconName, string> = {

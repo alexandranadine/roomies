@@ -1,4 +1,4 @@
-import { MoreHorizontal } from 'lucide-react';
+import { EllipsisHorizontalIcon } from '@heroicons/react/20/solid';
 import { IconButton, InitialsAvatar, Menu } from '../components/ui/index.js';
 import { cn } from '../components/ui/cn.js';
 import { homeRoleLabel } from '../homes/home-role-label.js';
@@ -79,7 +79,7 @@ export function RoommateMemberRow({
                   disabled={actionsDisabled}
                   className="shrink-0"
                 >
-                  <MoreHorizontal className="size-5" aria-hidden="true" />
+                  <EllipsisHorizontalIcon className="size-5" aria-hidden="true" />
                 </IconButton>
               }
             />

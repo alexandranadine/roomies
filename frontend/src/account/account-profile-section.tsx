@@ -1,5 +1,8 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { CircleAlert, CircleCheck } from 'lucide-react';
+import {
+  CheckCircleIcon,
+  ExclamationCircleIcon,
+} from '@heroicons/react/16/solid';
 import {
   VERIFICATION_EMAIL_SENT,
   VERIFICATION_EMAIL_SENT_TITLE,
@@ -115,14 +118,17 @@ export function AccountProfileSection() {
           ) : null}
           {verified ? (
             <p className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-brand">
-              <CircleCheck className="size-3.5 shrink-0" aria-hidden="true" />
+              <CheckCircleIcon className="size-3.5 shrink-0" aria-hidden="true" />
               Verified
             </p>
           ) : null}
           {unverified ? (
             <div className="mt-2 flex flex-col gap-2">
               <p className="inline-flex items-center gap-1 text-xs font-medium text-accent-coral-text">
-                <CircleAlert className="size-3.5 shrink-0" aria-hidden="true" />
+                <ExclamationCircleIcon
+                  className="size-3.5 shrink-0"
+                  aria-hidden="true"
+                />
                 Email not verified
               </p>
               <Button

@@ -1,4 +1,5 @@
-import { Check, CircleCheck } from 'lucide-react';
+import { CheckCircleIcon } from '@heroicons/react/20/solid';
+import { CheckIcon } from '@heroicons/react/24/outline';
 import { cn } from '../components/ui/cn.js';
 import { IconButton } from '../components/ui/index.js';
 import type { AssigneeLookup } from './task-assignee.js';
@@ -65,9 +66,8 @@ export function TaskRow({
               onComplete(task.id);
             }}
           >
-            <Check
+            <CheckIcon
               className="size-5 opacity-25 group-hover:opacity-100 group-focus-visible:opacity-100"
-              strokeWidth={2.5}
               aria-hidden="true"
             />
           </IconButton>
@@ -76,7 +76,7 @@ export function TaskRow({
             className="mt-0.5 inline-flex size-11 shrink-0 items-center justify-center rounded-full bg-success-soft text-success"
             aria-hidden="true"
           >
-            <CircleCheck className="size-5" strokeWidth={2.25} />
+            <CheckCircleIcon className="size-5" />
           </span>
         )}
 

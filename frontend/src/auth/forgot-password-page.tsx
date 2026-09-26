@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { Mail } from 'lucide-react';
+import { EnvelopeIcon } from '@heroicons/react/24/outline';
 import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link } from 'react-router';
@@ -63,7 +63,7 @@ export function ForgotPasswordPage() {
     <AuthPageLayout title="Forgot password · Roomies">
       <Card padding="lg" className="flex w-full flex-col gap-5">
         <AuthIconWell>
-          <Mail className="size-6" />
+          <EnvelopeIcon className="size-6" />
         </AuthIconWell>
         {submitted ? (
           <div className="flex flex-col gap-1">

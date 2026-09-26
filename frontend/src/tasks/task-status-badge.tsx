@@ -1,4 +1,8 @@
-import { AlertCircle, CalendarClock, Repeat } from 'lucide-react';
+import {
+  ArrowPathIcon,
+  CalendarDaysIcon,
+  ExclamationCircleIcon,
+} from '@heroicons/react/16/solid';
 import { cn } from '../components/ui/cn.js';
 import type { TaskDueKind } from './task-format.js';
 
@@ -9,7 +13,7 @@ export function TaskDueMeta({
   kind: TaskDueKind;
   label: string;
 }) {
-  const Icon = kind === 'overdue' ? AlertCircle : CalendarClock;
+  const Icon = kind === 'overdue' ? ExclamationCircleIcon : CalendarDaysIcon;
 
   return (
     <span
@@ -29,7 +33,7 @@ export function TaskDueMeta({
 export function TaskRepeatsMeta() {
   return (
     <span className="inline-flex items-center gap-1 text-text-secondary">
-      <Repeat className="size-3.5 shrink-0" aria-hidden="true" />
+      <ArrowPathIcon className="size-3.5 shrink-0" aria-hidden="true" />
       Repeats
     </span>
   );

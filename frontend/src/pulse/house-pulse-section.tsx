@@ -1,4 +1,6 @@
-import { Activity, ChevronRight, Wrench } from 'lucide-react';
+import { ChartBarIcon } from '@heroicons/react/20/solid';
+import { ChevronRightIcon } from '@heroicons/react/16/solid';
+import { WrenchScrewdriverIcon } from '@heroicons/react/24/outline';
 import { Link } from 'react-router';
 import { cn } from '../components/ui/cn.js';
 import type { HousePulseDto } from './pulse-api.js';
@@ -63,7 +65,7 @@ export function HousePulseSection({ homeId, pulse }: HousePulseSectionProps) {
         aria-label="Open Maintenance"
         className={maintenanceActionClassName}
       >
-        <Wrench className="size-4 shrink-0" aria-hidden="true" />
+        <WrenchScrewdriverIcon className="size-4 shrink-0" aria-hidden="true" />
         <span aria-hidden="true">Maintenance</span>
       </Link>
       <Link
@@ -71,7 +73,7 @@ export function HousePulseSection({ homeId, pulse }: HousePulseSectionProps) {
         aria-label="Open Tasks"
         className={actionLinkClassName}
       >
-        <ChevronRight className="size-5" aria-hidden="true" />
+        <ChevronRightIcon className="size-5" aria-hidden="true" />
       </Link>
     </span>
   );
@@ -89,7 +91,7 @@ export function HousePulseSection({ homeId, pulse }: HousePulseSectionProps) {
             className="order-1 inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand"
             aria-hidden="true"
           >
-            <Activity className="size-4" />
+            <ChartBarIcon className="size-4" />
           </span>
           <h2
             id="house-pulse-heading"

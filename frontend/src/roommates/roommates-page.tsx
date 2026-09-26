@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { UserPlus } from 'lucide-react';
+import { UserPlusIcon } from '@heroicons/react/24/outline';
 import { useEffect, useState } from 'react';
 import { useNavigate, useOutletContext, useParams } from 'react-router';
 import { DocumentTitle } from '../components/document-title.js';
@@ -186,7 +186,7 @@ export function RoommatesPage() {
             <Button
               type="button"
               className="shrink-0 self-start"
-              icon={<UserPlus className="size-4" aria-hidden="true" />}
+              icon={<UserPlusIcon className="size-4" aria-hidden="true" />}
               onClick={() => {
                 setInviteOpen(true);
               }}

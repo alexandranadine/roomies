@@ -1,4 +1,5 @@
-import { MoreHorizontal, Search } from 'lucide-react';
+import { EllipsisHorizontalIcon } from '@heroicons/react/20/solid';
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import type { ReactNode } from 'react';
 import { DocumentTitle } from '../components/document-title.js';
 import {
@@ -51,7 +52,7 @@ export function UiFixturePage() {
             <Button variant="danger">Danger</Button>
             <Button disabled>Disabled</Button>
             <Button loading>Loading</Button>
-            <Button icon={<Search className="size-4" aria-hidden="true" />}>
+            <Button icon={<MagnifyingGlassIcon className="size-4" aria-hidden="true" />}>
               With icon
             </Button>
           </div>
@@ -60,13 +61,13 @@ export function UiFixturePage() {
         <FixtureSection title="IconButton">
           <div className="flex flex-wrap items-center gap-3">
             <IconButton aria-label="Search">
-              <Search className="size-5" aria-hidden="true" />
+              <MagnifyingGlassIcon className="size-5" aria-hidden="true" />
             </IconButton>
             <IconButton aria-label="More actions" variant="secondary">
-              <MoreHorizontal className="size-5" aria-hidden="true" />
+              <EllipsisHorizontalIcon className="size-5" aria-hidden="true" />
             </IconButton>
             <IconButton aria-label="Loading icon action" loading>
-              <Search className="size-5" aria-hidden="true" />
+              <MagnifyingGlassIcon className="size-5" aria-hidden="true" />
             </IconButton>
           </div>
         </FixtureSection>
@@ -93,7 +94,7 @@ export function UiFixturePage() {
             />
             <TextField
               label="With adornment"
-              leading={<Search className="size-4" />}
+              leading={<MagnifyingGlassIcon className="size-4" />}
               placeholder="Search…"
             />
             <div className="md:col-span-2">

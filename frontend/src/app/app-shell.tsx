@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { User } from 'lucide-react';
+import { UserIcon } from '@heroicons/react/24/outline';
 import { NavLink, Outlet, useLocation, useMatches } from 'react-router';
 import { isAuthCanvasPath } from '../auth/auth-page-layout.js';
 import { PageContainer } from '../components/page-container.js';
@@ -87,7 +87,7 @@ export function AppShell() {
                 aria-label="Account"
                 className={accountNavClassName}
               >
-                <User className="size-5" aria-hidden="true" />
+                <UserIcon className="size-5" aria-hidden="true" />
               </NavLink>
             </nav>
           </PageContainer>

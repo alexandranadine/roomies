@@ -1,4 +1,4 @@
-import { Plus } from 'lucide-react';
+import { PlusIcon } from '@heroicons/react/24/outline';
 import { PageContainer } from '../components/page-container.js';
 import { RoomiesWordmark } from '../components/roomies-wordmark.js';
 import { IconButton } from '../components/ui/index.js';
@@ -51,7 +51,7 @@ export function HomeShellHeader({
               className="rounded-full"
               onClick={onAdd}
             >
-              <Plus className="size-5" aria-hidden="true" />
+              <PlusIcon className="size-5" aria-hidden="true" />
             </IconButton>
           </nav>
         </PageContainer>
@@ -81,7 +81,7 @@ export function HomeShellHeader({
               className="rounded-full"
               onClick={onAdd}
             >
-              <Plus className="size-5" aria-hidden="true" />
+              <PlusIcon className="size-5" aria-hidden="true" />
             </IconButton>
           ) : null}
         </div>

@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { Mail } from 'lucide-react';
+import { EnvelopeIcon } from '@heroicons/react/24/outline';
 import { Alert, Button } from '../components/ui/index.js';
 import { sendVerificationEmail } from '../invitations/send-verification-email-api.js';
 import { AuthIconWell } from './auth-page-layout.js';
@@ -68,7 +68,7 @@ export function UnverifiedEmailNotice({
       <div className="flex flex-col gap-3">
         {showIcon ? (
           <AuthIconWell>
-            <Mail className="size-6" />
+            <EnvelopeIcon className="size-6" />
           </AuthIconWell>
         ) : null}
         <div className="flex flex-col gap-1">

@@ -1,4 +1,9 @@
-import { CheckSquare, UserPlus, Users, Wrench } from 'lucide-react';
+import {
+  ClipboardDocumentCheckIcon,
+  UserGroupIcon,
+  UserPlusIcon,
+  WrenchScrewdriverIcon,
+} from '@heroicons/react/24/outline';
 import { Link } from 'react-router';
 import { cn } from '../components/ui/cn.js';
 
@@ -46,7 +51,10 @@ export function HomeQuickActions({
         </button>
         <div className="grid grid-cols-3 divide-x divide-border">
           <button type="button" className={tileClassName} onClick={onAddTask}>
-            <CheckSquare className="size-5 text-brand" aria-hidden="true" />
+            <ClipboardDocumentCheckIcon
+              className="size-5 text-brand"
+              aria-hidden="true"
+            />
             Add task
           </button>
           {isAdmin ? (
@@ -55,17 +63,20 @@ export function HomeQuickActions({
               className={tileClassName}
               onClick={onInviteRoommate}
             >
-              <UserPlus className="size-5 text-brand" aria-hidden="true" />
+              <UserPlusIcon className="size-5 text-brand" aria-hidden="true" />
               Invite
             </button>
           ) : (
             <Link to={roommatesHref} className={tileClassName}>
-              <Users className="size-5 text-brand" aria-hidden="true" />
+              <UserGroupIcon className="size-5 text-brand" aria-hidden="true" />
               Roommates
             </Link>
           )}
           <Link to={maintenanceHref} className={tileClassName}>
-            <Wrench className="size-5 text-brand" aria-hidden="true" />
+            <WrenchScrewdriverIcon
+              className="size-5 text-brand"
+              aria-hidden="true"
+            />
             Maintenance
           </Link>
         </div>

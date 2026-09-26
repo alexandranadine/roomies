@@ -1,4 +1,4 @@
-import { Plus } from 'lucide-react';
+import { PlusIcon } from '@heroicons/react/24/outline';
 import { useEffect, useState } from 'react';
 import { useOutletContext, useParams, useSearchParams } from 'react-router';
 import { DocumentTitle } from '../components/document-title.js';
@@ -129,7 +129,7 @@ export function MaintenanceListPage() {
           <Button
             type="button"
             className="shrink-0 self-start"
-            icon={<Plus className="size-4" aria-hidden="true" />}
+            icon={<PlusIcon className="size-4" aria-hidden="true" />}
             onClick={() => {
               setCreateOpen(true);
             }}

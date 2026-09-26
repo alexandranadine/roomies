@@ -1,4 +1,4 @@
-import { CircleCheck, CircleDot } from 'lucide-react';
+import { CheckCircleIcon, ClockIcon } from '@heroicons/react/16/solid';
 import { cn } from '../components/ui/cn.js';
 import type { MaintenanceStatus } from './maintenance-api.js';
 import { formatMaintenanceStatus } from './maintenance-format.js';
@@ -23,9 +23,9 @@ export function MaintenanceStatusBadge({
       )}
     >
       {resolved ? (
-        <CircleCheck className="size-3.5 shrink-0" aria-hidden="true" />
+        <CheckCircleIcon className="size-3.5 shrink-0" aria-hidden="true" />
       ) : (
-        <CircleDot className="size-3.5 shrink-0" aria-hidden="true" />
+        <ClockIcon className="size-3.5 shrink-0" aria-hidden="true" />
       )}
       {formatMaintenanceStatus(status)}
     </span>

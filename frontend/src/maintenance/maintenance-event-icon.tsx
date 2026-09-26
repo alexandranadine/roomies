@@ -1,4 +1,4 @@
-import { CircleCheck, Wrench } from 'lucide-react';
+import { CheckCircleIcon, WrenchScrewdriverIcon } from '@heroicons/react/20/solid';
 import { cn } from '../components/ui/cn.js';
 import type { MaintenanceStatus } from './maintenance-api.js';
 
@@ -12,7 +12,7 @@ export function MaintenanceEventIcon({
   status: MaintenanceStatus;
 }) {
   const resolved = status === 'RESOLVED';
-  const Icon = resolved ? CircleCheck : Wrench;
+  const Icon = resolved ? CheckCircleIcon : WrenchScrewdriverIcon;
   return (
     <span
       className={cn(

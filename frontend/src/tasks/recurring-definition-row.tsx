@@ -1,4 +1,4 @@
-import { MoreHorizontal } from 'lucide-react';
+import { EllipsisHorizontalIcon } from '@heroicons/react/20/solid';
 import { useState } from 'react';
 import { IconButton, Menu } from '../components/ui/index.js';
 import { DeactivateTaskDefinitionDialog } from './deactivate-task-definition-dialog.js';
@@ -53,7 +53,7 @@ export function RecurringDefinitionRow({
                   aria-label={`Actions for ${definition.title}`}
                   className="shrink-0"
                 >
-                  <MoreHorizontal className="size-5" aria-hidden="true" />
+                  <EllipsisHorizontalIcon className="size-5" aria-hidden="true" />
                 </IconButton>
               }
             />

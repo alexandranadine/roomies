@@ -1,4 +1,4 @@
-import { Lock } from 'lucide-react';
+import { LockClosedIcon } from '@heroicons/react/16/solid';
 import { cn } from '../components/ui/cn.js';
 
 /**
@@ -13,7 +13,10 @@ export function PrivateIndicator({ className }: { className?: string }) {
         className,
       )}
     >
-      <Lock className="size-3.5 shrink-0 text-privacy-icon" aria-hidden="true" />
+      <LockClosedIcon
+        className="size-3.5 shrink-0 text-privacy-icon"
+        aria-hidden="true"
+      />
       <span>Private</span>
     </span>
   );

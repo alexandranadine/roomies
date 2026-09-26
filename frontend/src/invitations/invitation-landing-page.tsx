@@ -1,5 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CircleAlert, Home } from 'lucide-react';
+import {
+  ExclamationCircleIcon,
+  HomeIcon,
+} from '@heroicons/react/24/outline';
 import type { ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { AuthIconWell, AuthPageLayout } from '../auth/auth-page-layout.js';
@@ -170,7 +173,7 @@ export function InvitationLandingPage() {
     >
       <Card padding="lg" className="flex w-full flex-col gap-3">
         <AuthIconWell>
-          <Home className="size-6" />
+          <HomeIcon className="size-6" />
         </AuthIconWell>
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold tracking-tight break-words text-text-primary">
@@ -300,7 +303,7 @@ function InvitationStatusPage({
     <AuthPageLayout title={title} size="invite">
       <Card padding="lg" className="flex w-full flex-col gap-5">
         <AuthIconWell>
-          <CircleAlert className="size-6" />
+          <ExclamationCircleIcon className="size-6" />
         </AuthIconWell>
         <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
           {heading}

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Home } from 'lucide-react';
+import { HomeIcon } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 import { Link, Navigate } from 'react-router';
 import { AuthIconWell } from '../auth/auth-page-layout.js';
@@ -64,7 +64,7 @@ export function HomeDiscoveryPage() {
             {showCreateForm ? (
               <>
                 <AuthIconWell>
-                  <Home className="size-6" />
+                  <HomeIcon className="size-6" />
                 </AuthIconWell>
                 <div className="flex flex-col gap-1">
                   <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
@@ -79,7 +79,7 @@ export function HomeDiscoveryPage() {
             ) : (
               <>
                 <AuthIconWell>
-                  <Home className="size-6" />
+                  <HomeIcon className="size-6" />
                 </AuthIconWell>
                 <div className="flex flex-col gap-2">
                   <h1 className="text-2xl font-semibold tracking-tight text-text-primary">

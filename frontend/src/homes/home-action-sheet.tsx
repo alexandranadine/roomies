@@ -1,5 +1,10 @@
-import { Camera, CheckSquare, UserPlus } from 'lucide-react';
+import {
+  CameraIcon,
+  ClipboardDocumentCheckIcon,
+  UserPlusIcon,
+} from '@heroicons/react/20/solid';
 import { Sheet } from '../components/ui/index.js';
+import type { HeroIcon } from './home-nav.js';
 
 export type HomeActionSheetProps = {
   open: boolean;
@@ -34,7 +39,7 @@ export function HomeActionSheet({
         <ul className="flex flex-col gap-1 p-0">
           <li>
             <ActionRow
-              icon={CheckSquare}
+              icon={ClipboardDocumentCheckIcon}
               label="Add task"
               onClick={() => {
                 onOpenChange(false);
@@ -45,7 +50,7 @@ export function HomeActionSheet({
           {isAdmin ? (
             <li>
               <ActionRow
-                icon={UserPlus}
+                icon={UserPlusIcon}
                 label="Invite roommate"
                 onClick={() => {
                   onOpenChange(false);
@@ -56,7 +61,7 @@ export function HomeActionSheet({
           ) : null}
           <li>
             <ActionRow
-              icon={Camera}
+              icon={CameraIcon}
               label={hasPhoto ? 'Change Home photo' : 'Add Home photo'}
               onClick={() => {
                 onOpenChange(false);
@@ -75,7 +80,7 @@ function ActionRow({
   label,
   onClick,
 }: {
-  icon: typeof CheckSquare;
+  icon: HeroIcon;
   label: string;
   onClick: () => void;
 }) {

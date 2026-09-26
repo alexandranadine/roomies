@@ -1,4 +1,4 @@
-import { Bell } from 'lucide-react';
+import { BellIcon } from '@heroicons/react/24/outline';
 import { NavLink } from 'react-router';
 import { cn } from '../components/ui/cn.js';
 import { useNotificationsList } from './use-notifications-list.js';
@@ -44,7 +44,7 @@ export function NotificationBellLink() {
       aria-label={accessibleName}
       className={bellClassName}
     >
-      <Bell className="size-5" aria-hidden="true" />
+      <BellIcon className="size-5" aria-hidden="true" />
       {unread > 0 ? (
         <span
           className="absolute top-1.5 right-1.5 flex min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-white"

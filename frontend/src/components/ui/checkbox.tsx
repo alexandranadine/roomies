@@ -1,5 +1,5 @@
 import { Checkbox as BaseCheckbox } from '@base-ui/react/checkbox';
-import { Check } from 'lucide-react';
+import { CheckIcon } from '@heroicons/react/16/solid';
 import type { ComponentProps, ReactNode } from 'react';
 import { cn } from './cn.js';
 
@@ -71,7 +71,7 @@ export function Checkbox({
         {...rootProps}
       >
         <BaseCheckbox.Indicator className="flex data-unchecked:hidden">
-          <Check className="size-3.5" strokeWidth={2.5} aria-hidden="true" />
+          <CheckIcon className="size-3.5" aria-hidden="true" />
         </BaseCheckbox.Indicator>
       </BaseCheckbox.Root>
       <span>{label}</span>

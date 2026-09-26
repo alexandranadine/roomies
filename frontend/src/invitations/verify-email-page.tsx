@@ -1,5 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import { CircleAlert, MailCheck } from 'lucide-react';
+import {
+  CheckBadgeIcon,
+  ExclamationCircleIcon,
+} from '@heroicons/react/24/outline';
 import { Link, useSearchParams } from 'react-router';
 import { AuthIconWell, AuthPageLayout } from '../auth/auth-page-layout.js';
 import { UnverifiedEmailNotice } from '../auth/unverified-email-notice.js';
@@ -40,7 +43,7 @@ export function VerifyEmailPage() {
         {linkError ? (
           <>
             <AuthIconWell>
-              <CircleAlert className="size-6" />
+              <ExclamationCircleIcon className="size-6" />
             </AuthIconWell>
             <div className="flex flex-col gap-1">
               <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
@@ -74,7 +77,7 @@ export function VerifyEmailPage() {
         {!linkError && verified ? (
           <>
             <AuthIconWell>
-              <MailCheck className="size-6" />
+              <CheckBadgeIcon className="size-6" />
             </AuthIconWell>
             <div className="flex flex-col gap-1">
               <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
@@ -101,7 +104,7 @@ export function VerifyEmailPage() {
         !verified ? (
           <>
             <AuthIconWell>
-              <CircleAlert className="size-6" />
+              <ExclamationCircleIcon className="size-6" />
             </AuthIconWell>
             <div className="flex flex-col gap-1">
               <h1 className="text-2xl font-semibold tracking-tight text-text-primary">

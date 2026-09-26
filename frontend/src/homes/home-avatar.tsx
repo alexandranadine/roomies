@@ -1,4 +1,4 @@
-import { House } from 'lucide-react';
+import { HomeIcon } from '@heroicons/react/20/solid';
 import { cn } from '../components/ui/cn.js';
 import { Skeleton } from '../components/ui/index.js';
 import { useBlobObjectUrl } from './use-blob-object-url.js';
@@ -60,7 +60,7 @@ export function HomeAvatar({
           aria-hidden="true"
           className="flex size-full items-center justify-center text-brand"
         >
-          <House className="size-[62%]" strokeWidth={2} />
+          <HomeIcon className="size-[62%]" />
         </span>
       )}
     </span>

@@ -1,5 +1,18 @@
-import type { LucideIcon } from 'lucide-react';
-import { CheckSquare, Home, User, Users } from 'lucide-react';
+import type { ComponentType, SVGProps } from 'react';
+import {
+  ClipboardDocumentCheckIcon as TasksIconOutline,
+  HomeIcon as HomeIconOutline,
+  UserGroupIcon as UserGroupIconOutline,
+  UserIcon as UserIconOutline,
+} from '@heroicons/react/24/outline';
+import {
+  ClipboardDocumentCheckIcon as TasksIconSolid,
+  HomeIcon as HomeIconSolid,
+  UserGroupIcon as UserGroupIconSolid,
+  UserIcon as UserIconSolid,
+} from '@heroicons/react/24/solid';
+
+export type HeroIcon = ComponentType<SVGProps<SVGSVGElement>>;
 
 export type HomeNavDestinationId = 'home' | 'tasks' | 'house' | 'profile';
 
@@ -7,7 +20,8 @@ export type HomeNavDestination = {
   id: HomeNavDestinationId;
   label: string;
   accessibleName: string;
-  icon: LucideIcon;
+  iconOutline: HeroIcon;
+  iconSolid: HeroIcon;
   end?: boolean;
   to: (homeId: string) => string;
 };
@@ -17,7 +31,8 @@ export const HOME_NAV_DESTINATIONS: readonly HomeNavDestination[] = [
     id: 'home',
     label: 'Home',
     accessibleName: 'Home',
-    icon: Home,
+    iconOutline: HomeIconOutline,
+    iconSolid: HomeIconSolid,
     end: true,
     to: (homeId) => `/homes/${encodeURIComponent(homeId)}`,
   },
@@ -25,21 +40,24 @@ export const HOME_NAV_DESTINATIONS: readonly HomeNavDestination[] = [
     id: 'tasks',
     label: 'Tasks',
     accessibleName: 'Tasks',
-    icon: CheckSquare,
+    iconOutline: TasksIconOutline,
+    iconSolid: TasksIconSolid,
     to: (homeId) => `/homes/${encodeURIComponent(homeId)}/tasks`,
   },
   {
     id: 'house',
     label: 'House',
     accessibleName: 'Roommates',
-    icon: Users,
+    iconOutline: UserGroupIconOutline,
+    iconSolid: UserGroupIconSolid,
     to: (homeId) => `/homes/${encodeURIComponent(homeId)}/roommates`,
   },
   {
     id: 'profile',
     label: 'Profile',
     accessibleName: 'Account',
-    icon: User,
+    iconOutline: UserIconOutline,
+    iconSolid: UserIconSolid,
     to: () => '/account',
   },
 ];

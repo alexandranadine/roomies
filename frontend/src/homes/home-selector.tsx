@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDownIcon } from '@heroicons/react/16/solid';
 import { useNavigate } from 'react-router';
 import { Menu } from '../components/ui/index.js';
 import { cn } from '../components/ui/cn.js';
@@ -50,7 +50,7 @@ export function HomeSelector({
             {homeName}
           </h1>
         </span>
-        <ChevronDown
+        <ChevronDownIcon
           className="size-4 shrink-0 text-text-muted"
           aria-hidden="true"
         />

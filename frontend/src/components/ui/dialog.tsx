@@ -1,5 +1,5 @@
 import { Dialog as BaseDialog } from '@base-ui/react/dialog';
-import { X } from 'lucide-react';
+import { XMarkIcon } from '@heroicons/react/24/outline';
 import type { ComponentProps, ReactNode } from 'react';
 import { cn } from './cn.js';
 import { IconButton } from './icon-button.js';
@@ -81,7 +81,7 @@ export function DialogPopup({
               <BaseDialog.Close
                 render={
                   <IconButton variant="subtle" aria-label={closeLabel}>
-                    <X className="size-5" aria-hidden="true" />
+                    <XMarkIcon className="size-5" aria-hidden="true" />
                   </IconButton>
                 }
               />

@@ -1,4 +1,4 @@
-import { Plus } from 'lucide-react';
+import { PlusIcon } from '@heroicons/react/24/solid';
 import { NavLink } from 'react-router';
 import { cn } from '../components/ui/cn.js';
 import { HOME_NAV_DESTINATIONS } from './home-nav.js';
@@ -42,7 +42,7 @@ export function HomeBottomNav({ homeId, onOpenActions }: HomeBottomNavProps) {
               'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
             )}
           >
-            <Plus className="size-7" strokeWidth={2.5} aria-hidden="true" />
+            <PlusIcon className="size-7" aria-hidden="true" />
           </button>
         </li>
         {trailing.map((destination) => (
@@ -62,7 +62,6 @@ function BottomNavLink({
   destination: (typeof HOME_NAV_DESTINATIONS)[number];
   homeId: string;
 }) {
-  const Icon = destination.icon;
   return (
     <NavLink
       to={destination.to(homeId)}
@@ -77,17 +76,17 @@ function BottomNavLink({
         )
       }
     >
-      {({ isActive }) => (
-        <>
-          <Icon
-            className={cn('size-5', isActive && 'fill-current')}
-            aria-hidden="true"
-          />
-          <span className={cn(isActive && 'font-semibold')}>
-            {destination.label}
-          </span>
-        </>
-      )}
+      {({ isActive }) => {
+        const Icon = isActive ? destination.iconSolid : destination.iconOutline;
+        return (
+          <>
+            <Icon className="size-5" aria-hidden="true" />
+            <span className={cn(isActive && 'font-semibold')}>
+              {destination.label}
+            </span>
+          </>
+        );
+      }}
     </NavLink>
   );
 }

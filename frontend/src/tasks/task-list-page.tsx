@@ -1,4 +1,4 @@
-import { Plus } from 'lucide-react';
+import { PlusIcon } from '@heroicons/react/24/outline';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useOutletContext, useParams } from 'react-router';
 import { DocumentTitle } from '../components/document-title.js';
@@ -216,7 +216,7 @@ export function TaskListPage() {
           <Button
             type="button"
             className="shrink-0 self-start"
-            icon={<Plus className="size-4" aria-hidden="true" />}
+            icon={<PlusIcon className="size-4" aria-hidden="true" />}
             onClick={openCreate}
           >
             Add task
