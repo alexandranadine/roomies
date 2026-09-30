@@ -23,6 +23,7 @@ import {
   recoverStaleHomeMembershipState,
   removeMembershipFromHomeCache,
 } from './refresh-home-membership-surfaces.js';
+import { RemoveAdminAccessDialog } from './remove-admin-access-dialog.js';
 import { RemoveRoommateDialog } from './remove-roommate-dialog.js';
 import { RoommateMemberRow } from './roommate-member-row.js';
 import { changeRoleErrorMessage } from './roommates-errors.js';
@@ -50,6 +51,12 @@ type PendingRemove = {
   name: string;
 };
 
+type PendingDemote = {
+  membershipId: string;
+  name: string;
+  isSelf: boolean;
+};
+
 export function RoommatesPage() {
   const { home, isAdmin, openInviteRoommate, adminInvite } =
     useOutletContext<HomeShellOutletContext>();
@@ -65,6 +72,9 @@ export function RoommatesPage() {
   });
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [pendingRemove, setPendingRemove] = useState<PendingRemove | null>(
+    null,
+  );
+  const [pendingDemote, setPendingDemote] = useState<PendingDemote | null>(
     null,
   );
   const [roleError, setRoleError] = useState<string | null>(null);
@@ -89,6 +99,7 @@ export function RoommatesPage() {
   useEffect(() => {
     setLeaveOpen(false);
     setPendingRemove(null);
+    setPendingDemote(null);
     setRoleError(null);
   }, [homeId]);
 
@@ -271,7 +282,11 @@ export function RoommatesPage() {
                     void handleChangeRole(member.membershipId, 'ADMIN');
                   }}
                   onMakeRoommate={() => {
-                    void handleChangeRole(member.membershipId, 'ROOMMATE');
+                    setPendingDemote({
+                      membershipId: member.membershipId,
+                      name: member.name,
+                      isSelf: member.membershipId === currentMembershipId,
+                    });
                   }}
                   onRemove={() => {
                     setPendingRemove({
@@ -325,6 +340,35 @@ export function RoommatesPage() {
               onUnauthenticated={handleUnauthenticated}
             />
           </section>
+        ) : null}
+
+        {pendingDemote !== null ? (
+          <RemoveAdminAccessDialog
+            homeId={homeId}
+            membershipId={pendingDemote.membershipId}
+            roommateName={pendingDemote.name}
+            isSelf={pendingDemote.isSelf}
+            open
+            onOpenChange={(next) => {
+              if (!next) {
+                setPendingDemote(null);
+              }
+            }}
+            onDemoted={() => {
+              patchHomeMembershipRole(
+                queryClient,
+                homeId,
+                pendingDemote.membershipId,
+                'ROOMMATE',
+              );
+              if (pendingDemote.isSelf) {
+                patchCurrentUserHomeRole(queryClient, homeId, 'ROOMMATE');
+              }
+              reconcileHomeMembershipSurfaces(queryClient, homeId);
+            }}
+            onStaleMembership={handleStaleMembership}
+            onUnauthenticated={handleUnauthenticated}
+          />
         ) : null}
 
         {pendingRemove !== null ? (

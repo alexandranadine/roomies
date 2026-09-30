@@ -3,6 +3,10 @@ import { IconButton, InitialsAvatar, Menu } from '../components/ui/index.js';
 import { cn } from '../components/ui/cn.js';
 import { roommateRosterRoleLabel } from '../homes/home-role-label.js';
 import type { ActiveHome } from '../homes/homes-api.js';
+import {
+  demoteAdminMenuLabel,
+  MAKE_ADMIN_MENU_LABEL,
+} from './role-change-copy.js';
 
 export type RoommateMemberRowProps = {
   name: string;
@@ -90,7 +94,7 @@ export function RoommateMemberRow({
                     onMakeAdmin();
                   }}
                 >
-                  Make admin
+                  {MAKE_ADMIN_MENU_LABEL}
                 </Menu.Item>
               ) : null}
               {showSelfDemote || showMakeRoommate ? (
@@ -100,7 +104,7 @@ export function RoommateMemberRow({
                     onMakeRoommate();
                   }}
                 >
-                  Make roommate
+                  {demoteAdminMenuLabel(showSelfDemote)}
                 </Menu.Item>
               ) : null}
               {showOtherAdminActions ? (

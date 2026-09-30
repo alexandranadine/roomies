@@ -242,7 +242,15 @@ describe('Home latest invite recovery', () => {
       screen.getByRole('button', { name: 'Actions for Alex' }),
     );
     await user.click(
-      await screen.findByRole('menuitem', { name: 'Make roommate' }),
+      await screen.findByRole('menuitem', {
+        name: 'Remove your admin access',
+      }),
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Remove your admin access',
+    });
+    await user.click(
+      within(dialog).getByRole('button', { name: /^Remove admin access$/ }),
     );
 
     await waitFor(() => {

@@ -57,6 +57,16 @@ async function openRowActions(
   expect(await screen.findByRole('menu')).toBeInTheDocument();
 }
 
+async function confirmRemoveAdminAccess(
+  user: ReturnType<typeof userEvent.setup>,
+  dialogTitle: 'Remove admin access' | 'Remove your admin access',
+) {
+  const dialog = await screen.findByRole('dialog', { name: dialogTitle });
+  await user.click(
+    within(dialog).getByRole('button', { name: /^Remove admin access$/ }),
+  );
+}
+
 describe('Roommates page', () => {
   it('reaches Roommates from Home navigation and lists active roommates only', async () => {
     const user = userEvent.setup();
@@ -260,7 +270,7 @@ describe('Roommates ADMIN UI', () => {
       screen.getByRole('menuitem', { name: 'Make admin' }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole('menuitem', { name: 'Make roommate' }),
+      screen.queryByRole('menuitem', { name: 'Remove admin access' }),
     ).not.toBeInTheDocument();
     expect(
       screen.getByRole('menuitem', { name: 'Remove from Home' }),
@@ -272,7 +282,7 @@ describe('Roommates ADMIN UI', () => {
       screen.queryByRole('menuitem', { name: 'Remove from Home' }),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole('menuitem', { name: 'Make roommate' }),
+      screen.getByRole('menuitem', { name: 'Remove your admin access' }),
     ).toBeInTheDocument();
     await user.keyboard('{Escape}');
   });
@@ -543,12 +553,15 @@ describe('Roommates role change', () => {
     expect(await screen.findByText('Alex')).toBeInTheDocument();
 
     await openRowActions(user, 'Alex');
-    await user.click(screen.getByRole('menuitem', { name: 'Make roommate' }));
+    await user.click(
+      screen.getByRole('menuitem', { name: 'Remove your admin access' }),
+    );
+    await confirmRemoveAdminAccess(user, 'Remove your admin access');
 
-    expect(
-      screen.getByRole('button', { name: 'Invite roommate' }),
-    ).toBeInTheDocument();
     expect(resolveRole).toBeDefined();
+    expect(
+      screen.getByRole('dialog', { name: 'Remove your admin access' }),
+    ).toBeInTheDocument();
 
     state.role = 'ROOMMATE';
     state.memberships = {
@@ -565,13 +578,13 @@ describe('Roommates role change', () => {
       expect(
         screen.queryByRole('button', { name: 'Invite roommate' }),
       ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Actions for Jamie' }),
+      ).not.toBeInTheDocument();
     });
     const alexRow = screen.getByText('Alex').closest('li');
     expect(alexRow).not.toBeNull();
     expect(within(alexRow!).getByText('Household member')).toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'Actions for Jamie' }),
-    ).not.toBeInTheDocument();
   });
 
   it('keeps previous Admin state when the backend rejects a role change', async () => {
@@ -594,11 +607,18 @@ describe('Roommates role change', () => {
     expect(await screen.findByText('Jamie')).toBeInTheDocument();
 
     await openRowActions(user, 'Alex');
-    await user.click(screen.getByRole('menuitem', { name: 'Make roommate' }));
+    await user.click(
+      screen.getByRole('menuitem', { name: 'Remove your admin access' }),
+    );
+    await confirmRemoveAdminAccess(user, 'Remove your admin access');
 
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Remove your admin access',
+    });
     expect(
-      await screen.findByText(/needs at least one Home admin/i),
+      await within(dialog).findByText(/needs at least one Home admin/i),
     ).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
     expect(
       screen.getByRole('button', { name: 'Invite roommate' }),
     ).toBeInTheDocument();
@@ -634,7 +654,7 @@ describe('Roommates role change', () => {
     ).toBeInTheDocument();
     await openRowActions(user, 'Jamie');
     expect(
-      screen.getByRole('menuitem', { name: 'Make roommate' }),
+      screen.getByRole('menuitem', { name: 'Remove admin access' }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('menuitem', { name: 'Make admin' }),
@@ -662,12 +682,15 @@ describe('Roommates role change', () => {
     ).toBeInTheDocument();
     await openRowActions(user, 'Jamie');
     expect(
-      screen.getByRole('menuitem', { name: 'Make roommate' }),
+      screen.getByRole('menuitem', { name: 'Remove admin access' }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('menuitem', { name: 'Make admin' }),
     ).not.toBeInTheDocument();
-    await user.click(screen.getByRole('menuitem', { name: 'Make roommate' }));
+    await user.click(
+      screen.getByRole('menuitem', { name: 'Remove admin access' }),
+    );
+    await confirmRemoveAdminAccess(user, 'Remove admin access');
 
     await waitFor(() => {
       expect(
@@ -681,7 +704,7 @@ describe('Roommates role change', () => {
       screen.getByRole('menuitem', { name: 'Make admin' }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole('menuitem', { name: 'Make roommate' }),
+      screen.queryByRole('menuitem', { name: 'Remove admin access' }),
     ).not.toBeInTheDocument();
   });
 
