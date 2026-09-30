@@ -86,7 +86,7 @@ export const FIXTURE_PRIVATE_CREATED = notificationItem({
   kind: NOTIFICATION_KINDS.PRIVATE_MAINTENANCE_CREATED,
   actor: null,
   source: null,
-  destination: { type: 'HOME', homeId: TEST_HOME_A },
+  destination: { type: 'MAINTENANCE', homeId: TEST_HOME_A },
   occurredAt: '2026-09-13T15:00:00.000Z',
 });
 
@@ -95,7 +95,7 @@ export const FIXTURE_PRIVATE_RESOLVED = notificationItem({
   kind: NOTIFICATION_KINDS.PRIVATE_MAINTENANCE_RESOLVED,
   actor: null,
   source: null,
-  destination: { type: 'HOME', homeId: TEST_HOME_A },
+  destination: { type: 'MAINTENANCE', homeId: TEST_HOME_A },
   occurredAt: '2026-09-13T14:00:00.000Z',
 });
 

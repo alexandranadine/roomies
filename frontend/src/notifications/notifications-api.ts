@@ -68,6 +68,12 @@ export const notificationDestinationSchema = z.discriminatedUnion('type', [
     .strict(),
   z
     .object({
+      type: z.literal('MAINTENANCE'),
+      homeId: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
       type: z.literal('HOME'),
       homeId: z.string().min(1),
     })

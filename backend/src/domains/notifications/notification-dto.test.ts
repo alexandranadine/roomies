@@ -54,22 +54,54 @@ void describe('Notification list DTO', () => {
     const dto = toNotificationListItemDto(
       item({
         kind: 'PRIVATE_MAINTENANCE_CREATED',
+        actor: null,
         source: null,
         destination: {
-          type: 'HOME',
+          type: 'MAINTENANCE',
           homeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         },
       }),
     );
     assert.equal(dto.source, null);
+    assert.equal(dto.actor, null);
     assert.deepEqual(dto.destination, {
-      type: 'HOME',
+      type: 'MAINTENANCE',
       homeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     });
+    assert.equal('maintenanceEntryId' in dto.destination, false);
     assert.equal('sourceEntityId' in dto, false);
     assert.equal('title' in (dto.source ?? {}), false);
     assert.equal('details' in dto, false);
     assert.equal('audience' in dto, false);
+  });
+
+  void it('rejects PRIVATE Maintenance destinations that include an entry id', () => {
+    assert.equal(
+      notificationListPageDtoSchema.safeParse({
+        items: [
+          {
+            id: '018f1e2c-7e3a-7000-8000-1234567890ab',
+            kind: 'PRIVATE_MAINTENANCE_CREATED',
+            occurredAt: OCCURRED.toISOString(),
+            readAt: null,
+            home: {
+              id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+              name: 'Home A',
+            },
+            actor: null,
+            source: null,
+            destination: {
+              type: 'MAINTENANCE',
+              homeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+              maintenanceEntryId: '018f1e2c-7e3a-7000-8000-1234567890ad',
+            },
+          },
+        ],
+        hasMore: false,
+        nextCursor: null,
+      }).success,
+      false,
+    );
   });
 
   void it('serializes an empty page', () => {

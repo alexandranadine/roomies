@@ -65,6 +65,15 @@ type DisplayQueryable = {
   ) => Promise<{ rows: T[] }>;
 };
 
+function isPrivateMaintenanceKind(
+  kind: EligibleNotification['kind'],
+): boolean {
+  return (
+    kind === 'PRIVATE_MAINTENANCE_CREATED' ||
+    kind === 'PRIVATE_MAINTENANCE_RESOLVED'
+  );
+}
+
 function actorDisplay(
   membershipId: string | null,
   displays: ReadonlyMap<string, HistoricalMembershipDisplay>,
@@ -120,6 +129,12 @@ function destinationFor(
       homeId: notification.homeId,
     });
   }
+  if (isPrivateMaintenanceKind(notification.kind)) {
+    return Object.freeze({
+      type: 'MAINTENANCE',
+      homeId: notification.homeId,
+    });
+  }
   return Object.freeze({
     type: 'HOME',
     homeId: notification.homeId,
@@ -146,7 +161,10 @@ function collectIdsByHome(items: readonly EligibleNotification[]): {
       };
       byHome.set(item.homeId, bucket);
     }
-    if (item.actorMembershipId !== null) {
+    if (
+      item.actorMembershipId !== null &&
+      !isPrivateMaintenanceKind(item.kind)
+    ) {
       bucket.membershipIds.add(item.actorMembershipId);
     }
     if (item.kind === 'ASSIGNED_TASK_COMPLETED') {
@@ -229,7 +247,9 @@ function projectItems(
           id: item.homeId,
           name: item.homeName,
         }),
-        actor: actorDisplay(item.actorMembershipId, memberships),
+        actor: isPrivateMaintenanceKind(item.kind)
+          ? null
+          : actorDisplay(item.actorMembershipId, memberships),
         source: sourcePresentation(item, tasks, supplies),
         destination: destinationFor(item),
       }),

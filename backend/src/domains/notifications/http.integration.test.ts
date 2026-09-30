@@ -424,10 +424,15 @@ void describe('Notification HTTP PostgreSQL', () => {
           assert.equal(alexBody.items[0]?.actor?.name, 'Alex');
           assert.equal(alexBody.items[1]?.source?.type, 'SUPPLY');
           assert.equal(alexBody.items[2]?.source, null);
+          assert.equal(alexBody.items[2]?.actor, null);
           assert.deepEqual(alexBody.items[2]?.destination, {
-            type: 'HOME',
+            type: 'MAINTENANCE',
             homeId: homeA,
           });
+          assert.equal(
+            'maintenanceEntryId' in (alexBody.items[2]?.destination ?? {}),
+            false,
+          );
           assert.equal(alexList.text.includes(PRIVATE_TITLE), false);
           assert.equal(alexList.text.includes(PRIVATE_DETAILS), false);
           assert.equal(alexList.text.includes(privateA), false);

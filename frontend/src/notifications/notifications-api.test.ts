@@ -8,6 +8,7 @@ import {
   readAllNotifications,
 } from './notifications-api.js';
 import {
+  FIXTURE_PRIVATE_CREATED,
   FIXTURE_TASK_TITLED,
   jsonResponse,
   listPage,
@@ -126,6 +127,18 @@ describe('notifications API contracts', () => {
       userId: TEST_USER_ID,
       audience: ['hidden'],
       membershipId: 'm1111111-1111-4111-8111-111111111111',
+    };
+    expect(notificationListItemSchema.safeParse(leaked).success).toBe(false);
+  });
+
+  it('rejects PRIVATE Maintenance destinations that include an entry id', () => {
+    const leaked = {
+      ...FIXTURE_PRIVATE_CREATED,
+      destination: {
+        type: 'MAINTENANCE',
+        homeId: TEST_HOME_A,
+        maintenanceEntryId: 'm1111111-1111-4111-8111-111111111111',
+      },
     };
     expect(notificationListItemSchema.safeParse(leaked).success).toBe(false);
   });

@@ -48,7 +48,7 @@ describe('presentNotification', () => {
       'Your roommate role changed',
       'Alex completed a task assigned to you',
       'Alex picked up a supply you added',
-      'New private maintenance update',
+      'Private maintenance was added',
       'Private maintenance was resolved',
     ]);
 
@@ -115,20 +115,28 @@ describe('presentNotification', () => {
     const created = presentNotification(
       notificationItem({
         kind: NOTIFICATION_KINDS.PRIVATE_MAINTENANCE_CREATED,
+        actor: { name: 'Alex' },
         source: null,
       }),
     );
     const resolved = presentNotification(
       notificationItem({
         kind: NOTIFICATION_KINDS.PRIVATE_MAINTENANCE_RESOLVED,
+        actor: { name: 'Jamie' },
         source: null,
       }),
     );
 
+    expect(created.message).toBe('Private maintenance was added');
+    expect(resolved.message).toBe('Private maintenance was resolved');
     expect(created.sourceTitle).toBeNull();
     expect(resolved.sourceTitle).toBeNull();
-    expect(created.message).not.toMatch(/title|details|audience|Quiet leak/i);
-    expect(resolved.message).not.toMatch(/title|details|audience|Quiet leak/i);
+    expect(created.message).not.toMatch(
+      /Alex|Jamie|title|details|audience|Quiet leak/i,
+    );
+    expect(resolved.message).not.toMatch(
+      /Alex|Jamie|title|details|audience|Quiet leak/i,
+    );
   });
 
   it('uses a generic presentation for unknown future kinds', () => {

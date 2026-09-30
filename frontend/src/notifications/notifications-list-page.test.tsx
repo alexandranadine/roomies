@@ -101,7 +101,7 @@ describe('Notifications list page', () => {
     expect(items[3]).toHaveTextContent('Alex picked up a supply you added');
     expect(items[3]).toHaveTextContent('Paper towels');
     expect(items[4]).toHaveTextContent('A supply you added was picked up');
-    expect(items[5]).toHaveTextContent('New private maintenance update');
+    expect(items[5]).toHaveTextContent('Private maintenance was added');
     expect(items[6]).toHaveTextContent('Private maintenance was resolved');
     expect(items[7]).toHaveTextContent(
       'Casey completed a task assigned to you',
@@ -181,6 +181,20 @@ describe('Notifications list page', () => {
 
     expect(
       await screen.findByRole('link', { name: 'Notifications, 2 unread' }),
+    ).toBeInTheDocument();
+  });
+
+  it('counts authorized PRIVATE Maintenance unread rows from the eligible list only', async () => {
+    stubNotificationsApis({
+      list: listPage([FIXTURE_PRIVATE_CREATED, FIXTURE_PRIVATE_RESOLVED]),
+    });
+    renderApp('/notifications');
+
+    expect(
+      await screen.findByRole('link', { name: 'Notifications, 2 unread' }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText('Private maintenance was added'),
     ).toBeInTheDocument();
   });
 
@@ -499,6 +513,43 @@ describe('Notification interactions', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('does not navigate PRIVATE Maintenance on concealed mark-one 404', async () => {
+    const user = userEvent.setup();
+    let listCalls = 0;
+    stubNotificationsApis({
+      list: () => {
+        listCalls += 1;
+        if (listCalls === 1) {
+          return listPage([FIXTURE_PRIVATE_CREATED]);
+        }
+        return listPage([]);
+      },
+      markOne: { status: 404, body: notFoundBody() },
+    });
+    const { router } = renderApp('/notifications');
+
+    expect(
+      await screen.findByText('Private maintenance was added'),
+    ).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Unread. Private maintenance was added',
+      }),
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText('Private maintenance was added'),
+      ).not.toBeInTheDocument();
+    });
+    expect(router.state.location.pathname).toBe('/notifications');
+    expect(router.state.location.pathname).not.toContain('/maintenance');
+    expect(
+      screen.queryByText(/permission|forbidden|not authorized/i),
+    ).not.toBeInTheDocument();
+  });
+
   it('navigates Supply using destination Home overview', async () => {
     const user = userEvent.setup();
     stubNotificationsApis({
@@ -557,7 +608,7 @@ describe('Notification interactions', () => {
     expect(router.state.location.pathname).not.toContain(TEST_TASK_ID);
   });
 
-  it('navigates Roommates to the destination Home Roommates route and HOME to overview', async () => {
+  it('navigates Roommates to the destination Home Roommates route and PRIVATE Maintenance to the list', async () => {
     const user = userEvent.setup();
     stubNotificationsApis({
       list: listPage([
@@ -570,7 +621,7 @@ describe('Notification interactions', () => {
         notificationItem({
           ...FIXTURE_PRIVATE_CREATED,
           readAt: '2026-09-13T15:01:00.000Z',
-          destination: { type: 'HOME', homeId: TEST_HOME_B },
+          destination: { type: 'MAINTENANCE', homeId: TEST_HOME_B },
           home: { id: TEST_HOME_B, name: 'Cedar House' },
         }),
       ]),
@@ -591,13 +642,15 @@ describe('Notification interactions', () => {
     await router.navigate('/notifications');
     await user.click(
       await screen.findByRole('button', {
-        name: /New private maintenance update/i,
+        name: /Private maintenance was added/i,
       }),
     );
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe(`/homes/${TEST_HOME_B}`);
+      expect(router.state.location.pathname).toBe(
+        `/homes/${TEST_HOME_B}/maintenance`,
+      );
     });
-    expect(router.state.location.pathname).not.toContain('/maintenance');
+    expect(router.state.location.pathname).not.toContain(TEST_MAINTENANCE_ID);
   });
 
   it('invokes read-all without optimistic mass mutation or affected count', async () => {
@@ -780,7 +833,7 @@ describe('Notification interactions', () => {
     renderApp('/notifications');
 
     expect(
-      await screen.findByText('New private maintenance update'),
+      await screen.findByText('Private maintenance was added'),
     ).toBeInTheDocument();
     expect(
       screen.getByText('Private maintenance was resolved'),

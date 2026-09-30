@@ -52,7 +52,7 @@ const PAGE_ONE = {
       home: { id: HOME_A, name: 'Oak Street' },
       actor: null,
       source: null,
-      destination: { type: 'HOME', homeId: HOME_A },
+      destination: { type: 'MAINTENANCE', homeId: HOME_A },
     },
     {
       id: 'n3333333-3333-4333-8333-333333333333',
@@ -330,7 +330,7 @@ test.describe('Notifications authenticated UI', () => {
       await expect(page.getByText(LONG_NAME)).toBeVisible();
       await expect(page.getByText(LONG_TITLE)).toBeVisible();
       await expect(
-        page.getByText('New private maintenance update'),
+        page.getByText('Private maintenance was added'),
       ).toBeVisible();
       await expect(
         page.getByText('Casey picked up a supply you added'),
@@ -404,7 +404,7 @@ test.describe('Notifications authenticated UI', () => {
       page.getByRole('heading', { name: 'Notifications', level: 1 }),
     ).toBeVisible();
     await expect(
-      page.getByText('New private maintenance update'),
+      page.getByText('Private maintenance was added'),
     ).toBeVisible();
     await assertNoHorizontalOverflow(page);
   });
@@ -435,7 +435,7 @@ test.describe('Notifications authenticated UI', () => {
     await expect(page.getByText(LONG_NAME)).toBeVisible();
     await expect(page.getByText(LONG_TITLE)).toBeVisible();
     await expect(
-      page.getByText('New private maintenance update'),
+      page.getByText('Private maintenance was added'),
     ).toBeVisible();
     await expect(page.getByText(TASK_ID)).toHaveCount(0);
     await expect(page.getByText(SUPPLY_ID)).toHaveCount(0);

@@ -3,6 +3,7 @@ import { notificationDestinationPath } from './notification-destination.js';
 import {
   TEST_HOME_A,
   TEST_HOME_B,
+  TEST_MAINTENANCE_ID,
   TEST_SUPPLY_ID,
   TEST_TASK_ID,
 } from './test-fixtures.js';
@@ -51,5 +52,15 @@ describe('notificationDestinationPath', () => {
     });
     expect(path).toBe(`/homes/${TEST_HOME_B}`);
     expect(path).not.toContain('/maintenance');
+  });
+
+  it('uses the Home Maintenance list without an entry id', () => {
+    const path = notificationDestinationPath({
+      type: 'MAINTENANCE',
+      homeId: TEST_HOME_B,
+    });
+    expect(path).toBe(`/homes/${TEST_HOME_B}/maintenance`);
+    expect(path).not.toContain(TEST_MAINTENANCE_ID);
+    expect(path.split('/').length).toBe(4);
   });
 });

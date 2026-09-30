@@ -97,8 +97,8 @@ void describe('listCurrentUserNotifications', () => {
     assert.equal('membershipId' in (result.items[0]?.actor ?? {}), false);
   });
 
-  void it('uses generic fallbacks and never resolves PRIVATE Maintenance titles', async () => {
-    let maintenanceCalled = false;
+  void it('keeps PRIVATE Maintenance generic without titles, actor names, or entry ids', async () => {
+    let membershipIds: readonly string[] | undefined;
     const result = await listCurrentUserNotifications(
       { userId: USER },
       {
@@ -112,6 +112,7 @@ void describe('listCurrentUserNotifications', () => {
                     kind: 'PRIVATE_MAINTENANCE_CREATED',
                     sourceEntityType: 'MAINTENANCE',
                     sourceEntityId: PRIVATE,
+                    actorMembershipId: ALEX,
                   }),
                   eligible({
                     id: TASK,
@@ -122,20 +123,30 @@ void describe('listCurrentUserNotifications', () => {
               }),
             ),
         },
-        findHistoricalMembershipDisplays: () => Promise.resolve(new Map()),
-        findTaskActivityDisplays: () => Promise.resolve(new Map()),
-        findSupplyActivityDisplays: () => {
-          maintenanceCalled = true;
-          return Promise.resolve(new Map());
+        findHistoricalMembershipDisplays: (input) => {
+          membershipIds = input.membershipIds;
+          return Promise.resolve(
+            new Map<string, HistoricalMembershipDisplay>([
+              [ALEX, { membershipId: ALEX, name: 'Alex' }],
+            ]),
+          );
         },
+        findTaskActivityDisplays: () => Promise.resolve(new Map()),
+        findSupplyActivityDisplays: () => Promise.resolve(new Map()),
       },
     );
-    void maintenanceCalled;
     assert.equal(result.items[0]?.source, null);
+    assert.equal(result.items[0]?.actor, null);
     assert.deepEqual(result.items[0]?.destination, {
-      type: 'HOME',
+      type: 'MAINTENANCE',
       homeId: HOME,
     });
+    assert.equal(
+      'maintenanceEntryId' in (result.items[0]?.destination ?? {}),
+      false,
+    );
+    assert.equal('sourceEntityId' in (result.items[0] ?? {}), false);
+    assert.deepEqual(membershipIds, []);
     assert.equal(result.items[1]?.source, null);
     assert.equal(result.items[1]?.actor, null);
   });

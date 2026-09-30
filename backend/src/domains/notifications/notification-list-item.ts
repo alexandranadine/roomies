@@ -18,12 +18,13 @@ export type NotificationDestination =
   | Readonly<{ type: 'TASK'; homeId: string; taskInstanceId: string }>
   | Readonly<{ type: 'SUPPLY'; homeId: string; supplyEntryId: string }>
   | Readonly<{ type: 'ROOMMATES'; homeId: string }>
+  | Readonly<{ type: 'MAINTENANCE'; homeId: string }>
   | Readonly<{ type: 'HOME'; homeId: string }>;
 
 /**
  * Recipient-safe Notification list item. No Membership IDs, account
  * identifiers, email, capability, internal source IDs for PRIVATE
- * Maintenance, or outbox IDs.
+ * Maintenance, Maintenance entry IDs in destinations, or outbox IDs.
  */
 export type NotificationListItem = Readonly<{
   id: string;

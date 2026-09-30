@@ -306,7 +306,7 @@ async function mockAuthenticatedApp(page: Page): Promise<void> {
             home: { id: HOME_A, name: 'Oak Street' },
             actor: null,
             source: null,
-            destination: { type: 'HOME', homeId: HOME_A },
+            destination: { type: 'MAINTENANCE', homeId: HOME_A },
           },
         ],
         hasMore: false,
@@ -403,7 +403,7 @@ const AUTH_SHOTS: Shot[] = [
       await expect(
         page.getByRole('heading', { name: 'Notifications', level: 1 }),
       ).toBeVisible();
-      await expect(page.getByText('New private maintenance update')).toBeVisible();
+      await expect(page.getByText('Private maintenance was added')).toBeVisible();
     },
   },
   {

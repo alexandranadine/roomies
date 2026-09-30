@@ -69,7 +69,7 @@ export function presentNotification(
     case NOTIFICATION_KINDS.PRIVATE_MAINTENANCE_CREATED:
       return {
         icon: 'wrench',
-        message: 'New private maintenance update',
+        message: 'Private maintenance was added',
         sourceTitle: null,
       };
     case NOTIFICATION_KINDS.PRIVATE_MAINTENANCE_RESOLVED:
