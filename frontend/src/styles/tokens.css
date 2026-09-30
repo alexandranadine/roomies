@@ -4,7 +4,7 @@
 */
 @theme {
   /* Colors — background / surface (warm cream household canvas) */
-  --color-bg: #f4efe6;
+  --color-bg: #f8f5ef;
   --color-surface: #fffdf8;
   --color-subtle: #ebe4d8;
 
@@ -18,25 +18,27 @@
   --color-border: #e4d9c8;
   --color-border-strong: #d4c7b2;
 
-  /* Colors — brand (forest green; Home accents stay in this earth family) */
-  --color-brand: #2f4a3c;
-  --color-brand-hover: #24382e;
-  --color-brand-active: #1b2b23;
-  --color-brand-soft: #e4ede7;
-  --color-brand-soft-text: #2f4a3c;
-  --color-focus: #2f4a3c;
+  /* Colors — brand (deep sage green; Home accents stay in this earth family) */
+  --color-brand: #58705d;
+  --color-brand-hover: #445648;
+  --color-brand-active: #324035;
+  --color-brand-soft: #e8efea;
+  --color-brand-soft-text: #58705d;
+  --color-brand-wordmark: #445648;
+  --color-brand-wordmark-hover: #324035;
+  --color-focus: #58705d;
 
   /* Colors — semantic status */
   --color-danger: #a34738;
   --color-danger-soft: #f8e8e4;
   --color-danger-muted: #b15c4e;
   --color-danger-muted-hover: #9e5044;
-  --color-success: #2f4a3c;
-  --color-success-soft: #e4ede7;
+  --color-success: #58705d;
+  --color-success-soft: #e8efea;
   --color-warning: #6a4e10;
   --color-warning-soft: #f6eed4;
   --color-info: #4a6758;
-  --color-info-soft: #e4ede7;
+  --color-info-soft: #e8efea;
 
   /* Colors — social / tertiary accents */
   --color-accent-coral: #c45c4a;
@@ -53,7 +55,7 @@
   --color-privacy-icon: #7a7168;
 
   /* Frozen Home accent palette (tokens only; earth-tone family) */
-  --color-accent-indigo: #2f4a3c;
+  --color-accent-indigo: #58705d;
   --color-accent-teal: #3d6b5c;
   --color-accent-rose: #c45c4a;
   --color-accent-amber: #b8952c;

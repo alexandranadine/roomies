@@ -8,7 +8,7 @@ export type RoomiesWordmarkProps = {
 };
 
 const wordmarkClassName =
-  'font-sans text-[1.7rem] font-extrabold leading-none tracking-tight text-brand';
+  'font-sans text-[1.7rem] font-extrabold leading-none tracking-tight text-brand-wordmark';
 
 /**
  * Brand lockup for shell chrome. Slightly heavier than body headings.
@@ -20,7 +20,7 @@ export function RoomiesWordmark({ className, to }: RoomiesWordmarkProps) {
         to={to}
         className={cn(
           wordmarkClassName,
-          'inline-block rounded-sm no-underline hover:text-brand hover:no-underline',
+          'inline-block rounded-sm no-underline hover:text-brand-wordmark-hover hover:no-underline',
           'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
           className,
         )}

@@ -309,6 +309,10 @@ test.describe('Home shell Phase 1', () => {
     await expect(
       page.getByRole('button', { name: 'Add Home photo' }),
     ).toBeVisible();
+    mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, 'add-action-sheet-390.png'),
+    });
   });
 
   test('Maintenance is available from the add action sheet', async ({ page }) => {
