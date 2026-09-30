@@ -388,7 +388,9 @@ test.describe('Tasks authenticated UI', () => {
       await expect(
         page.getByRole('heading', { name: 'Tasks', level: 1 }),
       ).toBeVisible();
-      await expect(page.getByText('Nothing on the list.')).toBeVisible();
+      await expect(
+        page.getByRole('heading', { name: 'No tasks yet', level: 2 }),
+      ).toBeVisible();
       await assertNoHorizontalOverflow(page);
       await assertContentClearOfBottomNav(page);
     }

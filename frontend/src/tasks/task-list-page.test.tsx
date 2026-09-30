@@ -117,26 +117,116 @@ describe('Tasks list page', () => {
     assertNoInternalIds();
   });
 
-  it('shows a useful empty state with Add task', async () => {
+  it('shows one primary empty state when the Home has no task data', async () => {
     stubTasksApis({
       listByHome: { [TEST_HOME_A]: [] },
       definitionsByHome: { [TEST_HOME_A]: [] },
     });
     renderApp(`/homes/${TEST_HOME_A}/tasks`);
 
-    expect(await screen.findByText('Nothing on the list.')).toBeInTheDocument();
     expect(
-      screen.getByText('Completed tasks will show up here.'),
+      await screen.findByRole('heading', { name: 'No tasks yet', level: 2 }),
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        'Set a task to repeat so the house doesn’t have to remember.',
+        'Add a task for something the house needs to get done.',
       ),
     ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add task' })).toBeInTheDocument();
+    expect(screen.queryByText('Nothing on the list.')).not.toBeInTheDocument();
     expect(
-      screen.getAllByRole('button', { name: 'Add task' }).length,
-    ).toBeGreaterThan(0);
-    expect(document.body.textContent).not.toMatch(/guilt|shame|overdue score/i);
+      screen.queryByText('Completed tasks will show up here.'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('No repeating tasks yet.')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Open 0' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Completed 0' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Repeating tasks 0' }),
+    ).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/chore|guilt|shame|overdue score/i);
+  });
+
+  it('opens create flow from header Add task on an empty Tasks page', async () => {
+    const user = userEvent.setup();
+    stubTasksApis({
+      listByHome: { [TEST_HOME_A]: [] },
+      definitionsByHome: { [TEST_HOME_A]: [] },
+    });
+    renderApp(`/homes/${TEST_HOME_A}/tasks`);
+
+    await screen.findByRole('heading', { name: 'No tasks yet', level: 2 });
+    await user.click(screen.getByRole('button', { name: 'Add task' }));
+    expect(
+      await screen.findByRole('dialog', { name: /add task/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('shows active tasks and a lightweight repeating hint when no definitions exist', async () => {
+    stubTasksApis({
+      listByHome: { [TEST_HOME_A]: [FIXTURE_OPEN_ASSIGNED] },
+      definitionsByHome: { [TEST_HOME_A]: [] },
+    });
+    renderApp(`/homes/${TEST_HOME_A}/tasks`);
+
+    expect(await screen.findByText('Take out trash')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Open 1' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Repeating tasks 0' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('No repeating tasks yet.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Set a task to repeat so it comes back automatically.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'No tasks yet', level: 2 }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Completed 0' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows repeating definitions without the global empty state when no open tasks exist', async () => {
+    stubTasksApis({
+      listByHome: { [TEST_HOME_A]: [] },
+      definitionsByHome: { [TEST_HOME_A]: [FIXTURE_DEFINITION_WEEKLY] },
+    });
+    renderApp(`/homes/${TEST_HOME_A}/tasks`);
+
+    expect(await screen.findByText('Weekly trash')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Open 0' })).toBeInTheDocument();
+    expect(screen.getByText('Nothing on the list.')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Repeating tasks 1' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'No tasks yet', level: 2 }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('No repeating tasks yet.')).not.toBeInTheDocument();
+  });
+
+  it('shows completed history without pretending the Home never used Tasks', async () => {
+    stubTasksApis({
+      listByHome: { [TEST_HOME_A]: [FIXTURE_COMPLETED] },
+      definitionsByHome: { [TEST_HOME_A]: [] },
+    });
+    renderApp(`/homes/${TEST_HOME_A}/tasks`);
+
+    expect(await screen.findByText('Sweep hallway')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Open 0' })).toBeInTheDocument();
+    expect(screen.getByText('Nothing on the list.')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Completed 1' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'No tasks yet', level: 2 }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Completed tasks will show up here.'),
+    ).not.toBeInTheDocument();
   });
 
   it('excludes ended members from assignment display and picker', async () => {

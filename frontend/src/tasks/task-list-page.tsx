@@ -1,8 +1,8 @@
 import { PlusIcon } from '@heroicons/react/24/outline';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import { useOutletContext, useParams } from 'react-router';
 import { DocumentTitle } from '../components/document-title.js';
-import { Alert, Button, Skeleton } from '../components/ui/index.js';
+import { Alert, Button, EmptyState, Skeleton } from '../components/ui/index.js';
 import type { HomeShellOutletContext } from '../homes/home-overview-page.js';
 import { useHomeMemberships } from '../homes/use-home-memberships.js';
 import { ApiError } from '../platform/api/index.js';
@@ -82,24 +82,29 @@ function SectionHeading({
   );
 }
 
-function SectionEmpty({
+function SectionEmptyHint({
   title,
   description,
-  action,
 }: {
   title: string;
   description?: string;
-  action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-start gap-2 rounded-xl border border-dashed border-border-strong bg-subtle/50 px-4 py-4">
-      <p className="text-sm font-semibold text-text-primary">{title}</p>
+    <div className="flex flex-col gap-0.5">
+      <p className="text-sm text-text-muted">{title}</p>
       {description ? (
-        <p className="max-w-prose text-sm text-text-secondary">{description}</p>
+        <p className="max-w-prose text-sm text-text-muted">{description}</p>
       ) : null}
-      {action}
     </div>
   );
+}
+
+export function hasAnyTaskContent(
+  openCount: number,
+  completedCount: number,
+  activeDefinitionCount: number,
+): boolean {
+  return openCount > 0 || completedCount > 0 || activeDefinitionCount > 0;
 }
 
 export function TaskListPage() {
@@ -166,6 +171,13 @@ export function TaskListPage() {
   const showLoading = tasksQuery.isPending && tasksQuery.data === undefined;
   const showTaskSections = tasksQuery.isSuccess;
   const showDefinitionSection = definitionsQuery.isSuccess;
+  const hasTaskContent = hasAnyTaskContent(
+    open.length,
+    completed.length,
+    activeDefinitions.length,
+  );
+  const showPrimaryEmpty =
+    showTaskSections && showDefinitionSection && !hasTaskContent;
 
   function openCreate() {
     setCreateOpen(true);
@@ -253,18 +265,19 @@ export function TaskListPage() {
           </Alert>
         ) : null}
 
-        {showTaskSections ? (
+        {showPrimaryEmpty ? (
+          <EmptyState
+            className="px-4 py-6"
+            title="No tasks yet"
+            description="Add a task for something the house needs to get done."
+          />
+        ) : null}
+
+        {showTaskSections && hasTaskContent ? (
           <section className="flex flex-col gap-2" aria-labelledby="tasks-open">
             <SectionHeading id="tasks-open" label="Open" count={open.length} />
             {open.length === 0 ? (
-              <SectionEmpty
-                title="Nothing on the list."
-                action={
-                  <Button type="button" onClick={openCreate}>
-                    Add task
-                  </Button>
-                }
-              />
+              <SectionEmptyHint title="Nothing on the list." />
             ) : (
               <ul className="m-0 flex list-none flex-col gap-1.5 p-0 lg:gap-2">
                 {open.map((task) => (
@@ -286,7 +299,7 @@ export function TaskListPage() {
           </section>
         ) : null}
 
-        {showTaskSections ? (
+        {showTaskSections && completed.length > 0 ? (
           <section
             className="flex flex-col gap-2"
             aria-labelledby="tasks-completed"
@@ -296,24 +309,20 @@ export function TaskListPage() {
               label="Completed"
               count={completed.length}
             />
-            {completed.length === 0 ? (
-              <SectionEmpty title="Completed tasks will show up here." />
-            ) : (
-              <ul className="m-0 flex list-none flex-col gap-1.5 p-0 lg:gap-2">
-                {completed.map((task) => (
-                  <TaskRow
-                    key={task.id}
-                    task={task}
-                    today={today}
-                    assigneeLookup={assigneeLookup}
-                    completing={false}
-                    completeDisabled
-                    completeError={null}
-                    onComplete={() => undefined}
-                  />
-                ))}
-              </ul>
-            )}
+            <ul className="m-0 flex list-none flex-col gap-1.5 p-0 lg:gap-2">
+              {completed.map((task) => (
+                <TaskRow
+                  key={task.id}
+                  task={task}
+                  today={today}
+                  assigneeLookup={assigneeLookup}
+                  completing={false}
+                  completeDisabled
+                  completeError={null}
+                  onComplete={() => undefined}
+                />
+              ))}
+            </ul>
           </section>
         ) : null}
 
@@ -333,7 +342,7 @@ export function TaskListPage() {
           </Alert>
         ) : null}
 
-        {showDefinitionSection ? (
+        {showDefinitionSection && hasTaskContent ? (
           <section
             className="flex flex-col gap-2"
             aria-labelledby="tasks-repeating"
@@ -344,9 +353,9 @@ export function TaskListPage() {
               count={activeDefinitions.length}
             />
             {activeDefinitions.length === 0 ? (
-              <SectionEmpty
+              <SectionEmptyHint
                 title="No repeating tasks yet."
-                description="Set a task to repeat so the house doesn’t have to remember."
+                description="Set a task to repeat so it comes back automatically."
               />
             ) : (
               <ul className="m-0 flex list-none flex-col gap-1.5 p-0 lg:gap-2">
