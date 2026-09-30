@@ -19,6 +19,14 @@ export function isStaleMembershipError(error: unknown): boolean {
   return isConcealedNotFound(error);
 }
 
+export function isLeaveArchiveConflict(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    (error.code === 'LAST_ROOMMATE_REQUIRES_ARCHIVE' ||
+      error.code === 'FINAL_MEMBER_REQUIRED')
+  );
+}
+
 export function inviteRoommateErrorMessage(error: unknown): string {
   if (!(error instanceof ApiError)) {
     return INVITE_GENERIC;
@@ -59,7 +67,10 @@ export function leaveHomeErrorMessage(error: unknown): string {
     error instanceof ApiError &&
     error.code === 'LAST_ROOMMATE_REQUIRES_ARCHIVE'
   ) {
-    return 'You’re the last roommate in this Home, so it can’t be left this way.';
+    return 'You’re the last roommate in this Home. Cancel, then leave again to archive it.';
+  }
+  if (error instanceof ApiError && error.code === 'FINAL_MEMBER_REQUIRED') {
+    return 'This Home still has other roommates, so it wasn’t archived.';
   }
   return LEAVE_GENERIC;
 }

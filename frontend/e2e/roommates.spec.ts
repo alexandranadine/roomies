@@ -463,7 +463,7 @@ test.describe('Roommates management', () => {
     await page.setViewportSize({ width: 360, height: 800 });
     await page.goto(`/homes/${HOME_A}/roommates`);
     await page.getByRole('button', { name: 'Leave Home' }).click();
-    await expect(page.getByRole('dialog', { name: 'Leave Home' })).toBeVisible();
+    await expect(page.getByRole('dialog', { name: 'Leave this Home?' })).toBeVisible();
     await assertDialogFitsViewport(page);
     await assertNoSeriousAxeViolations(page, 'roommates leave dialog');
   });

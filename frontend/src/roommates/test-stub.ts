@@ -49,6 +49,19 @@ export function defaultMemberships(
   };
 }
 
+export function soleAdminMemberships(): ActiveHomeMemberships {
+  return {
+    currentMembershipId: CURRENT_MEMBERSHIP_ID,
+    memberships: [
+      {
+        membershipId: CURRENT_MEMBERSHIP_ID,
+        name: 'Alex',
+        role: 'ADMIN',
+      },
+    ],
+  };
+}
+
 export function defaultCreatedInvitation(): CreatedInvitation {
   return {
     invitation: {
@@ -74,6 +87,7 @@ export type RoommatesStubHandlers = {
   ) => Response | Promise<Response>;
   remove?: (membershipId: string) => Response | Promise<Response>;
   leave?: (membershipId: string) => Response | Promise<Response>;
+  archiveFinalMember?: () => Response | Promise<Response>;
   revokeInvitation?: (
     invitationId: string,
   ) => Response | Promise<Response>;
@@ -194,6 +208,17 @@ export function stubRoommatesApis(options: RoommatesStubOptions = {}) {
         const handler = options.handlers?.leave;
         if (handler !== undefined) {
           return Promise.resolve(handler(leaveMatch[2]));
+        }
+        state.homes = [];
+        return Promise.resolve(emptyResponse(204));
+      }
+
+      const archiveMatch =
+        /^\/api\/v1\/homes\/([^/]+)\/archive-final-member$/i.exec(path);
+      if (archiveMatch?.[1] !== undefined && method === 'POST') {
+        const handler = options.handlers?.archiveFinalMember;
+        if (handler !== undefined) {
+          return Promise.resolve(handler());
         }
         state.homes = [];
         return Promise.resolve(emptyResponse(204));

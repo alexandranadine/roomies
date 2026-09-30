@@ -314,8 +314,9 @@ export function RoommatesPage() {
                   Your home
                 </h2>
                 <p className="max-w-prose text-sm text-text-secondary">
-                  You’ll lose current access to this Home. Shared household
-                  history stays with the Home.
+                  {justYou
+                    ? 'You’re the last roommate. Leaving will archive this Home. Household history stays with the Home.'
+                    : 'You’ll lose current access to this Home. Shared household history stays with the Home.'}
                 </p>
               </div>
               <Button
@@ -333,6 +334,7 @@ export function RoommatesPage() {
               homeId={homeId}
               homeName={home.name}
               membershipId={currentMembershipId}
+              archivesHome={justYou && isAdmin}
               open={leaveOpen}
               onOpenChange={setLeaveOpen}
               onLeft={handleLeftHome}

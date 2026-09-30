@@ -5,6 +5,7 @@ import {
   type MembershipRole,
 } from './change-membership-role-api.js';
 import { leaveHome } from './leave-home-api.js';
+import { archiveFinalMemberHome } from './archive-final-member-api.js';
 import { removeRoommate } from './remove-roommate-api.js';
 import {
   CURRENT_MEMBERSHIP_ID,
@@ -55,6 +56,23 @@ describe('membership action APIs', () => {
     );
     expect(init.method).toBe('POST');
     expect(init.body).toBe(JSON.stringify({}));
+  });
+
+  it('POSTs archive-final-member with an empty object body', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(emptyResponse(204));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await archiveFinalMemberHome({
+      homeId: TEST_HOME_A,
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(new URL(url).pathname).toBe(
+      `/api/v1/homes/${TEST_HOME_A}/archive-final-member`,
+    );
+    expect(init.method).toBe('POST');
+    expect(init.body).toBe(JSON.stringify({}));
+    expect(url).not.toContain('/leave');
   });
 
   it('POSTs remove with an empty object body', async () => {

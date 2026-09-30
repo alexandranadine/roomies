@@ -21,6 +21,7 @@ import {
   jsonResponse,
   OTHER_MEMBERSHIP_ID,
   REJOIN_MEMBERSHIP_ID,
+  soleAdminMemberships,
   stubRoommatesApis,
   TEST_HOME_A,
   TEST_USER_ID,
@@ -806,7 +807,7 @@ describe('Roommates remove', () => {
 describe('Roommates leave', () => {
   it('requires confirmation, clears private Home queries, and navigates away', async () => {
     const user = userEvent.setup();
-    stubRoommatesApis();
+    const { fetchMock } = stubRoommatesApis();
     const { queryClient, router } = renderApp(
       `/homes/${TEST_HOME_A}/roommates`,
     );
@@ -826,9 +827,12 @@ describe('Roommates leave', () => {
     });
 
     await user.click(screen.getByRole('button', { name: 'Leave Home' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Leave Home' });
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Leave this Home?',
+    });
     expect(dialog).toHaveTextContent(/lose access/i);
-    expect(dialog.textContent).not.toMatch(/disappear|delet/i);
+    expect(dialog).toHaveTextContent(/Shared household history stays with the Home/i);
+    expect(dialog.textContent).not.toMatch(/archive|disappear|delet/i);
 
     await user.click(
       within(dialog).getByRole('button', { name: 'Leave Home' }),
@@ -853,6 +857,18 @@ describe('Roommates leave', () => {
       queryClient.getQueryData(pulseKeys.all(TEST_HOME_A)),
     ).toBeUndefined();
     expect(queryClient.getQueryData(currentUserHomesQueryKey)).toEqual([]);
+    expect(
+      fetchMock.mock.calls.some((call) =>
+        String(call[0]).includes(
+          `/api/v1/homes/${TEST_HOME_A}/memberships/${CURRENT_MEMBERSHIP_ID}/leave`,
+        ),
+      ),
+    ).toBe(true);
+    expect(
+      fetchMock.mock.calls.some((call) =>
+        String(call[0]).includes('/archive-final-member'),
+      ),
+    ).toBe(false);
   });
 
   it('keeps the current Home usable when leave fails', async () => {
@@ -870,7 +886,9 @@ describe('Roommates leave', () => {
 
     expect(await screen.findByText('Jamie')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Leave Home' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Leave Home' });
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Leave this Home?',
+    });
     await user.click(
       within(dialog).getByRole('button', { name: 'Leave Home' }),
     );
@@ -906,14 +924,17 @@ describe('Roommates leave', () => {
 
     expect(await screen.findByText('Jamie')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Leave Home' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Leave Home' });
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Leave this Home?',
+    });
+    expect(dialog.textContent).not.toMatch(/archive/i);
     await user.click(
       within(dialog).getByRole('button', { name: 'Leave Home' }),
     );
 
     expect(
       await within(dialog).findByText(
-        /last roommate in this Home, so it can’t be left this way/i,
+        /last roommate in this Home. Cancel, then leave again to archive it/i,
       ),
     ).toBeInTheDocument();
     expect(router.state.location.pathname).toBe(
@@ -924,5 +945,108 @@ describe('Roommates leave', () => {
       screen.getByRole('heading', { name: 'Roommates', level: 1 }),
     ).toBeInTheDocument();
     expect(screen.getByText('Jamie')).toBeInTheDocument();
+  });
+
+  it('confirms last-roommate leave as archive, calls archive-final-member, and navigates away', async () => {
+    const user = userEvent.setup();
+    const { fetchMock } = stubRoommatesApis({
+      memberships: soleAdminMemberships(),
+    });
+    const { queryClient, router } = renderApp(
+      `/homes/${TEST_HOME_A}/roommates`,
+    );
+
+    expect(
+      await screen.findByText(/Leaving will archive this Home/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Leave Home' }),
+    ).toBeInTheDocument();
+    queryClient.setQueryData(pulseKeys.all(TEST_HOME_A), clearHousePulse());
+    queryClient.setQueryData(homeContextQueryKey(TEST_HOME_A), {
+      id: TEST_HOME_A,
+      name: 'Oak Street',
+      timezone: 'UTC',
+      hasPhoto: false,
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Leave Home' }));
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Leave and archive this Home?',
+    });
+    expect(dialog).toHaveTextContent(/You’re the last roommate/i);
+    expect(dialog).toHaveTextContent(/archive Oak Street/i);
+    expect(dialog).toHaveTextContent(/Household history stays with the Home/i);
+    expect(dialog.textContent).not.toMatch(/delet|disappear/i);
+
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Leave and archive' }),
+    );
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/');
+    });
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Welcome to Roomies',
+        level: 1,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      queryClient.getQueryData(homeContextQueryKey(TEST_HOME_A)),
+    ).toBeUndefined();
+    expect(
+      queryClient.getQueryData(pulseKeys.all(TEST_HOME_A)),
+    ).toBeUndefined();
+    expect(queryClient.getQueryData(currentUserHomesQueryKey)).toEqual([]);
+    expect(
+      fetchMock.mock.calls.some((call) =>
+        String(call[0]).includes(
+          `/api/v1/homes/${TEST_HOME_A}/archive-final-member`,
+        ),
+      ),
+    ).toBe(true);
+    const leftThroughLeave = fetchMock.mock.calls.some((call) => {
+      const url = String(call[0]);
+      return url.includes('/memberships/') && url.includes('/leave');
+    });
+    expect(leftThroughLeave).toBe(false);
+  });
+
+  it('keeps the Home usable when archive is rejected because other roommates remain', async () => {
+    const user = userEvent.setup();
+    stubRoommatesApis({
+      memberships: soleAdminMemberships(),
+      handlers: {
+        archiveFinalMember: () =>
+          jsonResponse(
+            409,
+            errorBody('FINAL_MEMBER_REQUIRED', 'Final member required'),
+          ),
+      },
+    });
+    const { router } = renderApp(`/homes/${TEST_HOME_A}/roommates`);
+
+    expect(await screen.findByText('Alex')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Leave Home' }));
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Leave and archive this Home?',
+    });
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Leave and archive' }),
+    );
+
+    expect(
+      await within(dialog).findByText(
+        /still has other roommates, so it wasn’t archived/i,
+      ),
+    ).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(
+      `/homes/${TEST_HOME_A}/roommates`,
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(
+      screen.getByRole('heading', { name: 'Roommates', level: 1 }),
+    ).toBeInTheDocument();
   });
 });
