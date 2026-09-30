@@ -60,7 +60,7 @@ test.describe('password reset', () => {
       });
     });
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/');
+    await page.goto('/?auth=sign-in');
     await expect(
       page.getByRole('link', { name: 'Forgot password?' }),
     ).toBeVisible();

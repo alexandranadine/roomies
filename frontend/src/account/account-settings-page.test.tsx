@@ -7,6 +7,7 @@ import {
   homeContextQueryKey,
 } from '../homes/home-query-keys.js';
 import { invitationAuthSessionQueryKey } from '../invitations/auth-session-api.js';
+import { LANDING_HEADLINE } from '../landing/landing-copy.js';
 import { notificationKeys } from '../notifications/notifications-query-keys.js';
 import { resetApiClientForTests } from '../platform/api/index.js';
 import { renderApp } from '../test/render.js';
@@ -329,13 +330,13 @@ describe('Account settings deletion', () => {
     expect(screen.queryByText(/INTERNAL_ERROR/i)).not.toBeInTheDocument();
   });
 
-  it('signs out and returns to the sign-in landing', async () => {
+  it('signs out and returns to the public landing', async () => {
     stubAccountApis();
     renderApp('/account');
     await screen.findByRole('heading', { name: 'Account', level: 1 });
     await userEvent.click(screen.getByRole('button', { name: 'Sign out' }));
     expect(
-      await screen.findByRole('heading', { name: 'Welcome back', level: 1 }),
+      await screen.findByRole('heading', { name: LANDING_HEADLINE, level: 1 }),
     ).toBeInTheDocument();
   });
 

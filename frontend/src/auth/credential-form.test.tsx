@@ -114,7 +114,7 @@ function stubUnauthenticatedLanding(handlers: {
 describe('credential form', () => {
   it('renders sign-in fields and the create-account control', async () => {
     stubUnauthenticatedLanding({});
-    renderApp('/');
+    renderApp('/?auth=sign-in');
 
     expect(
       await screen.findByRole('heading', { name: 'Welcome back', level: 1 }),
@@ -142,7 +142,7 @@ describe('credential form', () => {
 
   it('navigates to sign-up and back to sign-in without inventing fields', async () => {
     stubUnauthenticatedLanding({});
-    renderApp('/');
+    renderApp('/?auth=sign-in');
 
     await screen.findByRole('heading', { name: 'Welcome back', level: 1 });
     await userEvent.click(
@@ -180,7 +180,7 @@ describe('credential form', () => {
 
   it('validates required sign-in fields before calling the API', async () => {
     const fetchMock = stubUnauthenticatedLanding({});
-    renderApp('/');
+    renderApp('/?auth=sign-in');
     await screen.findByRole('heading', { name: 'Welcome back', level: 1 });
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
 
@@ -195,7 +195,7 @@ describe('credential form', () => {
 
   it('validates required sign-up fields before calling the API', async () => {
     const fetchMock = stubUnauthenticatedLanding({});
-    renderApp('/');
+    renderApp('/?auth=sign-in');
     await screen.findByRole('heading', { name: 'Welcome back', level: 1 });
     await userEvent.click(
       screen.getByRole('button', { name: 'Create an account' }),
@@ -222,7 +222,7 @@ describe('credential form', () => {
           message: 'Invalid email or password secret-body',
         }),
     });
-    renderApp('/');
+    renderApp('/?auth=sign-in');
 
     await screen.findByRole('heading', { name: 'Welcome back', level: 1 });
     await userEvent.type(
@@ -252,7 +252,7 @@ describe('credential form', () => {
           message: 'User already exists',
         }),
     });
-    renderApp('/');
+    renderApp('/?auth=sign-in');
 
     await screen.findByRole('heading', { name: 'Welcome back', level: 1 });
     await userEvent.click(
@@ -279,7 +279,7 @@ describe('credential form', () => {
 
   it('signs in from the unauthenticated landing and refreshes /me', async () => {
     const fetchMock = stubUnauthenticatedLanding({});
-    renderApp('/');
+    renderApp('/?auth=sign-in');
 
     expect(
       await screen.findByRole('heading', { name: 'Welcome back', level: 1 }),
@@ -325,7 +325,7 @@ describe('credential form', () => {
           resolveSignIn = resolve;
         }),
     });
-    renderApp('/');
+    renderApp('/?auth=sign-in');
 
     await screen.findByRole('heading', { name: 'Welcome back', level: 1 });
     await userEvent.type(
@@ -360,7 +360,7 @@ describe('credential form', () => {
           message: 'Invalid email or password',
         }),
     });
-    renderApp('/');
+    renderApp('/?auth=sign-in');
 
     await screen.findByRole('heading', { name: 'Welcome back', level: 1 });
     await userEvent.type(
@@ -406,7 +406,7 @@ describe('credential form', () => {
         });
       },
     });
-    renderApp('/');
+    renderApp('/?auth=sign-in');
 
     await screen.findByRole('heading', { name: 'Welcome back', level: 1 });
     await userEvent.click(
@@ -471,7 +471,7 @@ describe('credential form', () => {
           resolveSignUp = resolve;
         }),
     });
-    renderApp('/');
+    renderApp('/?auth=sign-in');
 
     await screen.findByRole('heading', { name: 'Welcome back', level: 1 });
     await userEvent.click(

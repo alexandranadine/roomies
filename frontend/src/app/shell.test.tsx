@@ -1,5 +1,6 @@
 import { screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { LANDING_HEADLINE } from '../landing/landing-copy.js';
 import { resetApiClientForTests } from '../platform/api/index.js';
 import { renderApp } from '../test/render.js';
 
@@ -10,7 +11,7 @@ afterEach(() => {
 });
 
 describe('application shell routes', () => {
-  it('renders the authenticated discovery landing after a session check', async () => {
+  it('renders the closed-alpha landing after a session check', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockImplementation((url: string) => {
@@ -34,10 +35,10 @@ describe('application shell routes', () => {
     renderApp('/');
 
     expect(
-      await screen.findByRole('heading', { name: 'Welcome back', level: 1 }),
+      await screen.findByRole('heading', { name: LANDING_HEADLINE, level: 1 }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Sign in' }),
+      screen.getByRole('link', { name: 'Sign in' }),
     ).toBeInTheDocument();
   });
 
@@ -102,7 +103,7 @@ describe('application shell routes', () => {
 
     renderApp('/');
 
-    await screen.findByRole('heading', { name: 'Welcome back', level: 1 });
+    await screen.findByRole('heading', { name: LANDING_HEADLINE, level: 1 });
 
     expect(screen.queryByRole('banner')).not.toBeInTheDocument();
     expect(screen.getByRole('main')).toBeInTheDocument();

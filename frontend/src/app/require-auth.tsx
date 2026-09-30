@@ -1,8 +1,10 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, type ReactNode } from 'react';
 import { useLocation } from 'react-router';
+import { parseCredentialModeFromSearch } from '../auth/auth-entry.js';
 import { AuthPageLayout } from '../auth/auth-page-layout.js';
 import { CredentialForm } from '../auth/credential-form.js';
+import type { CredentialMode } from '../auth/credential-form-schema.js';
 import {
   PASSWORD_RESET_SUCCESS_BODY,
   PASSWORD_RESET_SUCCESS_TITLE,
@@ -17,6 +19,7 @@ import {
   getInvitationAuthSession,
   invitationAuthSessionQueryKey,
 } from '../invitations/auth-session-api.js';
+import { PublicLandingPage } from '../landing/public-landing-page.js';
 import { ApiError } from '../platform/api/index.js';
 import { getCurrentUser } from '../users/current-user-api.js';
 
@@ -30,9 +33,65 @@ type AuthLandingLocationState = {
   passwordReset?: boolean;
 };
 
+function hasPostAuthNotice(state: AuthLandingLocationState | null): boolean {
+  return Boolean(
+    state?.passwordReset ||
+      state?.accountDeleted ||
+      state?.needsFreshSignInForDeletion,
+  );
+}
+
+function shouldShowPublicLanding(
+  pathname: string,
+  search: string,
+  state: AuthLandingLocationState | null,
+): boolean {
+  return (
+    pathname === '/' &&
+    parseCredentialModeFromSearch(search) === null &&
+    !hasPostAuthNotice(state)
+  );
+}
+
+function UnauthenticatedAuthCanvas({
+  locationState,
+  defaultMode,
+}: {
+  locationState: AuthLandingLocationState | null;
+  defaultMode: CredentialMode;
+}) {
+  return (
+    <AuthPageLayout
+      title={
+        defaultMode === 'sign-up'
+          ? 'Create account · Roomies'
+          : 'Sign in · Roomies'
+      }
+    >
+      {locationState?.passwordReset ? (
+        <Alert variant="success" title={PASSWORD_RESET_SUCCESS_TITLE}>
+          {PASSWORD_RESET_SUCCESS_BODY}
+        </Alert>
+      ) : null}
+      {locationState?.accountDeleted ? (
+        <Alert variant="info" title="Account deleted">
+          Your Roomies account has been deleted.
+        </Alert>
+      ) : null}
+      {locationState?.needsFreshSignInForDeletion ? (
+        <Alert variant="info" title="Sign in again">
+          Sign in again, then try deleting your account.
+        </Alert>
+      ) : null}
+      <CredentialForm defaultMode={defaultMode} />
+    </AuthPageLayout>
+  );
+}
+
 /**
  * Session gate for product routes. Invitation landing stays outside this wrap.
  * Home data is cleared on authentication loss so a prior Home cannot linger.
+ * Signed-out `/` is the closed-alpha landing; `?auth=` reuses CredentialForm.
  */
 export function RequireAuth({ children }: { children: ReactNode }) {
   const location = useLocation();
@@ -71,25 +130,17 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   }
 
   if (isUnauthenticated(query.error)) {
+    if (
+      shouldShowPublicLanding(location.pathname, location.search, locationState)
+    ) {
+      return <PublicLandingPage />;
+    }
+
     return (
-      <AuthPageLayout title="Sign in · Roomies">
-        {locationState?.passwordReset ? (
-          <Alert variant="success" title={PASSWORD_RESET_SUCCESS_TITLE}>
-            {PASSWORD_RESET_SUCCESS_BODY}
-          </Alert>
-        ) : null}
-        {locationState?.accountDeleted ? (
-          <Alert variant="info" title="Account deleted">
-            Your Roomies account has been deleted.
-          </Alert>
-        ) : null}
-        {locationState?.needsFreshSignInForDeletion ? (
-          <Alert variant="info" title="Sign in again">
-            Sign in again, then try deleting your account.
-          </Alert>
-        ) : null}
-        <CredentialForm />
-      </AuthPageLayout>
+      <UnauthenticatedAuthCanvas
+        locationState={locationState}
+        defaultMode={parseCredentialModeFromSearch(location.search) ?? 'sign-in'}
+      />
     );
   }
 

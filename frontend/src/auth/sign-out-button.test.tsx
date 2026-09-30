@@ -8,6 +8,7 @@ import {
   homeContextQueryKey,
 } from '../homes/home-query-keys.js';
 import { invitationAuthSessionQueryKey } from '../invitations/auth-session-api.js';
+import { LANDING_HEADLINE } from '../landing/landing-copy.js';
 import { notificationKeys } from '../notifications/notifications-query-keys.js';
 import { resetApiClientForTests } from '../platform/api/index.js';
 import { renderApp, renderWithProviders } from '../test/render.js';
@@ -157,7 +158,7 @@ describe('SignOutButton', () => {
       expect(router.state.location.pathname).toBe('/');
     });
     expect(
-      await screen.findByRole('heading', { name: 'Welcome back', level: 1 }),
+      await screen.findByRole('heading', { name: LANDING_HEADLINE, level: 1 }),
     ).toBeInTheDocument();
     expect(queryClient.getQueryData(currentUserHomesQueryKey)).toBeUndefined();
     expect(
@@ -277,7 +278,7 @@ describe('SignOutButton', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Sign out' }));
 
     expect(
-      await screen.findByRole('heading', { name: 'Welcome back', level: 1 }),
+      await screen.findByRole('heading', { name: LANDING_HEADLINE, level: 1 }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('navigation', { name: 'Global' }),

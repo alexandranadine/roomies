@@ -68,7 +68,10 @@ test.describe('foundation shell', () => {
       });
       await page.goto('/');
       await expect(
-        page.getByRole('heading', { name: 'Welcome back', level: 1 }),
+        page.getByRole('heading', {
+          name: 'Keep track of the house without living in the group chat.',
+          level: 1,
+        }),
       ).toBeVisible();
       await assertNoHorizontalOverflow(page);
     });
@@ -85,7 +88,10 @@ test.describe('foundation shell', () => {
     await page.goto('/');
     await expect(page.getByText('Roomies', { exact: true }).first()).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Welcome back', level: 1 }),
+      page.getByRole('heading', {
+        name: 'Keep track of the house without living in the group chat.',
+        level: 1,
+      }),
     ).toBeVisible();
     await expect(page.getByRole('banner')).toHaveCount(0);
   });

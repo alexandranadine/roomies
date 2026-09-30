@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link } from 'react-router';
 import { Alert, Button, Card, TextField } from '../components/ui/index.js';
+import { SIGN_IN_HREF } from './auth-entry.js';
 import { AuthIconWell, AuthPageLayout } from './auth-page-layout.js';
 import {
   forgotPasswordFormResolver,
@@ -115,7 +116,7 @@ export function ForgotPasswordPage() {
         )}
         <p className="text-center text-sm text-text-secondary">
           <Link
-            to="/"
+            to={SIGN_IN_HREF}
             className="font-semibold text-brand underline-offset-4 hover:text-brand-hover hover:underline focus-visible:rounded-sm"
           >
             {BACK_TO_SIGN_IN}

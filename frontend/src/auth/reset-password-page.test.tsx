@@ -145,7 +145,7 @@ describe('reset password page', () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'Back to sign in' }),
-    ).toHaveAttribute('href', '/');
+    ).toHaveAttribute('href', '/?auth=sign-in');
   });
 
   it('shows the expired-link state for Better Auth error redirects', async () => {

@@ -483,7 +483,7 @@ test.describe('final polish sign-in and not-found', () => {
   test('sign in 390 screenshot and axe', async ({ page }) => {
     await mockUnauthenticated(page);
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/');
+    await page.goto('/?auth=sign-in');
     await expect(
       page.getByRole('heading', { name: 'Welcome back', level: 1 }),
     ).toBeVisible();

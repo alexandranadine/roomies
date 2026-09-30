@@ -153,7 +153,7 @@ test.describe('signed-out auth landing', () => {
   test('shows sign-in fields and create-account control', async ({ page }) => {
     await mockUnauthenticated(page);
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/');
+    await page.goto('/?auth=sign-in');
     await expect(
       page.getByRole('heading', { name: 'Welcome back', level: 1 }),
     ).toBeVisible();
@@ -175,8 +175,7 @@ test.describe('signed-out auth landing', () => {
   }) => {
     await mockUnauthenticated(page);
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/');
-    await page.getByRole('button', { name: 'Create an account' }).click();
+    await page.goto('/?auth=sign-up');
     await expect(
       page.getByRole('heading', { name: 'Create your account', level: 1 }),
     ).toBeVisible();
@@ -205,7 +204,7 @@ test.describe('auth onboarding screenshots and axe', () => {
         width: viewport.width,
         height: viewport.height,
       });
-      await page.goto('/');
+      await page.goto('/?auth=sign-in');
       await expect(
         page.getByRole('heading', { name: 'Welcome back', level: 1 }),
       ).toBeVisible();
@@ -223,8 +222,7 @@ test.describe('auth onboarding screenshots and axe', () => {
   test('sign-up 390 screenshot', async ({ page }) => {
     await mockUnauthenticated(page);
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/');
-    await page.getByRole('button', { name: 'Create an account' }).click();
+    await page.goto('/?auth=sign-up');
     await expect(
       page.getByRole('heading', { name: 'Create your account', level: 1 }),
     ).toBeVisible();

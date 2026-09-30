@@ -1,6 +1,7 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { LANDING_HEADLINE } from '../landing/landing-copy.js';
 import { resetApiClientForTests } from '../platform/api/index.js';
 import { clearHousePulse } from '../pulse/test-fixtures.js';
 import { renderApp } from '../test/render.js';
@@ -340,7 +341,7 @@ describe('Create Home UX', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Create home' }));
 
     expect(
-      await screen.findByRole('heading', { name: 'Welcome back', level: 1 }),
+      await screen.findByRole('heading', { name: LANDING_HEADLINE, level: 1 }),
     ).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(

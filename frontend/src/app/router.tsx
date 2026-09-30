@@ -29,7 +29,8 @@ export type CreateAppRouterOptions = {
 
 /**
  * Router foundation:
- * - `/` — authenticated active-Home discovery
+ * - `/` — closed-alpha public landing when signed out; authenticated Home discovery
+ * - `/?auth=sign-in` / `/?auth=sign-up` — existing credential form on `/`
  * - `/homes/:homeId` — URL-backed authorized Home shell
  * - `/homes/:homeId/tasks` — Home-scoped Tasks
  * - `/homes/:homeId/activity` — Home-scoped Activity

@@ -58,7 +58,7 @@ function stubSignedOut(handlers: {
 describe('forgot password page', () => {
   it('is linked from sign in', async () => {
     stubSignedOut();
-    renderApp('/');
+    renderApp('/?auth=sign-in');
     await screen.findByRole('heading', { name: 'Welcome back', level: 1 });
     const link = screen.getByRole('link', { name: 'Forgot password?' });
     expect(link).toHaveAttribute('href', '/forgot-password');
@@ -82,7 +82,7 @@ describe('forgot password page', () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'Back to sign in' }),
-    ).toHaveAttribute('href', '/');
+    ).toHaveAttribute('href', '/?auth=sign-in');
   });
 
   it('submits Better Auth request-password-reset and shows generic success', async () => {
