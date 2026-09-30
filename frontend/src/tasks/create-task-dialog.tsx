@@ -53,6 +53,8 @@ export type CreateTaskDialogProps = {
   timeZone: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Called after a repeating task definition is created successfully. */
+  onRepeatingCreated?: () => void;
 };
 
 function emptyValues(timeZone: string): CreateTaskFormValues {
@@ -71,6 +73,7 @@ export function CreateTaskDialog({
   timeZone,
   open,
   onOpenChange,
+  onRepeatingCreated,
 }: CreateTaskDialogProps) {
   const formId = useId();
   const {
@@ -134,6 +137,7 @@ export function CreateTaskDialog({
           homeId,
           body: request.body,
         });
+        onRepeatingCreated?.();
       }
       onOpenChange(false);
     } catch (error) {

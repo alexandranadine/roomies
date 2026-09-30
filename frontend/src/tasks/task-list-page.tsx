@@ -111,6 +111,7 @@ export function TaskListPage() {
   const { home } = useOutletContext<HomeShellOutletContext>();
   const { homeId: routeHomeId = '' } = useParams();
   const [createOpen, setCreateOpen] = useState(false);
+  const [repeatingCreatedNotice, setRepeatingCreatedNotice] = useState(false);
   const [completeErrors, setCompleteErrors] = useState<Record<string, string>>(
     {},
   );
@@ -119,8 +120,16 @@ export function TaskListPage() {
 
   useEffect(() => {
     setCreateOpen(false);
+    setRepeatingCreatedNotice(false);
     setCompleteErrors({});
   }, [homeId]);
+
+  function handleCreateOpenChange(open: boolean) {
+    setCreateOpen(open);
+    if (open) {
+      setRepeatingCreatedNotice(false);
+    }
+  }
 
   const tasksQuery = useHomeTasks({
     homeId,
@@ -239,8 +248,17 @@ export function TaskListPage() {
           homeId={homeId}
           timeZone={home.timezone}
           open={createOpen}
-          onOpenChange={setCreateOpen}
+          onOpenChange={handleCreateOpenChange}
+          onRepeatingCreated={() => {
+            setRepeatingCreatedNotice(true);
+          }}
         />
+
+        {repeatingCreatedNotice ? (
+          <Alert variant="success" title="Repeating task created">
+            It’ll appear on the task list when it’s due.
+          </Alert>
+        ) : null}
 
         {showLoading ? (
           <div className="flex flex-col gap-2" aria-busy="true">

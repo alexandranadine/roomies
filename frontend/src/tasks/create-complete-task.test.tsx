@@ -120,6 +120,7 @@ describe('Tasks create UI', () => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
     expect(await screen.findByText('Buy paper towels')).toBeInTheDocument();
+    expect(screen.queryByText('Repeating task created')).not.toBeInTheDocument();
     expect(document.body.textContent).not.toContain(CREATED_ID);
     expect(document.body.textContent).not.toContain(TEST_MEMBERSHIP_B);
   });
@@ -193,14 +194,29 @@ describe('Tasks create UI', () => {
     expect(screen.queryByText(/bad SQL/)).not.toBeInTheDocument();
   });
 
-  it('creates a weekly repeating chore through TaskDefinitions', async () => {
+  it('creates a weekly repeating task with confirmation and immediate list update', async () => {
+    let definitions = [] as typeof FIXTURE_DEFINITION_WEEKLY[];
     const fetchMock = stubTasksApis({
       listByHome: { [TEST_HOME_A]: [] },
+      definitionsByHome: { [TEST_HOME_A]: () => definitions },
       createDefinitionByHome: {
-        [TEST_HOME_A]: FIXTURE_DEFINITION_WEEKLY,
+        [TEST_HOME_A]: (body) => {
+          const payload = body as { title: string };
+          const created = {
+            ...FIXTURE_DEFINITION_WEEKLY,
+            title: payload.title,
+          };
+          definitions = [created];
+          return created;
+        },
       },
     });
-    renderApp(`/homes/${TEST_HOME_A}/tasks`);
+    const { queryClient } = renderApp(`/homes/${TEST_HOME_A}/tasks`);
+
+    expect(
+      await screen.findByRole('heading', { name: 'No tasks yet', level: 2 }),
+    ).toBeInTheDocument();
+
     const dialog = await openCreateDialog();
     await userEvent.type(
       within(dialog).getByRole('textbox', { name: /title/i }),
@@ -234,9 +250,82 @@ describe('Tasks create UI', () => {
         assignedMembershipId: null,
       });
     });
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    expect(await screen.findByText('Repeating task created')).toBeInTheDocument();
+    expect(
+      screen.getByText('It’ll appear on the task list when it’s due.'),
+    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('heading', { name: 'No tasks yet', level: 2 }),
+      ).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole('heading', { name: 'Open 0' })).toBeInTheDocument();
+    expect(screen.getByText('Nothing on the list.')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Repeating tasks 1' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Weekly trash')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Mark Weekly trash done' }),
+    ).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/chore/i);
+    expect(
+      queryClient.getQueryData(taskKeys.definitions(TEST_HOME_A)),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ title: 'Weekly trash' }),
+      ]),
+    );
+    const definitionListGets = fetchMock.mock.calls.filter((call) => {
+      const url = String(call[0]);
+      const init = call[1] as RequestInit | undefined;
+      return (
+        url.includes('/task-definitions') &&
+        (init?.method ?? 'GET').toUpperCase() === 'GET'
+      );
+    });
+    expect(definitionListGets.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('creates a daily repeating chore through TaskDefinitions', async () => {
+  it('does not show repeating success feedback when definition create fails', async () => {
+    stubTasksApis({
+      listByHome: { [TEST_HOME_A]: [] },
+      definitionsByHome: { [TEST_HOME_A]: [] },
+      createDefinitionByHome: {
+        [TEST_HOME_A]: {
+          status: 400,
+          body: {
+            error: { code: 'INVALID_REQUEST', message: 'bad SQL' },
+          },
+        },
+      },
+    });
+    renderApp(`/homes/${TEST_HOME_A}/tasks`);
+    const dialog = await openCreateDialog();
+    await userEvent.type(
+      within(dialog).getByRole('textbox', { name: /title/i }),
+      'Weekly trash',
+    );
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Every week' }));
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Add task' }),
+    );
+    expect(
+      await screen.findByText(/Couldn’t add this task/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.queryByText('Repeating task created')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Repeating tasks 1' }),
+    ).not.toBeInTheDocument();
+    expect(document.body.textContent).toContain('No tasks yet');
+  });
+
+  it('creates a daily repeating task through task definitions', async () => {
     const fetchMock = stubTasksApis({
       listByHome: { [TEST_HOME_A]: [] },
       createDefinitionByHome: {
@@ -277,7 +366,7 @@ describe('Tasks create UI', () => {
     });
   });
 
-  it('creates a monthly repeating chore through TaskDefinitions', async () => {
+  it('creates a monthly repeating task through task definitions', async () => {
     const fetchMock = stubTasksApis({
       listByHome: { [TEST_HOME_A]: [] },
       createDefinitionByHome: {
