@@ -111,10 +111,11 @@ export function InvitationLandingPage() {
       >
         <Alert
           variant="warning"
-          title="This invitation link can’t be opened here"
+          title="This invitation link is incomplete"
         >
-          Please use the original invitation link again. Roomies does not store
-          the invitation secret after it is removed from the address bar.
+          Open the full invitation link from your message or email again.
+          Refreshing or bookmarking this page without the complete link won’t
+          work.
         </Alert>
       </InvitationStatusPage>
     );

@@ -279,8 +279,9 @@ describe('invitation landing page', () => {
       }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/use the original invitation link again/i),
+      screen.getByText(/open the full invitation link from your message or email again/i),
     ).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/secret|address bar|token|hash/i);
     expect(
       screen.queryByRole('button', { name: 'Join Home' }),
     ).not.toBeInTheDocument();
