@@ -321,7 +321,7 @@ test.describe('Roommates management', () => {
     await inviteDialog.getByRole('button', { name: 'Done' }).click();
     await expect(page.getByRole('dialog')).toHaveCount(0);
 
-    await expect(page.getByText(/Invite pending/i)).toBeVisible();
+    await expect(page.getByText(/Latest invite/i)).toBeVisible();
     await expect(page.getByLabel('Invite link')).toHaveValue(LONG_INVITE_URL);
     await assertNoHorizontalOverflow(page);
     await page.getByRole('button', { name: 'Revoke invite' }).click();
@@ -331,7 +331,7 @@ test.describe('Roommates management', () => {
     await revokeDialog
       .getByRole('button', { name: 'Revoke invite', exact: true })
       .click();
-    await expect(page.getByText(/Invite pending/i)).toHaveCount(0);
+    await expect(page.getByText(/Latest invite/i)).toHaveCount(0);
 
     await page.getByRole('button', { name: 'Actions for Jamie' }).click();
     await assertMenuFitsViewport(page);
@@ -437,8 +437,8 @@ test.describe('Roommates management', () => {
     await assertNoSeriousAxeViolations(page, 'roommates invite created');
     await dialog.getByRole('button', { name: 'Done' }).click();
     await expect(page.getByRole('dialog')).toHaveCount(0);
-    await expect(page.getByText(/Invite pending/i)).toBeVisible();
-    await assertNoSeriousAxeViolations(page, 'roommates pending invite panel');
+    await expect(page.getByText(/Latest invite/i)).toBeVisible();
+    await assertNoSeriousAxeViolations(page, 'roommates latest invite panel');
   });
 
   test('action menu and remove dialog axe scan (serious/critical)', async ({

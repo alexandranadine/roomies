@@ -319,16 +319,18 @@ async function assertContentClearOfBottomNav(page: Page): Promise<void> {
   });
 
   const navBox = await nav.boundingBox();
-  const lastSection = page
-    .locator('[data-testid="tasks-page"] > section')
-    .last();
-  const sectionBox = await lastSection.boundingBox();
+  const lastSection = page.locator('[data-testid="tasks-page"] > section');
+  const lastContent =
+    (await lastSection.count()) > 0
+      ? lastSection.last()
+      : page.getByRole('heading', { name: 'No tasks yet', level: 2 });
+  const contentBox = await lastContent.boundingBox();
   expect(navBox).not.toBeNull();
-  expect(sectionBox).not.toBeNull();
-  if (navBox === null || sectionBox === null) {
+  expect(contentBox).not.toBeNull();
+  if (navBox === null || contentBox === null) {
     return;
   }
-  expect(sectionBox.y + sectionBox.height).toBeLessThanOrEqual(navBox.y + 1);
+  expect(contentBox.y + contentBox.height).toBeLessThanOrEqual(navBox.y + 1);
 }
 
 async function assertDesktopContentWidth(page: Page): Promise<void> {
@@ -472,7 +474,7 @@ test.describe('Tasks authenticated UI', () => {
         page.getByRole('heading', { name: 'Tasks', level: 1 }),
       ).toBeVisible();
       await expect(page.getByText('Take out trash')).toBeVisible();
-      await expect(page.getByText('Overdue')).toBeVisible();
+      await expect(page.getByText(/Overdue ·/).first()).toBeVisible();
       await expect(page.getByRole('heading', { name: 'Open 4' })).toBeVisible();
       await expect(
         page.getByRole('heading', { name: 'Completed 1' }),
