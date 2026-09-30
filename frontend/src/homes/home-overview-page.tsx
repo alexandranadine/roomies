@@ -9,10 +9,19 @@ import { HousePulseSection } from '../pulse/house-pulse-section.js';
 import { HousePulseSkeleton } from '../pulse/house-pulse-skeleton.js';
 import { useHousePulse } from '../pulse/use-house-pulse.js';
 import { handlePassiveAuthLoss } from './clear-private-home-queries.js';
+import type { CreatedInvitation } from '../invitations/create-invitation-api.js';
 import type { HomeContext } from './home-context-api.js';
 import { HomeQuickActions } from './home-quick-actions.js';
 import { RoommateStrip } from './roommate-strip.js';
 import { useHomeMemberships } from './use-home-memberships.js';
+
+/** Admin-only invite recovery state for the current Home session. */
+export type HomeAdminInviteContext = {
+  latestInvite: CreatedInvitation | null;
+  inviteDialogOpen: boolean;
+  openLatestInvite: () => void;
+  clearLatestInvite: () => void;
+};
 
 export type HomeShellOutletContext = {
   home: HomeContext;
@@ -21,6 +30,8 @@ export type HomeShellOutletContext = {
   openInviteRoommate: () => void;
   openHomePhoto: () => void;
   openHomeActions: () => void;
+  /** Present only while the current user is a Home Admin. */
+  adminInvite?: HomeAdminInviteContext;
 };
 
 function isUnauthenticated(error: unknown): boolean {

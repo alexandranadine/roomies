@@ -1,6 +1,7 @@
 import {
   CameraIcon,
   ClipboardDocumentCheckIcon,
+  LinkIcon,
   UserPlusIcon,
   WrenchScrewdriverIcon,
 } from '@heroicons/react/20/solid';
@@ -14,8 +15,10 @@ export type HomeActionSheetProps = {
   homeId: string;
   isAdmin: boolean;
   hasPhoto: boolean;
+  hasLatestInvite?: boolean;
   onAddTask: () => void;
   onInviteRoommate: () => void;
+  onViewLatestInvite?: () => void;
   onHomePhoto: () => void;
 };
 
@@ -31,8 +34,10 @@ export function HomeActionSheet({
   homeId,
   isAdmin,
   hasPhoto,
+  hasLatestInvite = false,
   onAddTask,
   onInviteRoommate,
+  onViewLatestInvite,
   onHomePhoto,
 }: HomeActionSheetProps) {
   const maintenanceHref = `/homes/${encodeURIComponent(homeId)}/maintenance`;
@@ -67,16 +72,30 @@ export function HomeActionSheet({
             />
           </li>
           {isAdmin ? (
-            <li>
-              <ActionRow
-                icon={UserPlusIcon}
-                label="Invite roommate"
-                onClick={() => {
-                  onOpenChange(false);
-                  onInviteRoommate();
-                }}
-              />
-            </li>
+            <>
+              <li>
+                <ActionRow
+                  icon={UserPlusIcon}
+                  label="Invite roommate"
+                  onClick={() => {
+                    onOpenChange(false);
+                    onInviteRoommate();
+                  }}
+                />
+              </li>
+              {hasLatestInvite && onViewLatestInvite !== undefined ? (
+                <li>
+                  <ActionRow
+                    icon={LinkIcon}
+                    label="View latest invite"
+                    onClick={() => {
+                      onOpenChange(false);
+                      onViewLatestInvite();
+                    }}
+                  />
+                </li>
+              ) : null}
+            </>
           ) : null}
           <li>
             <ActionRow

@@ -314,7 +314,7 @@ describe('Roommates ADMIN UI', () => {
     );
   });
 
-  it('shows a compact pending invite panel and revokes through the existing contract', async () => {
+  it('shows a compact latest invite panel and revokes through the existing contract', async () => {
     const user = userEvent.setup();
     const created = defaultCreatedInvitation();
     const { fetchMock } = stubRoommatesApis({
@@ -342,7 +342,7 @@ describe('Roommates ADMIN UI', () => {
       expect(screen.queryByRole('dialog', { name: 'Invite roommate' })).not.toBeInTheDocument();
     });
 
-    expect(screen.getByText(/Invite pending/i)).toBeInTheDocument();
+    expect(screen.getByText(/Latest invite/i)).toBeInTheDocument();
     expect(screen.getByText(/jamie@example.com/i)).toBeInTheDocument();
     const link = screen.getByLabelText(/invite link/i);
     expect(link).toHaveValue(created.inviteUrl);
@@ -359,7 +359,7 @@ describe('Roommates ADMIN UI', () => {
     );
 
     await waitFor(() => {
-      expect(screen.queryByText(/Invite pending/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Latest invite/i)).not.toBeInTheDocument();
     });
     const revokeCall = fetchMock.mock.calls.find(([url, init]) => {
       return (

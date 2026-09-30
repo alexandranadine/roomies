@@ -10,7 +10,7 @@ import {
   revokeInvitationErrorMessage,
 } from './roommates-errors.js';
 
-export type PendingInvitePanelProps = {
+export type LatestInvitePanelProps = {
   homeId: string;
   created: CreatedInvitation;
   onRevoked: () => void;
@@ -18,13 +18,13 @@ export type PendingInvitePanelProps = {
   onUnauthenticated: () => void;
 };
 
-export function PendingInvitePanel({
+export function LatestInvitePanel({
   homeId,
   created,
   onRevoked,
   onStaleMembership,
   onUnauthenticated,
-}: PendingInvitePanelProps) {
+}: LatestInvitePanelProps) {
   const [copied, setCopied] = useState(false);
   const [revokeOpen, setRevokeOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -84,27 +84,27 @@ export function PendingInvitePanel({
 
   return (
     <section
-      aria-labelledby="pending-invite-heading"
+      aria-labelledby="latest-invite-heading"
       className="min-w-0 overflow-hidden rounded-xl border border-border bg-surface px-4 py-3 shadow-card"
     >
       <div className="flex flex-col gap-3">
         <div className="min-w-0">
           <h2
-            id="pending-invite-heading"
+            id="latest-invite-heading"
             className="text-sm font-semibold tracking-tight text-text-primary"
           >
-            Invite pending
+            Latest invite
           </h2>
           <p className="mt-0.5 min-w-0 break-words text-xs text-text-secondary">
-            Sent to {created.invitation.email}. Share before{' '}
+            Created for {created.invitation.email} in this session. Share before{' '}
             {formatInvitationExpiration(created.invitation.expiresAt)}.
           </p>
         </div>
-        <label className="sr-only" htmlFor="pending-invite-url">
+        <label className="sr-only" htmlFor="latest-invite-url">
           Invite link
         </label>
         <input
-          id="pending-invite-url"
+          id="latest-invite-url"
           readOnly
           value={created.inviteUrl}
           className="w-full min-w-0 max-w-full truncate rounded-lg border border-border bg-subtle px-3 py-2 text-sm text-text-secondary"

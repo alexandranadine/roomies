@@ -3,8 +3,10 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { PageContainer } from '../components/page-container.js';
 import { Spinner } from '../components/ui/index.js';
+import type { CreatedInvitation } from '../invitations/create-invitation-api.js';
 import { ApiError } from '../platform/api/index.js';
 import { InviteRoommateDialog } from '../roommates/invite-roommate-dialog.js';
+import { LatestInviteDialog } from '../roommates/latest-invite-dialog.js';
 import {
   reconcileHomeMembershipSurfaces,
   recoverStaleHomeMembershipState,
@@ -50,8 +52,29 @@ export function HomeChromeLayout({ homeId, children }: HomeChromeLayoutProps) {
 
   const [taskOpen, setTaskOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [latestInvite, setLatestInvite] = useState<CreatedInvitation | null>(
+    null,
+  );
+  const [latestInviteViewOpen, setLatestInviteViewOpen] = useState(false);
   const [photoOpen, setPhotoOpen] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
+
+  useEffect(() => {
+    setTaskOpen(false);
+    setInviteOpen(false);
+    setLatestInvite(null);
+    setLatestInviteViewOpen(false);
+    setPhotoOpen(false);
+    setActionsOpen(false);
+  }, [homeId]);
+
+  useEffect(() => {
+    if (!isAdmin) {
+      setLatestInvite(null);
+      setLatestInviteViewOpen(false);
+      setInviteOpen(false);
+    }
+  }, [isAdmin]);
 
   const contextQuery = useQuery({
     queryKey: homeContextQueryKey(homeId),
@@ -113,6 +136,22 @@ export function HomeChromeLayout({ homeId, children }: HomeChromeLayoutProps) {
     handlePassiveAuthLoss(queryClient);
   }
 
+  async function handleStaleMembership() {
+    await recoverStaleHomeMembershipState(queryClient, homeId);
+  }
+
+  function handleInvitationCreated(created: CreatedInvitation) {
+    if (!isAdmin) {
+      return;
+    }
+    setLatestInvite(created);
+  }
+
+  function clearLatestInvite() {
+    setLatestInvite(null);
+    setLatestInviteViewOpen(false);
+  }
+
   const outletContext: HomeShellOutletContext = {
     home,
     isAdmin,
@@ -130,6 +169,20 @@ export function HomeChromeLayout({ homeId, children }: HomeChromeLayoutProps) {
     openHomeActions: () => {
       setActionsOpen(true);
     },
+    ...(isAdmin
+      ? {
+          adminInvite: {
+            latestInvite,
+            inviteDialogOpen: inviteOpen,
+            openLatestInvite: () => {
+              if (latestInvite !== null) {
+                setLatestInviteViewOpen(true);
+              }
+            },
+            clearLatestInvite,
+          },
+        }
+      : {}),
   };
 
   return (
@@ -164,11 +217,15 @@ export function HomeChromeLayout({ homeId, children }: HomeChromeLayoutProps) {
         homeId={home.id}
         isAdmin={isAdmin}
         hasPhoto={home.hasPhoto}
+        hasLatestInvite={isAdmin && latestInvite !== null}
         onAddTask={() => {
           setTaskOpen(true);
         }}
         onInviteRoommate={() => {
           setInviteOpen(true);
+        }}
+        onViewLatestInvite={() => {
+          setLatestInviteViewOpen(true);
         }}
         onHomePhoto={() => {
           setPhotoOpen(true);
@@ -181,18 +238,30 @@ export function HomeChromeLayout({ homeId, children }: HomeChromeLayoutProps) {
         onOpenChange={setTaskOpen}
       />
       {isAdmin ? (
-        <InviteRoommateDialog
-          homeId={home.id}
-          open={inviteOpen}
-          onOpenChange={setInviteOpen}
-          onCreated={() => {
-            reconcileHomeMembershipSurfaces(queryClient, home.id);
-          }}
-          onStaleMembership={() =>
-            recoverStaleHomeMembershipState(queryClient, home.id)
-          }
-          onUnauthenticated={handleUnauthenticated}
-        />
+        <>
+          <InviteRoommateDialog
+            homeId={home.id}
+            open={inviteOpen}
+            onOpenChange={setInviteOpen}
+            onCreated={() => {
+              reconcileHomeMembershipSurfaces(queryClient, home.id);
+            }}
+            onInvitationCreated={handleInvitationCreated}
+            onStaleMembership={handleStaleMembership}
+            onUnauthenticated={handleUnauthenticated}
+          />
+          {latestInvite !== null ? (
+            <LatestInviteDialog
+              homeId={home.id}
+              created={latestInvite}
+              open={latestInviteViewOpen}
+              onOpenChange={setLatestInviteViewOpen}
+              onRevoked={clearLatestInvite}
+              onStaleMembership={handleStaleMembership}
+              onUnauthenticated={handleUnauthenticated}
+            />
+          ) : null}
+        </>
       ) : null}
       <HomePhotoDialog
         home={home}

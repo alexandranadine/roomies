@@ -11,13 +11,11 @@ import {
 } from '../homes/clear-private-home-queries.js';
 import type { HomeShellOutletContext } from '../homes/home-overview-page.js';
 import { useHomeMemberships } from '../homes/use-home-memberships.js';
-import type { CreatedInvitation } from '../invitations/create-invitation-api.js';
 import { ApiError } from '../platform/api/index.js';
 import type { MembershipRole } from './change-membership-role-api.js';
 import { changeMembershipRole } from './change-membership-role-api.js';
-import { InviteRoommateDialog } from './invite-roommate-dialog.js';
 import { LeaveHomeDialog } from './leave-home-dialog.js';
-import { PendingInvitePanel } from './pending-invite-panel.js';
+import { LatestInvitePanel } from './latest-invite-panel.js';
 import {
   patchCurrentUserHomeRole,
   patchHomeMembershipRole,
@@ -28,7 +26,6 @@ import {
 import { RemoveRoommateDialog } from './remove-roommate-dialog.js';
 import { RoommateMemberRow } from './roommate-member-row.js';
 import { changeRoleErrorMessage } from './roommates-errors.js';
-import { useCurrentHomeRole } from './use-current-home-role.js';
 
 function isUnauthenticated(error: unknown): boolean {
   return error instanceof ApiError && error.status === 401;
@@ -54,7 +51,8 @@ type PendingRemove = {
 };
 
 export function RoommatesPage() {
-  const { home } = useOutletContext<HomeShellOutletContext>();
+  const { home, isAdmin, openInviteRoommate, adminInvite } =
+    useOutletContext<HomeShellOutletContext>();
   const { homeId: routeHomeId = '' } = useParams();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -65,17 +63,14 @@ export function RoommatesPage() {
     homeId,
     enabled: homeId.length > 0,
   });
-  const { isAdmin } = useCurrentHomeRole(homeId);
-
-  const [inviteOpen, setInviteOpen] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [pendingRemove, setPendingRemove] = useState<PendingRemove | null>(
     null,
   );
-  const [pendingInvite, setPendingInvite] = useState<CreatedInvitation | null>(
-    null,
-  );
   const [roleError, setRoleError] = useState<string | null>(null);
+
+  const latestInvite = adminInvite?.latestInvite ?? null;
+  const inviteDialogOpen = adminInvite?.inviteDialogOpen ?? false;
 
   const roleMutation = useMutation({
     mutationFn: (input: { membershipId: string; role: MembershipRole }) =>
@@ -92,10 +87,8 @@ export function RoommatesPage() {
   }
 
   useEffect(() => {
-    setInviteOpen(false);
     setLeaveOpen(false);
     setPendingRemove(null);
-    setPendingInvite(null);
     setRoleError(null);
   }, [homeId]);
 
@@ -186,39 +179,40 @@ export function RoommatesPage() {
             ) : null}
           </div>
           {isAdmin ? (
-            <Button
-              type="button"
-              className="shrink-0 self-start"
-              icon={<UserPlusIcon className="size-4" aria-hidden="true" />}
-              onClick={() => {
-                setInviteOpen(true);
-              }}
-            >
-              Invite roommate
-            </Button>
+            <div className="flex shrink-0 flex-wrap gap-2 self-start">
+              <Button
+                type="button"
+                icon={<UserPlusIcon className="size-4" aria-hidden="true" />}
+                onClick={() => {
+                  openInviteRoommate();
+                }}
+              >
+                Invite roommate
+              </Button>
+              {latestInvite !== null ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    adminInvite?.openLatestInvite();
+                  }}
+                >
+                  View invite link
+                </Button>
+              ) : null}
+            </div>
           ) : null}
         </header>
 
-        {isAdmin ? (
-          <InviteRoommateDialog
+        {isAdmin &&
+        latestInvite !== null &&
+        !inviteDialogOpen &&
+        adminInvite !== undefined ? (
+          <LatestInvitePanel
             homeId={homeId}
-            open={inviteOpen}
-            onOpenChange={setInviteOpen}
-            onCreated={() => {
-              reconcileHomeMembershipSurfaces(queryClient, homeId);
-            }}
-            onInvitationCreated={setPendingInvite}
-            onStaleMembership={handleStaleMembership}
-            onUnauthenticated={handleUnauthenticated}
-          />
-        ) : null}
-
-        {isAdmin && pendingInvite !== null && !inviteOpen ? (
-          <PendingInvitePanel
-            homeId={homeId}
-            created={pendingInvite}
+            created={latestInvite}
             onRevoked={() => {
-              setPendingInvite(null);
+              adminInvite.clearLatestInvite();
             }}
             onStaleMembership={handleStaleMembership}
             onUnauthenticated={handleUnauthenticated}
