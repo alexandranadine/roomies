@@ -8,14 +8,21 @@ import {
 } from './test-fixtures.js';
 
 describe('notificationDestinationPath', () => {
-  it('uses destination Home for Task, not an active-Home rewrite', () => {
+  it('uses destination Home Tasks list for Task, not an active-Home rewrite', () => {
     expect(
       notificationDestinationPath({
         type: 'TASK',
         homeId: TEST_HOME_B,
         taskInstanceId: TEST_TASK_ID,
       }),
-    ).toBe(`/homes/${TEST_HOME_B}`);
+    ).toBe(`/homes/${TEST_HOME_B}/tasks`);
+    expect(
+      notificationDestinationPath({
+        type: 'TASK',
+        homeId: TEST_HOME_B,
+        taskInstanceId: TEST_TASK_ID,
+      }),
+    ).not.toContain(TEST_TASK_ID);
   });
 
   it('uses destination Home for Supply', () => {

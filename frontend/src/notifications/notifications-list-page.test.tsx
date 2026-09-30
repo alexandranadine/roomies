@@ -378,7 +378,7 @@ describe('Notification pagination', () => {
 });
 
 describe('Notification interactions', () => {
-  it('marks one unread on activate without optimistic read, then navigates to destination Home', async () => {
+  it('marks one unread on activate without optimistic read, then navigates to destination Tasks', async () => {
     const user = userEvent.setup();
     let markOneCalls = 0;
     let listCalls = 0;
@@ -419,7 +419,9 @@ describe('Notification interactions', () => {
     );
 
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe(`/homes/${TEST_HOME_A}`);
+      expect(router.state.location.pathname).toBe(
+        `/homes/${TEST_HOME_A}/tasks`,
+      );
     });
     expect(markOneCalls).toBe(1);
     const cached = queryClient.getQueryData<{
@@ -497,7 +499,7 @@ describe('Notification interactions', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('navigates using destination Home for Supply and cross-Home Task', async () => {
+  it('navigates Supply using destination Home overview', async () => {
     const user = userEvent.setup();
     stubNotificationsApis({
       list: listPage([
@@ -528,6 +530,31 @@ describe('Notification interactions', () => {
     await waitFor(() => {
       expect(router.state.location.pathname).toBe(`/homes/${TEST_HOME_B}`);
     });
+  });
+
+  it('navigates cross-Home Task notifications to the destination Home Tasks list', async () => {
+    const user = userEvent.setup();
+    stubNotificationsApis({
+      list: listPage([FIXTURE_HOME_B_TASK]),
+    });
+    const { router } = renderApp('/notifications');
+
+    expect(
+      await screen.findByText('Casey completed a task assigned to you'),
+    ).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole('button', {
+        name: /^Casey completed a task assigned to you$/,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe(
+        `/homes/${TEST_HOME_B}/tasks`,
+      );
+    });
+    expect(router.state.location.pathname).not.toContain(TEST_TASK_ID);
   });
 
   it('navigates Roommates to the destination Home Roommates route and HOME to overview', async () => {
@@ -717,7 +744,9 @@ describe('Notification interactions', () => {
     );
 
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe(`/homes/${TEST_HOME_A}`);
+      expect(router.state.location.pathname).toBe(
+        `/homes/${TEST_HOME_A}/tasks`,
+      );
     });
 
     const cached = queryClient.getQueryData<{
