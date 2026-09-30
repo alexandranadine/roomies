@@ -8,7 +8,10 @@ import {
   currentUserHomesQueryKey,
   currentUserQueryKey,
 } from './home-query-keys.js';
-import { HOME_NAME_MAX_LENGTH } from './supported-timezones.js';
+import {
+  HOME_NAME_MAX_LENGTH,
+  HOME_TIMEZONE_HELPER_TEXT,
+} from './supported-timezones.js';
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 const HOME_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -129,6 +132,7 @@ describe('Create Home UX', () => {
 
     expect(screen.getByLabelText(/home name/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/timezone/i)).toBeInTheDocument();
+    expect(screen.getByText(HOME_TIMEZONE_HELPER_TEXT)).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Create home' }),
     ).toBeInTheDocument();
@@ -536,7 +540,9 @@ describe('Create Home UX', () => {
     await openCreateHomeForm();
 
     expect(screen.getByLabelText(/home name/i)).toHaveAccessibleName();
-    expect(screen.getByLabelText(/timezone/i)).toHaveAccessibleName();
+    const timezone = screen.getByLabelText(/timezone/i);
+    expect(timezone).toHaveAccessibleName();
+    expect(timezone).toHaveAccessibleDescription(HOME_TIMEZONE_HELPER_TEXT);
     expect(document.body.textContent).not.toMatch(/owner|membership/i);
   });
 });

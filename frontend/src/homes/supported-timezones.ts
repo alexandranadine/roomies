@@ -1,6 +1,10 @@
 /** Matches backend HOME_NAME_MAX_LENGTH. */
 export const HOME_NAME_MAX_LENGTH = 80;
 
+/** Shown beside the Home timezone control in create/edit flows. */
+export const HOME_TIMEZONE_HELPER_TEXT =
+  'Used for household task due dates and recurring tasks. This won\u2019t change your device\u2019s timezone.';
+
 let cachedSupportedTimeZones: readonly string[] | undefined;
 
 /**

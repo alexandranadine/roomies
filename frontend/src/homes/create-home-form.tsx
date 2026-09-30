@@ -12,7 +12,10 @@ import {
 import { handlePassiveAuthLoss } from './clear-private-home-queries.js';
 import { seedCurrentUserHomesCacheAfterCreate } from './home-list-cache.js';
 import { currentUserHomesQueryKey } from './home-query-keys.js';
-import { getDefaultBrowserTimeZone } from './supported-timezones.js';
+import {
+  getDefaultBrowserTimeZone,
+  HOME_TIMEZONE_HELPER_TEXT,
+} from './supported-timezones.js';
 import { TimezoneField } from './timezone-field.js';
 
 const CREATE_HOME_FORM_ERROR =
@@ -87,6 +90,7 @@ export function CreateHomeForm() {
             disabled={isPending}
             invalid={Boolean(errors.timezone)}
             errorText={errors.timezone?.message}
+            helperText={HOME_TIMEZONE_HELPER_TEXT}
             value={field.value}
             onChange={field.onChange}
             onBlur={field.onBlur}
