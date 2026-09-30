@@ -4,12 +4,12 @@ export const VERIFY_EMAIL_BEFORE_JOINING_TITLE =
   'Verify your email to join this home';
 
 export const VERIFY_EMAIL_BEFORE_JOINING =
-  'Invitation acceptance requires a verified email that matches the invited address. Check your inbox for the verification link.';
+  'Your verified email must match this invitation before you can join. Check your inbox for the verification link.';
 
 export const VERIFY_EMAIL_FOR_INVITATIONS_TITLE = 'Verify your email';
 
 export const VERIFY_EMAIL_FOR_INVITATIONS =
-  'You can use Roomies now. Verify this email to accept a household invitation.';
+  'Verify your email to confirm your identity and accept invitations sent to this address. You can keep using Roomies in the meantime.';
 
 export const VERIFICATION_EMAIL_SENT_TITLE = 'Check your email';
 

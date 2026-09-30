@@ -429,7 +429,10 @@ describe('credential form', () => {
     );
 
     expect(
-      await screen.findByText(/you can use roomies now/i),
+      await screen.findByText(/confirm your identity and accept invitations/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/keep using Roomies in the meantime/i),
     ).toBeInTheDocument();
     expect(
       screen.queryByText(/you must verify before using roomies/i),

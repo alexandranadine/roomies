@@ -888,7 +888,7 @@ describe('invitation landing page', () => {
     );
     expect(await screen.findByText(/check your email/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/invitation acceptance requires a verified email/i),
+      screen.getByText(/verified email must match this invitation/i),
     ).toBeInTheDocument();
     expect(document.body.innerHTML).not.toContain(SECRET);
   });
