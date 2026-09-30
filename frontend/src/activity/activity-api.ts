@@ -21,6 +21,13 @@ export type ActivitySourceEntityType = z.infer<
   typeof activitySourceEntityTypeSchema
 >;
 
+export const membershipStartedKindSchema = z.enum([
+  'HOME_CREATION',
+  'JOINED',
+]);
+
+export type MembershipStartedKind = z.infer<typeof membershipStartedKindSchema>;
+
 /**
  * Recipient-safe Activity list item. Visibility, audience, userId, and
  * recipients are intentionally absent from this DTO.
@@ -35,6 +42,7 @@ export const activityListItemSchema = z
     actor: activityActorDisplaySchema.nullable(),
     sourceTitle: z.string().min(1).nullable(),
     subject: activityActorDisplaySchema.nullable(),
+    membershipStartedKind: membershipStartedKindSchema.nullable(),
   })
   .strict();
 

@@ -233,6 +233,7 @@ describe('Activity list page', () => {
             sourceTitle: null,
             actor: null,
             subject: { membershipId: TEST_MEMBERSHIP_JAMIE, name: null },
+            membershipStartedKind: 'JOINED',
           }),
         ]),
       },

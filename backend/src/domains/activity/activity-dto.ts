@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MEMBERSHIP_STARTED_KINDS } from '../memberships/find-membership-started-kinds-for-activity.js';
 import type {
   ActivityListItem,
   ActivityListPage,
@@ -25,6 +26,7 @@ export const activityListItemDtoSchema = z
     actor: activityActorDisplayDtoSchema.nullable(),
     sourceTitle: z.string().min(1).nullable(),
     subject: activityActorDisplayDtoSchema.nullable(),
+    membershipStartedKind: z.enum(MEMBERSHIP_STARTED_KINDS).nullable(),
   })
   .strict();
 
@@ -52,6 +54,7 @@ export function toActivityListItemDto(
     actor: item.actor,
     sourceTitle: item.sourceTitle,
     subject: item.subject,
+    membershipStartedKind: item.membershipStartedKind,
   });
 }
 

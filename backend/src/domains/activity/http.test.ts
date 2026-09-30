@@ -46,6 +46,7 @@ function listItem(overrides: Partial<ActivityListItem> = {}): ActivityListItem {
     actor: { membershipId: MEMBERSHIP_ID, name: 'Alex' },
     sourceTitle: 'Take out trash',
     subject: null,
+    membershipStartedKind: null,
     ...overrides,
   };
 }
@@ -173,6 +174,7 @@ void describe('GET /api/v1/homes/:homeId/activity', () => {
       'actor',
       'sourceTitle',
       'subject',
+      'membershipStartedKind',
     ]);
     assert.equal('details' in (body.items[0] ?? {}), false);
     assert.equal('homeId' in (body.items[0] ?? {}), false);

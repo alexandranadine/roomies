@@ -99,6 +99,7 @@ async function mockHomeApis(page: Page): Promise<void> {
             actor: { membershipId: MEMBERSHIP_A, name: 'Alex' },
             sourceTitle: 'Take out trash',
             subject: null,
+            membershipStartedKind: null,
           },
           {
             id: 'a2222222-2222-4222-8222-222222222222',
@@ -109,6 +110,7 @@ async function mockHomeApis(page: Page): Promise<void> {
             actor: { membershipId: MEMBERSHIP_B, name: 'Jamie' },
             sourceTitle: null,
             subject: { membershipId: MEMBERSHIP_B, name: 'Jamie' },
+            membershipStartedKind: 'JOINED',
           },
         ],
         hasMore: false,

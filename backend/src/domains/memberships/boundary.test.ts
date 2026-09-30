@@ -256,6 +256,24 @@ void describe('memberships domain boundary', () => {
     assert.doesNotMatch(source, /domains\/maintenance/);
   });
 
+  void it('keeps Membership started kind lookup free of user, role, and display fields', async () => {
+    const source = await readFile(
+      path.join(
+        membershipsDir,
+        'find-membership-started-kinds-for-activity.ts',
+      ),
+      'utf8',
+    );
+    assert.match(source, /FIND_MEMBERSHIP_STARTED_KINDS_FOR_ACTIVITY_SQL/);
+    assert.match(source, /m\.joined_at = h\.created_at/);
+    assert.doesNotMatch(source, /user_id/);
+    assert.doesNotMatch(source, /userId/);
+    assert.doesNotMatch(source, /m\.role/);
+    assert.doesNotMatch(source, /\bemail\b/);
+    assert.doesNotMatch(source, /\bname\b/);
+    assert.doesNotMatch(source, /from ['"]express['"]/);
+  });
+
   void it('keeps Activity source lookups free of user, role, and display fields', async () => {
     const source = await readFile(
       path.join(membershipsDir, 'find-membership-activity-source.ts'),

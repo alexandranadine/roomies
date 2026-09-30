@@ -23,6 +23,7 @@ function item(overrides: Partial<ActivityListItem> = {}): ActivityListItem {
     },
     sourceTitle: 'Take out trash',
     subject: null,
+    membershipStartedKind: null,
     ...overrides,
   };
 }
@@ -39,6 +40,7 @@ void describe('Activity list DTO', () => {
       'actor',
       'sourceTitle',
       'subject',
+      'membershipStartedKind',
     ]);
     assert.equal(dto.occurredAt, '2026-09-13T18:00:00.000Z');
     assert.equal('visibilityClass' in dto, false);

@@ -691,6 +691,7 @@ void describe('Activity HTTP PostgreSQL', () => {
           assert.ok(started);
           assert.equal(started.subject?.name, 'Jamie');
           assert.equal(started.actor?.membershipId, jamieMembership);
+          assert.equal(started.membershipStartedKind, 'JOINED');
           const role = taylorBody.items.find((item) => item.id === roleId);
           assert.ok(role);
           assert.equal(role.actor?.membershipId, taylorMembership);

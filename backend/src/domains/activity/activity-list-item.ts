@@ -1,3 +1,4 @@
+import type { MembershipStartedKind } from '../memberships/find-membership-started-kinds-for-activity.js';
 import type { Activity, ActivitySourceEntityType } from './activity.js';
 
 /**
@@ -23,6 +24,8 @@ export type ActivityListItem = Readonly<{
   actor: ActivityActorDisplay | null;
   sourceTitle: string | null;
   subject: ActivityActorDisplay | null;
+  /** Present for membership.started.v1; null for all other event types. */
+  membershipStartedKind: MembershipStartedKind | null;
 }>;
 
 export type ActivityRepositoryPage = Readonly<{

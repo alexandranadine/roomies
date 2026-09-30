@@ -76,6 +76,7 @@ void describe('activity application boundary', () => {
     assert.match(source, /findTaskActivityDisplays/);
     assert.match(source, /findSupplyActivityDisplays/);
     assert.match(source, /findMaintenanceActivityDisplays/);
+    assert.match(source, /findMembershipStartedKindsForActivity/);
     assert.doesNotMatch(source, /items\.filter/);
     assert.doesNotMatch(source, /sort\(/);
     assert.doesNotMatch(source, /decodeActivityListCursor/);

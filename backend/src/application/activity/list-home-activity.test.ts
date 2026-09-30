@@ -9,6 +9,7 @@ import type {
 } from '../../domains/activity/activity-list-item.js';
 import type { ListVisibleActivityPage } from '../../domains/activity/repository.js';
 import type { HistoricalMembershipDisplay } from '../../domains/memberships/find-historical-membership-display.js';
+import type { MembershipStartedKind } from '../../domains/memberships/find-membership-started-kinds-for-activity.js';
 import type { ActiveHomeActor } from '../../platform/authz/context.js';
 import {
   ConcealedNotFoundError,
@@ -84,6 +85,7 @@ function deps(
       string,
       { id: string; visibility: 'HOUSEHOLD' | 'PRIVATE'; title: string | null }
     >;
+    membershipStartedKinds?: ReadonlyMap<string, MembershipStartedKind>;
   } = {},
 ) {
   return {
@@ -128,6 +130,8 @@ function deps(
             ],
           ]),
       ),
+    findMembershipStartedKindsForActivity: () =>
+      Promise.resolve(options.membershipStartedKinds ?? new Map()),
   };
 }
 
@@ -315,6 +319,7 @@ void describe('listHomeActivity', () => {
           { membershipId: ALEX, name: 'Alex' },
           { membershipId: TAYLOR, name: 'Taylor' },
         ]),
+        membershipStartedKinds: new Map([[ALEX, 'HOME_CREATION']]),
       }),
     );
     assert.deepEqual(
@@ -326,6 +331,7 @@ void describe('listHomeActivity', () => {
         actorName: row.actor?.name ?? null,
         subjectId: row.subject?.membershipId ?? null,
         subjectName: row.subject?.name ?? null,
+        membershipStartedKind: row.membershipStartedKind,
       })),
       [
         {
@@ -336,6 +342,7 @@ void describe('listHomeActivity', () => {
           actorName: 'Alex',
           subjectId: null,
           subjectName: null,
+          membershipStartedKind: null,
         },
         {
           id: 'm-resolved',
@@ -345,6 +352,7 @@ void describe('listHomeActivity', () => {
           actorName: 'Alex',
           subjectId: null,
           subjectName: null,
+          membershipStartedKind: null,
         },
         {
           id: 'task',
@@ -354,6 +362,7 @@ void describe('listHomeActivity', () => {
           actorName: 'Alex',
           subjectId: null,
           subjectName: null,
+          membershipStartedKind: null,
         },
         {
           id: 'supply',
@@ -363,6 +372,7 @@ void describe('listHomeActivity', () => {
           actorName: 'Alex',
           subjectId: null,
           subjectName: null,
+          membershipStartedKind: null,
         },
         {
           id: 'started',
@@ -372,6 +382,7 @@ void describe('listHomeActivity', () => {
           actorName: 'Alex',
           subjectId: ALEX,
           subjectName: 'Alex',
+          membershipStartedKind: 'HOME_CREATION',
         },
         {
           id: 'ended',
@@ -381,6 +392,7 @@ void describe('listHomeActivity', () => {
           actorName: 'Taylor',
           subjectId: ALEX,
           subjectName: 'Alex',
+          membershipStartedKind: null,
         },
         {
           id: 'role',
@@ -390,6 +402,7 @@ void describe('listHomeActivity', () => {
           actorName: 'Taylor',
           subjectId: ALEX,
           subjectName: 'Alex',
+          membershipStartedKind: null,
         },
       ],
     );
@@ -428,5 +441,42 @@ void describe('listHomeActivity', () => {
     assert.equal(listed.items[0]?.sourceTitle, null);
     assert.equal(listed.items[0]?.actor?.membershipId, TAYLOR);
     assert.equal(listed.items[0]?.actor?.name, null);
+  });
+
+  void it('distinguishes Home creation from later Membership starts', async () => {
+    const JAMIE = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+    const listed = await listHomeActivity(
+      { actor, homeId: HOME },
+      deps({
+        page: page({
+          items: [
+            activity({
+              id: 'creator',
+              eventType: 'membership.started.v1',
+              sourceEntityType: 'MEMBERSHIP',
+              sourceEntityId: ALEX,
+              actorMembershipId: ALEX,
+            }),
+            activity({
+              id: 'joiner',
+              eventType: 'membership.started.v1',
+              sourceEntityType: 'MEMBERSHIP',
+              sourceEntityId: JAMIE,
+              actorMembershipId: JAMIE,
+            }),
+          ],
+        }),
+        memberships: memberships([
+          { membershipId: ALEX, name: 'Alex' },
+          { membershipId: JAMIE, name: 'Jamie' },
+        ]),
+        membershipStartedKinds: new Map([
+          [ALEX, 'HOME_CREATION'],
+          [JAMIE, 'JOINED'],
+        ]),
+      }),
+    );
+    assert.equal(listed.items[0]?.membershipStartedKind, 'HOME_CREATION');
+    assert.equal(listed.items[1]?.membershipStartedKind, 'JOINED');
   });
 });

@@ -19,11 +19,17 @@ import {
   type MaintenanceActivityDisplay,
 } from '../../domains/maintenance/find-maintenance-activity-display.js';
 import { MembershipActivitySourceIntegrityError } from '../../domains/memberships/errors.js';
+import { MEMBERSHIP_STARTED_V1 } from '../../domains/memberships/events.js';
 import {
   findHistoricalMembershipDisplays,
   type FindHistoricalMembershipDisplaysInput,
   type HistoricalMembershipDisplay,
 } from '../../domains/memberships/find-historical-membership-display.js';
+import {
+  findMembershipStartedKindsForActivity,
+  type FindMembershipStartedKindsForActivityInput,
+  type MembershipStartedKind,
+} from '../../domains/memberships/find-membership-started-kinds-for-activity.js';
 import { SupplyActivitySourceIntegrityError } from '../../domains/supplies/errors.js';
 import {
   findSupplyActivityDisplays,
@@ -69,6 +75,9 @@ export type ListHomeActivityDependencies = Readonly<{
   findMaintenanceActivityDisplays: (
     input: FindMaintenanceActivityDisplaysInput,
   ) => Promise<ReadonlyMap<string, MaintenanceActivityDisplay>>;
+  findMembershipStartedKindsForActivity: (
+    input: FindMembershipStartedKindsForActivityInput,
+  ) => Promise<ReadonlyMap<string, MembershipStartedKind>>;
 }>;
 
 type DisplayQueryable = {
@@ -110,12 +119,30 @@ function sourceTitleForActivity(
   return null;
 }
 
+function membershipStartedKindForActivity(
+  activity: Activity,
+  kinds: ReadonlyMap<string, MembershipStartedKind>,
+): MembershipStartedKind | null {
+  if (
+    activity.eventType !== MEMBERSHIP_STARTED_V1 ||
+    activity.sourceEntityType !== 'MEMBERSHIP'
+  ) {
+    return null;
+  }
+  const kind = kinds.get(activity.sourceEntityId);
+  if (kind === undefined) {
+    throw new ActivityProjectionIntegrityError();
+  }
+  return kind;
+}
+
 function projectItems(
   activities: readonly Activity[],
   memberships: ReadonlyMap<string, HistoricalMembershipDisplay>,
   tasks: ReadonlyMap<string, TaskActivityDisplay>,
   supplies: ReadonlyMap<string, SupplyActivityDisplay>,
   maintenance: ReadonlyMap<string, MaintenanceActivityDisplay>,
+  membershipStartedKinds: ReadonlyMap<string, MembershipStartedKind>,
 ): readonly ActivityListItem[] {
   return Object.freeze(
     activities.map((activity) =>
@@ -136,6 +163,10 @@ function projectItems(
           activity.sourceEntityType === 'MEMBERSHIP'
             ? actorDisplay(activity.sourceEntityId, memberships)
             : null,
+        membershipStartedKind: membershipStartedKindForActivity(
+          activity,
+          membershipStartedKinds,
+        ),
       }),
     ),
   );
@@ -143,6 +174,7 @@ function projectItems(
 
 function collectIds(activities: readonly Activity[]): {
   membershipIds: string[];
+  membershipStartedIds: string[];
   taskIds: string[];
   supplyIds: string[];
   maintenanceIds: string[];
@@ -170,6 +202,13 @@ function collectIds(activities: readonly Activity[]): {
   }
   return {
     membershipIds: [...membershipIds],
+    membershipStartedIds: activities
+      .filter(
+        (activity) =>
+          activity.eventType === MEMBERSHIP_STARTED_V1 &&
+          activity.sourceEntityType === 'MEMBERSHIP',
+      )
+      .map((activity) => activity.sourceEntityId),
     taskIds: [...taskIds],
     supplyIds: [...supplyIds],
     maintenanceIds: [...maintenanceIds],
@@ -213,24 +252,29 @@ export async function listHomeActivity(
 
   const ids = collectIds(page.items);
   try {
-    const [memberships, tasks, supplies, maintenance] = await Promise.all([
-      deps.findHistoricalMembershipDisplays({
-        homeId: input.homeId,
-        membershipIds: ids.membershipIds,
-      }),
-      deps.findTaskActivityDisplays({
-        homeId: input.homeId,
-        taskInstanceIds: ids.taskIds,
-      }),
-      deps.findSupplyActivityDisplays({
-        homeId: input.homeId,
-        supplyEntryIds: ids.supplyIds,
-      }),
-      deps.findMaintenanceActivityDisplays({
-        homeId: input.homeId,
-        maintenanceEntryIds: ids.maintenanceIds,
-      }),
-    ]);
+    const [memberships, tasks, supplies, maintenance, membershipStartedKinds] =
+      await Promise.all([
+        deps.findHistoricalMembershipDisplays({
+          homeId: input.homeId,
+          membershipIds: ids.membershipIds,
+        }),
+        deps.findTaskActivityDisplays({
+          homeId: input.homeId,
+          taskInstanceIds: ids.taskIds,
+        }),
+        deps.findSupplyActivityDisplays({
+          homeId: input.homeId,
+          supplyEntryIds: ids.supplyIds,
+        }),
+        deps.findMaintenanceActivityDisplays({
+          homeId: input.homeId,
+          maintenanceEntryIds: ids.maintenanceIds,
+        }),
+        deps.findMembershipStartedKindsForActivity({
+          homeId: input.homeId,
+          membershipIds: ids.membershipStartedIds,
+        }),
+      ]);
     return Object.freeze({
       items: projectItems(
         page.items,
@@ -238,6 +282,7 @@ export async function listHomeActivity(
         tasks,
         supplies,
         maintenance,
+        membershipStartedKinds,
       ),
       hasMore: page.hasMore,
       nextCursor: page.nextCursor,
@@ -271,5 +316,7 @@ export function createListHomeActivityFromPool(
         findSupplyActivityDisplays(db, displayInput),
       findMaintenanceActivityDisplays: (displayInput) =>
         findMaintenanceActivityDisplays(db, displayInput),
+      findMembershipStartedKindsForActivity: (displayInput) =>
+        findMembershipStartedKindsForActivity(db, displayInput),
     });
 }

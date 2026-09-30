@@ -7,6 +7,7 @@ import {
 } from './activity-copy.js';
 import {
   activityItem,
+  FIXTURE_HOME_CREATED,
   FIXTURE_JOINED,
   FIXTURE_LEFT,
   FIXTURE_MAINTENANCE_CREATED,
@@ -29,6 +30,12 @@ describe('Activity presentation copy', () => {
   it('renders membership.started with the subject', () => {
     expect(presentActivity(FIXTURE_JOINED).sentence).toBe(
       'Jamie joined the home',
+    );
+  });
+
+  it('renders Home creation membership.started as created the home', () => {
+    expect(presentActivity(FIXTURE_HOME_CREATED).sentence).toBe(
+      'Alexandra created the home',
     );
   });
 
@@ -111,6 +118,7 @@ describe('Activity presentation copy', () => {
       sourceTitle: null,
       actor: null,
       subject: { membershipId: TEST_MEMBERSHIP_JAMIE, name: null },
+      membershipStartedKind: 'JOINED',
     });
     expect(presentActivity(item).sentence).toBe(
       `${FORMER_ROOMMATE_LABEL} joined the home`,

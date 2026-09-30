@@ -40,6 +40,7 @@ const PAGE_ONE = {
       actor: { membershipId: MEMBERSHIP_A, name: LONG_NAME },
       sourceTitle: LONG_TITLE,
       subject: null,
+      membershipStartedKind: null,
     },
     {
       id: 'a2222222-2222-4222-8222-222222222222',
@@ -50,6 +51,7 @@ const PAGE_ONE = {
       actor: { membershipId: MEMBERSHIP_A, name: 'Alex' },
       sourceTitle: 'Quiet leak under sink',
       subject: null,
+      membershipStartedKind: null,
     },
     {
       id: 'a3333333-3333-4333-8333-333333333333',
@@ -60,6 +62,7 @@ const PAGE_ONE = {
       actor: { membershipId: MEMBERSHIP_A, name: null },
       subject: { membershipId: MEMBERSHIP_B, name: null },
       sourceTitle: null,
+      membershipStartedKind: null,
     },
     {
       id: 'a5555555-5555-4555-8555-555555555555',
@@ -70,6 +73,7 @@ const PAGE_ONE = {
       actor: { membershipId: MEMBERSHIP_C, name: 'Taylor' },
       subject: { membershipId: MEMBERSHIP_B, name: 'Jamie' },
       sourceTitle: null,
+      membershipStartedKind: null,
     },
     {
       id: 'a6666666-6666-4666-8666-666666666666',
@@ -80,6 +84,7 @@ const PAGE_ONE = {
       actor: { membershipId: MEMBERSHIP_B, name: 'Jamie' },
       subject: { membershipId: MEMBERSHIP_B, name: 'Jamie' },
       sourceTitle: null,
+      membershipStartedKind: 'JOINED',
     },
     {
       id: 'a7777777-7777-4777-8777-777777777777',
@@ -90,6 +95,7 @@ const PAGE_ONE = {
       actor: { membershipId: MEMBERSHIP_A, name: 'Alex' },
       sourceTitle: 'Quiet leak under sink',
       subject: null,
+      membershipStartedKind: null,
     },
     {
       id: 'a8888888-8888-4888-8888-888888888888',
@@ -100,6 +106,7 @@ const PAGE_ONE = {
       actor: null,
       sourceTitle: null,
       subject: null,
+      membershipStartedKind: null,
     },
   ],
   hasMore: true,
@@ -117,6 +124,7 @@ const PAGE_TWO = {
       actor: { membershipId: MEMBERSHIP_A, name: 'Alex' },
       sourceTitle: 'Paper towels',
       subject: null,
+      membershipStartedKind: null,
     },
   ],
   hasMore: false,
@@ -134,6 +142,7 @@ const HOME_B_PAGE = {
       actor: { membershipId: MEMBERSHIP_B, name: 'Casey' },
       sourceTitle: 'Water the plants',
       subject: null,
+      membershipStartedKind: null,
     },
   ],
   hasMore: false,
@@ -553,6 +562,7 @@ test.describe('Activity authenticated UI', () => {
             actor: { membershipId: MEMBERSHIP_A, name: 'Alex' },
             sourceTitle: null,
             subject: null,
+            membershipStartedKind: null,
           },
         ],
         hasMore: false,

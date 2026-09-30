@@ -142,6 +142,7 @@ async function mockAuthenticatedApp(page: Page): Promise<void> {
             actor: { membershipId: MEMBERSHIP_A, name: LONG_NAME },
             sourceTitle: LONG_TITLE,
             subject: null,
+            membershipStartedKind: null,
           },
           {
             id: 'a2222222-2222-4222-8222-222222222222',
@@ -152,6 +153,7 @@ async function mockAuthenticatedApp(page: Page): Promise<void> {
             actor: { membershipId: MEMBERSHIP_A, name: 'Alex' },
             sourceTitle: 'Quiet leak under sink',
             subject: null,
+            membershipStartedKind: null,
           },
           {
             id: 'a3333333-3333-4333-8333-333333333333',
@@ -162,6 +164,7 @@ async function mockAuthenticatedApp(page: Page): Promise<void> {
             actor: { membershipId: MEMBERSHIP_A, name: null },
             subject: { membershipId: MEMBERSHIP_B, name: null },
             sourceTitle: null,
+            membershipStartedKind: null,
           },
           {
             id: 'a6666666-6666-4666-8666-666666666666',
@@ -172,6 +175,7 @@ async function mockAuthenticatedApp(page: Page): Promise<void> {
             actor: { membershipId: MEMBERSHIP_B, name: 'Jamie' },
             subject: { membershipId: MEMBERSHIP_B, name: 'Jamie' },
             sourceTitle: null,
+            membershipStartedKind: 'JOINED',
           },
         ],
         hasMore: false,

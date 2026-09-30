@@ -73,19 +73,26 @@ export function presentActivity(item: ActivityListItem): ActivityPresentation {
   switch (item.eventType) {
     case ACTIVITY_EVENT_TYPES.MEMBERSHIP_STARTED: {
       const subject = personLabel(item.subject);
+      const createdHome = item.membershipStartedKind === 'HOME_CREATION';
       if (subject === null) {
         return presentation(
           'user-plus',
-          'A roommate joined the home',
+          createdHome
+            ? 'A roommate created the home'
+            : 'A roommate joined the home',
           null,
-          'A roommate joined the home',
+          createdHome
+            ? 'A roommate created the home'
+            : 'A roommate joined the home',
         );
       }
       return presentation(
         'user-plus',
-        `${subject} joined the home`,
+        createdHome
+          ? `${subject} created the home`
+          : `${subject} joined the home`,
         subject,
-        'joined the home',
+        createdHome ? 'created the home' : 'joined the home',
       );
     }
     case ACTIVITY_EVENT_TYPES.MEMBERSHIP_ENDED: {

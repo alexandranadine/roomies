@@ -31,6 +31,7 @@ export function activityItem(
     actor: { membershipId: TEST_MEMBERSHIP_ALEX, name: 'Alex' },
     sourceTitle: 'Take out trash',
     subject: null,
+    membershipStartedKind: null,
     ...overrides,
   };
 }
@@ -95,7 +96,20 @@ export const FIXTURE_JOINED = activityItem({
   actor: { membershipId: TEST_MEMBERSHIP_JAMIE, name: 'Jamie' },
   subject: { membershipId: TEST_MEMBERSHIP_JAMIE, name: 'Jamie' },
   sourceTitle: null,
+  membershipStartedKind: 'JOINED',
   occurredAt: '2026-09-13T14:00:00.000Z',
+});
+
+export const FIXTURE_HOME_CREATED = activityItem({
+  id: 'a7878787-7878-4787-8787-878787878787',
+  eventType: ACTIVITY_EVENT_TYPES.MEMBERSHIP_STARTED,
+  sourceEntityType: 'MEMBERSHIP',
+  sourceEntityId: TEST_MEMBERSHIP_ALEX,
+  actor: { membershipId: TEST_MEMBERSHIP_ALEX, name: 'Alexandra' },
+  subject: { membershipId: TEST_MEMBERSHIP_ALEX, name: 'Alexandra' },
+  sourceTitle: null,
+  membershipStartedKind: 'HOME_CREATION',
+  occurredAt: '2026-09-13T18:00:00.000Z',
 });
 
 export const FIXTURE_LEFT = activityItem({

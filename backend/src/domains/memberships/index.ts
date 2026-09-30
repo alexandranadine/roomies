@@ -64,6 +64,15 @@ export {
   type HistoricalMembershipDisplayQueryable,
 } from './find-historical-membership-display.js';
 export {
+  FIND_MEMBERSHIP_STARTED_KINDS_FOR_ACTIVITY_SQL,
+  findMembershipStartedKindsForActivity,
+  MEMBERSHIP_STARTED_KINDS,
+  type FindMembershipStartedKindsForActivity,
+  type FindMembershipStartedKindsForActivityInput,
+  type MembershipStartedKind,
+  type MembershipStartedKindQueryable,
+} from './find-membership-started-kinds-for-activity.js';
+export {
   FIND_MEMBERSHIP_ENDED_ACTIVITY_SOURCE_SQL,
   FIND_MEMBERSHIP_ROLE_TRANSITION_ACTIVITY_SOURCE_SQL,
   FIND_MEMBERSHIP_STARTED_ACTIVITY_SOURCE_SQL,
